@@ -47,15 +47,15 @@ swift run BotBridge --turns 2 --seed "Introduce yourselves briefly and compare n
 
 The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far. On any exit — run finished, an agent sent the stop sequence, an error, or Ctrl+C — focus is handed back to the app BotBridge was launched from.
 
-To watch a run with both conversations visible, tile the chat windows first with `swift run BotBridge --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move.
+To watch a run, `swift run BotBridge --arrange` tiles a 2x2 grid on the terminal's screen — the launching terminal top-left, ChatGPT top-right, Claude bottom-right, bottom-left free — and `--unarrange` puts all three windows back where they were. The frames are set directly through AX (the same thing tiling utilities do) rather than by driving the native Fill & Arrange menus, because the native cross-app arrangements only pair windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Two quirks handled along the way: `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move; and ChatGPT clamps its window to a minimum height of about 600px, so Claude is stacked below whatever height ChatGPT actually accepted rather than at the exact half. Arranging twice keeps the first snapshot, so `--unarrange` always restores the true original layout.
 
 ## Flags
 
 | Flag | Default | Purpose |
 |---|---|---|
 | `--list` | | Print running apps and bundle IDs, then exit |
-| `--arrange` | | Tile the two chat windows side by side (ChatGPT left, Claude right) on the screen hosting the ChatGPT window, saving their frames first, then exit |
-| `--unarrange` | | Restore the frames saved by the last `--arrange` (falls back to centering both), then exit |
+| `--arrange` | | Tile a 2x2 grid on the terminal's screen: terminal top-left, ChatGPT top-right, Claude bottom-right, bottom-left free; saves the original frames first, then exit |
+| `--unarrange` | | Restore the frames saved by the last `--arrange`, terminal included (falls back to centering the chat windows), then exit |
 | `--inspect` | | Dump each app's windows, buttons, text inputs, and what the selectors match, then exit |
 | `--press chatgpt\|claude "label"` | | Press the first button whose label contains the substring, then exit (debug) |
 | `--turns N` | 10 | Responses to relay before stopping |
