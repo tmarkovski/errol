@@ -18,6 +18,7 @@
 //   --inspect                    dump buttons/text areas of both apps and what the selectors match, then exit
 //   --press chatgpt|claude "label"  press the first button whose label contains "label", then exit (debug)
 //   --turns N                    number of responses to relay (default 10)
+//   --new-chats                  start a fresh chat in both apps (Cmd+N) before seeding; default is to use the open chats
 //   --first chatgpt|claude       which app receives the seed (default chatgpt)
 //   --seed "text"                seed prompt
 //   --seed-file path             read seed prompt from a file
@@ -52,6 +53,7 @@ struct Config {
     var claudeBundleID = "com.anthropic.claudefordesktop"
     var turns = 10
     var first = "chatgpt"
+    var newChats = false
     var seed = "Hello! You are talking with another AI assistant through a relay. Introduce yourself briefly and pick an interesting topic to discuss."
     var timeout: TimeInterval = 300
     var maxChars = 12000
@@ -98,6 +100,7 @@ func parseArgs() {
                 exit(1)
             }
         case "--turns":            config.turns = Int(take() ?? "") ?? config.turns
+        case "--new-chats":        config.newChats = true
         case "--first":            config.first = take() ?? config.first
         case "--seed":             config.seed = take() ?? config.seed
         case "--seed-file":
@@ -617,9 +620,30 @@ func keystroke(_ virtualKey: CGKeyCode, flags: CGEventFlags = []) {
 }
 
 let keyV: CGKeyCode = 9
+let keyN: CGKeyCode = 45
 let keyReturn: CGKeyCode = 36
 
 // MARK: - Core actions
+
+/// Cmd+N opens a fresh conversation in both apps (reusing the window).
+/// Confirmed fresh when no per-message copy buttons remain in the chat window.
+func startNewChat(in target: TargetApp) -> Bool {
+    guard makeFrontmost(target) else {
+        log("\(target.name): could not bring app to front for Cmd+N")
+        return false
+    }
+    keystroke(keyN, flags: .maskCommand)
+    let deadline = Date().addingTimeInterval(4)
+    while Date() < deadline {
+        if copyButtons(in: target).isEmpty {
+            log("\(target.name): new chat ready")
+            return true
+        }
+        usleep(200_000)
+    }
+    log("\(target.name): WARNING: could not confirm a fresh chat, continuing in the current one")
+    return true
+}
 
 func copyLastResponse(from target: TargetApp) -> String? {
     let buttons = copyButtons(in: target)
@@ -818,6 +842,11 @@ signal(SIGINT) { _ in
     exit(0)
 }
 
+guard config.turns >= 1 else {
+    log("--turns must be at least 1")
+    exit(1)
+}
+
 // Preflight: refuse to run without an eligible chat window in each app.
 // (A Claude Code session window inside Claude Desktop does not count.)
 for target in [chatgpt, claude] {
@@ -831,6 +860,15 @@ for target in [chatgpt, claude] {
     if inputArea(in: target) == nil {
         log("ERROR: \(target.name): chat window has no composer text area.")
         exit(1)
+    }
+}
+
+if config.newChats {
+    for target in [chatgpt, claude] {
+        guard startNewChat(in: target) else {
+            log("ERROR: \(target.name): could not start a new chat.")
+            exit(1)
+        }
     }
 }
 
