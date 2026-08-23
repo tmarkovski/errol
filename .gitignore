@@ -2,3 +2,4 @@
 *.xcodeproj
 .DS_Store
 botbridge-transcript.md
+.botbridge-frames

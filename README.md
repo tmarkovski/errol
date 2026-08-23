@@ -45,11 +45,15 @@ swift run BotBridge --turns 2 --seed "Hi! You're talking to another AI through a
 
 The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far.
 
+To watch a run with both conversations visible, tile the chat windows first with `swift run BotBridge --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move.
+
 ## Flags
 
 | Flag | Default | Purpose |
 |---|---|---|
 | `--list` | | Print running apps and bundle IDs, then exit |
+| `--arrange` | | Tile the two chat windows side by side (ChatGPT left, Claude right) on the screen hosting the ChatGPT window, saving their frames first, then exit |
+| `--unarrange` | | Restore the frames saved by the last `--arrange` (falls back to centering both), then exit |
 | `--inspect` | | Dump each app's windows, buttons, text inputs, and what the selectors match, then exit |
 | `--press chatgpt\|claude "label"` | | Press the first button whose label contains the substring, then exit (debug) |
 | `--turns N` | 10 | Responses to relay before stopping |
