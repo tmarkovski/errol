@@ -13,8 +13,8 @@
 //
 // Useful flags:
 //   --list                       print running apps + bundle IDs, then exit
-//   --arrange                    tile a 2x2 grid: terminal top-left, ChatGPT top-right, Claude bottom-right, then exit
-//   --unarrange                  restore the frames saved by the last --arrange (or center the chat windows), then exit
+//   --arrange                    tile the chat windows side by side (ChatGPT left, Claude right), then exit
+//   --unarrange                  restore the frames saved by the last --arrange (or center both), then exit
 //   --inspect                    dump buttons/text areas of both apps and what the selectors match, then exit
 //   --press chatgpt|claude "label"  press the first button whose label contains "label", then exit (debug)
 //   --turns N                    number of responses to relay (default 10)
@@ -556,8 +556,7 @@ func windowFrameDescription(_ window: AXUIElement) -> String {
 func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint, size: CGSize) {
     // AXEnhancedUserInterface (set at startup as the Electron nudge) makes
     // some apps animate or ignore AX moves; drop it for the move, restore
-    // after. Only restore it where it was set — the launching terminal never
-    // had it and shouldn't gain it.
+    // after — but only where it was actually set.
     let hadEnhanced = (axAttribute(target.ax, "AXEnhancedUserInterface") as? Bool) ?? false
     AXUIElementSetAttributeValue(target.ax, "AXEnhancedUserInterface" as CFString, kCFBooleanFalse)
     var origin = origin
@@ -573,35 +572,6 @@ func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint,
     if hadEnhanced {
         AXUIElementSetAttributeValue(target.ax, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
-}
-
-func isChatTarget(_ target: TargetApp) -> Bool {
-    target.app.bundleIdentifier == config.chatgptBundleID
-        || target.app.bundleIdentifier == config.claudeBundleID
-}
-
-/// The launching app (normally the terminal) wrapped as a TargetApp so the
-/// window helpers can move its window too. Nil when BotBridge was launched
-/// from one of the chat apps themselves.
-func launchTarget() -> TargetApp? {
-    guard let app = launchFrontmostApp,
-          let bundleID = app.bundleIdentifier,
-          bundleID != config.chatgptBundleID,
-          bundleID != config.claudeBundleID else { return nil }
-    let ax = AXUIElementCreateApplication(app.processIdentifier)
-    AXUIElementSetMessagingTimeout(ax, 3.0)
-    return TargetApp(name: app.localizedName ?? bundleID, app: app, ax: ax,
-                     selectors: AppSelectors(copyKeyword: "", copyExcludeKeywords: []))
-}
-
-/// The window a target contributes to the arrangement: chat apps use the
-/// chosen chat window, the launching app uses its focused (or first) window.
-func arrangeWindow(of target: TargetApp) -> AXUIElement? {
-    if isChatTarget(target) { return chatWindow(in: target) }
-    if let focused = axAttribute(target.ax, kAXFocusedWindowAttribute) {
-        return (focused as! AXUIElement)
-    }
-    return axWindows(target).first
 }
 
 func currentFrame(_ window: AXUIElement) -> CGRect {
@@ -633,31 +603,20 @@ func unarrange(_ targets: [TargetApp]) {
             let parts = line.split(separator: "\t")
             guard parts.count == 5,
                   let x = Double(parts[1]), let y = Double(parts[2]),
-                  let width = Double(parts[3]), let height = Double(parts[4]) else { continue }
-            // Match saved names against known targets, falling back to any
-            // running app with that name (the terminal entry, if unarrange
-            // was launched from somewhere else).
-            var target = targets.first(where: { $0.name == parts[0] })
-            if target == nil,
-               let app = NSWorkspace.shared.runningApplications
-                   .first(where: { $0.localizedName == String(parts[0]) }) {
-                let ax = AXUIElementCreateApplication(app.processIdentifier)
-                AXUIElementSetMessagingTimeout(ax, 3.0)
-                target = TargetApp(name: String(parts[0]), app: app, ax: ax,
-                                   selectors: AppSelectors(copyKeyword: "", copyExcludeKeywords: []))
-            }
-            guard let target, let window = arrangeWindow(of: target) else { continue }
+                  let width = Double(parts[3]), let height = Double(parts[4]),
+                  let target = targets.first(where: { $0.name == parts[0] }),
+                  let window = chatWindow(in: target) else { continue }
             setWindowFrame(target, window, origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))
             log("restored \(target.name) to \(windowFrameDescription(window))")
         }
         try? FileManager.default.removeItem(atPath: config.frameStatePath)
         return
     }
-    log("unarrange: no saved frames at \(config.frameStatePath); centering the chat windows instead")
+    log("unarrange: no saved frames at \(config.frameStatePath); centering both windows instead")
     let area = axRect(NSScreen.screens[0].visibleFrame)
     let size = CGSize(width: (area.width * 0.7).rounded(), height: (area.height * 0.85).rounded())
     var cascade: CGFloat = -30
-    for target in targets where isChatTarget(target) {
+    for target in targets {
         guard let window = chatWindow(in: target) else { continue }
         let origin = CGPoint(x: (area.midX - size.width / 2 + cascade).rounded(),
                              y: (area.midY - size.height / 2 + cascade / 2).rounded())
@@ -667,35 +626,24 @@ func unarrange(_ targets: [TargetApp]) {
     }
 }
 
-/// Tile a 2x2 grid: the launching terminal top-left, ChatGPT top-right,
-/// Claude bottom-right. Bottom-left stays free. Done through AX frames for
-/// the same reason as before: the native Fill & Arrange menus only pair
-/// windows interactively and can't be aimed across apps.
-func arrangeQuad(terminal: TargetApp?, chatgptTarget: TargetApp, claudeTarget: TargetApp) {
-    guard let chatgptWindow = chatWindow(in: chatgptTarget),
-          let claudeWindow = chatWindow(in: claudeTarget) else {
+/// Tile the two chat windows into the halves of one screen, same result as
+/// the native Fill & Arrange "Left & Right", which only pairs windows
+/// interactively and can't be aimed at a specific window across two apps.
+func arrangeSideBySide(left: TargetApp, right: TargetApp) {
+    guard let leftWindow = chatWindow(in: left), let rightWindow = chatWindow(in: right) else {
         log("arrange: could not resolve a chat window in both apps")
         return
     }
-    let terminalWindow = terminal.flatMap { arrangeWindow(of: $0) }
-    if terminal != nil && terminalWindow == nil {
-        log("arrange: no window found for the launching app; tiling the chat windows only")
-    }
-    var entries: [(TargetApp, AXUIElement)] = []
-    if let terminal, let terminalWindow { entries.append((terminal, terminalWindow)) }
-    entries.append((chatgptTarget, chatgptWindow))
-    entries.append((claudeTarget, claudeWindow))
     // Never overwrite an existing snapshot: arranging twice must not replace
     // the original frames with already-tiled ones.
     if FileManager.default.fileExists(atPath: config.frameStatePath) {
         log("arrange: keeping the existing frame snapshot for --unarrange")
     } else {
-        saveFrames(entries)
+        saveFrames([(left, leftWindow), (right, rightWindow)])
     }
-
-    // Tile on the screen hosting the terminal window (fall back to ChatGPT's).
+    // Tile on whichever screen currently hosts the left app's window.
     var screen = NSScreen.screens[0]
-    if let value = axAttribute(terminalWindow ?? chatgptWindow, kAXPositionAttribute) {
+    if let value = axAttribute(leftWindow, kAXPositionAttribute) {
         var position = CGPoint.zero
         AXValueGetValue(value as! AXValue, .cgPoint, &position)
         for candidate in NSScreen.screens where axRect(candidate.frame).contains(position) {
@@ -703,42 +651,22 @@ func arrangeQuad(terminal: TargetApp?, chatgptTarget: TargetApp, claudeTarget: T
         }
     }
     let area = axRect(screen.visibleFrame)
-    let halfWidth = (area.width / 2).rounded(.down)
-    let halfHeight = (area.height / 2).rounded(.down)
-
-    if let terminal, let terminalWindow {
-        setWindowFrame(terminal, terminalWindow,
-                       origin: area.origin,
-                       size: CGSize(width: halfWidth, height: halfHeight))
-    }
-    setWindowFrame(chatgptTarget, chatgptWindow,
-                   origin: CGPoint(x: area.origin.x + halfWidth, y: area.origin.y),
-                   size: CGSize(width: area.width - halfWidth, height: halfHeight))
-    // Min-size clamps (ChatGPT refuses heights under ~600) can leave the top
-    // window taller than requested; stack Claude below the height that
-    // actually took effect so the two never overlap.
-    let chatgptActual = currentFrame(chatgptWindow)
-    let claudeTop = max(area.origin.y + halfHeight, chatgptActual.maxY)
-    setWindowFrame(claudeTarget, claudeWindow,
-                   origin: CGPoint(x: area.origin.x + halfWidth, y: claudeTop),
-                   size: CGSize(width: area.width - halfWidth, height: area.maxY - claudeTop))
-
-    // Raise the chat windows; the terminal comes forward on exit via the
-    // atexit refocus, landing on top of a fully visible grid.
-    for target in [chatgptTarget, claudeTarget] {
+    let half = (area.width / 2).rounded(.down)
+    setWindowFrame(left, leftWindow,
+                   origin: area.origin,
+                   size: CGSize(width: half, height: area.height))
+    setWindowFrame(right, rightWindow,
+                   origin: CGPoint(x: area.origin.x + half, y: area.origin.y),
+                   size: CGSize(width: area.width - half, height: area.height))
+    // Raise both so they are the visible pair.
+    for target in [left, right] {
         if let window = chatWindow(in: target) {
             AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
             AXUIElementPerformAction(window, kAXRaiseAction as CFString)
         }
         _ = makeFrontmost(target)
     }
-    var placed: [String] = []
-    if let terminal, let terminalWindow {
-        placed.append("\(terminal.name) \(windowFrameDescription(terminalWindow))")
-    }
-    placed.append("\(chatgptTarget.name) \(windowFrameDescription(chatgptWindow))")
-    placed.append("\(claudeTarget.name) \(windowFrameDescription(claudeWindow))")
-    log("arranged 2x2 on \(Int(area.width))x\(Int(area.height)): \(placed.joined(separator: ", "))")
+    log("arranged on \(Int(area.width))x\(Int(area.height)): \(left.name) \(windowFrameDescription(leftWindow)), \(right.name) \(windowFrameDescription(rightWindow))")
 }
 
 // MARK: - Keyboard synthesis
@@ -961,14 +889,12 @@ if let press = config.press {
 }
 
 if config.arrange {
-    arrangeQuad(terminal: launchTarget(), chatgptTarget: chatgpt, claudeTarget: claude)
+    arrangeSideBySide(left: chatgpt, right: claude)
     exit(0)
 }
 
 if config.unarrange {
-    var targets = [chatgpt, claude]
-    if let terminal = launchTarget() { targets.append(terminal) }
-    unarrange(targets)
+    unarrange([chatgpt, claude])
     exit(0)
 }
 
