@@ -10,6 +10,8 @@ An experiment in having two AI assistants talk to each other **as products**, no
 
 ## How it works
 
+The conversation is framed for both participants before the relay goes hands-off. The first agent receives the ground rules (this is an agent-to-agent conversation, the human is not participating, and it can end the run by replying with an empty message or by including the stop sequence, default `[[END-CONVERSATION]]`) followed by the human's initial message from `--seed`. When the first response comes back, the second agent receives the same rules plus both the initial message and that response, so both sides start from identical context. Every message after those two framing messages passes through verbatim. A reply that is empty or contains the stop sequence ends the run.
+
 One turn of the loop:
 
 1. Wait until the current speaker finishes its response. Completion is detected when a **new copy button** appears beyond the baseline, **no "Stop" button** is visible (still streaming), and that state holds for two consecutive polls. The just-pasted user message grows a copy button of its own in both apps, so right after sending, the relay waits for that echo and folds it into the baseline; only buttons beyond it can belong to the response.
@@ -40,7 +42,7 @@ A markdown transcript of each run is written incrementally (default `botbridge-t
 3. Build and run:
 
 ```sh
-swift run BotBridge --turns 2 --seed "Hi! You're talking to another AI through a relay. Say hello briefly."
+swift run BotBridge --turns 2 --seed "Introduce yourselves briefly and compare notes on what you're each good at."
 ```
 
 The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far.
@@ -59,7 +61,8 @@ To watch a run with both conversations visible, tile the chat windows first with
 | `--turns N` | 10 | Responses to relay before stopping |
 | `--new-chats` | off | Start a fresh chat in both apps (Cmd+N) before seeding; without it, the relay continues in whatever chats are open |
 | `--first chatgpt\|claude` | chatgpt | Who gets the seed prompt (anything not "claude" means the Codex side) |
-| `--seed "text"` / `--seed-file path` | generic intro | Seed prompt |
+| `--seed "text"` / `--seed-file path` | generic intro | The human's initial message; the relay wraps it in the framing preamble |
+| `--stop-sequence "token"` | `[[END-CONVERSATION]]` | A reply containing this (or an empty reply) ends the run |
 | `--timeout N` | 300 | Seconds to wait for each response |
 | `--max-chars N` | 12000 | Truncate relayed messages |
 | `--transcript path` | ./botbridge-transcript.md | Markdown transcript output |

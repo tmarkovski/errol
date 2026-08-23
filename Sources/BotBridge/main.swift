@@ -20,8 +20,9 @@
 //   --turns N                    number of responses to relay (default 10)
 //   --new-chats                  start a fresh chat in both apps (Cmd+N) before seeding; default is to use the open chats
 //   --first chatgpt|claude       which app receives the seed (default chatgpt)
-//   --seed "text"                seed prompt
-//   --seed-file path             read seed prompt from a file
+//   --seed "text"                the human's initial message, handed to the first agent
+//   --seed-file path             read the initial message from a file
+//   --stop-sequence "token"      reply marker that ends the run (default [[END-CONVERSATION]])
 //   --timeout N                  seconds to wait for a response (default 300)
 //   --max-chars N                truncate relayed messages (default 12000)
 //   --transcript path            transcript output (default ./botbridge-transcript.md)
@@ -54,7 +55,12 @@ struct Config {
     var turns = 10
     var first = "chatgpt"
     var newChats = false
-    var seed = "Hello! You are talking with another AI assistant through a relay. Introduce yourself briefly and pick an interesting topic to discuss."
+    /// The human's initial message. The relay wraps it in a framing preamble
+    /// (see openingMessage/introMessage), so this should read like an ordinary
+    /// user request, not an explanation of the relay.
+    var seed = "Please introduce yourselves to each other and discuss a topic you both find interesting."
+    /// A reply containing this marker (or an empty reply) ends the run early.
+    var stopSequence = "[[END-CONVERSATION]]"
     var timeout: TimeInterval = 300
     var maxChars = 12000
     var transcriptPath = "botbridge-transcript.md"
@@ -107,6 +113,7 @@ func parseArgs() {
             if let path = take(), let text = try? String(contentsOfFile: path, encoding: .utf8) {
                 config.seed = text
             }
+        case "--stop-sequence":    config.stopSequence = take() ?? config.stopSequence
         case "--timeout":          config.timeout = TimeInterval(take() ?? "") ?? config.timeout
         case "--max-chars":        config.maxChars = Int(take() ?? "") ?? config.maxChars
         case "--transcript":       config.transcriptPath = take() ?? config.transcriptPath
@@ -875,12 +882,60 @@ if config.newChats {
 var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
 var listener = speaker.app == chatgpt.app ? claude : chatgpt
 
+// MARK: - Message framing
+
+/// Ground rules given to each agent once, at the start of its side of the
+/// conversation. Everything after these two framing messages passes through
+/// verbatim.
+func relayRules() -> String {
+    """
+    This is an automated agent-to-agent conversation: your replies are relayed \
+    to another AI assistant, and its replies are relayed back to you. The human \
+    who set this up is not taking part in the conversation. You can end the \
+    conversation at any time by replying with an empty message or by including \
+    \(config.stopSequence) anywhere in a reply.
+    """
+}
+
+/// What the first agent receives: the rules plus the human's initial message.
+func openingMessage() -> String {
+    relayRules()
+        + "\n\nThe initial message from the human user follows.\n\n---\n\n"
+        + config.seed
+}
+
+/// What the second agent receives on its first turn: the rules, the human's
+/// initial message, and the first agent's response to it.
+func introMessage(firstReply: String, from other: TargetApp) -> String {
+    relayRules() + """
+    \n
+    Below are the human's initial message and \(other.name)'s response to it, \
+    so you have the full context. Continue the conversation by replying to \
+    \(other.name).
+
+    --- Initial message from the human ---
+
+    \(config.seed)
+
+    --- \(other.name)'s response ---
+
+    \(firstReply)
+    """
+}
+
+/// The agents' side of the stop protocol.
+func isStopReply(_ reply: String) -> Bool {
+    let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty || trimmed.localizedCaseInsensitiveContains(config.stopSequence)
+}
+
 appendTranscript("# BotBridge transcript, \(iso.string(from: Date()))\n\n")
-appendTranscript("## Seed (to \(speaker.name))\n\n\(config.seed)\n\n")
+let opener = openingMessage()
+appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
 
 log("Seeding \(speaker.name)...")
 var baseline = copyButtons(in: speaker).count
-guard send(config.seed, to: speaker) else { exit(1) }
+guard send(opener, to: speaker) else { exit(1) }
 baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
 
 for turn in 1...config.turns {
@@ -888,21 +943,31 @@ for turn in 1...config.turns {
         log("Stopping: no response from \(speaker.name).")
         break
     }
-    guard let reply = copyLastResponse(from: speaker), !reply.isEmpty else {
+    guard let reply = copyLastResponse(from: speaker) else {
         log("Stopping: could not copy response from \(speaker.name).")
         break
     }
 
-    log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
     appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
+
+    if isStopReply(reply) {
+        log("\(speaker.name) ended the conversation (empty reply or stop sequence).")
+        appendTranscript("_\(speaker.name) ended the conversation._\n\n")
+        break
+    }
+
+    log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
 
     if turn == config.turns {
         log("Turn cap reached.")
         break
     }
 
+    // The listener's first message carries the rules and full context; every
+    // later relay is the other agent's reply, untouched.
+    let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker) : reply
     baseline = copyButtons(in: listener).count
-    guard send(reply, to: listener) else { break }
+    guard send(payload, to: listener) else { break }
     baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
     swap(&speaker, &listener)
 }
