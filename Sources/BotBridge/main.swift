@@ -447,6 +447,52 @@ func isFrontmost(_ target: TargetApp) -> Bool {
     return false
 }
 
+/// The app that was frontmost when BotBridge started — normally the terminal
+/// it was launched from — captured before any focus is moved so it can be
+/// handed back when the run ends.
+let launchFrontmostApp: NSRunningApplication? = {
+    if let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) {
+        var pid: pid_t = -1
+        AXUIElementGetPid(focused as! AXUIElement, &pid)
+        if let app = NSRunningApplication(processIdentifier: pid) { return app }
+    }
+    if let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                             kCGNullWindowID) as? [[String: Any]] {
+        for window in info {
+            if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+               let pid = window[kCGWindowOwnerPID as String] as? pid_t,
+               let app = NSRunningApplication(processIdentifier: pid) {
+                return app
+            }
+        }
+    }
+    return NSWorkspace.shared.frontmostApplication
+}()
+
+/// Hand focus back to wherever BotBridge was launched from. Registered via
+/// atexit so every exit path (done, stop sequence, error, Ctrl+C) goes
+/// through it.
+func refocusLaunchApp() {
+    guard let app = launchFrontmostApp, let bundleID = app.bundleIdentifier else { return }
+    // Skip when it never lost focus (e.g. --inspect moves no windows).
+    if let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                             kCGNullWindowID) as? [[String: Any]] {
+        for window in info {
+            if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+               let pid = window[kCGWindowOwnerPID as String] as? pid_t {
+                if pid == app.processIdentifier { return }
+                break
+            }
+        }
+    }
+    let open = Process()
+    open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    open.arguments = ["-b", bundleID]
+    try? open.run()
+    open.waitUntilExit()
+    log("Focus returned to \(app.localizedName ?? bundleID).")
+}
+
 /// Bring the target app to the foreground and confirm it got there.
 /// NSRunningApplication.activate from a background process is ignored under
 /// macOS cooperative activation, so fall back to the AX frontmost attribute
@@ -811,6 +857,10 @@ let claude = requireApp(bundleID: config.claudeBundleID, name: "Claude", selecto
 enableElectronAccessibility(claude)
 enableElectronAccessibility(chatgpt)
 usleep(700_000) // let the trees populate
+
+// From here on the tool may move focus; give it back on any exit. (--list
+// exits during arg parsing and never reaches this.)
+atexit { refocusLaunchApp() }
 
 if let press = config.press {
     let target = press.app.lowercased() == "claude" ? claude : chatgpt

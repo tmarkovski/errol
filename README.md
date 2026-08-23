@@ -45,7 +45,7 @@ A markdown transcript of each run is written incrementally (default `botbridge-t
 swift run BotBridge --turns 2 --seed "Introduce yourselves briefly and compare notes on what you're each good at."
 ```
 
-The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far.
+The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far. On any exit — run finished, an agent sent the stop sequence, an error, or Ctrl+C — focus is handed back to the app BotBridge was launched from.
 
 To watch a run with both conversations visible, tile the chat windows first with `swift run BotBridge --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move.
 
