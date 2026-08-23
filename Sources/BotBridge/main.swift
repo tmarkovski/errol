@@ -55,11 +55,12 @@ struct Config {
     var maxChars = 12000
     var transcriptPath = "botbridge-transcript.md"
 
-    // ChatGPT labels per-message copies "Copy message"; bare "Copy" is code
-    // blocks and "Copy table" is tables, so the specific label needs no excludes.
+    // ChatGPT's response action bar uses bare "Copy"; "Copy message" (paired
+    // with "Edit message") belongs to user messages, and tables/links get
+    // their own qualified labels. Match bare copy, exclude the qualified ones.
     var chatgptSelectors = AppSelectors(
-        copyKeyword: "copy message",
-        copyExcludeKeywords: [])
+        copyKeyword: "copy",
+        copyExcludeKeywords: ["message", "table", "link", "code"])
     var claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
@@ -403,6 +404,70 @@ func inspect(_ target: TargetApp) {
     print("")
 }
 
+// MARK: - Activation
+
+let systemWideAX = AXUIElementCreateSystemWide()
+
+/// NSWorkspace.frontmostApplication is refreshed by run-loop notifications and
+/// goes stale in a CLI that never spins one. The system-wide AX focused
+/// application is queried live, but it proxies through the focused app, whose
+/// AX server (Electron) is intermittently unresponsive; fall back to the
+/// window server's front window, which needs no cooperation from the app.
+func isFrontmost(_ target: TargetApp) -> Bool {
+    if let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) {
+        var pid: pid_t = -1
+        AXUIElementGetPid(focused as! AXUIElement, &pid)
+        return pid == target.app.processIdentifier
+    }
+    guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                kCGNullWindowID) as? [[String: Any]] else { return false }
+    for window in info {
+        if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+           let pid = window[kCGWindowOwnerPID as String] as? pid_t {
+            return pid == target.app.processIdentifier
+        }
+    }
+    return false
+}
+
+/// Bring the target app to the foreground and confirm it got there.
+/// NSRunningApplication.activate from a background process is ignored under
+/// macOS cooperative activation, so fall back to the AX frontmost attribute
+/// (which honors the Accessibility grant) and raising the chat window.
+func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Bool {
+    let deadline = Date().addingTimeInterval(seconds)
+    var attempt = 0
+    while Date() < deadline {
+        if isFrontmost(target) { return true }
+        switch attempt % 3 {
+        case 0:
+            // Ignored under cooperative activation, but free when it does work.
+            target.app.activate(options: [])
+        case 1:
+            // Observed returning success without effect (macOS 26); kept as a
+            // cheap second try on systems where it still lands.
+            AXUIElementSetAttributeValue(target.ax, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+            if let window = chatWindow(in: target) {
+                AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            }
+        default:
+            // LaunchServices activation is the one that reliably lands from a
+            // background CLI (verified: the two above are no-ops here).
+            if let bundleID = target.app.bundleIdentifier {
+                let open = Process()
+                open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                open.arguments = ["-b", bundleID]
+                try? open.run()
+                open.waitUntilExit()
+            }
+        }
+        attempt += 1
+        usleep(300_000)
+    }
+    return isFrontmost(target)
+}
+
 // MARK: - Keyboard synthesis
 
 func keystroke(_ virtualKey: CGKeyCode, flags: CGEventFlags = []) {
@@ -456,8 +521,12 @@ func send(_ text: String, to target: TargetApp) -> Bool {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(payload, forType: .string)
 
-    target.app.activate(options: [])
-    usleep(500_000)
+    // Keystrokes go to the frontmost app no matter what has AX focus, so
+    // never type unless the target is verified frontmost.
+    guard makeFrontmost(target) else {
+        log("\(target.name): could not bring app to front; refusing to type into another app's window")
+        return false
+    }
 
     if let input = inputArea(in: target) {
         AXUIElementSetAttributeValue(input, kAXFocusedAttribute as CFString, kCFBooleanTrue)
@@ -483,11 +552,21 @@ func send(_ text: String, to target: TargetApp) -> Bool {
         log("\(target.name): sent via Return keystroke")
     }
 
-    // Confirm the composer emptied; if not, escalate through the known variants.
+    // Confirm the composer emptied; if not, escalate through the known
+    // variants, re-checking frontmost before each keystroke so an app that
+    // stole focus mid-send doesn't receive stray Returns.
     if !waitForComposerChange(in: target, from: beforeSend, within: 3) {
+        guard isFrontmost(target) else {
+            log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
+            return false
+        }
         log("\(target.name): composer unchanged after send, trying Return keystroke")
         keystroke(keyReturn)
         if !waitForComposerChange(in: target, from: beforeSend, within: 3) {
+            guard isFrontmost(target) else {
+                log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
+                return false
+            }
             log("\(target.name): composer still unchanged, trying Cmd+Return")
             keystroke(keyReturn, flags: .maskCommand)
             if !waitForComposerChange(in: target, from: beforeSend, within: 3) {
@@ -507,6 +586,19 @@ func waitForComposerChange(in target: TargetApp, from before: String?, within se
         usleep(200_000)
     }
     return false
+}
+
+/// Both apps give the just-pasted user message its own copy button, so a raw
+/// "count went up" check fires on the echo of our own message. Wait for that
+/// echo to render and fold it into the baseline; only buttons beyond it can
+/// belong to the response.
+func absorbEchoIntoBaseline(in target: TargetApp, preSend: Int) -> Int {
+    let deadline = Date().addingTimeInterval(4)
+    while Date() < deadline {
+        if copyButtons(in: target).count > preSend { return preSend + 1 }
+        usleep(100_000)
+    }
+    return preSend
 }
 
 func waitForResponse(in target: TargetApp, baselineCopyCount: Int) -> Bool {
@@ -532,6 +624,9 @@ func waitForResponse(in target: TargetApp, baselineCopyCount: Int) -> Bool {
 }
 
 // MARK: - Main
+
+// Logs must stream when stdout is a pipe (background runs), not sit in a block buffer.
+setvbuf(stdout, nil, _IOLBF, 0)
 
 parseArgs()
 
@@ -603,6 +698,7 @@ appendTranscript("## Seed (to \(speaker.name))\n\n\(config.seed)\n\n")
 log("Seeding \(speaker.name)...")
 var baseline = copyButtons(in: speaker).count
 guard send(config.seed, to: speaker) else { exit(1) }
+baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
 
 for turn in 1...config.turns {
     guard waitForResponse(in: speaker, baselineCopyCount: baseline) else {
@@ -624,6 +720,7 @@ for turn in 1...config.turns {
 
     baseline = copyButtons(in: listener).count
     guard send(reply, to: listener) else { break }
+    baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
     swap(&speaker, &listener)
 }
 

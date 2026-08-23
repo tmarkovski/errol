@@ -12,14 +12,16 @@ An experiment in having two AI assistants talk to each other **as products**, no
 
 One turn of the loop:
 
-1. Wait until the current speaker finishes its response. Completion is detected when a **new copy button** appears (count compared to a baseline taken before sending), **no "Stop" button** is visible (still streaming), and that state holds for two consecutive polls.
+1. Wait until the current speaker finishes its response. Completion is detected when a **new copy button** appears beyond the baseline, **no "Stop" button** is visible (still streaming), and that state holds for two consecutive polls. The just-pasted user message grows a copy button of its own in both apps, so right after sending, the relay waits for that echo and folds it into the baseline; only buttons beyond it can belong to the response.
 2. Press the last copy button in the tree (newest message) and confirm the press landed by watching `NSPasteboard.changeCount`.
-3. Activate the other app, focus its composer (`AXTextArea`), synthesize Cmd+V, wait for the paste to render, synthesize Return.
+3. Bring the other app frontmost and verify it actually got there (see safeguards), focus its composer (`AXTextArea`), synthesize Cmd+V, wait for the paste to render, press the send button.
 4. Swap speaker and listener. Repeat until the turn cap.
 
 Both apps are Chromium-based, and Chromium exposes an empty accessibility tree until nudged, so the script sets `AXManualAccessibility` on both at startup. Everything runs against label-based selectors, kept per app in `AppSelectors` structs inside `Config` because they are the part most likely to break. The labels differ between the apps: ChatGPT calls per-message copies "Copy message" (bare "Copy" is code blocks, "Copy table" is tables), while Claude uses "Copy" with excludes.
 
-Two safeguards discovered the hard way:
+Three safeguards discovered the hard way:
+
+- **Verified activation.** From a background CLI under macOS cooperative activation, `NSRunningApplication.activate` returns true without effect and setting the AX `kAXFrontmostAttribute` returns success without effect; LaunchServices (`/usr/bin/open -b`) is what actually brings an app forward. Synthesized keystrokes go to the frontmost app regardless of AX focus, so the relay confirms the target is frontmost before typing — via the system-wide AX focused application, falling back to the window server's front window when the focused app's AX server won't answer (Electron apps go quiet intermittently) — and refuses to send keystrokes otherwise. Without this, the seed gets typed into whatever window the user last touched.
 
 - **Window scoping.** All searches run inside one chosen chat window per app, re-resolved on every poll. Claude Desktop can host Claude Code sessions whose windows contain their own "Copy" and "Stop" buttons — including, if you develop this tool inside one, the session driving the relay. Windows containing Claude Code markers ("Terminal input", "New terminal", "Rewind to here") are never eligible, and the preflight refuses to start if an app has no eligible chat window.
 - **Send confirmation.** Sending prefers pressing the app's send button over a Return keystroke, then confirms the composer's value actually changed, escalating through Return and Cmd+Return before warning.
@@ -61,11 +63,12 @@ The machine is effectively unusable while it runs (shared clipboard and focus). 
 
 ## Status and known brittleness
 
-Verified against live trees (Aug 2026), via `--inspect`:
+Verified against live trees and a completed 4-turn relay run (Aug 2026):
 
-- **ChatGPT side (com.openai.codex, the unified app)**: a populated conversation exposes "Copy message" buttons per message (one for the user message, one for the response — the relay takes the last), a "Send" button, and a "Message ChatGPT" `AXTextArea` composer. An **empty** chat exposes no copy buttons at all, which looks like selector breakage but isn't. Neither app has a "copy last response" menu command; the message buttons are the only path.
-- **Claude side**: a Claude Code session window exposes "Prompt"/"Terminal input" inputs and its own Copy/Stop buttons; the exclusion markers correctly disqualify it. A regular chat window has NOT yet been inspected live — the per-response copy label ("Copy"), the composer label, and the send button label still need verification with a real conversation open.
-- The "Stop" label during streaming has not been observed live on either side yet.
+- **ChatGPT side (com.openai.codex, the unified app)**: the response's action bar uses a bare "Copy" button; "Copy message" (paired with "Edit message") belongs to the **user** message, and tables get "Copy table". The selector matches "copy" and excludes the qualified labels. An earlier reading that responses use "Copy message" was wrong and cost a debugging round: the relay kept copying its own pasted message back. A "Send" button and a "Message ChatGPT" `AXTextArea` composer are exposed; an **empty** chat exposes no copy buttons at all, which looks like selector breakage but isn't. Neither app has a "copy last response" menu command.
+- **Claude side**: verified live — the composer is a "Write your prompt to Claude" `AXTextArea`, the send button matches "send", and per-message copy buttons match bare "copy" with the code/link/table excludes. User messages expose copy buttons too (the echo absorption in step 1 exists for both apps). A Claude Code session window exposes "Prompt"/"Terminal input" inputs and its own Copy/Stop buttons; the exclusion markers correctly disqualify it.
+- The "Stop" label during streaming has not been observed live on either side yet; in practice the echo-absorbed copy-button count alone detected completion correctly, since the action bar only renders when a response finishes.
+- "Continue in new chat" in ChatGPT carries prior context into the new conversation and leaves stale copy buttons in the tree; start genuinely fresh chats (Cmd+N) between runs.
 - Selectors are label-based and will break when either app renames or icon-ifies its buttons after an update. Non-English UI needs the keywords in `AppSelectors` changed.
 - OpenAI's app naming is mid-migration: the unified app can be named ChatGPT.app while identifying as `com.openai.codex`, with a "ChatGPT Classic.app" as `com.openai.chat`. Use `--list` to see what this machine actually runs.
 - Turn and length caps are the protection against two chatty models burning through usage limits.
