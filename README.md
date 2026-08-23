@@ -58,6 +58,7 @@ To watch a run with both conversations visible, tile the chat windows first with
 | `--unarrange` | | Restore the frames saved by the last `--arrange` (falls back to centering both), then exit |
 | `--inspect` | | Dump each app's windows, buttons, text inputs, and what the selectors match, then exit |
 | `--press chatgpt\|claude "label"` | | Press the first button whose label contains the substring, then exit (debug) |
+| `--no-hud` | | Don't show the floating log panel during the run |
 | `--turns N` | 10 | Responses to relay before stopping |
 | `--new-chats` | off | Start a fresh chat in both apps (Cmd+N) before seeding; without it, the relay continues in whatever chats are open |
 | `--first chatgpt\|claude` | chatgpt | Who gets the seed prompt (anything not "claude" means the Codex side) |

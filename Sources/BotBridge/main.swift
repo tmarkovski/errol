@@ -17,6 +17,7 @@
 //   --unarrange                  restore the frames saved by the last --arrange (or center both), then exit
 //   --inspect                    dump buttons/text areas of both apps and what the selectors match, then exit
 //   --press chatgpt|claude "label"  press the first button whose label contains "label", then exit (debug)
+//   --no-hud                     don't show the floating log panel during the run
 //   --turns N                    number of responses to relay (default 10)
 //   --new-chats                  start a fresh chat in both apps (Cmd+N) before seeding; default is to use the open chats
 //   --first chatgpt|claude       which app receives the seed (default chatgpt)
@@ -76,6 +77,9 @@ struct Config {
         copyExcludeKeywords: ["code", "link", "table"],
         windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"])
 
+    /// Show a floating, non-activating log panel during the run so progress
+    /// stays visible while the chat apps hold focus.
+    var hud = true
     var inspect = false
     var arrange = false
     var unarrange = false
@@ -105,6 +109,7 @@ func parseArgs() {
                 log("--press needs two values: app (chatgpt|claude) and a label substring")
                 exit(1)
             }
+        case "--no-hud":           config.hud = false
         case "--turns":            config.turns = Int(take() ?? "") ?? config.turns
         case "--new-chats":        config.newChats = true
         case "--first":            config.first = take() ?? config.first
@@ -138,8 +143,68 @@ func listRunningApps() {
 // MARK: - Logging
 
 let iso = ISO8601DateFormatter()
+
+/// Extra destination for log lines (the floating panel, when shown).
+var logSink: ((String) -> Void)?
+
 func log(_ message: String) {
-    print("[\(iso.string(from: Date()))] \(message)")
+    let line = "[\(iso.string(from: Date()))] \(message)"
+    print(line)
+    logSink?(line)
+}
+
+// MARK: - Floating log panel
+
+/// A small always-on-top panel mirroring the log. It is the answer to "keep
+/// the launch window visible while the chat apps take focus": macOS gives no
+/// public way to raise another app's window level, so the level is set on a
+/// window this process owns instead. The panel is non-activating (it never
+/// steals focus from the apps) and disappears when the run ends.
+final class LogHUD {
+    private let panel: NSPanel
+    private let textView: NSTextView
+    private let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+
+    init() {
+        let width: CGFloat = 640
+        let height: CGFloat = 200
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        // Top center: the chat composers live at the bottoms of the tiled
+        // windows, so cover header space instead. The panel stays draggable.
+        let frame = NSRect(x: screen.visibleFrame.midX - width / 2,
+                           y: screen.visibleFrame.maxY - height - 12,
+                           width: width, height: height)
+        panel = NSPanel(contentRect: frame,
+                        styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
+                        backing: .buffered, defer: false)
+        panel.title = "BotBridge"
+        panel.level = .floating
+        panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        scroll.hasVerticalScroller = true
+        scroll.autoresizingMask = [.width, .height]
+        textView = NSTextView(frame: scroll.bounds)
+        textView.isEditable = false
+        textView.font = font
+        textView.autoresizingMask = [.width]
+        textView.textContainerInset = NSSize(width: 6, height: 6)
+        scroll.documentView = textView
+        panel.contentView = scroll
+        panel.orderFrontRegardless()
+    }
+
+    func append(_ line: String) {
+        DispatchQueue.main.async { [textView, font] in
+            textView.textStorage?.append(NSAttributedString(
+                string: line + "\n",
+                attributes: [.font: font, .foregroundColor: NSColor.textColor]))
+            textView.scrollToEndOfDocument(nil)
+        }
+    }
 }
 
 func appendTranscript(_ text: String) {
@@ -909,39 +974,6 @@ signal(SIGINT) { _ in
     exit(0)
 }
 
-guard config.turns >= 1 else {
-    log("--turns must be at least 1")
-    exit(1)
-}
-
-// Preflight: refuse to run without an eligible chat window in each app.
-// (A Claude Code session window inside Claude Desktop does not count.)
-for target in [chatgpt, claude] {
-    guard let window = chatWindow(in: target) else {
-        log("ERROR: \(target.name): no eligible chat window found.")
-        log("Open a regular chat conversation in \(target.name) and re-run. (--inspect shows how windows were classified.)")
-        exit(1)
-    }
-    let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? "untitled"
-    log("\(target.name): targeting window \"\(title)\"")
-    if inputArea(in: target) == nil {
-        log("ERROR: \(target.name): chat window has no composer text area.")
-        exit(1)
-    }
-}
-
-if config.newChats {
-    for target in [chatgpt, claude] {
-        guard startNewChat(in: target) else {
-            log("ERROR: \(target.name): could not start a new chat.")
-            exit(1)
-        }
-    }
-}
-
-var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
-var listener = speaker.app == chatgpt.app ? claude : chatgpt
-
 // MARK: - Message framing
 
 /// Ground rules given to each agent once, at the start of its side of the
@@ -989,47 +1021,105 @@ func isStopReply(_ reply: String) -> Bool {
     return trimmed.isEmpty || trimmed.localizedCaseInsensitiveContains(config.stopSequence)
 }
 
-appendTranscript("# BotBridge transcript, \(iso.string(from: Date()))\n\n")
-let opener = openingMessage()
-appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
+// MARK: - Run
 
-log("Seeding \(speaker.name)...")
-var baseline = copyButtons(in: speaker).count
-guard send(opener, to: speaker) else { exit(1) }
-baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
-
-for turn in 1...config.turns {
-    guard waitForResponse(in: speaker, baselineCopyCount: baseline) else {
-        log("Stopping: no response from \(speaker.name).")
-        break
-    }
-    guard let reply = copyLastResponse(from: speaker) else {
-        log("Stopping: could not copy response from \(speaker.name).")
-        break
+/// The whole relay run. Runs on a worker thread when the HUD holds the main
+/// thread for its event loop.
+func runRelay() {
+    guard config.turns >= 1 else {
+        log("--turns must be at least 1")
+        exit(1)
     }
 
-    appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
-
-    if isStopReply(reply) {
-        log("\(speaker.name) ended the conversation (empty reply or stop sequence).")
-        appendTranscript("_\(speaker.name) ended the conversation._\n\n")
-        break
+    // Preflight: refuse to run without an eligible chat window in each app.
+    // (A Claude Code session window inside Claude Desktop does not count.)
+    for target in [chatgpt, claude] {
+        guard let window = chatWindow(in: target) else {
+            log("ERROR: \(target.name): no eligible chat window found.")
+            log("Open a regular chat conversation in \(target.name) and re-run. (--inspect shows how windows were classified.)")
+            exit(1)
+        }
+        let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? "untitled"
+        log("\(target.name): targeting window \"\(title)\"")
+        if inputArea(in: target) == nil {
+            log("ERROR: \(target.name): chat window has no composer text area.")
+            exit(1)
+        }
     }
 
-    log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
-
-    if turn == config.turns {
-        log("Turn cap reached.")
-        break
+    if config.newChats {
+        for target in [chatgpt, claude] {
+            guard startNewChat(in: target) else {
+                log("ERROR: \(target.name): could not start a new chat.")
+                exit(1)
+            }
+        }
     }
 
-    // The listener's first message carries the rules and full context; every
-    // later relay is the other agent's reply, untouched.
-    let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker) : reply
-    baseline = copyButtons(in: listener).count
-    guard send(payload, to: listener) else { break }
-    baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
-    swap(&speaker, &listener)
+    var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
+    var listener = speaker.app == chatgpt.app ? claude : chatgpt
+
+    appendTranscript("# BotBridge transcript, \(iso.string(from: Date()))\n\n")
+    let opener = openingMessage()
+    appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
+
+    log("Seeding \(speaker.name)...")
+    var baseline = copyButtons(in: speaker).count
+    guard send(opener, to: speaker) else { exit(1) }
+    baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
+
+    for turn in 1...config.turns {
+        guard waitForResponse(in: speaker, baselineCopyCount: baseline) else {
+            log("Stopping: no response from \(speaker.name).")
+            break
+        }
+        guard let reply = copyLastResponse(from: speaker) else {
+            log("Stopping: could not copy response from \(speaker.name).")
+            break
+        }
+
+        appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
+
+        if isStopReply(reply) {
+            log("\(speaker.name) ended the conversation (empty reply or stop sequence).")
+            appendTranscript("_\(speaker.name) ended the conversation._\n\n")
+            break
+        }
+
+        log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
+
+        if turn == config.turns {
+            log("Turn cap reached.")
+            break
+        }
+
+        // The listener's first message carries the rules and full context;
+        // every later relay is the other agent's reply, untouched.
+        let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker) : reply
+        baseline = copyButtons(in: listener).count
+        guard send(payload, to: listener) else { break }
+        baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
+        swap(&speaker, &listener)
+    }
+
+    log("Done. Transcript: \(config.transcriptPath)")
 }
 
-log("Done. Transcript: \(config.transcriptPath)")
+if config.hud {
+    // The floating panel needs an event loop on the main thread, so the run
+    // itself moves to a worker thread. The always-on-top state ends with the
+    // process: the panel closes and focus returns to the launching app.
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let hud = LogHUD()
+    logSink = { hud.append($0) }
+    let worker = Thread {
+        runRelay()
+        exit(0)
+    }
+    worker.stackSize = 4 << 20
+    worker.start()
+    app.run()
+} else {
+    runRelay()
+}
