@@ -4,7 +4,11 @@ The project began life as **BotBridge**, a working title. This document records 
 
 ## Chosen: Errol
 
-The Weasley family's elderly owl: not the fastest bird, occasionally crashes into a closed window, but the message always gets delivered. The fit is uncomfortably good — this tool's first-ever test run typed its opening message into the wrong window, and its whole mechanism is a slightly clumsy but reliable courier flying between two chat windows.
+The Weasley family's elderly owl: not the fastest bird, occasionally crashes into a closed window, but the message always gets delivered. The fit is uncomfortably good, because of what happened on the very first live run.
+
+**The founding incident (2026-08-23).** On the first test, the relay was supposed to type its seed prompt — "Hi! You're talking to another AI assistant through an automated relay between your two desktop apps..." — into the ChatGPT composer. macOS cooperative activation silently ignored the activation call (`NSRunningApplication.activate` returned true and did nothing), and since synthesized keystrokes always go to whatever window is frontmost, the seed was typed into the frontmost terminal instead. That terminal was the Claude Code session that was *building the tool*. The relay's first-ever delivery crashed into the wrong window: it introduced itself to its own author, who received the message mid-development as if the user had typed it. An owl bound for the Burrow, arriving beak-first through the developer's own window.
+
+The incident produced the verified-activation safeguard (never type a keystroke until the target app is confirmed frontmost), and the name was retroactively inevitable.
 
 - `errol.chat` — **available** (and the TLD suits the product)
 - `errol.dev`, `errol.ai` — taken
