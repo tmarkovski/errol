@@ -10,7 +10,7 @@ The Weasley family's elderly owl: not the fastest bird, occasionally crashes int
 
 The incident produced the verified-activation safeguard (never type a keystroke until the target app is confirmed frontmost), and the name was retroactively inevitable.
 
-- `errol.chat` — **available** (and the TLD suits the product)
+- `errol.chat` — **registered 2026-08-24**; the project's home (and the TLD suits the product)
 - `errol.dev`, `errol.ai` — taken
 
 ## Round 1: concept names
