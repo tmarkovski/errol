@@ -1,9 +1,9 @@
-// BotBridge
+// Errol
 // Drives a conversation between the ChatGPT desktop app and Claude Desktop
 // by pressing each app's "Copy" button and pasting into the other app's input.
 //
 // Build & run:
-//   swift run BotBridge --seed "Hi! You're talking to another AI. Pick a topic."
+//   swift run Errol --seed "Hi! You're talking to another AI. Pick a topic."
 //
 // Requirements:
 //   - Grant Accessibility permission to your TERMINAL app (Terminal/iTerm/etc):
@@ -26,7 +26,7 @@
 //   --stop-sequence "token"      reply marker that ends the run (default [[END-CONVERSATION]])
 //   --timeout N                  seconds to wait for a response (default 300)
 //   --max-chars N                truncate relayed messages (default 12000)
-//   --transcript path            transcript output (default ./botbridge-transcript.md)
+//   --transcript path            transcript output (default ./errol-transcript.md)
 //   --chatgpt-bundle-id ID       override (default com.openai.codex; classic app is com.openai.chat)
 //   --claude-bundle-id ID        override (default com.anthropic.claudefordesktop)
 
@@ -64,7 +64,7 @@ struct Config {
     var stopSequence = "[[END-CONVERSATION]]"
     var timeout: TimeInterval = 300
     var maxChars = 12000
-    var transcriptPath = "botbridge-transcript.md"
+    var transcriptPath = "errol-transcript.md"
 
     // ChatGPT's response action bar uses bare "Copy"; "Copy message" (paired
     // with "Edit message") belongs to user messages, and tables/links get
@@ -83,7 +83,7 @@ struct Config {
     var inspect = false
     var arrange = false
     var unarrange = false
-    var frameStatePath = ".botbridge-frames"
+    var frameStatePath = ".errol-frames"
     var press: (app: String, label: String)?
 }
 
@@ -177,7 +177,7 @@ final class LogHUD {
         panel = NSPanel(contentRect: frame,
                         styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
                         backing: .buffered, defer: false)
-        panel.title = "BotBridge"
+        panel.title = "Errol"
         panel.level = .floating
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
@@ -512,7 +512,7 @@ func isFrontmost(_ target: TargetApp) -> Bool {
     return false
 }
 
-/// The app that was frontmost when BotBridge started — normally the terminal
+/// The app that was frontmost when Errol started — normally the terminal
 /// it was launched from — captured before any focus is moved so it can be
 /// handed back when the run ends.
 let launchFrontmostApp: NSRunningApplication? = {
@@ -534,7 +534,7 @@ let launchFrontmostApp: NSRunningApplication? = {
     return NSWorkspace.shared.frontmostApplication
 }()
 
-/// Hand focus back to wherever BotBridge was launched from. Registered via
+/// Hand focus back to wherever Errol was launched from. Registered via
 /// atexit so every exit path (done, stop sequence, error, Ctrl+C) goes
 /// through it.
 func refocusLaunchApp() {
@@ -1059,7 +1059,7 @@ func runRelay() {
     var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
     var listener = speaker.app == chatgpt.app ? claude : chatgpt
 
-    appendTranscript("# BotBridge transcript, \(iso.string(from: Date()))\n\n")
+    appendTranscript("# Errol transcript, \(iso.string(from: Date()))\n\n")
     let opener = openingMessage()
     appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
 

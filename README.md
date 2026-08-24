@@ -1,6 +1,8 @@
-# BotBridge
+# Errol
 
 Relays a conversation between the OpenAI Codex desktop app and Claude Desktop on macOS by automating their UIs: it presses each app's "Copy" button and pastes the response into the other app's composer, exactly like a human relaying messages between two chat windows.
+
+Named for the Weasleys' owl: not the fastest courier, has been known to hit the wrong window, but the message always gets delivered. (The naming candidates that lost are recorded in `docs/brand-exploration.md`.)
 
 ## What we're building and why
 
@@ -30,10 +32,10 @@ Three safeguards discovered the hard way:
 
 ## Layout
 
-- `Sources/BotBridge/main.swift`: the whole tool. `Config` at the top holds bundle IDs, label keywords, caps, and timings. Below it: AX helpers, element finders, keyboard synthesis, the copy/send/wait primitives, and the orchestration loop.
+- `Sources/Errol/main.swift`: the whole tool. `Config` at the top holds bundle IDs, label keywords, caps, and timings. Below it: AX helpers, element finders, keyboard synthesis, the copy/send/wait primitives, and the orchestration loop.
 - `Package.swift`: plain executable SwiftPM package, macOS 13+.
 
-A markdown transcript of each run is written incrementally (default `botbridge-transcript.md`, gitignored).
+A markdown transcript of each run is written incrementally (default `errol-transcript.md`, gitignored).
 
 ## Setup
 
@@ -42,12 +44,12 @@ A markdown transcript of each run is written incrementally (default `botbridge-t
 3. Build and run:
 
 ```sh
-swift run BotBridge --turns 2 --seed "Introduce yourselves briefly and compare notes on what you're each good at."
+swift run Errol --turns 2 --seed "Introduce yourselves briefly and compare notes on what you're each good at."
 ```
 
-The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far. On any exit — run finished, an agent sent the stop sequence, an error, or Ctrl+C — focus is handed back to the app BotBridge was launched from.
+The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far. On any exit — run finished, an agent sent the stop sequence, an error, or Ctrl+C — focus is handed back to the app Errol was launched from.
 
-To watch a run with both conversations visible, tile the chat windows first with `swift run BotBridge --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move. Arranging twice keeps the first snapshot, so `--unarrange` always restores the true original layout.
+To watch a run with both conversations visible, tile the chat windows first with `swift run Errol --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move. Arranging twice keeps the first snapshot, so `--unarrange` always restores the true original layout.
 
 ## Flags
 
@@ -66,7 +68,7 @@ To watch a run with both conversations visible, tile the chat windows first with
 | `--stop-sequence "token"` | `[[END-CONVERSATION]]` | A reply containing this (or an empty reply) ends the run |
 | `--timeout N` | 300 | Seconds to wait for each response |
 | `--max-chars N` | 12000 | Truncate relayed messages |
-| `--transcript path` | ./botbridge-transcript.md | Markdown transcript output |
+| `--transcript path` | ./errol-transcript.md | Markdown transcript output |
 | `--chatgpt-bundle-id` | com.openai.codex | Codex/unified app; classic ChatGPT is com.openai.chat |
 | `--claude-bundle-id` | com.anthropic.claudefordesktop | Override if needed |
 

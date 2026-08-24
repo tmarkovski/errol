@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "BotBridge",
+    name: "Errol",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
-            name: "BotBridge",
-            path: "Sources/BotBridge"
+            name: "Errol",
+            path: "Sources/Errol"
         )
     ]
 )

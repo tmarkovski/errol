@@ -1,5 +1,5 @@
 .build/
 *.xcodeproj
 .DS_Store
-botbridge-transcript.md
-.botbridge-frames
+errol-transcript.md
+.errol-frames
