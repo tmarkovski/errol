@@ -2,6 +2,8 @@
 
 Relays a conversation between the OpenAI Codex desktop app and Claude Desktop on macOS by automating their UIs: it presses each app's "Copy" button and pastes the response into the other app's composer, exactly like a human relaying messages between two chat windows.
 
+It is a menu bar app: an owl sits in the status bar, and clicking it opens a floating panel where you type the instruction that seeds the conversation and press Start. There is no CLI; the panel's Inspect button covers the selector debugging the old command-line flags used to.
+
 Named for the Weasleys' owl: not the fastest courier, has been known to hit the wrong window, but the message always gets delivered. (The naming candidates that lost are recorded in `docs/brand-exploration.md`.)
 
 ## What we're building and why
@@ -12,7 +14,7 @@ An experiment in having two AI assistants talk to each other **as products**, no
 
 ## How it works
 
-The conversation is framed for both participants before the relay goes hands-off. The first agent receives the ground rules (this is an agent-to-agent conversation, the human is not participating, and it can end the run by replying with an empty message or by including the stop sequence, default `[[END-CONVERSATION]]`) followed by the human's initial message from `--seed`. When the first response comes back, the second agent receives the same rules plus both the initial message and that response, so both sides start from identical context. Every message after those two framing messages passes through verbatim. A reply that is empty or contains the stop sequence ends the run.
+The conversation is framed for both participants before the relay goes hands-off. The first agent receives the ground rules (this is an agent-to-agent conversation, the human is not participating, and it can end the run by replying with an empty message or by including the stop sequence, default `[[END-CONVERSATION]]`) followed by the instruction typed into the panel. When the first response comes back, the second agent receives the same rules plus both the initial message and that response, so both sides start from identical context. Every message after those two framing messages passes through verbatim. A reply that is empty or contains the stop sequence ends the run.
 
 One turn of the loop:
 
@@ -21,56 +23,46 @@ One turn of the loop:
 3. Bring the other app frontmost and verify it actually got there (see safeguards), focus its composer (`AXTextArea`), synthesize Cmd+V, wait for the paste to render, press the send button.
 4. Swap speaker and listener. Repeat until the turn cap.
 
-Both apps are Chromium-based, and Chromium exposes an empty accessibility tree until nudged, so the script sets `AXManualAccessibility` on both at startup. Everything runs against label-based selectors, kept per app in `AppSelectors` structs inside `Config` because they are the part most likely to break. The labels differ between the apps: ChatGPT calls per-message copies "Copy message" (bare "Copy" is code blocks, "Copy table" is tables), while Claude uses "Copy" with excludes.
+Both apps are Chromium-based, and Chromium exposes an empty accessibility tree until nudged, so `AXManualAccessibility` is set on both at the start of each run. Everything runs against label-based selectors, kept per app in `AppSelectors` structs inside `Config` because they are the part most likely to break. The labels differ between the apps: ChatGPT calls per-message copies "Copy message" (bare "Copy" is code blocks, "Copy table" is tables), while Claude uses "Copy" with excludes.
 
 Three safeguards discovered the hard way:
 
-- **Verified activation.** From a background CLI under macOS cooperative activation, `NSRunningApplication.activate` returns true without effect and setting the AX `kAXFrontmostAttribute` returns success without effect; LaunchServices (`/usr/bin/open -b`) is what actually brings an app forward. Synthesized keystrokes go to the frontmost app regardless of AX focus, so the relay confirms the target is frontmost before typing — via the system-wide AX focused application, falling back to the window server's front window when the focused app's AX server won't answer (Electron apps go quiet intermittently) — and refuses to send keystrokes otherwise. Without this, the seed gets typed into whatever window the user last touched.
+- **Verified activation.** From a background process under macOS cooperative activation, `NSRunningApplication.activate` returns true without effect and setting the AX `kAXFrontmostAttribute` returns success without effect; LaunchServices (`/usr/bin/open -b`) is what actually brings an app forward. Synthesized keystrokes go to the frontmost app regardless of AX focus, so the relay confirms the target is frontmost before typing — via the system-wide AX focused application, falling back to the window server's front window when the focused app's AX server won't answer (Electron apps go quiet intermittently) — and refuses to send keystrokes otherwise. Without this, the seed gets typed into whatever window the user last touched.
 
 - **Window scoping.** All searches run inside one chosen chat window per app, re-resolved on every poll. Claude Desktop can host Claude Code sessions whose windows contain their own "Copy" and "Stop" buttons — including, if you develop this tool inside one, the session driving the relay. Windows containing Claude Code markers ("Terminal input", "New terminal", "Rewind to here") are never eligible, and the preflight refuses to start if an app has no eligible chat window.
 - **Send confirmation.** Sending prefers pressing the app's send button over a Return keystroke, then confirms the composer's value actually changed, escalating through Return and Cmd+Return before warning.
 
 ## Layout
 
-- `Sources/Errol/main.swift`: the whole tool. `Config` at the top holds bundle IDs, label keywords, caps, and timings. Below it: AX helpers, element finders, keyboard synthesis, the copy/send/wait primitives, and the orchestration loop.
-- `Package.swift`: plain executable SwiftPM package, macOS 13+.
+Everything lives in the Xcode project at `app/Errol` (`Errol.xcodeproj`). Inside the app target:
 
-A markdown transcript of each run is written incrementally (default `errol-transcript.md`, gitignored).
+- `ErrolApp.swift`: the `@main` entry point; a placeholder Settings scene plus the delegate adaptor that installs the shell.
+- `MenuBarController.swift`: the AppKit shell — the status item and the floating panel hosting the SwiftUI view. It stays AppKit because the panel must be a non-activating floating panel (the Spotlight pattern): SwiftUI's `MenuBarExtra` window dismisses itself whenever another app activates, which the relay does on every turn, so the controls and log would vanish exactly when a run needs them visible.
+- `ControlPanelView.swift` / `RelayController.swift`: the SwiftUI interface and its observable model — form state, the log, and the start/stop/inspect wiring around the engine.
+- `Core/`: the relay engine, split by concern. `Config.swift` holds bundle IDs, label keywords, caps, and timings; `Accessibility.swift` and `Elements.swift` the AX wrappers and window-scoped element finders; `Activation.swift` the verified-activation and refocus logic; `Arrangement.swift` the window tiling; `Keyboard.swift` the synthesized keystrokes; `RelayActions.swift` the copy/send/wait primitives; `Relay.swift` the message framing and the orchestration loop; `Inspect.swift` the selector-debugging dump; `Logging.swift` the log, transcript, and the cancellation flag behind the Stop button.
+
+Three build settings depart from the app template's defaults and matter: **App Sandbox is off** (a sandboxed app can neither get the Accessibility permission nor post keystrokes — with it on, Errol can do nothing), **`SWIFT_DEFAULT_ACTOR_ISOLATION` is `nonisolated`** (the engine runs on a worker thread while the main thread serves the panel; the template's main-actor default would fight that design), and **`LSUIElement` is set** (menu bar only, no Dock icon).
+
+A markdown transcript of each run is written incrementally to `~/Documents/errol-transcript.md` (the app is launched from Finder with `/` as its working directory, so the path is absolute; macOS may ask once for access to the Documents folder).
 
 ## Setup
 
-1. Grant Accessibility permission to your **terminal app** in System Settings > Privacy & Security > Accessibility. Processes launched from the terminal inherit its grant. (If running via Claude Code inside a desktop app, the grant attributes to that app instead; running from Terminal is the clean path.)
-2. Launch both apps with a conversation open in each.
-3. Build and run:
+1. Open `app/Errol/Errol.xcodeproj` in Xcode and run, or build and copy `Errol.app` wherever you keep apps.
+2. Launch both chat apps with a conversation open in each.
+3. Click the owl in the menu bar, type the instruction that should seed the conversation, and press Start. The first Start triggers the Accessibility permission prompt; grant **Errol** in System Settings > Privacy & Security > Accessibility and press Start again. (When running from Xcode, the grant may attribute to Xcode instead — grant whichever the prompt names. Re-signed rebuilds can look like a new app to the privacy system; re-toggle the grant if pressing Start silently does nothing.)
 
-```sh
-swift run Errol --turns 2 --seed "Introduce yourselves briefly and compare notes on what you're each good at."
-```
+The machine is effectively unusable while a run is active (shared clipboard and focus). Stop ends the run at the next safe point and keeps the transcript so far; when a run ends, focus is handed back to whatever was frontmost when Start was pressed.
 
-The machine is effectively unusable while it runs (shared clipboard and focus). Ctrl+C stops it and keeps the transcript so far. On any exit — run finished, an agent sent the stop sequence, an error, or Ctrl+C — focus is handed back to the app Errol was launched from.
+## Controls
 
-To watch a run with both conversations visible, tile the chat windows first with `swift run Errol --arrange` and restore them afterwards with `--unarrange`. This sets the window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. Note that `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during the move. Arranging twice keeps the first snapshot, so `--unarrange` always restores the true original layout.
+- **Instruction**: the human's initial message. The relay wraps it in the framing preamble, so it should read like an ordinary request, not an explanation of the relay.
+- **Turns** (default 10): responses to relay before stopping — the protection, along with the message length cap, against two chatty models burning through usage limits.
+- **Start new chats**: Cmd+N in both apps before seeding; without it, the relay continues in whatever chats are open.
+- **Tile the chat windows side by side**: arrange ChatGPT left, Claude right before the run, so both conversations are visible. This sets window frames directly through AX (the same thing tiling utilities do) rather than driving the native Fill & Arrange menus, because the native cross-app "Left & Right" arrangement only pairs windows interactively and, in Claude Desktop, a menu-driven tile would act on whatever window is front — which can be a Claude Code session rather than the chat. `AXEnhancedUserInterface` (set as the Electron accessibility nudge) makes apps ignore or animate AX window moves, so it is temporarily dropped during each move. Tiling twice keeps the first snapshot, so restore always returns to the true original layout.
+- **Inspect**: dump each app's windows, buttons, text inputs, and what the selectors match into the log — the first stop when a run misbehaves after an app update.
+- Right-clicking the owl offers **Open Transcript**, **Restore Window Positions** (undo the tiling from the saved snapshot), and **Quit**.
 
-## Flags
-
-| Flag | Default | Purpose |
-|---|---|---|
-| `--list` | | Print running apps and bundle IDs, then exit |
-| `--arrange` | | Tile the two chat windows side by side (ChatGPT left, Claude right) on the screen hosting the ChatGPT window, saving their frames first, then exit |
-| `--unarrange` | | Restore the frames saved by the last `--arrange` (falls back to centering both), then exit |
-| `--inspect` | | Dump each app's windows, buttons, text inputs, and what the selectors match, then exit |
-| `--press chatgpt\|claude "label"` | | Press the first button whose label contains the substring, then exit (debug) |
-| `--no-hud` | | Don't show the floating log panel during the run |
-| `--turns N` | 10 | Responses to relay before stopping |
-| `--new-chats` | off | Start a fresh chat in both apps (Cmd+N) before seeding; without it, the relay continues in whatever chats are open |
-| `--first chatgpt\|claude` | chatgpt | Who gets the seed prompt (anything not "claude" means the Codex side) |
-| `--seed "text"` / `--seed-file path` | generic intro | The human's initial message; the relay wraps it in the framing preamble |
-| `--stop-sequence "token"` | `[[END-CONVERSATION]]` | A reply containing this (or an empty reply) ends the run |
-| `--timeout N` | 300 | Seconds to wait for each response |
-| `--max-chars N` | 12000 | Truncate relayed messages |
-| `--transcript path` | ./errol-transcript.md | Markdown transcript output |
-| `--chatgpt-bundle-id` | com.openai.codex | Codex/unified app; classic ChatGPT is com.openai.chat |
-| `--claude-bundle-id` | com.anthropic.claudefordesktop | Override if needed |
+Settings without UI — bundle IDs, timeouts, the stop sequence, the per-message length cap, selector keywords — live at the top of `Core/Config.swift`.
 
 ## Status and known brittleness
 
@@ -79,15 +71,14 @@ Verified against live trees and a completed 4-turn relay run (Aug 2026):
 - **ChatGPT side (com.openai.codex, the unified app)**: the response's action bar uses a bare "Copy" button; "Copy message" (paired with "Edit message") belongs to the **user** message, and tables get "Copy table". The selector matches "copy" and excludes the qualified labels. An earlier reading that responses use "Copy message" was wrong and cost a debugging round: the relay kept copying its own pasted message back. A "Send" button and a "Message ChatGPT" `AXTextArea` composer are exposed; an **empty** chat exposes no copy buttons at all, which looks like selector breakage but isn't. Neither app has a "copy last response" menu command.
 - **Claude side**: verified live — the composer is a "Write your prompt to Claude" `AXTextArea`, the send button matches "send", and per-message copy buttons match bare "copy" with the code/link/table excludes. User messages expose copy buttons too (the echo absorption in step 1 exists for both apps). A Claude Code session window exposes "Prompt"/"Terminal input" inputs and its own Copy/Stop buttons; the exclusion markers correctly disqualify it.
 - The "Stop" label during streaming has not been observed live on either side yet; in practice the echo-absorbed copy-button count alone detected completion correctly, since the action bar only renders when a response finishes.
-- "Continue in new chat" in ChatGPT carries prior context into the new conversation and leaves stale copy buttons in the tree; start genuinely fresh chats (Cmd+N) between runs.
+- "Continue in new chat" in ChatGPT carries prior context into the new conversation and leaves stale copy buttons in the tree; start genuinely fresh chats (the "Start new chats" toggle) between runs.
 - Selectors are label-based and will break when either app renames or icon-ifies its buttons after an update. Non-English UI needs the keywords in `AppSelectors` changed.
-- OpenAI's app naming is mid-migration: the unified app can be named ChatGPT.app while identifying as `com.openai.codex`, with a "ChatGPT Classic.app" as `com.openai.chat`. Use `--list` to see what this machine actually runs.
-- Turn and length caps are the protection against two chatty models burning through usage limits.
+- OpenAI's app naming is mid-migration: the unified app can be named ChatGPT.app while identifying as `com.openai.codex`, with a "ChatGPT Classic.app" as `com.openai.chat`. `osascript -e 'id of app "ChatGPT"'` shows what this machine actually runs.
 
 ## Troubleshooting
 
-- **App "not running" but it is**: bundle ID mismatch. `--list`, or `osascript -e 'id of app "ChatGPT"'`.
-- **Empty tree / no buttons found**: restart the script so the `AXManualAccessibility` nudge reapplies; confirm with Accessibility Inspector.
-- **Wrong button pressed (e.g. "Copy code")**: adjust `copyExcludeKeywords` in `Config`.
+- **App "not running" but it is**: bundle ID mismatch. Check with `osascript -e 'id of app "ChatGPT"'` and adjust the IDs in `Core/Config.swift`.
+- **Empty tree / no buttons found in Inspect**: quit and relaunch Errol so the `AXManualAccessibility` nudge reapplies; confirm with Accessibility Inspector.
+- **Wrong button pressed (e.g. "Copy code")**: adjust `copyExcludeKeywords` in `Core/Config.swift`.
 - **Paste lands but Return doesn't send**: some layouts use Cmd+Return; change `keystroke(keyReturn)` to `keystroke(keyReturn, flags: .maskCommand)` in `send(_:to:)`.
-- **Permission prompt loops**: TCC grants stick to the responsible process; grant whichever app actually launched the binary.
+- **Start silently does nothing after a rebuild**: the privacy system treats a re-signed build as a new app; re-toggle Errol (or Xcode, for Xcode-launched runs) in System Settings > Privacy & Security > Accessibility.
