@@ -12,6 +12,8 @@ struct ControlPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            readinessStrip
+
             Group {
                 sectionHeader("Instruction to seed the conversation")
                 TextEditor(text: $controller.seed)
@@ -50,7 +52,19 @@ struct ControlPanelView: View {
             logView
         }
         .padding(14)
-        .frame(width: 440, height: 560)
+        .frame(width: 440, height: 620)
+    }
+
+    /// ChatGPT on the left, Claude on the right — the same sides the tiling
+    /// arrangement uses — each with its live readiness and detected surface.
+    private var readinessStrip: some View {
+        HStack(spacing: 8) {
+            SideStatusCard(status: controller.chatgptStatus)
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+            SideStatusCard(status: controller.claudeStatus)
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -81,6 +95,52 @@ struct ControlPanelView: View {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
+        }
+    }
+}
+
+private struct SideStatusCard: View {
+    let status: SideStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Text(status.appName)
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer(minLength: 4)
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 7, height: 7)
+                Text(status.headline)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            Text(subline)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 5)
+            .stroke(Color(nsColor: .separatorColor)))
+    }
+
+    /// A single space keeps the card height stable when there is no surface
+    /// to show yet.
+    private var subline: String {
+        let parts = [status.surface, status.detail].compactMap { $0 }
+        return parts.isEmpty ? " " : parts.joined(separator: " — ")
+    }
+
+    private var dotColor: Color {
+        switch status.state {
+        case .checking: return .gray
+        case .missing: return .red
+        case .notReady: return .orange
+        case .ready: return .green
         }
     }
 }

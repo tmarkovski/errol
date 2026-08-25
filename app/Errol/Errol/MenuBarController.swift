@@ -17,8 +17,24 @@ import SwiftUI
 /// would make the instruction field untypeable; force it. Esc hides the
 /// panel instead of beeping.
 final class KeyablePanel: NSPanel {
+    /// Fires on every path the panel appears or disappears through — toggle,
+    /// Esc, the close button — so the readiness scanner tracks visibility.
+    var onVisibilityChange: ((Bool) -> Void)?
+
     override var canBecomeKey: Bool { true }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        onVisibilityChange?(true)
+    }
+    override func orderOut(_ sender: Any?) {
+        super.orderOut(sender)
+        onVisibilityChange?(false)
+    }
+    override func close() {
+        super.close()
+        onVisibilityChange?(false)
+    }
 }
 
 final class MenuBarController: NSObject, NSApplicationDelegate {
@@ -88,10 +104,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     // MARK: Panel
 
     private func buildPanel() {
-        panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 560),
+        panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 620),
                              styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
                              backing: .buffered, defer: false)
         panel.title = "Errol"
+        panel.onVisibilityChange = { [relay] visible in relay.setPanelVisible(visible) }
         panel.level = .floating
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false

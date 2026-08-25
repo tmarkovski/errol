@@ -20,7 +20,31 @@ final class RelayController: ObservableObject {
     @Published var tileWindows = false
     @Published var isRunning = false
     @Published var logLines: [LogLine] = []
+    @Published var chatgptStatus = SideStatus(appName: "ChatGPT")
+    @Published var claudeStatus = SideStatus(appName: "Claude")
     private var nextLogID = 0
+    private let scanner = ReadinessScanner()
+    private var panelVisible = false
+
+    init() {
+        scanner.onUpdate = { [weak self] chatgpt, claude in
+            DispatchQueue.main.async {
+                self?.chatgptStatus = chatgpt
+                self?.claudeStatus = claude
+            }
+        }
+    }
+
+    /// The readiness strip only scans while someone can see it, and never
+    /// while a run owns the apps' AX trees and the machine's focus.
+    func setPanelVisible(_ visible: Bool) {
+        panelVisible = visible
+        updateScanner()
+    }
+
+    private func updateScanner() {
+        scanner.setActive(panelVisible && !isRunning)
+    }
 
     /// Main thread only (the logSink wrapper in MenuBarController dispatches).
     func append(_ line: String) {
@@ -45,6 +69,7 @@ final class RelayController: ObservableObject {
         let tile = tileWindows
 
         isRunning = true
+        updateScanner()
         relayCancelled.set(false)
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
@@ -56,7 +81,10 @@ final class RelayController: ObservableObject {
             if tile { arrangeSideBySide(left: apps.chatgpt, right: apps.claude) }
             _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude)
             refocus(to: origin)
-            DispatchQueue.main.async { self?.isRunning = false }
+            DispatchQueue.main.async {
+                self?.isRunning = false
+                self?.updateScanner()
+            }
         }
     }
 

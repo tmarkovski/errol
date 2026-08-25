@@ -16,6 +16,17 @@ struct AppSelectors {
     /// A window containing a button or text field with any of these labels is
     /// not a chat window (e.g. Claude Code session windows inside Claude Desktop).
     var windowExcludeLabels: [String] = []
+    /// What an excluded window is, for the readiness strip ("Claude Code").
+    var excludedSurfaceName: String?
+    /// Label prefix of the AXPopUpButton that announces the app's active
+    /// mode; the text after the prefix names the mode (ChatGPT exposes
+    /// "Switch mode, current mode: ChatGPT", or ": Codex" in Codex mode).
+    var modePopupPrefix: String?
+    /// Display names for raw mode names, keyed lowercased ("chatgpt" -> "Chat").
+    var modeNames: [String: String] = [:]
+    /// Surface names keyed by the first path component of a window's
+    /// claude.ai AXWebArea URL. Empty for apps without claude.ai URLs.
+    var surfacePathNames: [String: String] = [:]
 }
 
 struct Config {
@@ -42,11 +53,23 @@ struct Config {
     // their own qualified labels. Match bare copy, exclude the qualified ones.
     var chatgptSelectors = AppSelectors(
         copyKeyword: "copy",
-        copyExcludeKeywords: ["message", "table", "link", "code"])
+        copyExcludeKeywords: ["message", "table", "link", "code"],
+        modePopupPrefix: "Switch mode, current mode:",
+        modeNames: ["chatgpt": "Chat"])
     var claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
-        windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"])
+        windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"],
+        excludedSurfaceName: "Claude Code",
+        // Only "epitaxy" is verified against a live tree; the rest are the
+        // expected paths for surfaces not yet observed over AX.
+        surfacePathNames: [
+            "epitaxy": "Claude Code",
+            "chat": "Chat",
+            "new": "New chat",
+            "project": "Project chat",
+            "projects": "Projects",
+        ])
 
     static func documentsPath(_ name: String) -> String {
         (FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
