@@ -93,16 +93,19 @@ func hasStopButton(in target: TargetApp) -> Bool {
     return !results.isEmpty
 }
 
+func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
+    guard label.localizedCaseInsensitiveContains(selectors.sendKeyword) else { return false }
+    for exclude in selectors.sendExcludeKeywords
+        where label.localizedCaseInsensitiveContains(exclude) { return false }
+    return true
+}
+
 func sendButton(in target: TargetApp) -> AXUIElement? {
     guard let root = chatWindow(in: target) else { return nil }
     var results: [AXUIElement] = []
     findAll(in: root, where: { el in
         guard axAttribute(el, kAXRoleAttribute) as? String == kAXButtonRole as String else { return false }
-        let label = axLabel(el)
-        guard label.localizedCaseInsensitiveContains(target.selectors.sendKeyword) else { return false }
-        for exclude in target.selectors.sendExcludeKeywords
-            where label.localizedCaseInsensitiveContains(exclude) { return false }
-        return true
+        return isSendButtonLabel(axLabel(el), selectors: target.selectors)
     }, into: &results)
     return results.first
 }

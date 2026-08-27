@@ -1,0 +1,11 @@
+#!/bin/bash
+# Build (incrementally, debug — @testable needs testability) and run the
+# guided verification harness. See tools/errol-verify/verify.swift for the
+# tiers and Package.swift for the architecture.
+#
+# Needs the Accessibility grant on the invoking process, like ax-dump — and
+# from a Claude Code shell, run with the Bash sandbox disabled.
+set -euo pipefail
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+swift build --package-path "$repo" --product errol-verify >&2
+exec "$repo/.build/debug/errol-verify" "$@"

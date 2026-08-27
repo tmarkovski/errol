@@ -48,7 +48,7 @@ struct SideStatus {
 /// walk. AX reads are synchronous IPC into the target app and the scan
 /// repeats every few seconds, so labels are only read on the few roles that
 /// can carry a signal.
-private struct WindowScan {
+struct WindowScan {
     var title = ""
     var hasComposer = false
     /// Carries a window-exclusion marker (a Claude Code session, not a chat).
@@ -77,7 +77,7 @@ private struct WindowScan {
 /// The text after `prefix` in a joined AX label. axLabel concatenates several
 /// attributes, so an announcement can appear twice; only the text between
 /// occurrences counts.
-private func value(after prefix: String, in label: String) -> String? {
+func value(after prefix: String, in label: String) -> String? {
     guard let range = label.range(of: prefix) else { return nil }
     var rest = String(label[range.upperBound...])
     if let repeated = rest.range(of: prefix) { rest = String(rest[..<repeated.lowerBound]) }
@@ -178,7 +178,7 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
 /// then the composer placeholder (ChatGPT unmounts the tab pair inside a
 /// conversation), then the app's mode switcher (still names Codex mode),
 /// then the claude.ai URL, then the exclusion markers.
-private func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
+func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
     if let tab = scan.surfaceTab { return tab }
     if let surface = scan.composerSurface { return surface }
     if let mode = scan.modeLabel {
