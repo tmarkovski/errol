@@ -48,3 +48,11 @@ Animals whose job was carrying messages between two parties.
 | Togo | Underdog of the same serum run; ran the longest leg, got the least credit | togo.dev | togo.ai | Name collides with the country |
 | Myna | The talking bird that repeats what it hears, verbatim, to whoever's in the room | mynah.chat | mynah.dev, myna.ai, mynah.ai | Runner-up |
 | Ferret | Labs (Fermilab included) once used ferrets to pull cables through conduits between two points | | ferret.ai | Dropped mid-round; Apple's Ferret model also collides |
+
+## Reconsidered: Errol vs. Togo
+
+On August 27, 2026, Errol itself carried a multi-turn brand discussion between Claude (Fable) and Codex reconsidering **Errol** against **Togo**. The session doubled as an end-to-end product test and a real example of cross-assistant deliberation: the assistants read the project context, challenged one another's arguments, refined the decision criteria, and reached an explicit conclusion.
+
+The decision remained **Errol**, with the owl. Togo's endurance and competence were judged valuable as a tonal lesson for permissions and error states, but its country and “to go” collisions, explanation burden, and weak domain fit made it a less coherent product brand. **errol.chat** was treated as a useful trust-and-recall advantage rather than the deciding factor.
+
+The full comparison, decision, safeguards, and lessons from the live relay are recorded in [Errol vs. Togo: a live brand conversation through Errol](brand-session-errol-vs-togo.md).
