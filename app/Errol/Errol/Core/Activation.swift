@@ -73,6 +73,21 @@ func refocus(to app: NSRunningApplication?) {
     log("Focus returned to \(app.localizedName ?? bundleID).")
 }
 
+/// LaunchServices activation — the one path that reliably moves both the
+/// active-app state and the key window to the target from a background
+/// process. isFrontmost can be true while another window still holds key
+/// status (synthesized keystrokes follow key, not the active app), so this
+/// exists for callers that need typing to land, not just frontmost to read
+/// true.
+func activateViaLaunchServices(_ target: TargetApp) {
+    guard let bundleID = target.app.bundleIdentifier else { return }
+    let open = Process()
+    open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    open.arguments = ["-b", bundleID]
+    try? open.run()
+    open.waitUntilExit()
+}
+
 /// Bring the target app to the foreground and confirm it got there.
 /// NSRunningApplication.activate from a background process is ignored under
 /// macOS cooperative activation, so fall back to the AX frontmost attribute

@@ -39,7 +39,13 @@ func inspectReport(_ target: TargetApp) -> String {
         }
         lines.append("   Buttons (\(buttons.count) total, \(order.count) distinct):")
         for key in order {
-            let marker = isCopyButtonLabel(key, selectors: target.selectors) ? "  <- matches copy selector" : ""
+            var marker = ""
+            if isCopyButtonLabel(key, selectors: target.selectors) {
+                marker = "  <- matches copy selector"
+            } else if let actions = target.selectors.messageActionsLabel,
+                      key.localizedCaseInsensitiveContains(actions) {
+                marker = "  <- message-actions toggle"
+            }
             lines.append("     \(counts[key]!)x \(key)\(marker)")
         }
 
@@ -109,6 +115,6 @@ func inspectReport(_ target: TargetApp) -> String {
         }
     }
 
-    lines.append("\nApp-wide selector results: copy=\(copyButtons(in: target).count), stop=\(hasStopButton(in: target)), input=\(inputArea(in: target) != nil ? "found" : "MISSING")")
+    lines.append("\nApp-wide selector results: copy=\(copyButtons(in: target).count), affordances=\(messageAffordances(in: target).count), stop=\(hasStopButton(in: target)), input=\(inputArea(in: target) != nil ? "found" : "MISSING")")
     return lines.joined(separator: "\n")
 }

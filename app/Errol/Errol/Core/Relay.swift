@@ -115,7 +115,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
 
     log("Seeding \(speaker.name)...")
-    var baseline = copyButtons(in: speaker).count
+    var baseline = messageAffordances(in: speaker).count
     guard send(opener, to: speaker) else { return false }
     baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
     setConversation(speaker, .chatting)
@@ -177,7 +177,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         // The listener's first message carries the rules and full context;
         // every later relay is the other agent's reply, untouched.
         let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker) : reply
-        baseline = copyButtons(in: listener).count
+        baseline = messageAffordances(in: listener).count
         guard send(payload, to: listener) else { break }
         baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
         if !signedOff { setConversation(speaker, .waiting) }

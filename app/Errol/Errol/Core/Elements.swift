@@ -61,6 +61,28 @@ func copyButtons(in target: TargetApp) -> [AXUIElement] {
     return results
 }
 
+/// The collapsed stand-in for a message's whole action bar (Claude Code's
+/// "Show message actions"); pressing it mounts the bar and removes itself.
+func isMessageActionsToggle(_ element: AXUIElement, selectors: AppSelectors) -> Bool {
+    guard let label = selectors.messageActionsLabel else { return false }
+    guard axAttribute(element, kAXRoleAttribute) as? String == kAXButtonRole as String else { return false }
+    return axLabel(element).localizedCaseInsensitiveContains(label)
+}
+
+/// Exactly one per rendered message: its mounted copy button, or the collapsed
+/// toggle standing in for the bar. Counting these is counting messages, which
+/// is what the completion baselines actually need; the tree walk is
+/// depth-first, so the last element belongs to the newest message.
+func messageAffordances(in target: TargetApp) -> [AXUIElement] {
+    guard let root = chatWindow(in: target) else { return [] }
+    var results: [AXUIElement] = []
+    findAll(in: root, where: {
+        isCopyButton($0, selectors: target.selectors)
+            || isMessageActionsToggle($0, selectors: target.selectors)
+    }, into: &results)
+    return results
+}
+
 func hasStopButton(in target: TargetApp) -> Bool {
     guard let root = chatWindow(in: target) else { return false }
     var results: [AXUIElement] = []

@@ -11,6 +11,25 @@ struct AppSelectors {
     var copyKeyword: String
     /// Reject copy buttons whose label also contains any of these.
     var copyExcludeKeywords: [String]
+    /// Label of the collapsed per-message actions toggle. Claude Code keeps
+    /// each message's action bar (Copy, Rewind, Fork, Read aloud) unmounted
+    /// behind a "Show message actions" button until a hover or an AXPress
+    /// expands it, and every conversation switch collapses all bars again —
+    /// so the bare copy count misses fresh responses there. The toggle
+    /// itself mounts exactly when a response completes (verified live,
+    /// Aug 27 2026), making it the countable stand-in for the bar. nil for
+    /// apps that mount copy buttons directly.
+    var messageActionsLabel: String?
+    /// Whether the echo of a just-sent user message registers in the
+    /// message-affordance count. Claude gives user messages the same counted
+    /// affordances as responses; ChatGPT's echo mounts "Copy message", which
+    /// the copy selector excludes, so its count only ever moves on a
+    /// response. When false, echo absorption is skipped entirely — waiting
+    /// for an echo that cannot register would swallow any response that
+    /// completes inside the wait window into the baseline (observed live in
+    /// Codex mode, Aug 27 2026, where replies can land in under 2s), leaving
+    /// the relay waiting forever on a baseline it can never exceed.
+    var echoCountsAsAffordance = true
     var stopKeyword = "stop"
     var sendKeyword = "send"
     /// Reject send buttons whose label also contains any of these. Claude
@@ -93,6 +112,8 @@ struct Config {
     var chatgptSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["message", "table", "link", "code"],
+        // The echo's "Copy message" is excluded above, so it never counts.
+        echoCountsAsAffordance: false,
         modePopupPrefix: "Switch mode, current mode:",
         modeNames: ["chatgpt": "Chat"],
         // The Chat/Work toggle pair in the "Composer mode" group (AXCheckBox
@@ -108,6 +129,9 @@ struct Config {
     var claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
+        // Claude Code's collapsed action-bar toggle; not seen on the chat
+        // surfaces, where the harmless extra match arm never fires.
+        messageActionsLabel: "Show message actions",
         // Claude Code's "Send feedback" button matches the bare send keyword
         // (observed live, Aug 2026); the chat surface has no such trap but
         // the exclude is harmless there.
