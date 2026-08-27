@@ -120,11 +120,13 @@ struct Verify {
 
         if let button = sendButton(in: target) {
             let enabled = (axAttribute(button, kAXEnabledAttribute) as? Bool) ?? false
-            report("PASS", "send-control", "present, enabled=\(enabled) (empty composer expects disabled on Claude)")
-        } else if key == "chatgpt" {
-            report("INFO", "send-control", "absent — normal on ChatGPT with an empty composer")
+            report("PASS", "send-control", "present, enabled=\(enabled)")
         } else {
-            report("FAIL", "send-control", "no send button (Claude keeps a persistent disabled one)")
+            // Neither chat surface mounts a send control over an empty
+            // composer (captured Aug 27 2026); only Claude Code keeps a
+            // persistent disabled one. The nudge tier proves it mounts and
+            // enables once text lands.
+            report("INFO", "send-control", "absent — normal with an empty composer on the chat surfaces")
         }
 
         let affordances = messageAffordances(in: target).count
@@ -165,20 +167,8 @@ struct Verify {
         }
     }
 
-    /// Known empty-composer placeholder values across both apps' surfaces.
-    /// The nudge and live tiers refuse to run over anything else: their
-    /// cleanup (or send) would take a human draft with it.
-    static let composerPlaceholders = ["Type / for commands",
-                                       "Describe a task or ask a question",
-                                       "Message ChatGPT", "Work with ChatGPT",
-                                       "Do anything",
-                                       "Write your prompt to Claude", ""]
-
-    static func composerDraft(in target: TargetApp) -> String? {
-        let value = (composerValue(in: target) ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return composerPlaceholders.contains(value) ? nil : value
-    }
+    // The draft guard (composerDraft / composerPlaceholders) lives in
+    // ErrolKit now, shared with the live test category.
 
     // MARK: nudge tier — reversible UI touches
 

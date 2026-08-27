@@ -176,3 +176,11 @@ func composerValue(in target: TargetApp) -> String? {
     guard let input = inputArea(in: target) else { return nil }
     return axAttribute(input, kAXValueAttribute) as? String
 }
+
+/// The composer's text when it holds a real draft; nil when it is empty or
+/// showing a known placeholder (composerPlaceholders in Config.swift).
+func composerDraft(in target: TargetApp) -> String? {
+    let value = (composerValue(in: target) ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return composerPlaceholders.contains(value) ? nil : value
+}

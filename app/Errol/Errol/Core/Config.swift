@@ -165,3 +165,13 @@ struct Config {
 }
 
 var config = Config()
+
+/// Known empty-composer placeholder values across both apps' surfaces. The
+/// harness tiers and the live tests refuse to act on a composer holding
+/// anything else: it could be a human draft, and a cleanup or a send would
+/// take it along (a select-all revert once ate a real draft).
+let composerPlaceholders = ["Type / for commands",
+                            "Describe a task or ask a question",
+                            "Message ChatGPT", "Work with ChatGPT",
+                            "Do anything",
+                            "Write your prompt to Claude", ""]
