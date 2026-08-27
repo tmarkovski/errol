@@ -56,6 +56,13 @@ The detection contract is testable at three cost levels, and all of them run the
 
 After an app update breaks something: `swift test` says whether the pure contract moved, `tools/verify` names the first live check that fails, and `ax-dump`'s capture-and-diff finds the new tree shape to encode back into `Config.swift` — then the harness proves the fix.
 
+Open threads in the test suite (state as of Aug 27 2026: `swift test` green, static and nudge tiers green on both live apps):
+
+- The `--live` tier has not been rerun since the SwiftPM refactor. Its internals are the same production calls the day's relay runs proved, but one `tools/verify --live all` with throwaway conversations displayed would close the loop.
+- Excluded-surface classification flaps: the "Rewind to here" window-exclusion marker lives in the hover-gated action bars, so `isExcludedWindow` says yes or no depending on whether any bar happens to be expanded. Benign on the current single-window build. Candidate fix: add "Show message actions" to `windowExcludeLabels` — but first confirm with `ax-dump` that the Claude *chat* surface doesn't use the same label for its own action bars (needs a chat conversation displayed, not yet observed).
+- Phase 2, replay fixtures: abstract the tree walk behind a small element protocol (role, label, attributes, children) so the finders in `Elements.swift`/`Readiness.swift` can run over recorded trees as well as live `AXUIElement`s. Then `ax-dump` captures of real app states become regression fixtures and the contract tests can cover the finders themselves with no apps open. This is the biggest remaining win and a deliberate refactor — design the protocol before touching call sites.
+- Small ergonomics: `nudge-expand` SKIPs when the newest message's bar is already expanded (switching conversations collapses all bars and re-arms it), and the static tier reports 0 affordances on a ChatGPT home screen — both are precondition SKIPs, not failures, but the guidance could name the fix more directly.
+
 Three build settings depart from the app template's defaults and matter: **App Sandbox is off** (a sandboxed app can neither get the Accessibility permission nor post keystrokes — with it on, Errol can do nothing), **`SWIFT_DEFAULT_ACTOR_ISOLATION` is `nonisolated`** (the engine runs on a worker thread while the main thread serves the panel; the template's main-actor default would fight that design), and **`LSUIElement` is set** (menu bar only, no Dock icon).
 
 A markdown transcript of each run is written incrementally to `~/Documents/errol-transcript.md` (the app is launched from Finder with `/` as its working directory, so the path is absolute; macOS may ask once for access to the Documents folder).
