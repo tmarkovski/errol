@@ -100,13 +100,20 @@ final class LiveRelayTests: XCTestCase {
                 pasteboard.setString(savedClipboard, forType: .string)
             }
         }
+        // The seed asks for a few exchanges before the sign-off so the run
+        // exercises the steady-state relay branch (turn 3 and later relay
+        // the reply verbatim, without the intro framing) — the first live
+        // run ended after two turns because both models signed off
+        // immediately when merely told to be brief.
         config.seed = """
             You are taking part in a brief automated integration test of this \
-            relay. Greet the other assistant, exchange at most one short \
-            pleasantry, and then end the conversation politely following the \
+            relay. Greet the other assistant and keep a light small-talk \
+            exchange going: each of you should send at least three replies \
+            before anyone ends the conversation, so do not include the end \
+            marker before your third reply. Then end politely following the \
             rules above. Keep every reply to one or two sentences.
             """
-        config.turns = 4
+        config.turns = 8
         config.timeout = 120
         config.newChats = true
         config.first = "chatgpt"
@@ -122,8 +129,13 @@ final class LiveRelayTests: XCTestCase {
         let transcript = (try? String(contentsOfFile: config.transcriptPath,
                                       encoding: .utf8)) ?? ""
         let turns = transcript.components(separatedBy: "## Turn ").count - 1
-        XCTAssertGreaterThanOrEqual(turns, 2,
-            "need at least one reply from each side; transcript: \(config.transcriptPath)")
+        // Four turns guarantees each side took a steady-state turn beyond
+        // the framed opening exchange. Reaching it depends on the models
+        // honoring the seed's three-replies-first instruction; a failure
+        // here with 2-3 clean turns means the models cut the chat short,
+        // not that the relay broke — the transcript tells them apart.
+        XCTAssertGreaterThanOrEqual(turns, 4,
+            "need two replies from each side; transcript: \(config.transcriptPath)")
         XCTAssertTrue(transcript.contains("## Turn 1: ChatGPT"),
                       "the first captured turn should be ChatGPT's reply to the seed")
         XCTAssertTrue(transcript.contains("## Turn 2: Claude"),
