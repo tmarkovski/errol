@@ -4,9 +4,10 @@
 //
 // Detection is grounded in what the apps expose over AX (verified live,
 // Aug 2026):
-// - ChatGPT announces its active mode through an AXPopUpButton labeled
-//   "Switch mode, current mode: <mode>" — "ChatGPT" is the chat surface,
-//   Codex is its own mode.
+// - ChatGPT's Chat/Work surfaces are named by the composer-level toggle pair
+//   (the "Composer mode" group); its AXPopUpButton labeled "Switch mode,
+//   current mode: <mode>" says "ChatGPT" for both and only distinguishes
+//   Codex mode.
 // - Claude Desktop windows carry an AXWebArea whose AXURL is a claude.ai
 //   URL, and its first path component names the surface ("epitaxy" is a
 //   Claude Code session; the mapping lives in AppSelectors.surfacePathNames).
@@ -31,9 +32,12 @@ struct SideStatus {
     var appName: String
     var state = ReadyState.checking
     var headline = "Checking..."
-    /// The chosen window's active surface ("Chat mode", "Codex mode", "Chat",
-    /// "Claude Code").
+    /// The chosen window's active surface ("Chat", "Work", "Cowork",
+    /// "Claude Code", "Codex mode").
     var surface: String?
+    /// The chosen window's active model plus effort ("Fable 5 · Extra",
+    /// "5.6 Sol High", or "Default"), where the window announces one.
+    var model: String?
     /// Secondary context: the window title, or other surfaces open alongside.
     var detail: String?
 }
@@ -51,8 +55,34 @@ private struct WindowScan {
     var isExcluded = false
     /// Raw mode name from the app's mode switcher popup.
     var modeLabel: String?
+    /// Display name of the selected composer surface tab ("Chat"/"Cowork"
+    /// on Claude, "Chat"/"Work" on ChatGPT).
+    var surfaceTab: String?
+    /// Surface named by the composer placeholder, for windows where the
+    /// toggle pair is not mounted (ChatGPT conversations).
+    var composerSurface: String?
+    /// Model announcement, prefix stripped ("Fable 5 · Extra"), or the bare
+    /// model popup title on Claude Code ("Fable 5").
+    var model: String?
+    /// Effort from a separate effort popup (Claude Code's "Effort: Extra");
+    /// nil where the model announcement already embeds it.
+    var effort: String?
+    /// Label of the popup visited just before the current one, for the
+    /// model-precedes-effort adjacency on Claude Code.
+    var lastPopupLabel: String?
     /// First path component of the window's claude.ai AXWebArea URL.
     var surfacePath: String?
+}
+
+/// The text after `prefix` in a joined AX label. axLabel concatenates several
+/// attributes, so an announcement can appear twice; only the text between
+/// occurrences counts.
+private func value(after prefix: String, in label: String) -> String? {
+    guard let range = label.range(of: prefix) else { return nil }
+    var rest = String(label[range.upperBound...])
+    if let repeated = rest.range(of: prefix) { rest = String(rest[..<repeated.lowerBound]) }
+    let trimmed = rest.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
 }
 
 private func scanWindow(_ window: AXUIElement, selectors: AppSelectors) -> WindowScan {
@@ -69,6 +99,11 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
 
     if role == kAXTextAreaRole as String {
         scan.hasComposer = true
+        if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
+            let label = axLabel(element)
+            scan.composerSurface = selectors.composerSurfaceNames
+                .first { label.contains($0.key) }?.value
+        }
     } else if role == kAXButtonRole as String || role == kAXTextFieldRole as String {
         if !scan.isExcluded, !selectors.windowExcludeLabels.isEmpty {
             let label = axLabel(element)
@@ -77,16 +112,51 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
             }
         }
     } else if role == kAXPopUpButtonRole as String {
-        if scan.modeLabel == nil, let prefix = selectors.modePopupPrefix {
+        let wantsMode = scan.modeLabel == nil && selectors.modePopupPrefix != nil
+        let wantsModel = scan.model == nil
+            && (selectors.modelPopupPrefix != nil || !selectors.modelPopupSuffixes.isEmpty
+                || selectors.modelPopupDefaultLabel != nil)
+        let wantsEffort = scan.effort == nil && selectors.effortPopupPrefix != nil
+        if wantsMode || wantsModel || wantsEffort {
             let label = axLabel(element)
-            if let range = label.range(of: prefix) {
-                // axLabel joins several attributes, so the announcement can
-                // appear twice; keep only the text between occurrences.
-                var rest = String(label[range.upperBound...])
-                if let repeated = rest.range(of: prefix) { rest = String(rest[..<repeated.lowerBound]) }
-                let mode = rest.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !mode.isEmpty { scan.modeLabel = mode }
+            if wantsMode, let prefix = selectors.modePopupPrefix {
+                scan.modeLabel = value(after: prefix, in: label)
             }
+            if wantsModel {
+                if let prefix = selectors.modelPopupPrefix, label.contains(prefix) {
+                    scan.model = value(after: prefix, in: label)
+                } else if selectors.modelPopupPrefix == nil {
+                    let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let lower = trimmed.lowercased()
+                    if selectors.modelPopupSuffixes.contains(where: {
+                        lower == $0 || lower.hasSuffix(" " + $0)
+                    }) {
+                        scan.model = trimmed
+                    } else if trimmed == selectors.modelPopupDefaultLabel {
+                        scan.model = "Default"
+                    }
+                }
+            }
+            if wantsEffort, let prefix = selectors.effortPopupPrefix, label.contains(prefix) {
+                scan.effort = value(after: prefix, in: label)
+                // The bare-titled model popup sits immediately before the
+                // effort popup (verified live on Claude Code, Aug 2026).
+                if scan.model == nil, let previous = scan.lastPopupLabel, !previous.isEmpty {
+                    scan.model = previous
+                }
+            }
+            scan.lastPopupLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    } else if role == kAXRadioButtonRole as String || role == kAXCheckBoxRole as String {
+        // Claude's surface tabs are AXRadioButtons, ChatGPT's are AXCheckBox
+        // toggle buttons; the title match keeps ordinary checkboxes out.
+        if scan.surfaceTab == nil, !selectors.surfaceTabNames.isEmpty,
+           let title = axAttribute(element, kAXTitleAttribute) as? String,
+           let name = selectors.surfaceTabNames.first(where: {
+               $0.caseInsensitiveCompare(title) == .orderedSame
+           }),
+           (axAttribute(element, kAXValueAttribute) as? NSNumber)?.intValue == 1 {
+            scan.surfaceTab = name
         }
     } else if role == "AXWebArea" {
         if scan.surfacePath == nil, !selectors.surfacePathNames.isEmpty,
@@ -102,14 +172,22 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
     }
 }
 
-/// Human name for a window's active surface, best signal first: the app's
-/// own mode switcher, then the claude.ai URL, then the exclusion markers.
+/// Human name for a window's active surface, best signal first: the selected
+/// composer tab (ChatGPT's mode popup says "ChatGPT" for both Chat and Work,
+/// and Claude's Chat/Cowork share a URL, so the tab outranks everything),
+/// then the composer placeholder (ChatGPT unmounts the tab pair inside a
+/// conversation), then the app's mode switcher (still names Codex mode),
+/// then the claude.ai URL, then the exclusion markers.
 private func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
+    if let tab = scan.surfaceTab { return tab }
+    if let surface = scan.composerSurface { return surface }
     if let mode = scan.modeLabel {
         return (selectors.modeNames[mode.lowercased()] ?? mode) + " mode"
     }
     if let path = scan.surfacePath {
-        return selectors.surfacePathNames[path] ?? path
+        // Unmapped paths read fine capitalized ("cowork" -> "Cowork"); the
+        // map exists only for paths whose display name differs.
+        return selectors.surfacePathNames[path] ?? path.capitalized
     }
     if scan.isExcluded { return selectors.excludedSurfaceName }
     return nil
@@ -142,7 +220,13 @@ func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSt
 
     let scans = windows.map { scanWindow($0, selectors: selectors) }
     let eligible = scans.indices.filter { !scans[$0].isExcluded }
-    let chosenIndex = eligible.first(where: { scans[$0].hasComposer }) ?? eligible.first
+    // Mirrors chatWindow: prefer a chat window; when every window is excluded
+    // and the selectors allow it, fall back to an excluded-surface window
+    // with a composer (a Claude Code session).
+    var chosenIndex = eligible.first(where: { scans[$0].hasComposer }) ?? eligible.first
+    if chosenIndex == nil, selectors.excludedSurfaceIsFallback {
+        chosenIndex = scans.indices.first(where: { scans[$0].hasComposer })
+    }
     let chosenSurface = chosenIndex.flatMap { surfaceName(scans[$0], selectors: selectors) }
 
     // Surfaces open in windows other than the chosen one (e.g. a Claude Code
@@ -167,6 +251,12 @@ func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSt
 
     let chosen = scans[chosenIndex]
     status.surface = chosenSurface
+    status.model = chosen.model
+    if let effort = chosen.effort {
+        // Claude Code announces effort separately; render it the way the
+        // chat surfaces embed it ("Fable 5 · Extra").
+        status.model = status.model.map { "\($0) \u{00B7} \(effort)" } ?? effort
+    }
     var details: [String] = []
     if !chosen.title.isEmpty, chosen.title.localizedCaseInsensitiveCompare(name) != .orderedSame {
         details.append("\u{201C}\(chosen.title)\u{201D}")

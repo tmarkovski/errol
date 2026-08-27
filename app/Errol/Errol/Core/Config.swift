@@ -13,20 +13,59 @@ struct AppSelectors {
     var copyExcludeKeywords: [String]
     var stopKeyword = "stop"
     var sendKeyword = "send"
+    /// Reject send buttons whose label also contains any of these. Claude
+    /// Code's "Send feedback" button matches the bare send keyword.
+    var sendExcludeKeywords: [String] = []
     /// A window containing a button or text field with any of these labels is
     /// not a chat window (e.g. Claude Code session windows inside Claude Desktop).
     var windowExcludeLabels: [String] = []
+    /// Allow targeting an excluded-surface window that has a composer when
+    /// the app has no chat window at all (e.g. Claude Desktop showing only a
+    /// Claude Code session). An open chat window always wins.
+    var excludedSurfaceIsFallback = false
     /// What an excluded window is, for the readiness strip ("Claude Code").
     var excludedSurfaceName: String?
     /// Label prefix of the AXPopUpButton that announces the app's active
     /// mode; the text after the prefix names the mode (ChatGPT exposes
     /// "Switch mode, current mode: ChatGPT", or ": Codex" in Codex mode).
+    /// ChatGPT's popup does NOT track its Chat/Work composer toggle — it says
+    /// "ChatGPT" in both — so the surface tab always outranks this.
     var modePopupPrefix: String?
     /// Display names for raw mode names, keyed lowercased ("chatgpt" -> "Chat").
     var modeNames: [String: String] = [:]
     /// Surface names keyed by the first path component of a window's
     /// claude.ai AXWebArea URL. Empty for apps without claude.ai URLs.
     var surfacePathNames: [String: String] = [:]
+    /// Titles of the composer-level surface-tab toggles, matched
+    /// case-insensitively; the tab with AXValue 1 is the active surface and
+    /// is displayed under the name given here. Claude renders the pair as
+    /// AXRadioButtons ("Chat"/"Cowork"), ChatGPT as AXCheckBox toggle
+    /// buttons ("Chat"/"Work"); both apps share one window, URL, composer,
+    /// and sidebar across the pair, so this toggle is the only direct signal.
+    var surfaceTabNames: [String] = []
+    /// Surface names keyed by a substring of the composer's placeholder
+    /// label, for windows where the surface toggle is not mounted — ChatGPT
+    /// removes the Chat/Work pair once a conversation opens, leaving the
+    /// per-surface placeholder as the only marker.
+    var composerSurfaceNames: [String: String] = [:]
+    /// Label prefix of the AXPopUpButton announcing the active model; the
+    /// text after it is model plus effort ("Model: Fable 5 · Extra").
+    var modelPopupPrefix: String?
+    /// For apps whose model pill has no prefix (ChatGPT): an AXPopUpButton
+    /// whose label ends with one of these effort words is the pill, and the
+    /// whole label is the model string — "5.6 Sol High" with a model chosen,
+    /// bare "High" on the default. Unobserved effort names must be added
+    /// here. Ignored when modelPopupPrefix is set.
+    var modelPopupSuffixes: [String] = []
+    /// With the default model active, ChatGPT's pill drops the title and
+    /// carries only this description (title and description swap between
+    /// states); a pill matching it exactly reports "Default".
+    var modelPopupDefaultLabel: String?
+    /// Label prefix of a separate effort popup. Claude Code's composer splits
+    /// the announcement across two adjacent popups — a bare-titled model
+    /// ("Fable 5") immediately followed by "Effort: Extra" — so the effort
+    /// match also names the popup right before it as the model.
+    var effortPopupPrefix: String?
 }
 
 struct Config {
@@ -55,21 +94,44 @@ struct Config {
         copyKeyword: "copy",
         copyExcludeKeywords: ["message", "table", "link", "code"],
         modePopupPrefix: "Switch mode, current mode:",
-        modeNames: ["chatgpt": "Chat"])
+        modeNames: ["chatgpt": "Chat"],
+        // The Chat/Work toggle pair in the "Composer mode" group (AXCheckBox
+        // toggle buttons) exists only on the home screen; open conversations
+        // fall back to the placeholder. "Message ChatGPT" and the Work home
+        // screen's "Work with ChatGPT" are verified live (Aug 2026); a Work
+        // conversation keeping that placeholder is expected, not yet observed.
+        surfaceTabNames: ["Chat", "Work"],
+        composerSurfaceNames: ["Message ChatGPT": "Chat", "Work with ChatGPT": "Work"],
+        // "high" and "medium" observed live (Aug 2026); "low" is expected.
+        modelPopupSuffixes: ["high", "medium", "low"],
+        modelPopupDefaultLabel: "Select ChatGPT model")
     var claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
+        // Claude Code's "Send feedback" button matches the bare send keyword
+        // (observed live, Aug 2026); the chat surface has no such trap but
+        // the exclude is harmless there.
+        sendExcludeKeywords: ["feedback"],
+        // Of these, only "Rewind to here" is present in current Claude Code
+        // trees (Aug 2026); the terminal labels appear only with a terminal
+        // pane open. Markers are ORed, so stale extras cost nothing.
         windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"],
+        excludedSurfaceIsFallback: true,
         excludedSurfaceName: "Claude Code",
-        // Only "epitaxy" is verified against a live tree; the rest are the
+        // Only paths whose display name differs from the capitalized path
+        // (unmapped ones fall back to that: "cowork" -> "Cowork"). "epitaxy"
+        // and "cowork" are verified against live trees; the rest are the
         // expected paths for surfaces not yet observed over AX.
         surfacePathNames: [
             "epitaxy": "Claude Code",
-            "chat": "Chat",
             "new": "New chat",
             "project": "Project chat",
-            "projects": "Projects",
-        ])
+        ],
+        surfaceTabNames: ["Chat", "Cowork"],
+        // Chat and Cowork announce model plus effort in one "Model:" popup;
+        // Claude Code splits them into the bare-model + "Effort:" pair.
+        modelPopupPrefix: "Model:",
+        effortPopupPrefix: "Effort:")
 
     static func documentsPath(_ name: String) -> String {
         (FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first

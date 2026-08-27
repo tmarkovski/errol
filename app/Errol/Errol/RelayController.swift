@@ -22,6 +22,8 @@ final class RelayController: ObservableObject {
     @Published var logLines: [LogLine] = []
     @Published var chatgptStatus = SideStatus(appName: "ChatGPT")
     @Published var claudeStatus = SideStatus(appName: "Claude")
+    @Published var chatgptConversation = ConversationStatus.notStarted
+    @Published var claudeConversation = ConversationStatus.notStarted
     private var nextLogID = 0
     private let scanner = ReadinessScanner()
     private var panelVisible = false
@@ -31,6 +33,12 @@ final class RelayController: ObservableObject {
             DispatchQueue.main.async {
                 self?.chatgptStatus = chatgpt
                 self?.claudeStatus = claude
+            }
+        }
+        conversationStatusSink = { [weak self] chatgpt, claude in
+            DispatchQueue.main.async {
+                self?.chatgptConversation = chatgpt
+                self?.claudeConversation = claude
             }
         }
     }
@@ -71,6 +79,8 @@ final class RelayController: ObservableObject {
         isRunning = true
         updateScanner()
         relayCancelled.set(false)
+        chatgptConversation = .notStarted
+        claudeConversation = .notStarted
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
 

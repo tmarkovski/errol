@@ -29,11 +29,17 @@ func hasTextArea(_ window: AXUIElement) -> Bool {
     return !areas.isEmpty
 }
 
-/// The window all searches are scoped to. Windows with exclusion markers
-/// (e.g. Claude Code sessions inside Claude Desktop) are never eligible.
+/// The window all searches are scoped to: the first chat window, preferring
+/// one with a composer. When every window carries an exclusion marker and the
+/// selectors allow it, an excluded-surface window with a composer (a Claude
+/// Code session in Claude Desktop) is targeted instead — an open chat window
+/// always wins.
 func chatWindow(in target: TargetApp) -> AXUIElement? {
-    let eligible = axWindows(target).filter { !isExcludedWindow($0, selectors: target.selectors) }
-    return eligible.first(where: hasTextArea) ?? eligible.first
+    let windows = axWindows(target)
+    let chat = windows.filter { !isExcludedWindow($0, selectors: target.selectors) }
+    if let window = chat.first(where: hasTextArea) ?? chat.first { return window }
+    guard target.selectors.excludedSurfaceIsFallback else { return nil }
+    return windows.first(where: hasTextArea)
 }
 
 func isCopyButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
@@ -70,7 +76,11 @@ func sendButton(in target: TargetApp) -> AXUIElement? {
     var results: [AXUIElement] = []
     findAll(in: root, where: { el in
         guard axAttribute(el, kAXRoleAttribute) as? String == kAXButtonRole as String else { return false }
-        return axLabel(el).localizedCaseInsensitiveContains(target.selectors.sendKeyword)
+        let label = axLabel(el)
+        guard label.localizedCaseInsensitiveContains(target.selectors.sendKeyword) else { return false }
+        for exclude in target.selectors.sendExcludeKeywords
+            where label.localizedCaseInsensitiveContains(exclude) { return false }
+        return true
     }, into: &results)
     return results.first
 }

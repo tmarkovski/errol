@@ -59,11 +59,13 @@ struct ControlPanelView: View {
     /// arrangement uses — each with its live readiness and detected surface.
     private var readinessStrip: some View {
         HStack(spacing: 8) {
-            SideStatusCard(status: controller.chatgptStatus)
+            SideStatusCard(status: controller.chatgptStatus,
+                           conversation: controller.chatgptConversation)
             Image(systemName: "arrow.left.arrow.right")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
-            SideStatusCard(status: controller.claudeStatus)
+            SideStatusCard(status: controller.claudeStatus,
+                           conversation: controller.claudeConversation)
         }
     }
 
@@ -101,6 +103,7 @@ struct ControlPanelView: View {
 
 private struct SideStatusCard: View {
     let status: SideStatus
+    let conversation: ConversationStatus
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -120,6 +123,9 @@ private struct SideStatusCard: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            Text(conversation.rawValue)
+                .font(.system(size: 11))
+                .foregroundColor(conversation == .ended ? .orange : .secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -131,7 +137,8 @@ private struct SideStatusCard: View {
     /// A single space keeps the card height stable when there is no surface
     /// to show yet.
     private var subline: String {
-        let parts = [status.surface, status.detail].compactMap { $0 }
+        let lead = [status.surface, status.model].compactMap { $0 }.joined(separator: " · ")
+        let parts = [lead.isEmpty ? nil : lead, status.detail].compactMap { $0 }
         return parts.isEmpty ? " " : parts.joined(separator: " — ")
     }
 
@@ -148,3 +155,4 @@ private struct SideStatusCard: View {
 #Preview {
     ControlPanelView(controller: RelayController())
 }
+

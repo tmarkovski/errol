@@ -12,9 +12,11 @@ func relayRules() -> String {
     """
     This is an automated agent-to-agent conversation: your replies are relayed \
     to another AI assistant, and its replies are relayed back to you. The human \
-    who set this up is not taking part in the conversation. You can end the \
-    conversation at any time by replying with an empty message or by including \
-    \(config.stopSequence) anywhere in a reply.
+    who set this up is not taking part in the conversation. When you want to \
+    end the conversation, include \(config.stopSequence) anywhere in a reply. \
+    When the other assistant does so, reply with your own goodbye containing \
+    \(config.stopSequence) — the conversation closes once both sides have sent \
+    it. Replying with an empty message ends the conversation immediately.
     """
 }
 
@@ -44,13 +46,20 @@ func introMessage(firstReply: String, from other: TargetApp) -> String {
     """
 }
 
-/// The agents' side of the stop protocol.
-func isStopReply(_ reply: String) -> Bool {
-    let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty || trimmed.localizedCaseInsensitiveContains(config.stopSequence)
+// MARK: - Run
+
+/// Per-side conversation state during a relay run, shown under each side's
+/// readiness card in the panel.
+enum ConversationStatus: String {
+    case notStarted = "Not started"
+    case chatting = "Chatting\u{2026}"
+    case waiting = "Waiting"
+    case ended = "Conversation ended"
 }
 
-// MARK: - Run
+/// Set by the app layer; called on the relay worker thread with both sides'
+/// statuses (ChatGPT first) whenever either changes.
+var conversationStatusSink: ((ConversationStatus, ConversationStatus) -> Void)?
 
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
@@ -60,16 +69,21 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         return false
     }
 
-    // Preflight: refuse to run without an eligible chat window in each app.
-    // (A Claude Code session window inside Claude Desktop does not count.)
+    // Preflight: refuse to run without a targetable window in each app — an
+    // eligible chat window, or (where the selectors allow it) an excluded-
+    // surface window with a composer, e.g. a Claude Code session in Claude
+    // Desktop when no chat conversation is open.
     for target in [chatgpt, claude] {
         guard let window = chatWindow(in: target) else {
-            log("ERROR: \(target.name): no eligible chat window found.")
-            log("Open a regular chat conversation in \(target.name) and press Start again. (Inspect shows how each window was classified.)")
+            log("ERROR: \(target.name): no targetable window found.")
+            log("Open a chat conversation in \(target.name) and press Start again. (Inspect shows how each window was classified.)")
             return false
         }
         let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? "untitled"
         log("\(target.name): targeting window \"\(title)\"")
+        if isExcludedWindow(window, selectors: target.selectors) {
+            log("\(target.name): NOTE: no chat window is open; targeting a \(target.selectors.excludedSurfaceName ?? "non-chat") window instead. Everything relayed will land in that session.")
+        }
         if inputArea(in: target) == nil {
             log("ERROR: \(target.name): chat window has no composer text area.")
             return false
@@ -88,6 +102,14 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
     var listener = speaker.app == chatgpt.app ? claude : chatgpt
 
+    var chatgptConversation = ConversationStatus.notStarted
+    var claudeConversation = ConversationStatus.notStarted
+    func setConversation(_ target: TargetApp, _ status: ConversationStatus) {
+        if target.app == chatgpt.app { chatgptConversation = status }
+        else { claudeConversation = status }
+        conversationStatusSink?(chatgptConversation, claudeConversation)
+    }
+
     appendTranscript("# Errol transcript, \(iso.string(from: Date()))\n\n")
     let opener = openingMessage()
     appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
@@ -96,6 +118,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     var baseline = copyButtons(in: speaker).count
     guard send(opener, to: speaker) else { return false }
     baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
+    setConversation(speaker, .chatting)
+    setConversation(listener, .waiting)
+
+    // A sign-off is relayed like any reply so the peer sees it; the run ends
+    // when two consecutive replies carry the stop sequence.
+    var lastReplyEnded = false
 
     for turn in 1...config.turns {
         guard waitForResponse(in: speaker, baselineCopyCount: baseline) else {
@@ -114,11 +142,24 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
 
         appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
 
-        if isStopReply(reply) {
-            log("\(speaker.name) ended the conversation (empty reply or stop sequence).")
+        let trimmedReply = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedReply.isEmpty {
+            setConversation(speaker, .ended)
+            log("\(speaker.name) ended the conversation (empty reply).")
             appendTranscript("_\(speaker.name) ended the conversation._\n\n")
             break
         }
+        let signedOff = trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
+        if signedOff {
+            setConversation(speaker, .ended)
+            appendTranscript("_\(speaker.name) ended the conversation._\n\n")
+            if lastReplyEnded {
+                log("\(speaker.name) ended the conversation too — both sides have signed off.")
+                break
+            }
+            log("\(speaker.name) ended the conversation; relaying the sign-off so \(listener.name) can close out.")
+        }
+        lastReplyEnded = signedOff
 
         log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
 
@@ -139,8 +180,15 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         baseline = copyButtons(in: listener).count
         guard send(payload, to: listener) else { break }
         baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
+        if !signedOff { setConversation(speaker, .waiting) }
+        setConversation(listener, .chatting)
         swap(&speaker, &listener)
     }
+
+    // A side frozen mid-state by a cap, stop, or error is not in a
+    // conversation anymore; only a real sign-off survives as "ended".
+    if chatgptConversation != .ended { setConversation(chatgpt, .notStarted) }
+    if claudeConversation != .ended { setConversation(claude, .notStarted) }
 
     log("Done. Transcript: \(config.transcriptPath)")
     return true
