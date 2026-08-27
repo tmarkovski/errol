@@ -1,0 +1,38 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Claude",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 1 },
+          { "role": "AXRadioButton", "description": "Code, idle", "value": 0 }
+        ]
+      },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/new",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              {
+                "role": "AXRadioGroup",
+                "children": [
+                  { "role": "AXRadioButton", "title": "Chat", "value": 0 },
+                  { "role": "AXRadioButton", "title": "Cowork", "value": 1 }
+                ]
+              },
+              { "role": "AXTextArea", "description": "Write your prompt to Claude", "value": "" },
+              { "role": "AXPopUpButton", "description": "Model: Opus 5 · Extra" },
+              { "role": "AXButton", "description": "Clear active" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

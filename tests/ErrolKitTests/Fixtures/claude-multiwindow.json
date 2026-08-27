@@ -1,0 +1,70 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Errol brand naming",
+    "children": [
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/chat/8f3c2a91-77aa-4bfa-9f21-0d6e2b9d5c44",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Copy message" } ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Copy", "help": "newest" } ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Write your prompt to Claude", "value": "" },
+              { "role": "AXPopUpButton", "description": "Model: Fable 5 · Extra" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "role": "AXWindow",
+    "title": "Claude Code",
+    "children": [
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/epitaxy/a1b2c3d4-5e6f-7089-9abc-def012345678",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Session transcript",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [
+                  { "role": "AXButton", "description": "Copy" },
+                  { "role": "AXButton", "description": "Rewind to here" }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Prompt", "value": "" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

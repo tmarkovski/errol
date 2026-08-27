@@ -1,0 +1,33 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Errol project",
+    "children": [
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/project/0a1b2c3d-4e5f-6789-abcd-ef0123456789",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Copy", "help": "newest" } ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Write your prompt to Claude", "value": "" },
+              { "role": "AXPopUpButton", "description": "Model: Fable 5 · Extra" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

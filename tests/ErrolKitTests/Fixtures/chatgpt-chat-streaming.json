@@ -1,0 +1,40 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Logo brainstorm",
+    "children": [
+      {
+        "role": "AXGroup",
+        "children": [
+          { "role": "AXPopUpButton", "description": "Switch mode, current mode: ChatGPT" },
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "description": "User message",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" },
+                  { "role": "AXButton", "description": "Edit message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Assistant message, streaming"
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Message ChatGPT", "value": "" },
+              { "role": "AXButton", "description": "Stop streaming" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

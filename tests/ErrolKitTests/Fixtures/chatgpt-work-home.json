@@ -1,0 +1,39 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "ChatGPT",
+    "children": [
+      {
+        "role": "AXGroup",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New chat" },
+          { "role": "AXButton", "title": "Quarterly report" }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Composer mode",
+            "children": [
+              { "role": "AXCheckBox", "subrole": "AXToggleButton", "title": "Chat", "value": 0 },
+              { "role": "AXCheckBox", "subrole": "AXToggleButton", "title": "Work", "value": 1 }
+            ]
+          },
+          { "role": "AXPopUpButton", "description": "Switch mode, current mode: ChatGPT" },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Work with ChatGPT", "value": "" },
+              { "role": "AXPopUpButton", "title": "5.6 Sol High" },
+              { "role": "AXButton", "description": "Choose tool" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

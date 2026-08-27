@@ -29,6 +29,7 @@ let package = Package(
         .testTarget(
             name: "ErrolKitTests",
             dependencies: ["ErrolKit"],
-            path: "tests/ErrolKitTests"),
+            path: "tests/ErrolKitTests",
+            resources: [.copy("Fixtures")]),
     ]
 )

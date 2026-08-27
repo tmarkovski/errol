@@ -130,7 +130,7 @@ func describeValue(_ value: CFTypeRef) -> String {
 // MARK: - Element rendering
 
 struct Options {
-    enum Mode { case list, summary, tree, buttons, find(String), menus }
+    enum Mode { case list, summary, tree, buttons, find(String), menus, capture }
     var mode = Mode.summary
     var appSpec: String?
     var windowIndex: Int?
@@ -301,6 +301,50 @@ func runFind(_ appElement: AXUIElement, query: String, options: Options) {
     print("\(matches) element(s) matching \"\(query)\"")
 }
 
+// MARK: - Capture (fixture JSON)
+
+/// One node in the schema ErrolKit's FixtureElement decodes (see
+/// app/Errol/Errol/Core/ElementNode.swift): role, subrole, the label
+/// attributes under their own keys, value, url, children. Empty strings are
+/// dropped, long values truncated — detection reads labels and short values,
+/// never message bodies.
+func captureNode(_ element: AXUIElement, depth: Int, options: Options) -> [String: Any] {
+    let attrs = axMultiple(element, [kAXRoleAttribute, kAXSubroleAttribute,
+                                     kAXValueAttribute, "AXURL"] + labelAttributes)
+    var node: [String: Any] = [:]
+    if let role = attrs[kAXRoleAttribute] as? String { node["role"] = role }
+    if let subrole = attrs[kAXSubroleAttribute] as? String { node["subrole"] = subrole }
+    if let text = attrs[kAXDescriptionAttribute] as? String, !text.isEmpty { node["description"] = text }
+    if let text = attrs[kAXTitleAttribute] as? String, !text.isEmpty { node["title"] = text }
+    if let text = attrs[kAXHelpAttribute] as? String, !text.isEmpty { node["help"] = text }
+    if let text = attrs["AXLabel"] as? String, !text.isEmpty { node["label"] = text }
+    if let value = attrs[kAXValueAttribute] {
+        if let string = value as? String {
+            node["value"] = string.count > 300 ? String(string.prefix(300)) : string
+        } else if CFGetTypeID(value) == CFBooleanGetTypeID() {
+            node["value"] = (value as! Bool)
+        } else if let number = value as? NSNumber {
+            node["value"] = number
+        }
+    }
+    if let url = attrs["AXURL"] as? NSURL, let absolute = url.absoluteString { node["url"] = absolute }
+    if depth < options.maxDepth {
+        let children = axChildren(element).map { captureNode($0, depth: depth + 1, options: options) }
+        if !children.isEmpty { node["children"] = children }
+    }
+    return node
+}
+
+/// stdout is a JSON array of the selected windows' trees, ready to drop into
+/// tests/ErrolKitTests/Fixtures/<scenario>.json.
+func runCapture(_ appElement: AXUIElement, options: Options) {
+    let windows = selectedWindows(appElement, options: options)
+        .map { captureNode($0.1, depth: 0, options: options) }
+    let data = try! JSONSerialization.data(withJSONObject: windows,
+                                           options: [.prettyPrinted, .sortedKeys])
+    print(String(data: data, encoding: .utf8)!)
+}
+
 func runMenus(_ appElement: AXUIElement, options: Options) {
     guard let menuBar = axAttribute(appElement, kAXMenuBarAttribute) else {
         print("no menu bar exposed")
@@ -362,6 +406,8 @@ modes (default: summary)
   --buttons        distinct button labels with counts, plus text inputs
   --find <text>    all attributes of elements matching role/subrole/label/value
   --menus          menu bar tree (menu items are hover-free AX targets)
+  --capture        fixture JSON of the windows' trees, for the contract tests
+                   (redirect into tests/ErrolKitTests/Fixtures/<scenario>.json)
 
 options
   --window <n>     restrict to window n (index from --summary)
@@ -386,6 +432,7 @@ func parseOptions() -> Options {
         case "--buttons": options.mode = .buttons
         case "--find": options.mode = .find(next(arg))
         case "--menus": options.mode = .menus
+        case "--capture": options.mode = .capture
         case "--window": options.windowIndex = Int(next(arg)) ?? -1
         case "--depth": options.maxDepth = Int(next(arg)) ?? 80
         case "--frames": options.frames = true
@@ -435,7 +482,13 @@ AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kC
 AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
 Thread.sleep(forTimeInterval: 0.4)
 
-print("=== \(app.localizedName ?? "?") (\(app.bundleIdentifier ?? "?")) pid \(app.processIdentifier) ===")
+let heading = "=== \(app.localizedName ?? "?") (\(app.bundleIdentifier ?? "?")) pid \(app.processIdentifier) ==="
+if case .capture = options.mode {
+    // stdout must stay pure JSON; the heading goes to stderr.
+    FileHandle.standardError.write((heading + "\n").data(using: .utf8)!)
+} else {
+    print(heading)
+}
 
 switch options.mode {
 case .list: break
@@ -444,4 +497,5 @@ case .tree: runTree(appElement, options: options)
 case .buttons: runButtons(appElement, options: options)
 case .find(let query): runFind(appElement, query: query, options: options)
 case .menus: runMenus(appElement, options: options)
+case .capture: runCapture(appElement, options: options)
 }

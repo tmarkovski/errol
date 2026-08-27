@@ -29,18 +29,18 @@ func openingMessage() -> String {
 
 /// What the second agent receives on its first turn: the rules, the human's
 /// initial message, and the first agent's response to it.
-func introMessage(firstReply: String, from other: TargetApp) -> String {
+func introMessage(firstReply: String, from otherName: String) -> String {
     relayRules() + """
     \n
-    Below are the human's initial message and \(other.name)'s response to it, \
+    Below are the human's initial message and \(otherName)'s response to it, \
     so you have the full context. Continue the conversation by replying to \
-    \(other.name).
+    \(otherName).
 
     --- Initial message from the human ---
 
     \(config.seed)
 
-    --- \(other.name)'s response ---
+    --- \(otherName)'s response ---
 
     \(firstReply)
     """
@@ -176,7 +176,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
 
         // The listener's first message carries the rules and full context;
         // every later relay is the other agent's reply, untouched.
-        let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker) : reply
+        let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker.name) : reply
         baseline = messageAffordances(in: listener).count
         guard send(payload, to: listener) else { break }
         baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)

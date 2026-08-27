@@ -68,10 +68,16 @@ func copyLastResponse(from target: TargetApp) -> String? {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+/// The per-message length cap, applied before pasting — the protection
+/// (with the turn cap) against two chatty models burning through usage.
+func truncatedForRelay(_ text: String) -> String {
+    guard text.count > config.maxChars else { return text }
+    return String(text.prefix(config.maxChars)) + "\n\n[truncated by relay]"
+}
+
 func send(_ text: String, to target: TargetApp) -> Bool {
-    var payload = text
-    if payload.count > config.maxChars {
-        payload = String(payload.prefix(config.maxChars)) + "\n\n[truncated by relay]"
+    let payload = truncatedForRelay(text)
+    if payload.count != text.count {
         log("\(target.name): payload truncated to \(config.maxChars) chars")
     }
 

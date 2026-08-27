@@ -1,0 +1,43 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "errol test suite",
+    "children": [
+      {
+        "role": "AXGroup",
+        "children": [
+          { "role": "AXPopUpButton", "description": "Switch mode, current mode: Codex" },
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "description": "User message",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" },
+                  { "role": "AXButton", "description": "Edit message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Assistant message",
+                "children": [
+                  { "role": "AXButton", "description": "Copy", "help": "newest" }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "value": "" },
+              { "role": "AXPopUpButton", "description": "Select ChatGPT model" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

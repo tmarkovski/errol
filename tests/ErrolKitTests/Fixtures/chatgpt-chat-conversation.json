@@ -1,0 +1,82 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Logo brainstorm",
+    "children": [
+      {
+        "role": "AXGroup",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New chat" },
+          { "role": "AXButton", "title": "Logo brainstorm" },
+          { "role": "AXButton", "title": "Trip planning" }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "children": [
+          { "role": "AXPopUpButton", "description": "Switch mode, current mode: ChatGPT" },
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "description": "User message",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" },
+                  { "role": "AXButton", "description": "Edit message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Assistant message",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "description": "Code block",
+                    "children": [ { "role": "AXButton", "description": "Copy code" } ]
+                  },
+                  { "role": "AXButton", "description": "Copy" },
+                  { "role": "AXButton", "description": "Good response" },
+                  { "role": "AXButton", "description": "Bad response" },
+                  { "role": "AXButton", "description": "Read aloud" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "User message",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" },
+                  { "role": "AXButton", "description": "Edit message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Assistant message",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "description": "Table",
+                    "children": [ { "role": "AXButton", "description": "Copy table" } ]
+                  },
+                  { "role": "AXButton", "description": "Copy", "help": "newest" },
+                  { "role": "AXButton", "description": "Good response" }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Message ChatGPT", "value": "half-typed reply" },
+              { "role": "AXPopUpButton", "title": "5.6 Sol Medium" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

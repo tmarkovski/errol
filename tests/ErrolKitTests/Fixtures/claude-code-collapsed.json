@@ -1,0 +1,52 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Claude",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 0 },
+          { "role": "AXRadioButton", "description": "Code, idle", "value": 1 }
+        ]
+      },
+      { "role": "AXButton", "description": "Open sidebar" },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/epitaxy/a1b2c3d4-5e6f-7089-9abc-def012345678",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Session transcript",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Show message actions" } ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Show message actions" } ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [ { "role": "AXButton", "description": "Show message actions" } ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXPopUpButton", "title": "Fable 5" },
+              { "role": "AXPopUpButton", "description": "Effort: Extra" },
+              { "role": "AXPopUpButton", "description": "Usage: context 12%, plan 40%" },
+              { "role": "AXTextArea", "description": "Prompt", "value": "" },
+              { "role": "AXButton", "description": "Send feedback", "title": "Send feedback" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "Errol brand naming",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 1 },
+          { "role": "AXRadioButton", "description": "Code, idle", "value": 0 }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New chat" },
+          { "role": "AXButton", "title": "Errol brand naming" },
+          { "role": "AXButton", "title": "Owl logo concepts" }
+        ]
+      },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/chat/8f3c2a91-77aa-4bfa-9f21-0d6e2b9d5c44",
+        "children": [
+          {
+            "role": "AXGroup",
+            "description": "Conversation",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" },
+                  { "role": "AXButton", "description": "Edit message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "description": "Code block",
+                    "children": [ { "role": "AXButton", "description": "Copy code" } ]
+                  },
+                  { "role": "AXButton", "description": "Copy" },
+                  { "role": "AXButton", "description": "Retry" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [
+                  { "role": "AXButton", "description": "Copy message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "children": [
+                  { "role": "AXButton", "description": "Copy", "help": "newest" },
+                  { "role": "AXButton", "description": "Retry" }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "description": "Composer",
+            "children": [
+              { "role": "AXTextArea", "description": "Write your prompt to Claude", "value": "" },
+              { "role": "AXPopUpButton", "description": "Model: Fable 5 · Extra" },
+              { "role": "AXButton", "description": "Send" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,1858 @@
+[
+  {
+    "children" : [
+      {
+        "children" : [
+          {
+            "children" : [
+              {
+                "children" : [
+                  {
+                    "children" : [
+                      {
+                        "children" : [
+                          {
+                            "children" : [
+                              {
+                                "children" : [
+                                  {
+                                    "role" : "AXGroup",
+                                    "value" : ""
+                                  }
+                                ],
+                                "role" : "AXWebArea",
+                                "url" : "file:\/\/\/Applications\/Claude.app\/Contents\/Resources\/app.asar\/.vite\/renderer\/main_window\/index.html",
+                                "value" : ""
+                              }
+                            ],
+                            "role" : "AXGroup",
+                            "value" : ""
+                          },
+                          {
+                            "children" : [
+                              {
+                                "children" : [
+                                  {
+                                    "children" : [
+                                      {
+                                        "children" : [
+                                          {
+                                            "children" : [
+                                              {
+                                                "children" : [
+                                                  {
+                                                    "children" : [
+                                                      {
+                                                        "children" : [
+                                                          {
+                                                            "description" : "Resize sidebar",
+                                                            "role" : "AXSplitter",
+                                                            "value" : 303
+                                                          },
+                                                          {
+                                                            "description" : "Collapse sidebar",
+                                                            "role" : "AXButton",
+                                                            "value" : ""
+                                                          },
+                                                          {
+                                                            "description" : "Back",
+                                                            "role" : "AXButton",
+                                                            "value" : ""
+                                                          },
+                                                          {
+                                                            "description" : "Forward",
+                                                            "role" : "AXButton",
+                                                            "value" : ""
+                                                          },
+                                                          {
+                                                            "children" : [
+                                                              {
+                                                                "description" : "Chat and Cowork",
+                                                                "role" : "AXRadioButton",
+                                                                "value" : 1
+                                                              },
+                                                              {
+                                                                "description" : "Code, working",
+                                                                "role" : "AXRadioButton",
+                                                                "value" : 0
+                                                              }
+                                                            ],
+                                                            "description" : "Mode",
+                                                            "role" : "AXRadioGroup",
+                                                            "value" : ""
+                                                          },
+                                                          {
+                                                            "children" : [
+                                                              {
+                                                                "role" : "AXButton",
+                                                                "title" : "New",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "description" : "Quick task",
+                                                                "role" : "AXButton",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "role" : "AXButton",
+                                                                "title" : "Projects",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "role" : "AXButton",
+                                                                "title" : "Artifacts",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "role" : "AXButton",
+                                                                "title" : "Scheduled",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "children" : [
+                                                                  {
+                                                                    "role" : "AXStaticText",
+                                                                    "value" : "Dispatch"
+                                                                  },
+                                                                  {
+                                                                    "role" : "AXStaticText",
+                                                                    "value" : "Beta"
+                                                                  }
+                                                                ],
+                                                                "role" : "AXButton",
+                                                                "title" : "Dispatch Beta",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "role" : "AXButton",
+                                                                "title" : "Customize",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "children" : [
+                                                                  {
+                                                                    "role" : "AXButton",
+                                                                    "title" : "Scheduled",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "role" : "AXButton",
+                                                                    "title" : "Projects",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "description" : "All projects",
+                                                                    "role" : "AXButton",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "description" : "Create project",
+                                                                    "role" : "AXButton",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "role" : "AXStaticText",
+                                                                    "value" : "Pin projects to keep them here"
+                                                                  },
+                                                                  {
+                                                                    "role" : "AXButton",
+                                                                    "title" : "Pinned",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 18"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 18",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 18",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 25"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 25",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 25",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 19"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 19",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 19",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 21"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 21",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 21",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 03"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 03",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 03",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 15"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 15",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 15",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "role" : "AXButton",
+                                                                    "title" : "Chats and tasks",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "description" : "View all",
+                                                                    "role" : "AXButton",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "description" : "Search",
+                                                                        "role" : "AXButton",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "description" : "Filter and group recents",
+                                                                    "role" : "AXPopUpButton",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 06"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 06",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 06",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 12"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 12",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 12",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "description" : "Mark as unread",
+                                                                                    "role" : "AXImage",
+                                                                                    "value" : ""
+                                                                                  }
+                                                                                ],
+                                                                                "description" : "Mark as unread",
+                                                                                "role" : "AXButton",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 22"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Mark as unread Recent chat 22",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 22",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      },
+                                                                      {
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 11"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 11",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 11",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 14"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 14",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 14",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 24"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 24",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 24",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 17"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 17",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 17",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 13"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 13",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 13",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 02"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 02",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 02",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 06"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 06",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 06",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 07"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 07",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 07",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 05"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 05",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 05",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 04"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 04",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 04",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 20"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 20",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 20",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 16"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 16",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 16",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 01"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 01",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 01",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 08"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 08",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 08",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 09"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 09",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 09",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 23"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 23",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 23",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "Idle",
+                                                                                "role" : "AXImage",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXStaticText",
+                                                                                    "value" : "Recent chat 10"
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXButton",
+                                                                            "title" : "Idle Recent chat 10",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "description" : "More options for Recent chat 10",
+                                                                                "role" : "AXPopUpButton",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  }
+                                                                ],
+                                                                "role" : "AXGroup",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "children" : [
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "description" : "Design (opens in a new window)",
+                                                                        "role" : "AXButton",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "description" : "User",
+                                                                            "role" : "AXImage",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "role" : "AXStaticText",
+                                                                            "value" : "User"
+                                                                          },
+                                                                          {
+                                                                            "role" : "AXStaticText",
+                                                                            "value" : "Max"
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXPopUpButton",
+                                                                        "title" : "User profile",
+                                                                        "value" : ""
+                                                                      },
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "description" : "Get apps and extensions",
+                                                                            "role" : "AXLink",
+                                                                            "url" : "https:\/\/claude.ai\/downloads",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  }
+                                                                ],
+                                                                "role" : "AXGroup",
+                                                                "value" : ""
+                                                              }
+                                                            ],
+                                                            "role" : "AXGroup",
+                                                            "value" : ""
+                                                          }
+                                                        ],
+                                                        "description" : "Sidebar",
+                                                        "role" : "AXGroup",
+                                                        "subrole" : "AXLandmarkComplementary",
+                                                        "value" : ""
+                                                      },
+                                                      {
+                                                        "children" : [
+                                                          {
+                                                            "children" : [
+                                                              {
+                                                                "children" : [
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "description" : "Use incognito",
+                                                                            "role" : "AXButton",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "subrole" : "AXSectionHeader",
+                                                                    "value" : ""
+                                                                  },
+                                                                  {
+                                                                    "children" : [
+                                                                      {
+                                                                        "children" : [
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "children" : [
+                                                                                      {
+                                                                                        "role" : "AXGroup",
+                                                                                        "value" : ""
+                                                                                      }
+                                                                                    ],
+                                                                                    "role" : "AXGroup",
+                                                                                    "value" : ""
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "role" : "AXStaticText",
+                                                                                "value" : "Evening, how are things?"
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "role" : "AXGroup",
+                                                                                "subrole" : "AXApplicationStatus",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXGroup",
+                                                                                    "subrole" : "AXApplicationStatus",
+                                                                                    "value" : ""
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "value" : ""
+                                                                              },
+                                                                              {
+                                                                                "role" : "AXGroup",
+                                                                                "subrole" : "AXApplicationStatus",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          },
+                                                                          {
+                                                                            "children" : [
+                                                                              {
+                                                                                "children" : [
+                                                                                  {
+                                                                                    "role" : "AXGroup",
+                                                                                    "subrole" : "AXApplicationStatus",
+                                                                                    "value" : ""
+                                                                                  },
+                                                                                  {
+                                                                                    "role" : "AXGroup",
+                                                                                    "subrole" : "AXApplicationStatus",
+                                                                                    "value" : ""
+                                                                                  },
+                                                                                  {
+                                                                                    "children" : [
+                                                                                      {
+                                                                                        "children" : [
+                                                                                          {
+                                                                                            "children" : [
+                                                                                              {
+                                                                                                "children" : [
+                                                                                                  {
+                                                                                                    "children" : [
+                                                                                                      {
+                                                                                                        "children" : [
+                                                                                                          {
+                                                                                                            "children" : [
+                                                                                                              {
+                                                                                                                "role" : "AXGroup",
+                                                                                                                "value" : ""
+                                                                                                              }
+                                                                                                            ],
+                                                                                                            "description" : "Write your prompt to Claude",
+                                                                                                            "role" : "AXTextArea",
+                                                                                                            "value" : "\n"
+                                                                                                          },
+                                                                                                          {
+                                                                                                            "role" : "AXGroup",
+                                                                                                            "subrole" : "AXApplicationStatus",
+                                                                                                            "value" : ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "role" : "AXGroup",
+                                                                                                    "value" : ""
+                                                                                                  },
+                                                                                                  {
+                                                                                                    "children" : [
+                                                                                                      {
+                                                                                                        "children" : [
+                                                                                                          {
+                                                                                                            "description" : "Add files, connectors, and more",
+                                                                                                            "role" : "AXPopUpButton",
+                                                                                                            "value" : ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "children" : [
+                                                                                                          {
+                                                                                                            "children" : [
+                                                                                                              {
+                                                                                                                "role" : "AXRadioButton",
+                                                                                                                "title" : "Chat",
+                                                                                                                "value" : 1
+                                                                                                              },
+                                                                                                              {
+                                                                                                                "role" : "AXRadioButton",
+                                                                                                                "title" : "Cowork",
+                                                                                                                "value" : 0
+                                                                                                              }
+                                                                                                            ],
+                                                                                                            "description" : "Surface",
+                                                                                                            "role" : "AXRadioGroup",
+                                                                                                            "value" : ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "role" : "AXGroup",
+                                                                                                    "value" : ""
+                                                                                                  },
+                                                                                                  {
+                                                                                                    "children" : [
+                                                                                                      {
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "children" : [
+                                                                                                          {
+                                                                                                            "children" : [
+                                                                                                              {
+                                                                                                                "children" : [
+                                                                                                                  {
+                                                                                                                    "children" : [
+                                                                                                                      {
+                                                                                                                        "role" : "AXStaticText",
+                                                                                                                        "value" : "Opus 5"
+                                                                                                                      },
+                                                                                                                      {
+                                                                                                                        "role" : "AXStaticText",
+                                                                                                                        "value" : " High"
+                                                                                                                      }
+                                                                                                                    ],
+                                                                                                                    "role" : "AXGroup",
+                                                                                                                    "value" : ""
+                                                                                                                  }
+                                                                                                                ],
+                                                                                                                "description" : "Model: Opus 5 · High",
+                                                                                                                "role" : "AXPopUpButton",
+                                                                                                                "value" : ""
+                                                                                                              }
+                                                                                                            ],
+                                                                                                            "role" : "AXGroup",
+                                                                                                            "value" : ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      },
+                                                                                                      {
+                                                                                                        "children" : [
+                                                                                                          {
+                                                                                                            "children" : [
+                                                                                                              {
+                                                                                                                "description" : "Dictate",
+                                                                                                                "role" : "AXButton",
+                                                                                                                "value" : ""
+                                                                                                              },
+                                                                                                              {
+                                                                                                                "description" : "Voice input",
+                                                                                                                "role" : "AXPopUpButton",
+                                                                                                                "value" : ""
+                                                                                                              }
+                                                                                                            ],
+                                                                                                            "description" : "Dictate",
+                                                                                                            "role" : "AXGroup",
+                                                                                                            "subrole" : "AXApplicationGroup",
+                                                                                                            "value" : ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role" : "AXGroup",
+                                                                                                        "value" : ""
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "role" : "AXGroup",
+                                                                                                    "value" : ""
+                                                                                                  }
+                                                                                                ],
+                                                                                                "role" : "AXGroup",
+                                                                                                "value" : ""
+                                                                                              }
+                                                                                            ],
+                                                                                            "role" : "AXGroup",
+                                                                                            "value" : ""
+                                                                                          }
+                                                                                        ],
+                                                                                        "role" : "AXGroup",
+                                                                                        "value" : ""
+                                                                                      }
+                                                                                    ],
+                                                                                    "role" : "AXGroup",
+                                                                                    "value" : ""
+                                                                                  }
+                                                                                ],
+                                                                                "role" : "AXGroup",
+                                                                                "subrole" : "AXApplicationGroup",
+                                                                                "value" : ""
+                                                                              }
+                                                                            ],
+                                                                            "role" : "AXGroup",
+                                                                            "value" : ""
+                                                                          }
+                                                                        ],
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      },
+                                                                      {
+                                                                        "role" : "AXGroup",
+                                                                        "value" : ""
+                                                                      }
+                                                                    ],
+                                                                    "role" : "AXGroup",
+                                                                    "value" : ""
+                                                                  }
+                                                                ],
+                                                                "description" : "Primary pane",
+                                                                "role" : "AXGroup",
+                                                                "subrole" : "AXLandmarkRegion",
+                                                                "value" : ""
+                                                              },
+                                                              {
+                                                                "role" : "AXGroup",
+                                                                "value" : ""
+                                                              }
+                                                            ],
+                                                            "role" : "AXGroup",
+                                                            "value" : ""
+                                                          }
+                                                        ],
+                                                        "role" : "AXGroup",
+                                                        "subrole" : "AXLandmarkMain",
+                                                        "value" : ""
+                                                      }
+                                                    ],
+                                                    "role" : "AXGroup",
+                                                    "value" : ""
+                                                  }
+                                                ],
+                                                "role" : "AXGroup",
+                                                "value" : ""
+                                              }
+                                            ],
+                                            "role" : "AXGroup",
+                                            "value" : ""
+                                          },
+                                          {
+                                            "role" : "AXGroup",
+                                            "value" : ""
+                                          },
+                                          {
+                                            "children" : [
+                                              {
+                                                "children" : [
+                                                  {
+                                                    "children" : [
+                                                      {
+                                                        "role" : "AXGroup",
+                                                        "subrole" : "AXApplicationStatus",
+                                                        "value" : ""
+                                                      },
+                                                      {
+                                                        "description" : "Notifications",
+                                                        "role" : "AXGroup",
+                                                        "subrole" : "AXLandmarkRegion",
+                                                        "value" : ""
+                                                      }
+                                                    ],
+                                                    "role" : "AXGroup",
+                                                    "value" : ""
+                                                  }
+                                                ],
+                                                "role" : "AXGroup",
+                                                "value" : ""
+                                              }
+                                            ],
+                                            "role" : "AXGroup",
+                                            "value" : ""
+                                          }
+                                        ],
+                                        "role" : "AXGroup",
+                                        "value" : ""
+                                      }
+                                    ],
+                                    "role" : "AXWebArea",
+                                    "title" : "New chat - Claude",
+                                    "url" : "https:\/\/claude.ai\/new",
+                                    "value" : ""
+                                  }
+                                ],
+                                "role" : "AXGroup",
+                                "value" : ""
+                              }
+                            ],
+                            "role" : "AXGroup",
+                            "value" : ""
+                          }
+                        ],
+                        "role" : "AXGroup",
+                        "value" : ""
+                      }
+                    ],
+                    "role" : "AXGroup",
+                    "value" : ""
+                  }
+                ],
+                "role" : "AXGroup",
+                "value" : ""
+              }
+            ],
+            "role" : "AXGroup",
+            "value" : ""
+          }
+        ],
+        "role" : "AXGroup",
+        "title" : "Claude",
+        "value" : ""
+      },
+      {
+        "role" : "AXButton",
+        "subrole" : "AXCloseButton"
+      },
+      {
+        "children" : [
+          {
+            "children" : [
+              {
+                "role" : "AXGroup"
+              }
+            ],
+            "role" : "AXGroup"
+          }
+        ],
+        "help" : "this button also has an action to zoom the window",
+        "role" : "AXButton",
+        "subrole" : "AXFullScreenButton"
+      },
+      {
+        "role" : "AXButton",
+        "subrole" : "AXMinimizeButton"
+      }
+    ],
+    "role" : "AXWindow",
+    "subrole" : "AXStandardWindow",
+    "title" : "Claude"
+  }
+]

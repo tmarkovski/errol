@@ -85,28 +85,30 @@ func value(after prefix: String, in label: String) -> String? {
     return trimmed.isEmpty ? nil : trimmed
 }
 
-private func scanWindow(_ window: AXUIElement, selectors: AppSelectors) -> WindowScan {
+/// Generic over ElementNode, so fixture windows scan through the identical
+/// code the live sweep runs.
+func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> WindowScan {
     var scan = WindowScan()
-    scan.title = (axAttribute(window, kAXTitleAttribute) as? String) ?? ""
+    scan.title = window.title ?? ""
     visit(window, depth: 0, into: &scan, selectors: selectors)
     return scan
 }
 
-private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowScan,
-                   selectors: AppSelectors) {
+private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: inout WindowScan,
+                                      selectors: AppSelectors) {
     guard depth <= 80 else { return }
-    let role = (axAttribute(element, kAXRoleAttribute) as? String) ?? ""
+    let role = element.role ?? ""
 
     if role == kAXTextAreaRole as String {
         scan.hasComposer = true
         if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
-            let label = axLabel(element)
+            let label = element.label
             scan.composerSurface = selectors.composerSurfaceNames
                 .first { label.contains($0.key) }?.value
         }
     } else if role == kAXButtonRole as String || role == kAXTextFieldRole as String {
         if !scan.isExcluded, !selectors.windowExcludeLabels.isEmpty {
-            let label = axLabel(element)
+            let label = element.label
             if selectors.windowExcludeLabels.contains(where: { label.localizedCaseInsensitiveContains($0) }) {
                 scan.isExcluded = true
             }
@@ -118,7 +120,7 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
                 || selectors.modelPopupDefaultLabel != nil)
         let wantsEffort = scan.effort == nil && selectors.effortPopupPrefix != nil
         if wantsMode || wantsModel || wantsEffort {
-            let label = axLabel(element)
+            let label = element.label
             if wantsMode, let prefix = selectors.modePopupPrefix {
                 scan.modeLabel = value(after: prefix, in: label)
             }
@@ -151,23 +153,23 @@ private func visit(_ element: AXUIElement, depth: Int, into scan: inout WindowSc
         // Claude's surface tabs are AXRadioButtons, ChatGPT's are AXCheckBox
         // toggle buttons; the title match keeps ordinary checkboxes out.
         if scan.surfaceTab == nil, !selectors.surfaceTabNames.isEmpty,
-           let title = axAttribute(element, kAXTitleAttribute) as? String,
+           let title = element.title,
            let name = selectors.surfaceTabNames.first(where: {
                $0.caseInsensitiveCompare(title) == .orderedSame
            }),
-           (axAttribute(element, kAXValueAttribute) as? NSNumber)?.intValue == 1 {
+           element.numberValue == 1 {
             scan.surfaceTab = name
         }
     } else if role == "AXWebArea" {
         if scan.surfacePath == nil, !selectors.surfacePathNames.isEmpty,
-           let url = axAttribute(element, "AXURL") as? NSURL,
+           let url = element.url,
            url.host?.localizedCaseInsensitiveContains("claude.ai") == true {
-            scan.surfacePath = (url.path ?? "").split(separator: "/").first
+            scan.surfacePath = url.path.split(separator: "/").first
                 .map { String($0).lowercased() }
         }
     }
 
-    for child in axChildren(element) {
+    for child in element.children {
         visit(child, depth: depth + 1, into: &scan, selectors: selectors)
     }
 }
@@ -198,8 +200,8 @@ func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
 /// One sweep of one side. Mirrors chatWindow's selection rules so the strip
 /// reports readiness for exactly the window a run would target.
 func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideStatus {
-    var status = SideStatus(appName: name)
     guard let target = findApp(bundleID: bundleID, name: name, selectors: selectors) else {
+        var status = SideStatus(appName: name)
         status.state = .missing
         status.headline = "Not running"
         return status
@@ -212,13 +214,21 @@ func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSt
         usleep(700_000)
         windows = axWindows(target)
     }
-    guard !windows.isEmpty else {
+    let scans = windows.map { scanWindow(LiveElement(ax: $0), selectors: selectors) }
+    return composeSideStatus(appName: name, scans: scans, selectors: selectors)
+}
+
+/// The pure half of a sweep: window scans in, the strip's status out. Split
+/// from the AX walking so fixture trees can drive the whole readiness
+/// decision in tests.
+func composeSideStatus(appName: String, scans: [WindowScan], selectors: AppSelectors) -> SideStatus {
+    var status = SideStatus(appName: appName)
+    guard !scans.isEmpty else {
         status.state = .notReady
         status.headline = "No window"
         return status
     }
 
-    let scans = windows.map { scanWindow($0, selectors: selectors) }
     let eligible = scans.indices.filter { !scans[$0].isExcluded }
     // Mirrors chatWindow: prefer a chat window; when every window is excluded
     // and the selectors allow it, fall back to an excluded-surface window
@@ -258,7 +268,7 @@ func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSt
         status.model = status.model.map { "\($0) \u{00B7} \(effort)" } ?? effort
     }
     var details: [String] = []
-    if !chosen.title.isEmpty, chosen.title.localizedCaseInsensitiveCompare(name) != .orderedSame {
+    if !chosen.title.isEmpty, chosen.title.localizedCaseInsensitiveCompare(appName) != .orderedSame {
         details.append("\u{201C}\(chosen.title)\u{201D}")
     }
     if !others.isEmpty {
