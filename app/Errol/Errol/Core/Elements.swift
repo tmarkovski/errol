@@ -83,6 +83,35 @@ func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelec
     return results
 }
 
+/// The absolute ordinal of a conversation message, where the surface numbers
+/// them: Claude names each one "Message N" (an AXGroup article, user and
+/// assistant messages alike — the name arrives in AXDescription, so it is
+/// read through the joined label, with AXTitle kept as a candidate). nil for
+/// everything else — including the sidebar hazards ("Message actions
+/// button…" session rows are AXButtons, and the whole-string numeric parse
+/// rejects any label with more after the number).
+func messageOrdinal<Node: ElementNode>(_ element: Node) -> Int? {
+    guard element.role == kAXGroupRole as String else { return nil }
+    for text in [element.title, element.label] {
+        guard let text, text.hasPrefix("Message "),
+              let ordinal = Int(text.dropFirst("Message ".count)) else { continue }
+        return ordinal
+    }
+    return nil
+}
+
+/// The newest message's ordinal, nil where messages are unnumbered (ChatGPT).
+/// This is the completion signal that survives list virtualization: Claude
+/// unmounts older messages as a conversation grows — observed live Aug 28
+/// 2026 with only "Message 6"–"Message 8" mounted of 8 — so the affordance
+/// count can plateau or fall while the ordinal of the always-mounted newest
+/// message keeps rising.
+func lastMessageOrdinal<Node: ElementNode>(under root: Node) -> Int? {
+    var groups: [Node] = []
+    findAll(in: root, where: { messageOrdinal($0) != nil }, into: &groups)
+    return groups.compactMap(messageOrdinal).max()
+}
+
 func hasStopButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Bool {
     var results: [Node] = []
     findAll(in: root, where: { el in
@@ -145,6 +174,11 @@ func copyButtons(in target: TargetApp) -> [AXUIElement] {
 func messageAffordances(in target: TargetApp) -> [AXUIElement] {
     guard let root = chatWindow(in: target) else { return [] }
     return messageAffordances(under: LiveElement(ax: root), selectors: target.selectors).map(\.ax)
+}
+
+func lastMessageOrdinal(in target: TargetApp) -> Int? {
+    guard let root = chatWindow(in: target) else { return nil }
+    return lastMessageOrdinal(under: LiveElement(ax: root))
 }
 
 func hasStopButton(in target: TargetApp) -> Bool {

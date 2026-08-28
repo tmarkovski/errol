@@ -71,7 +71,9 @@ struct FixtureElement: ElementNode, Equatable {
     var children: [FixtureElement] = []
 
     var label: String {
-        [axDescription, title, help, axLabelText].compactMap { $0 }.joined(separator: " ")
+        [axDescription, title, help, axLabelText].compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
     var stringValue: String? {
         if case .string(let string)? = value { return string }

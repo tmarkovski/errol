@@ -16,9 +16,16 @@ func axChildren(_ element: AXUIElement) -> [AXUIElement] {
     (axAttribute(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
 }
 
+/// Empty attributes are dropped before joining: Chromium reports AXTitle as
+/// "" (not absent) next to a real AXDescription, and keeping it would leave a
+/// stray trailing separator — harmless to the contains-based selectors, fatal
+/// to exact parses like messageOrdinal ("Message 6 " is not a number), and a
+/// silent divergence from FixtureElement.label, whose captures never carry
+/// empty strings.
 func axLabel(_ element: AXUIElement) -> String {
     [kAXDescriptionAttribute, kAXTitleAttribute, kAXHelpAttribute, "AXLabel"]
         .compactMap { axAttribute(element, $0) as? String }
+        .filter { !$0.isEmpty }
         .joined(separator: " ")
 }
 

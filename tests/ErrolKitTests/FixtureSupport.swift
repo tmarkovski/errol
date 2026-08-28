@@ -46,6 +46,9 @@ struct Detection {
     var sendLabel: String?
     var composerLabel: String?
     var streaming = false
+    /// The newest message's "Message N" ordinal, where the surface numbers
+    /// messages (Claude) — the virtualization-proof completion signal.
+    var lastOrdinal: Int?
 }
 
 func detect(fixture name: String, selectors: AppSelectors, appName: String,
@@ -66,6 +69,7 @@ func detect(fixture name: String, selectors: AppSelectors, appName: String,
         detection.sendLabel = sendButton(under: chosen, selectors: selectors)?.label
         detection.composerLabel = composerElement(under: chosen)?.label
         detection.streaming = hasStopButton(under: chosen, selectors: selectors)
+        detection.lastOrdinal = lastMessageOrdinal(under: chosen)
     }
     debugDump(fixture: name, detection: detection)
     return detection
@@ -106,7 +110,8 @@ private func debugDump(fixture name: String, detection: Detection) {
         + " copies=\(detection.copyLabels)"
         + " send=\(detection.sendLabel ?? "-")"
         + " composer=\(detection.composerLabel ?? "-")"
-        + " streaming=\(detection.streaming)")
+        + " streaming=\(detection.streaming)"
+        + " lastOrdinal=\(detection.lastOrdinal.map(String.init) ?? "-")")
     lines.append("")
     FileHandle.standardError.write(lines.joined(separator: "\n").data(using: .utf8)!)
 }

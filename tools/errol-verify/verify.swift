@@ -295,15 +295,16 @@ struct Verify {
         defer { config.timeout = savedTimeout }
 
         let start = Date()
-        var baseline = messageAffordances(in: target).count
+        var baseline = responseBaseline(in: target)
         guard send(probe, to: target) else {
             report("FAIL", "live-send", "send() returned false")
             return
         }
         baseline = absorbEchoIntoBaseline(in: target, preSend: baseline)
-        report("PASS", "live-send", "sent; baseline \(baseline) affordance(s)")
+        report("PASS", "live-send", "sent; baseline \(baseline.affordances) affordance(s)"
+            + (baseline.lastOrdinal.map { ", message \($0)" } ?? ""))
 
-        guard waitForResponse(in: target, baselineCopyCount: baseline) else {
+        guard waitForResponse(in: target, baseline: baseline) else {
             report("FAIL", "live-complete", "no completion within \(Int(config.timeout))s")
             return
         }
