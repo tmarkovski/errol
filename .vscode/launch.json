@@ -19,6 +19,26 @@
             "target": "Errol",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release Errol"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:errol}",
+            "name": "Debug errol-verify",
+            "target": "errol-verify",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug errol-verify"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:errol}",
+            "name": "Release errol-verify",
+            "target": "errol-verify",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release errol-verify"
         }
     ]
 }

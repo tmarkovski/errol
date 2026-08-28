@@ -48,6 +48,22 @@ final class RelayFramingTests: XCTestCase {
                        "messages under the cap pass through untouched")
     }
 
+    func testRulesDiscourageEarlySignoff() {
+        // Both models signed off after one reply each in the first live run —
+        // the single-shot habit: answer completely, feel finished, reach for
+        // the marker. The standing rules must push back on that for every
+        // purpose, so both framed openings carry pacing language. The seed
+        // can still tighten pacing per purpose (the live test does).
+        for framing in [openingMessage(), introMessage(firstReply: "hi", from: "ChatGPT")] {
+            XCTAssertTrue(framing.contains("not a one-shot answer"),
+                          "the rules must frame this as a multi-turn dialogue")
+            XCTAssertTrue(framing.contains("never initiate the sign-off in your first reply"),
+                          "\"initiate\" is deliberate: reciprocating a peer's sign-off in a first reply must stay allowed")
+            XCTAssertTrue(framing.contains("run its course"),
+                          "ending must be tied to the exchange being exhausted, not to having answered once")
+        }
+    }
+
     func testDefaultEndConditionIsTheSignoff() {
         // A fresh Config must leave the turn cap off: runs end on the
         // conversation's own close (mutual sign-off, empty reply, timeout,

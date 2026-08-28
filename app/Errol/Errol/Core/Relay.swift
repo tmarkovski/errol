@@ -12,11 +12,15 @@ func relayRules() -> String {
     """
     This is an automated agent-to-agent conversation: your replies are relayed \
     to another AI assistant, and its replies are relayed back to you. The human \
-    who set this up is not taking part in the conversation. When you want to \
-    end the conversation, include \(config.stopSequence) anywhere in a reply. \
-    When the other assistant does so, reply with your own goodbye containing \
-    \(config.stopSequence) — the conversation closes once both sides have sent \
-    it. Replying with an empty message ends the conversation immediately.
+    who set this up is not taking part in the conversation. Treat it as a real \
+    multi-turn dialogue, not a one-shot answer: contribute incrementally and \
+    leave room for the other assistant to build on your reply. When you want to \
+    end the conversation, include \(config.stopSequence) anywhere in a reply — \
+    but only once the exchange has genuinely run its course; never initiate \
+    the sign-off in your first reply. When the other assistant sends it, reply \
+    with your own goodbye containing \(config.stopSequence) — the conversation \
+    closes once both sides have sent it. Replying with an empty message ends \
+    the conversation immediately.
     """
 }
 
