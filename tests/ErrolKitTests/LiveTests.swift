@@ -113,6 +113,9 @@ final class LiveRelayTests: XCTestCase {
             marker before your third reply. Then end politely following the \
             rules above. Keep every reply to one or two sentences.
             """
+        // The default end condition is the mutual sign-off with no cap; the
+        // test opts into the cap as its guard against a runaway conversation.
+        config.limitTurns = true
         config.turns = 8
         config.timeout = 120
         config.newChats = true

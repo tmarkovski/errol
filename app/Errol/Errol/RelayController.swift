@@ -15,6 +15,7 @@ struct LogLine: Identifiable {
 
 final class RelayController: ObservableObject {
     @Published var seed = ""
+    @Published var limitTurns = config.limitTurns
     @Published var turns = config.turns
     @Published var newChats = false
     @Published var tileWindows = false
@@ -71,6 +72,7 @@ final class RelayController: ObservableObject {
         guard ensureTrusted(), let apps = resolveApps() else { return }
 
         config.seed = instruction
+        config.limitTurns = limitTurns
         turns = max(1, turns)
         config.turns = turns
         config.newChats = newChats

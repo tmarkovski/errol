@@ -64,8 +64,11 @@ var conversationStatusSink: ((ConversationStatus, ConversationStatus) -> Void)?
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
 func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
-    guard config.turns >= 1 else {
-        log("turns must be at least 1")
+    // nil = no cap: the run ends on the conversation's own close (mutual
+    // sign-off, empty reply, timeout, or Stop).
+    let turnCap = config.limitTurns ? config.turns : nil
+    if let turnCap, turnCap < 1 {
+        log("turns must be at least 1 when the turn limit is on")
         return false
     }
 
@@ -125,7 +128,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     // when two consecutive replies carry the stop sequence.
     var lastReplyEnded = false
 
-    for turn in 1...config.turns {
+    var turn = 0
+    while true {
+        turn += 1
         guard waitForResponse(in: speaker, baselineCopyCount: baseline) else {
             if relayCancelled.isSet {
                 log("Run stopped by user.")
@@ -161,9 +166,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         }
         lastReplyEnded = signedOff
 
-        log("Turn \(turn)/\(config.turns): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
+        log("Turn \(turn)\(turnCap.map { "/\($0)" } ?? ""): \(speaker.name) -> \(listener.name) (\(reply.count) chars)")
 
-        if turn == config.turns {
+        if let turnCap, turn >= turnCap {
             log("Turn cap reached.")
             break
         }

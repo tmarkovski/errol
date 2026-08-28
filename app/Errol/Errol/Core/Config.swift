@@ -90,6 +90,14 @@ struct AppSelectors {
 struct Config {
     var chatgptBundleID = "com.openai.codex"   // standalone Codex / unified app; classic ChatGPT is com.openai.chat
     var claudeBundleID = "com.anthropic.claudefordesktop"
+    /// End condition: by default a run continues until the conversation
+    /// closes itself — the mutual stop-sequence sign-off, an empty reply, a
+    /// response timeout, or the Stop button. When true, `turns` additionally
+    /// caps how many responses get relayed.
+    var limitTurns = false
+    /// The optional turn cap, applied only when limitTurns is set — extra
+    /// protection, along with the message length cap, against two chatty
+    /// models burning through usage limits.
     var turns = 10
     var first = "chatgpt"
     var newChats = false

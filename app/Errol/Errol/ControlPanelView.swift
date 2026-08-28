@@ -23,11 +23,14 @@ struct ControlPanelView: View {
                         .stroke(Color(nsColor: .separatorColor)))
 
                 HStack(spacing: 12) {
-                    Text("Turns:")
+                    Toggle("Limit turns:", isOn: $controller.limitTurns)
+                        .help("Off: the run ends when both agents sign off (or on an empty reply, a timeout, or Stop). On: also stop after this many responses.")
                     TextField("10", value: $controller.turns, format: .number)
                         .frame(width: 48)
+                        .disabled(!controller.limitTurns)
                     Stepper("", value: $controller.turns, in: 1...99)
                         .labelsHidden()
+                        .disabled(!controller.limitTurns)
                     Toggle("Start new chats", isOn: $controller.newChats)
                     Spacer()
                 }
