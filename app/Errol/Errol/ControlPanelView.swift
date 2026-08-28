@@ -1,26 +1,19 @@
-// The SwiftUI interface inside the floating panel: the seed instruction,
-// run options, Start/Stop, and the live log.
+// The SwiftUI interface inside the floating panel: the conversation setup
+// (shape picker, topic, instructions), run options, Start/Stop, and the
+// live log.
 
 import SwiftUI
 
 struct ControlPanelView: View {
     @ObservedObject var controller: RelayController
 
-    private var seedIsEmpty: Bool {
-        controller.seed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             readinessStrip
 
             Group {
-                sectionHeader("Instruction to seed the conversation")
-                TextEditor(text: $controller.seed)
-                    .font(.system(size: 13))
-                    .frame(height: 100)
-                    .overlay(RoundedRectangle(cornerRadius: 5)
-                        .stroke(Color(nsColor: .separatorColor)))
+                sectionHeader("Conversation")
+                conversationSetup
 
                 HStack(spacing: 12) {
                     Toggle("Limit turns:", isOn: $controller.limitTurns)
@@ -48,7 +41,7 @@ struct ControlPanelView: View {
                     .disabled(!controller.isRunning)
                 Button("Start") { controller.start() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(controller.isRunning || seedIsEmpty)
+                    .disabled(controller.isRunning || !controller.instructionsReady)
             }
 
             sectionHeader("Log")
@@ -56,6 +49,43 @@ struct ControlPanelView: View {
         }
         .padding(14)
         .frame(width: 440, height: 620)
+    }
+
+    /// The shape picker with, for a template, a topic field and the "Edit
+    /// instructions" link (which hands the composed text to Custom); Custom
+    /// is the only state that shows the full editor.
+    @ViewBuilder
+    private var conversationSetup: some View {
+        HStack(spacing: 8) {
+            Picker("", selection: $controller.conversation) {
+                ForEach(conversationTemplates) { template in
+                    Text(template.name).tag(template.name)
+                }
+                Divider()
+                Text(RelayController.customConversation)
+                    .tag(RelayController.customConversation)
+            }
+            .labelsHidden()
+            .fixedSize()
+            Spacer()
+            if controller.selectedTemplate != nil {
+                Button("Edit instructions") { controller.editInstructions() }
+                    .buttonStyle(.link)
+                    .help("Show the full opening message this shape composes, and edit it freely")
+            }
+        }
+        if let template = controller.selectedTemplate {
+            TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
+                .lineLimit(1...4)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 13))
+        } else {
+            TextEditor(text: $controller.customInstructions)
+                .font(.system(size: 13))
+                .frame(height: 100)
+                .overlay(RoundedRectangle(cornerRadius: 5)
+                    .stroke(Color(nsColor: .separatorColor)))
+        }
     }
 
     /// ChatGPT on the left, Claude on the right — the same sides the tiling

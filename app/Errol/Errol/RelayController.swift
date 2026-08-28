@@ -14,7 +14,15 @@ struct LogLine: Identifiable {
 }
 
 final class RelayController: ObservableObject {
-    @Published var seed = ""
+    /// The picker tag for free-form instructions; not a ConversationTemplate.
+    static let customConversation = "Custom"
+    /// The selected template's name, or customConversation.
+    @Published var conversation = conversationTemplates[0].name
+    /// Completes the selected template ("What to brainstorm about").
+    @Published var topic = ""
+    /// The full opening text when the picker is on Custom — either written
+    /// from scratch or handed over by editInstructions().
+    @Published var customInstructions = ""
     @Published var limitTurns = config.limitTurns
     @Published var turns = config.turns
     @Published var newChats = false
@@ -44,6 +52,34 @@ final class RelayController: ObservableObject {
         }
     }
 
+    /// nil means the picker is on Custom.
+    var selectedTemplate: ConversationTemplate? {
+        conversationTemplates.first { $0.name == conversation }
+    }
+
+    /// The exact initial message the relay will hand to the first agent
+    /// (before the framing preamble): the template composed with the topic,
+    /// or the custom text as written.
+    var composedInstructions: String {
+        guard let template = selectedTemplate else { return customInstructions }
+        return template.composed(topic: topic)
+    }
+
+    /// Whether Start has something to send: a topic in template mode, any
+    /// text in Custom mode.
+    var instructionsReady: Bool {
+        let text = selectedTemplate == nil ? customInstructions : topic
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The "Edit instructions" link: reveal the composed message as editable
+    /// custom text. One-way by design — re-picking a template recomposes from
+    /// the template and the last topic, discarding the edits.
+    func editInstructions() {
+        customInstructions = composedInstructions
+        conversation = Self.customConversation
+    }
+
     /// The readiness strip only scans while someone can see it, and never
     /// while a run owns the apps' AX trees and the machine's focus.
     func setPanelVisible(_ visible: Bool) {
@@ -64,14 +100,15 @@ final class RelayController: ObservableObject {
     func start() {
         guard !isRunning else { return }
 
-        let instruction = seed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !instruction.isEmpty else {
-            append("Type an instruction first — it becomes the opening message handed to the first agent.")
+        guard instructionsReady else {
+            append(selectedTemplate == nil
+                ? "Write the instructions first — they become the opening message handed to the first agent."
+                : "Add a topic first — it completes the \(conversation) opening handed to the first agent.")
             return
         }
         guard ensureTrusted(), let apps = resolveApps() else { return }
 
-        config.seed = instruction
+        config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
         config.limitTurns = limitTurns
         turns = max(1, turns)
         config.turns = turns
