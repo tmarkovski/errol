@@ -37,13 +37,9 @@ enum PanelLayout {
                 CGSize(width: 560, height: logOpen ? 660 : 470)
             }
         case .wireframe:
-            // Card size + 14pt outer padding a side (the shadow's room); the
-            // compact card is content-sized, so its height carries slack.
-            if compact {
-                CGSize(width: 508, height: 252)
-            } else {
-                CGSize(width: 508, height: 588)
-            }
+            // Derived from the card the skin draws (WireframeMetrics), so
+            // rescaling the instrument moves the window with it.
+            compact ? WireframeMetrics.compactPanel : WireframeMetrics.expandedPanel
         }
     }
 }

@@ -176,9 +176,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = window.screen ?? NSScreen.main
         var x = buttonFrame.midX - panel.frame.width / 2
+        var y = buttonFrame.minY - 8
         if let visible = screen?.visibleFrame {
             x = max(visible.minX + 8, min(x, visible.maxX - panel.frame.width - 8))
+            // Lift a panel whose bottom would run off the screen — but only
+            // while it still fits; taller than the screen, hanging from the
+            // status item at least keeps the instrument head in view.
+            if panel.frame.height + 16 <= visible.height {
+                y = max(y, visible.minY + panel.frame.height + 8)
+            }
         }
-        panel.setFrameTopLeftPoint(NSPoint(x: x, y: buttonFrame.minY - 8))
+        panel.setFrameTopLeftPoint(NSPoint(x: x, y: y))
     }
 }
