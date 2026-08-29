@@ -21,7 +21,7 @@ final class VirtualizedConversationScenarioTests: XCTestCase {
         // fallback — the surface the relay was deliberately run on.
         XCTAssertEqual(detection.excluded, [true])
         XCTAssertEqual(detection.chosenIndex, 0)
-        XCTAssertEqual(detection.status.surface, "Claude Code")
+        XCTAssertEqual(detection.status.surface, "Code")
 
         // The virtualization trap itself: 8 messages exchanged, affordances
         // for only the last 3 mounted. The run's baseline was 7 — recorded

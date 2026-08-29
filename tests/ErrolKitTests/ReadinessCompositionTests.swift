@@ -18,7 +18,7 @@ final class ReadinessCompositionTests: XCTestCase {
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertEqual(d.status.state, .ready)
         XCTAssertEqual(d.status.surface, "Chat")
-        XCTAssertEqual(d.status.detail, "\u{201C}Errol brand naming\u{201D}; Claude Code also open")
+        XCTAssertEqual(d.status.detail, "\u{201C}Errol brand naming\u{201D}; Code also open")
         // Counts come from the chosen window only — the code session's copy
         // button must not leak into the chat window's baseline.
         XCTAssertEqual(d.affordanceLabels, ["Copy message", "Copy newest"])
@@ -48,7 +48,7 @@ final class ReadinessCompositionTests: XCTestCase {
         let status = composeSideStatus(appName: "Claude", scans: [scan], selectors: selectors)
         XCTAssertEqual(status.state, .notReady)
         XCTAssertEqual(status.headline, "Not found")
-        XCTAssertEqual(status.surface, "Claude Code")
+        XCTAssertEqual(status.surface, "Code")
         XCTAssertEqual(status.detail, "no chat window")
     }
 

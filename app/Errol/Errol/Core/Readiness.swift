@@ -33,7 +33,8 @@ struct SideStatus {
     var state = ReadyState.checking
     var headline = "Checking..."
     /// The chosen window's active surface ("Chat", "Work", "Cowork",
-    /// "Claude Code", "Codex mode").
+    /// "Code", "Codex mode"). Shown under the app's own name, so the names
+    /// carry no vendor prefix.
     var surface: String?
     /// The chosen window's active model plus effort ("Fable 5 · Extra",
     /// "5.6 Sol High", or "Default"), where the window announces one.

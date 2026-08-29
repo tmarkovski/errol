@@ -89,7 +89,7 @@ final class SurfaceNamePrecedenceTests: XCTestCase {
     func testTabOutranksURL() {
         var scan = WindowScan()
         scan.surfacePath = "epitaxy"
-        XCTAssertEqual(surfaceName(scan, selectors: claude), "Claude Code")
+        XCTAssertEqual(surfaceName(scan, selectors: claude), "Code")
         scan.surfaceTab = "Chat"
         XCTAssertEqual(surfaceName(scan, selectors: claude), "Chat",
                        "the selected composer tab must outrank the URL path")

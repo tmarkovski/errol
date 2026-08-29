@@ -26,7 +26,7 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         XCTAssertEqual(d.excluded, [false])
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertEqual(d.status.state, .ready)
-        XCTAssertEqual(d.status.surface, "Claude Code")
+        XCTAssertEqual(d.status.surface, "Code")
         // The composer announces the model as a bare-titled popup followed by
         // the "Effort:" popup; the pair composes like the chat surfaces.
         XCTAssertEqual(d.status.model, "Fable 5 \u{00B7} Extra")
@@ -53,7 +53,7 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         // (no chat window exists in this app).
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertEqual(d.status.state, .ready)
-        XCTAssertEqual(d.status.surface, "Claude Code")
+        XCTAssertEqual(d.status.surface, "Code")
         // Two collapsed toggles plus the expanded bar's copy button: still
         // one affordance per message.
         XCTAssertEqual(d.affordanceLabels.count, 3)
@@ -74,6 +74,6 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         // in-flight response contributes nothing until the Stop button goes.
         XCTAssertEqual(d.affordanceLabels.count, 3)
         XCTAssertTrue(d.copyLabels.isEmpty)
-        XCTAssertEqual(d.status.surface, "Claude Code")
+        XCTAssertEqual(d.status.surface, "Code")
     }
 }

@@ -42,7 +42,9 @@ struct AppSelectors {
     /// the app has no chat window at all (e.g. Claude Desktop showing only a
     /// Claude Code session). An open chat window always wins.
     var excludedSurfaceIsFallback = false
-    /// What an excluded window is, for the readiness strip ("Claude Code").
+    /// What an excluded window is, for the readiness strip ("Code"). Surface
+    /// names are shown right under the app's own name, so they drop a
+    /// redundant vendor prefix: Claude's coding surface reads "Code".
     var excludedSurfaceName: String?
     /// Label prefix of the AXPopUpButton that announces the app's active
     /// mode; the text after the prefix names the mode (ChatGPT exposes
@@ -149,13 +151,13 @@ struct Config {
         // pane open. Markers are ORed, so stale extras cost nothing.
         windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"],
         excludedSurfaceIsFallback: true,
-        excludedSurfaceName: "Claude Code",
+        excludedSurfaceName: "Code",
         // Only paths whose display name differs from the capitalized path
         // (unmapped ones fall back to that: "cowork" -> "Cowork"). "epitaxy"
         // and "cowork" are verified against live trees; the rest are the
         // expected paths for surfaces not yet observed over AX.
         surfacePathNames: [
-            "epitaxy": "Claude Code",
+            "epitaxy": "Code",
             "new": "New chat",
             "project": "Project chat",
         ],
