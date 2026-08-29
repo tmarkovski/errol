@@ -422,6 +422,10 @@ struct WireframePanelView: View {
         .background(
             RoundedRectangle(cornerRadius: Wire.s(10)).fill(Wire.paper)
                 .shadow(color: .black.opacity(0.28), radius: Wire.s(9), y: Wire.s(4))
+                // Bare paper — the card's padding and the gaps between rows
+                // — moves the window. See `header` for why the card asks for
+                // the drag instead of leaving it to the window background.
+                .gesture(WindowDragGesture())
         )
         .overlay(RoundedRectangle(cornerRadius: Wire.s(10)).stroke(Wire.ink.opacity(0.3)))
         .environment(\.colorScheme, .light)
@@ -431,6 +435,14 @@ struct WireframePanelView: View {
 
     // MARK: Header
 
+    /// The name-and-state line doubles as the card's title bar: the panel is
+    /// borderless, so this is the one strip that always drags the window no
+    /// matter what state the console is in. It asks for the drag outright
+    /// rather than relying on `isMovableByWindowBackground`, which only moves
+    /// a window when AppKit judges that nothing in the content wanted the
+    /// click — an inference that does not hold on every macOS release. Text
+    /// selection in the log and the instruction editor is untouched, because
+    /// the gesture lives here and on the bare paper, not over those.
     private var header: some View {
         HStack {
             Text("ERROL")
@@ -443,6 +455,10 @@ struct WireframePanelView: View {
                 .tracking(1.2)
                 .foregroundColor(Wire.ink)
         }
+        // The Spacer between the two labels is empty; without a content
+        // shape the middle of the strip would not take the press.
+        .contentShape(Rectangle())
+        .gesture(WindowDragGesture())
     }
 
     private var stateWord: String {
@@ -504,7 +520,7 @@ struct WireframePanelView: View {
         .padding(Wire.s(10))
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Wire.s(6)).fill(Wire.well))
-        .overlay(RoundedRectangle(cornerRadius: Wire.s(6)).stroke(Wire.faint.opacity(0.5)))
+        .overlay(cardStroke(for: speaker, conversation: conversation))
         // Clicking a card nominates that side to open the next run — the
         // largest target for the plainest statement of it. The courier's
         // pointer swinging over is the acknowledgement.
@@ -512,6 +528,22 @@ struct WireframePanelView: View {
         .onTapGesture { nominate(speaker) }
         .modifier(WireHandCursor(active: canChooseOpener))
         .help(canChooseOpener ? "Have \(status.appName) send the opening message" : "")
+    }
+
+    /// The border tells the card's place in the turn, in the dash grammar
+    /// the rail and the ghost stop already speak: dashed while the side's
+    /// turn is on its way, solid ink while it is composing, and the plain
+    /// faint outline when the next message is none of its business. The
+    /// dashes hold still on purpose — marching ones read as a selection,
+    /// not a state.
+    private func cardStroke(for speaker: Speaker,
+                            conversation: ConversationStatus) -> some View {
+        let composing = conversation == .chatting
+        let upNext = !composing && nextTaker == speaker
+        return RoundedRectangle(cornerRadius: Wire.s(6))
+            .stroke(composing || upNext ? Wire.ink : Wire.faint.opacity(0.5),
+                    style: StrokeStyle(lineWidth: Wire.s(1),
+                                       dash: upNext ? [Wire.s(2.5), Wire.s(2.5)] : []))
     }
 
     /// Green when the side is relayable, red when it is not, amber while the
@@ -554,71 +586,52 @@ struct WireframePanelView: View {
 
     private var centerDeck: some View {
         VStack(spacing: Wire.s(8)) {
-            HStack(spacing: Wire.s(4)) {
-                Text("TURN")
-                    .font(Wire.mono(8, .bold))
-                    .foregroundColor(Wire.faint)
+            // Named under the drums the way the lamps are named under
+            // their lenses, in the same plate style.
+            VStack(spacing: Wire.s(3)) {
                 WireOdometer(value: controller.currentTurn)
+                Text("TURN")
+                    .font(Wire.mono(7, .bold))
+                    .tracking(0.5)
+                    .foregroundColor(Wire.faint)
             }
             route
-            Text(statusLine.uppercased())
+            Text(primaryStatus.uppercased())
                 .font(Wire.mono(8, .bold))
                 .tracking(0.5)
                 .foregroundColor(Wire.ink)
                 .lineLimit(1)
                 .fixedSize()
-            badge
+            secondaryStatus
         }
         .frame(width: Wire.s(150))
     }
 
-    /// The slot under the status line. A run holding at a handoff says so;
-    /// an idle instrument names the side its courier is aimed at, since an
-    /// arrow's angle is not something the panel should make anyone read.
-    /// Empty otherwise, so the row's height never moves.
+    /// The line under the primary status: a single faint readout in one
+    /// style, whichever state fills it in. In a run it
+    /// reports a pause — the word alone tells PAUSING from PAUSED, and the
+    /// ghost stop draws that distinction on the route besides. Idle it
+    /// names the side the courier is aimed at, since an arrow's angle is
+    /// not something the panel should make anyone read. Blank otherwise,
+    /// so the row's height never moves.
     ///
-    /// The two wear different clothes on purpose. A stroked box is this
-    /// panel's readout and its buttons; brackets are what it puts around a
-    /// choice, the way the shape picker is bracketed. No chevron, though —
-    /// that one belongs to controls that open a menu, and this is a toggle
-    /// between two sides.
-    @ViewBuilder
-    private var badge: some View {
-        if controller.isRunning {
-            // Dashed while the pause is still on its way, solid once the run
-            // is actually standing still — the same distinction the ghost
-            // stop on the route draws, in the same dashes.
-            Text(controller.isHolding ? "PAUSED" : "PAUSING")
-                .font(Wire.mono(8, .bold))
-                .tracking(0.5)
-                .foregroundColor(Wire.ink)
-                .padding(.horizontal, Wire.s(5))
-                .padding(.vertical, Wire.s(2))
-                .overlay(
-                    Rectangle().stroke(
-                        Wire.ink,
-                        style: StrokeStyle(lineWidth: Wire.s(1),
-                                           dash: controller.isHolding
-                                               ? [] : [Wire.s(2.5), Wire.s(2.5)]))
-                )
-                .opacity(controller.isPaused ? 1 : 0)
-        } else {
-            Button(action: flipOpener) {
-                Text("[ \(openerName.uppercased()) OPENS ]")
-                    .font(Wire.mono(9, .bold))
-                    .foregroundColor(Wire.ink)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.vertical, Wire.s(2))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .modifier(WireHandCursor(active: true))
-            .help("Which side sends the opening message")
-        }
+    /// Plain faint text, not a control: flipping the opener already lives
+    /// on the participant cards and on the courier itself, and brackets
+    /// are what this panel puts around a choice — a readout gets none.
+    private var secondaryStatus: some View {
+        Text(controller.isRunning
+                ? (controller.isHolding ? "PAUSED" : "PAUSING")
+                : "\(openerName.uppercased()) OPENS")
+            .font(Wire.mono(8, .bold))
+            .tracking(0.5)
+            .foregroundColor(Wire.faint)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.vertical, Wire.s(2))
+            .opacity(controller.isRunning && !controller.isPaused ? 0 : 1)
     }
 
-    private var statusLine: String {
+    private var primaryStatus: String {
         if controller.isRunning {
             if controller.isHolding { return "Holding at handoff" }
             if controller.chatgptConversation == .chatting { return "ChatGPT is composing" }
@@ -720,6 +733,16 @@ struct WireframePanelView: View {
     /// screen, both sides signed off. Once it lets go of the panel the
     /// pointer means the next run's opener again.
     private var routeIsLive: Bool { !(controller.isRunning && bothEnded) }
+
+    /// The side that composes the next message: the far side of whoever
+    /// holds one, or the nominated opener. Nil while a finished run is
+    /// still on screen, and nil the moment a pause is asked for — from
+    /// then on the next actor is the human, which the ghost stop and the
+    /// parked courier already say, and no card's turn is on its way.
+    private var nextTaker: Speaker? {
+        guard routeIsLive, !controller.isPaused else { return nil }
+        return pointsRight ? .claude : .chatgpt
+    }
 
     // MARK: Nominating an opener
 

@@ -112,8 +112,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// titled utility panel; glass and wireframe get a borderless transparent
     /// panel (glass so its Liquid Glass surfaces sample the desktop behind the
     /// window, wireframe so its painted paper card is the panel's edge; Esc
-    /// still hides it, empty regions drag it) whose frame animates with the
-    /// console/companion morph.
+    /// still hides it, the header strip and bare paper drag it) whose frame
+    /// animates with the console/companion morph.
     private func buildPanel() {
         let size = PanelLayout.size(style: activePanelStyle, compact: relay.compact,
                                     logOpen: relay.logOpen)
@@ -129,6 +129,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = false
+            // Carries the glass skin, whose surfaces float over window
+            // background AppKit can see is unclaimed. The wireframe card
+            // covers its whole window, so it names its own drag regions
+            // (WireframePanelView.header) rather than trusting this.
             panel.isMovableByWindowBackground = true
             // Follow presentation changes with an animated frame change,
             // anchored top-center so the panel hangs from the status item.
