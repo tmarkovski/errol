@@ -65,6 +65,10 @@ enum ConversationStatus: String {
 /// statuses (ChatGPT first) whenever either changes.
 var conversationStatusSink: ((ConversationStatus, ConversationStatus) -> Void)?
 
+/// Set by the app layer; called on the relay worker thread as each turn
+/// begins (1-based). The app resets its own counter when a run starts.
+var relayTurnSink: ((Int) -> Void)?
+
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
 func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
@@ -135,6 +139,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     var turn = 0
     while true {
         turn += 1
+        relayTurnSink?(turn)
         guard waitForResponse(in: speaker, baseline: baseline) else {
             if relayCancelled.isSet {
                 log("Run stopped by user.")
@@ -175,6 +180,14 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         if let turnCap, turn >= turnCap {
             log("Turn cap reached.")
             break
+        }
+
+        // Pause parks the run here — the reply is safely captured and nothing
+        // has been typed into the listener yet. Stop stays responsive.
+        if relayPaused.isSet, !relayCancelled.isSet {
+            log("Paused — holding \(speaker.name)'s reply before it reaches \(listener.name).")
+            while relayPaused.isSet, !relayCancelled.isSet { usleep(200_000) }
+            if !relayCancelled.isSet { log("Resumed.") }
         }
 
         if relayCancelled.isSet {

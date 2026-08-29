@@ -25,6 +25,12 @@ final class CancelFlag {
 
 let relayCancelled = CancelFlag()
 
+/// Set from the panel's Pause control (main thread) and polled by the relay
+/// loop (worker thread). While set, the run parks at the next handoff
+/// boundary — after a reply has been captured, before it is delivered — so
+/// neither app is touched while held.
+let relayPaused = CancelFlag()
+
 func appendTranscript(_ text: String) {
     let url = URL(fileURLWithPath: config.transcriptPath)
     if !FileManager.default.fileExists(atPath: url.path) {

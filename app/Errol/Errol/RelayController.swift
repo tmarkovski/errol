@@ -28,11 +28,23 @@ final class RelayController: ObservableObject {
     @Published var newChats = false
     @Published var tileWindows = false
     @Published var isRunning = false
+    /// Whether the run is holding at the next handoff (see relayPaused).
+    @Published var isPaused = false
+    /// Panel presentation state, glass skin only: a run shrinks the panel to
+    /// the companion pane; the user can expand back mid-run. The AppKit shell
+    /// watches this (with logOpen) to animate the glass panel's frame; the
+    /// classic skin ignores it.
+    @Published var compact = false
+    /// Whether the glass skin's log drawer is open.
+    @Published var logOpen = false
     @Published var logLines: [LogLine] = []
     @Published var chatgptStatus = SideStatus(appName: "ChatGPT")
     @Published var claudeStatus = SideStatus(appName: "Claude")
     @Published var chatgptConversation = ConversationStatus.notStarted
     @Published var claudeConversation = ConversationStatus.notStarted
+    /// The running turn number (1-based) during a relay run; 0 outside one.
+    /// Feeds the wireframe skin's odometer.
+    @Published var currentTurn = 0
     private var nextLogID = 0
     private let scanner = ReadinessScanner()
     private var panelVisible = false
@@ -49,6 +61,9 @@ final class RelayController: ObservableObject {
                 self?.chatgptConversation = chatgpt
                 self?.claudeConversation = claude
             }
+        }
+        relayTurnSink = { [weak self] turn in
+            DispatchQueue.main.async { self?.currentTurn = turn }
         }
     }
 
@@ -116,10 +131,14 @@ final class RelayController: ObservableObject {
         let tile = tileWindows
 
         isRunning = true
+        isPaused = false
+        relayPaused.set(false)
+        compact = true
         updateScanner()
         relayCancelled.set(false)
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
+        currentTurn = 0
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
 
@@ -132,6 +151,9 @@ final class RelayController: ObservableObject {
             refocus(to: origin)
             DispatchQueue.main.async {
                 self?.isRunning = false
+                self?.isPaused = false
+                relayPaused.set(false)
+                self?.compact = false
                 self?.updateScanner()
             }
         }
@@ -139,8 +161,23 @@ final class RelayController: ObservableObject {
 
     func stop() {
         guard isRunning else { return }
+        // Clear any pause so the loop wakes and reaches its cancel check.
+        isPaused = false
+        relayPaused.set(false)
         relayCancelled.set(true)
         append("Stop requested — ending the run at the next safe point...")
+    }
+
+    /// Pause holds the run at the next handoff boundary; the agent currently
+    /// composing finishes its reply, which is captured but not delivered
+    /// until Resume.
+    func togglePause() {
+        guard isRunning else { return }
+        isPaused.toggle()
+        relayPaused.set(isPaused)
+        if isPaused {
+            append("Pause requested — the run holds at the next handoff.")
+        }
     }
 
     /// Dump both apps' windows, buttons, and selector matches into the log —

@@ -1,6 +1,6 @@
-// The SwiftUI interface inside the floating panel: the conversation setup
-// (shape picker, topic, instructions), run options, Start/Stop, and the
-// live log.
+// The classic panel skin (see PanelRootView for skin selection): the
+// conversation setup (shape picker, topic, instructions), run options,
+// Start/Stop, and the live log.
 
 import SwiftUI
 

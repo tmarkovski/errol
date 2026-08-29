@@ -1,5 +1,6 @@
 // The AppKit shell around the SwiftUI interface: the status item (an owl,
-// hidden until clicked) and the floating panel that hosts ControlPanelView.
+// hidden until clicked) and the floating panel that hosts the compiled-in
+// skin (PanelRootView).
 //
 // The shell stays AppKit on purpose. SwiftUI's MenuBarExtra window dismisses
 // itself whenever another app activates — which the relay does on every
@@ -22,6 +23,9 @@ final class KeyablePanel: NSPanel {
     var onVisibilityChange: ((Bool) -> Void)?
 
     override var canBecomeKey: Bool { true }
+    /// Frame changes (the console/companion morph) pace themselves to the
+    /// SwiftUI content animation.
+    override func animationResizeTime(_ newFrame: NSRect) -> TimeInterval { 0.32 }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
     override func makeKeyAndOrderFront(_ sender: Any?) {
         super.makeKeyAndOrderFront(sender)
@@ -42,6 +46,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var panel: KeyablePanel!
     private let relay = RelayController()
     private var iconWatcher: AnyCancellable?
+    private var layoutWatcher: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // LSUIElement in the Info.plist already hides the Dock icon; this
@@ -103,10 +108,35 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Panel
 
+    /// Window chrome follows the compiled-in skin: classic keeps the original
+    /// titled utility panel; glass and wireframe get a borderless transparent
+    /// panel (glass so its Liquid Glass surfaces sample the desktop behind the
+    /// window, wireframe so its painted paper card is the panel's edge; Esc
+    /// still hides it, empty regions drag it) whose frame animates with the
+    /// console/companion morph.
     private func buildPanel() {
-        panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 620),
-                             styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
-                             backing: .buffered, defer: false)
+        let size = PanelLayout.size(style: activePanelStyle, compact: relay.compact,
+                                    logOpen: relay.logOpen)
+        switch activePanelStyle {
+        case .classic:
+            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
+                                 styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
+                                 backing: .buffered, defer: false)
+        case .glass, .wireframe:
+            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
+                                 styleMask: [.borderless, .nonactivatingPanel],
+                                 backing: .buffered, defer: false)
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.hasShadow = false
+            panel.isMovableByWindowBackground = true
+            // Follow presentation changes with an animated frame change,
+            // anchored top-center so the panel hangs from the status item.
+            layoutWatcher = Publishers.CombineLatest(relay.$compact, relay.$logOpen)
+                .map { PanelLayout.size(style: activePanelStyle, compact: $0, logOpen: $1) }
+                .removeDuplicates()
+                .sink { [weak self] size in self?.resizePanel(to: size) }
+        }
         panel.title = "Errol"
         panel.onVisibilityChange = { [relay] visible in relay.setPanelVisible(visible) }
         panel.level = .floating
@@ -114,7 +144,21 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: ControlPanelView(controller: relay))
+        panel.contentView = NSHostingView(rootView: PanelRootView(controller: relay))
+    }
+
+    private func resizePanel(to size: CGSize) {
+        guard let panel else { return }
+        var frame = panel.frame
+        let topY = frame.maxY
+        let midX = frame.midX
+        frame.size = size
+        frame.origin = NSPoint(x: midX - size.width / 2, y: topY - size.height)
+        if let visible = (panel.screen ?? NSScreen.main)?.visibleFrame {
+            frame.origin.x = max(visible.minX + 8,
+                                 min(frame.origin.x, visible.maxX - size.width - 8))
+        }
+        panel.setFrame(frame, display: true, animate: panel.isVisible)
     }
 
     private func togglePanel() {
