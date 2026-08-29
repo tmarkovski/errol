@@ -446,7 +446,10 @@ struct WireframePanelView: View {
     }
 
     private var stateWord: String {
-        if controller.isRunning { return controller.isPaused ? "PAUSED" : "IN RUN" }
+        if controller.isRunning {
+            guard controller.isPaused else { return "IN RUN" }
+            return controller.isHolding ? "PAUSED" : "PAUSING"
+        }
         if bothEnded { return "DONE" }
         if bothReady { return "READY" }
         if [controller.chatgptStatus.state, controller.claudeStatus.state]
@@ -525,7 +528,9 @@ struct WireframePanelView: View {
     private func gaugeLevel(_ conversation: ConversationStatus) -> Double {
         switch conversation {
         case .chatting: 0.72
-        case .waiting: 0.28
+        // A held reply drops the needle the same way waiting does: the side
+        // is in the conversation but not working.
+        case .waiting, .replied: 0.28
         case .ended, .notStarted: 0.08
         }
     }
@@ -580,13 +585,22 @@ struct WireframePanelView: View {
     @ViewBuilder
     private var badge: some View {
         if controller.isRunning {
-            Text("PAUSED")
+            // Dashed while the pause is still on its way, solid once the run
+            // is actually standing still — the same distinction the ghost
+            // stop on the route draws, in the same dashes.
+            Text(controller.isHolding ? "PAUSED" : "PAUSING")
                 .font(Wire.mono(8, .bold))
                 .tracking(0.5)
                 .foregroundColor(Wire.ink)
                 .padding(.horizontal, Wire.s(5))
                 .padding(.vertical, Wire.s(2))
-                .overlay(Rectangle().stroke(Wire.ink, lineWidth: Wire.s(1)))
+                .overlay(
+                    Rectangle().stroke(
+                        Wire.ink,
+                        style: StrokeStyle(lineWidth: Wire.s(1),
+                                           dash: controller.isHolding
+                                               ? [] : [Wire.s(2.5), Wire.s(2.5)]))
+                )
                 .opacity(controller.isPaused ? 1 : 0)
         } else {
             Button(action: flipOpener) {
@@ -606,7 +620,7 @@ struct WireframePanelView: View {
 
     private var statusLine: String {
         if controller.isRunning {
-            if controller.isPaused { return "Holding at handoff" }
+            if controller.isHolding { return "Holding at handoff" }
             if controller.chatgptConversation == .chatting { return "ChatGPT is composing" }
             if controller.claudeConversation == .chatting { return "Claude is composing" }
             return "Relaying"
@@ -628,6 +642,10 @@ struct WireframePanelView: View {
             let inset = Wire.s(6)
             ZStack {
                 rail(width: geo.size.width, midY: midY)
+                ghostStop
+                    .position(x: geo.size.width / 2, y: midY)
+                    .opacity(showsGhostStop ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: showsGhostStop)
                 WireCourier(pointsRight: pointsRight,
                             showsPointer: routeIsLive,
                             interactive: canChooseOpener,
@@ -654,11 +672,29 @@ struct WireframePanelView: View {
                                    dash: controller.isRunning ? [] : [Wire.s(3), Wire.s(3)]))
     }
 
+    /// The spot the courier will come to rest on, drawn only while a pause is
+    /// on its way: dashed and muted, because a pause asked for mid-reply is
+    /// not in effect yet — the agent is still writing, and the run carries on
+    /// until it reaches the handoff.
+    private var ghostStop: some View {
+        Circle()
+            .stroke(Wire.faint,
+                    style: StrokeStyle(lineWidth: Wire.s(1.5),
+                                       dash: [Wire.s(2.5), Wire.s(2.5)]))
+            .frame(width: Wire.s(10), height: Wire.s(10))
+    }
+
+    /// Only in the gap between asking for a pause and the run taking it. Once
+    /// the courier is standing there the mark has nothing left to say.
+    private var showsGhostStop: Bool {
+        controller.isPaused && !controller.isHolding
+    }
+
     /// The bead parks beside whoever holds the message and waits in the
     /// middle when nobody does: before the run opens, after it closes, and
-    /// while a pause holds a captured reply that has not been handed over.
+    /// once a pause has actually parked a captured reply there.
     private var courierFraction: CGFloat {
-        if controller.isPaused { return 0.5 }
+        if controller.isHolding { return 0.5 }
         if controller.chatgptConversation == .chatting { return 0.04 }
         if controller.claudeConversation == .chatting { return 0.96 }
         return 0.5
@@ -668,9 +704,16 @@ struct WireframePanelView: View {
     /// whoever is composing now, and — with nobody composing — at whichever
     /// side is nominated to open.
     private var pointsRight: Bool {
-        if controller.chatgptConversation == .chatting { return true }
-        if controller.claudeConversation == .chatting { return false }
+        if holdsTheMessage(controller.chatgptConversation) { return true }
+        if holdsTheMessage(controller.claudeConversation) { return false }
         return controller.firstSpeaker == .claude
+    }
+
+    /// Whether the next message is coming from this side: it is writing one,
+    /// or it has written one that has not been delivered yet. Either way the
+    /// pointer belongs on the far side.
+    private func holdsTheMessage(_ status: ConversationStatus) -> Bool {
+        status == .chatting || status == .replied
     }
 
     /// Every state has a next message except one: a finished run still on
@@ -852,9 +895,10 @@ struct WireframePanelView: View {
     }
 
     private var pauseHelp: String {
-        controller.isPaused
+        guard controller.isPaused else { return "Hold the run at the next handoff" }
+        return controller.isHolding
             ? "Send the held reply and continue"
-            : "Hold the run at the next handoff"
+            : "Call off the pause and let the run carry on"
     }
 
     private func wireButton(_ label: String, disabled: Bool,

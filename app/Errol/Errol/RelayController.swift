@@ -32,8 +32,13 @@ final class RelayController: ObservableObject {
     @Published var newChats = false
     @Published var tileWindows = false
     @Published var isRunning = false
-    /// Whether the run is holding at the next handoff (see relayPaused).
+    /// Whether a pause has been *asked for* (see relayPaused). The run keeps
+    /// going until it reaches the next handoff.
     @Published var isPaused = false
+    /// Whether the run has actually parked at that handoff. Between the two
+    /// the agent that was composing is still finishing its reply, which is
+    /// the gap the panel's route draws.
+    @Published var isHolding = false
     /// Panel presentation state, glass skin only: a run shrinks the panel to
     /// the companion pane; the user can expand back mid-run. The AppKit shell
     /// watches this (with logOpen) to animate the glass panel's frame; the
@@ -68,6 +73,9 @@ final class RelayController: ObservableObject {
         }
         relayTurnSink = { [weak self] turn in
             DispatchQueue.main.async { self?.currentTurn = turn }
+        }
+        relayHoldingSink = { [weak self] holding in
+            DispatchQueue.main.async { self?.isHolding = holding }
         }
     }
 
@@ -137,6 +145,7 @@ final class RelayController: ObservableObject {
 
         isRunning = true
         isPaused = false
+        isHolding = false
         relayPaused.set(false)
         compact = true
         updateScanner()
@@ -157,6 +166,7 @@ final class RelayController: ObservableObject {
             DispatchQueue.main.async {
                 self?.isRunning = false
                 self?.isPaused = false
+                self?.isHolding = false
                 relayPaused.set(false)
                 self?.compact = false
                 self?.updateScanner()

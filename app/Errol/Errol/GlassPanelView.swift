@@ -213,6 +213,7 @@ struct GlassPanelView: View {
         if controller.isRunning {
             switch conversation {
             case .chatting: return "COMPOSING"
+            case .replied: return "REPLIED"
             case .waiting: return "WAITING"
             case .ended: return "ENDED"
             case .notStarted: return "IDLE"
@@ -529,6 +530,7 @@ struct GlassPanelView: View {
         if controller.isPaused { return "Paused" }
         switch conversation {
         case .chatting: return "Composing\u{2026}"
+        case .replied: return "Reply ready"
         case .waiting: return "Waiting"
         case .ended: return "Signed off"
         case .notStarted: return "Standing by"
@@ -539,7 +541,7 @@ struct GlassPanelView: View {
         if controller.isPaused { return 0 }
         switch conversation {
         case .chatting: return 3
-        case .waiting: return 1
+        case .replied, .waiting: return 1
         case .ended: return 0
         case .notStarted: return 1
         }

@@ -66,6 +66,11 @@ enum Speaker: String {
 enum ConversationStatus: String {
     case notStarted = "Not started"
     case chatting = "Chatting\u{2026}"
+    /// Finished writing, with the reply captured but not yet delivered. In an
+    /// uninterrupted run a side is never seen in this state — the handoff
+    /// follows immediately — but a pause parks the run here, and a side shown
+    /// as still composing through a hold is simply wrong.
+    case replied = "Reply ready"
     case waiting = "Waiting"
     case ended = "Conversation ended"
 }
@@ -77,6 +82,13 @@ var conversationStatusSink: ((ConversationStatus, ConversationStatus) -> Void)?
 /// Set by the app layer; called on the relay worker thread as each turn
 /// begins (1-based). The app resets its own counter when a run starts.
 var relayTurnSink: ((Int) -> Void)?
+
+/// Set by the app layer; called on the relay worker thread when the run
+/// parks at a handoff to wait for Resume, and again when it lets go. Asking
+/// for a pause and the run acting on it are different moments — the request
+/// lands mid-reply and takes effect only once that reply is captured — and
+/// nothing else the app can see tells them apart.
+var relayHoldingSink: ((Bool) -> Void)?
 
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
@@ -195,7 +207,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         // has been typed into the listener yet. Stop stays responsive.
         if relayPaused.isSet, !relayCancelled.isSet {
             log("Paused — holding \(speaker.name)'s reply before it reaches \(listener.name).")
+            // The reply is in hand, so whoever wrote it has stopped. A
+            // sign-off already put them in a state worth keeping.
+            if !signedOff { setConversation(speaker, .replied) }
+            relayHoldingSink?(true)
             while relayPaused.isSet, !relayCancelled.isSet { usleep(200_000) }
+            relayHoldingSink?(false)
             if !relayCancelled.isSet { log("Resumed.") }
         }
 
