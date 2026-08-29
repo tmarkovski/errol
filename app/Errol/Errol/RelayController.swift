@@ -25,6 +25,10 @@ final class RelayController: ObservableObject {
     @Published var customInstructions = ""
     @Published var limitTurns = config.limitTurns
     @Published var turns = config.turns
+    /// Which side sends the opening message. Chosen before a run — the
+    /// wireframe skin's courier points at whoever is nominated — and copied
+    /// into config at Start, which is where the relay loop reads it.
+    @Published var firstSpeaker = Speaker.chatgpt
     @Published var newChats = false
     @Published var tileWindows = false
     @Published var isRunning = false
@@ -128,6 +132,7 @@ final class RelayController: ObservableObject {
         turns = max(1, turns)
         config.turns = turns
         config.newChats = newChats
+        config.first = firstSpeaker
         let tile = tileWindows
 
         isRunning = true

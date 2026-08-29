@@ -15,6 +15,7 @@
 // PanelLayout has the sizes). EXPAND brings the full console back mid-run
 // with the setup rows disabled.
 
+import AppKit
 import SwiftUI
 
 // MARK: - Palette
@@ -61,6 +62,169 @@ enum WireframeMetrics {
 }
 
 // MARK: - Instrument parts
+
+/// The pointing-hand cursor over a control, but only while the control does
+/// something. Tracks its own push so a view that never pushed never pops
+/// somebody else's cursor off the stack.
+private struct WireHandCursor: ViewModifier {
+    var active: Bool
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, active, !pushed {
+                    NSCursor.pointingHand.push()
+                    pushed = true
+                } else if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            // A panel that closes under the cursor never gets its hover exit.
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+    }
+}
+
+/// The courier: an open bead riding the route, with a pointer swinging out
+/// of it toward the side the next message is bound for. The arm is drawn
+/// pointing right and turned around by rotation, so a handoff reads as one
+/// pointer swinging over rather than as an arrow blinking out on one side
+/// and in on the other.
+///
+/// Outside a run the courier is also the control that aims it. A click turns
+/// it around. Holding it opens the bead, and letting go spins the pointer
+/// like a roulette wheel that coasts to a stop on a side at random — for the
+/// conversations where who opens is worth not deciding.
+private struct WireCourier: View {
+    /// Where the next message is bound: the pointer's resting angle.
+    var pointsRight: Bool
+    /// False only in the one state with no next message.
+    var showsPointer: Bool
+    /// Whether the courier can be aimed, which is to say: outside a run.
+    var interactive: Bool
+    /// A plain click turns the courier around.
+    var onFlip: () -> Void
+    /// The roulette's verdict, handed over as the wheel stops.
+    var onRoulette: (Speaker) -> Void
+
+    /// How long the bead has to be held before the roulette arms, and how
+    /// long the wheel then takes to coast down.
+    private static let chargeSeconds = 1.4
+    private static let spinSeconds = 2.4
+
+    /// Turns the roulette has wound on. It is never wound back: whole turns
+    /// are visually identity, and leaving the last partial turn in place is
+    /// what lets the nomination land without the pointer twitching.
+    @State private var spin: Double = 0
+    /// 0 with the bead at rest, 1 with it fully open under a held click.
+    @State private var charge: CGFloat = 0
+    @State private var armed = false
+    @State private var spinning = false
+    @State private var chargeTask: Task<Void, Never>?
+
+    /// The pointer's total rotation. Both the ordinary handoff swing and the
+    /// roulette move this one number, which is why the spin can hand over to
+    /// a new nomination without a seam.
+    private var angle: Double { spin + (pointsRight ? 0 : 180) }
+
+    var body: some View {
+        ZStack {
+            pointer
+                .rotationEffect(.degrees(angle))
+                .opacity(showsPointer ? 1 : 0)
+                .animation(spinning ? .timingCurve(0.1, 0.72, 0.18, 1,
+                                                   duration: Self.spinSeconds)
+                                    : .easeInOut(duration: 0.45),
+                           value: angle)
+            Circle()
+                .fill(Wire.paper)
+                .overlay(Circle().stroke(Wire.ink, lineWidth: Wire.s(1.5)))
+                .frame(width: Wire.s(10 + 9 * charge), height: Wire.s(10 + 9 * charge))
+        }
+        .frame(width: Wire.s(44), height: Wire.s(36))
+        // The arrowhead alone is a miserable target; the whole bead and arm
+        // take the press.
+        .contentShape(Rectangle())
+        .gesture(press)
+        .modifier(WireHandCursor(active: interactive && !spinning))
+        .help(interactive ? "Click to turn the courier around, or hold it" : "")
+    }
+
+    private var pointer: some View {
+        Canvas { ctx, size in
+            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            let style = StrokeStyle(lineWidth: Wire.s(1.5), lineCap: .round, lineJoin: .round)
+            var arm = Path()
+            arm.move(to: CGPoint(x: c.x + Wire.s(7), y: c.y))
+            arm.addLine(to: CGPoint(x: c.x + Wire.s(18), y: c.y))
+            ctx.stroke(arm, with: .color(Wire.ink), style: style)
+            var head = Path()
+            head.move(to: CGPoint(x: c.x + Wire.s(14), y: c.y - Wire.s(4)))
+            head.addLine(to: CGPoint(x: c.x + Wire.s(18), y: c.y))
+            head.addLine(to: CGPoint(x: c.x + Wire.s(14), y: c.y + Wire.s(4)))
+            ctx.stroke(head, with: .color(Wire.ink), style: style)
+        }
+    }
+
+    /// One gesture covers both moves, because they begin the same way: a
+    /// quick click turns the courier around, and a click held past the charge
+    /// time releases into a spin instead. A drag with no minimum distance is
+    /// what gives the press a beginning and an end; a long-press gesture
+    /// reports neither.
+    private var press: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard interactive, !spinning, chargeTask == nil else { return }
+                chargeTask = Task { @MainActor in
+                    withAnimation(.easeIn(duration: Self.chargeSeconds)) { charge = 1 }
+                    try? await Task.sleep(for: .seconds(Self.chargeSeconds))
+                    if !Task.isCancelled { armed = true }
+                }
+            }
+            .onEnded { _ in
+                chargeTask?.cancel()
+                chargeTask = nil
+                guard interactive, !spinning else { return }
+                if armed {
+                    armed = false
+                    startRoulette()
+                } else {
+                    withAnimation(.easeOut(duration: 0.18)) { charge = 0 }
+                    onFlip()
+                }
+            }
+    }
+
+    private func startRoulette() {
+        spinning = true
+        let winner: Speaker = Bool.random() ? .chatgpt : .claude
+        let landing: Double = winner == .claude ? 0 : 180
+        // The wheel's own overshoot: whole turns for the show, plus the part
+        // turn that leaves the pointer on the winning side.
+        let delta = landing - (pointsRight ? 0 : 180)
+        spin += 360 * Double(Int.random(in: 3...5)) + delta
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.spinSeconds))
+            // Unwind exactly the part of the spin the nomination is about to
+            // account for, so `angle` comes out unchanged and the pointer
+            // does not move when the panel adopts the winner.
+            var settle = Transaction()
+            settle.disablesAnimations = true
+            withTransaction(settle) {
+                spin -= delta
+                spinning = false
+                onRoulette(winner)
+            }
+            withAnimation(.easeOut(duration: 0.3)) { charge = 0 }
+        }
+    }
+}
 
 /// A half-circle gauge; the needle rises while that side is composing.
 private struct WireGauge: View {
@@ -302,15 +466,15 @@ struct WireframePanelView: View {
 
     private var instrumentRow: some View {
         HStack(alignment: .top, spacing: Wire.s(14)) {
-            participant(status: controller.chatgptStatus,
+            participant(.chatgpt, status: controller.chatgptStatus,
                         conversation: controller.chatgptConversation)
             centerDeck
-            participant(status: controller.claudeStatus,
+            participant(.claude, status: controller.claudeStatus,
                         conversation: controller.claudeConversation)
         }
     }
 
-    private func participant(status: SideStatus,
+    private func participant(_ speaker: Speaker, status: SideStatus,
                              conversation: ConversationStatus) -> some View {
         VStack(spacing: Wire.s(8)) {
             WireGauge(level: gaugeLevel(conversation))
@@ -338,6 +502,13 @@ struct WireframePanelView: View {
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Wire.s(6)).fill(Wire.well))
         .overlay(RoundedRectangle(cornerRadius: Wire.s(6)).stroke(Wire.faint.opacity(0.5)))
+        // Clicking a card nominates that side to open the next run — the
+        // largest target for the plainest statement of it. The courier's
+        // pointer swinging over is the acknowledgement.
+        .contentShape(Rectangle())
+        .onTapGesture { nominate(speaker) }
+        .modifier(WireHandCursor(active: canChooseOpener))
+        .help(canChooseOpener ? "Have \(status.appName) send the opening message" : "")
     }
 
     /// Green when the side is relayable, red when it is not, amber while the
@@ -391,6 +562,24 @@ struct WireframePanelView: View {
                 .foregroundColor(Wire.ink)
                 .lineLimit(1)
                 .fixedSize()
+            badge
+        }
+        .frame(width: Wire.s(150))
+    }
+
+    /// The slot under the status line. A run holding at a handoff says so;
+    /// an idle instrument names the side its courier is aimed at, since an
+    /// arrow's angle is not something the panel should make anyone read.
+    /// Empty otherwise, so the row's height never moves.
+    ///
+    /// The two wear different clothes on purpose. A stroked box is this
+    /// panel's readout and its buttons; brackets are what it puts around a
+    /// choice, the way the shape picker is bracketed. No chevron, though —
+    /// that one belongs to controls that open a menu, and this is a toggle
+    /// between two sides.
+    @ViewBuilder
+    private var badge: some View {
+        if controller.isRunning {
             Text("PAUSED")
                 .font(Wire.mono(8, .bold))
                 .tracking(0.5)
@@ -399,8 +588,20 @@ struct WireframePanelView: View {
                 .padding(.vertical, Wire.s(2))
                 .overlay(Rectangle().stroke(Wire.ink, lineWidth: Wire.s(1)))
                 .opacity(controller.isPaused ? 1 : 0)
+        } else {
+            Button(action: flipOpener) {
+                Text("[ \(openerName.uppercased()) OPENS ]")
+                    .font(Wire.mono(9, .bold))
+                    .foregroundColor(Wire.ink)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.vertical, Wire.s(2))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .modifier(WireHandCursor(active: true))
+            .help("Which side sends the opening message")
         }
-        .frame(width: Wire.s(150))
     }
 
     private var statusLine: String {
@@ -427,11 +628,14 @@ struct WireframePanelView: View {
             let inset = Wire.s(6)
             ZStack {
                 rail(width: geo.size.width, midY: midY)
-                courier
+                WireCourier(pointsRight: pointsRight,
+                            showsPointer: routeIsLive,
+                            interactive: canChooseOpener,
+                            onFlip: flipOpener,
+                            onRoulette: { controller.firstSpeaker = $0 })
                     .position(x: inset + courierFraction * (geo.size.width - 2 * inset),
                               y: midY)
                     .animation(.easeInOut(duration: 0.45), value: courierFraction)
-                    .animation(.easeInOut(duration: 0.45), value: pointsRight)
             }
         }
         // Tall enough for the pointer's swing between the two sides to stay
@@ -450,51 +654,52 @@ struct WireframePanelView: View {
                                    dash: controller.isRunning ? [] : [Wire.s(3), Wire.s(3)]))
     }
 
-    /// The bead and its pointer. The arm is drawn pointing right and turned
-    /// around by rotation, so a handoff reads as one pointer swinging over
-    /// rather than as an arrow blinking out on one side and in on the other.
-    private var courier: some View {
-        ZStack {
-            pointer
-                .rotationEffect(.degrees(pointsRight ? 0 : 180))
-                .opacity(bothEnded ? 0 : 1)
-            Circle()
-                .fill(Wire.paper)
-                .overlay(Circle().stroke(Wire.ink, lineWidth: Wire.s(1.5)))
-                .frame(width: Wire.s(10), height: Wire.s(10))
-        }
-        .frame(width: Wire.s(44), height: Wire.s(36))
-    }
-
-    private var pointer: some View {
-        Canvas { ctx, size in
-            let c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let style = StrokeStyle(lineWidth: Wire.s(1.5), lineCap: .round, lineJoin: .round)
-            var arm = Path()
-            arm.move(to: CGPoint(x: c.x + Wire.s(7), y: c.y))
-            arm.addLine(to: CGPoint(x: c.x + Wire.s(18), y: c.y))
-            ctx.stroke(arm, with: .color(Wire.ink), style: style)
-            var head = Path()
-            head.move(to: CGPoint(x: c.x + Wire.s(14), y: c.y - Wire.s(4)))
-            head.addLine(to: CGPoint(x: c.x + Wire.s(18), y: c.y))
-            head.addLine(to: CGPoint(x: c.x + Wire.s(14), y: c.y + Wire.s(4)))
-            ctx.stroke(head, with: .color(Wire.ink), style: style)
-        }
-    }
-
     /// The bead parks beside whoever holds the message and waits in the
-    /// middle when nobody does — before the run opens, and after it closes.
+    /// middle when nobody does: before the run opens, after it closes, and
+    /// while a pause holds a captured reply that has not been handed over.
     private var courierFraction: CGFloat {
+        if controller.isPaused { return 0.5 }
         if controller.chatgptConversation == .chatting { return 0.04 }
         if controller.claudeConversation == .chatting { return 0.96 }
         return 0.5
     }
 
     /// The pointer names the side the next message is bound for: away from
-    /// whoever is composing now, and — before anyone has spoken — at ChatGPT,
-    /// who opens.
+    /// whoever is composing now, and — with nobody composing — at whichever
+    /// side is nominated to open.
     private var pointsRight: Bool {
-        controller.chatgptConversation == .chatting
+        if controller.chatgptConversation == .chatting { return true }
+        if controller.claudeConversation == .chatting { return false }
+        return controller.firstSpeaker == .claude
+    }
+
+    /// Every state has a next message except one: a finished run still on
+    /// screen, both sides signed off. Once it lets go of the panel the
+    /// pointer means the next run's opener again.
+    private var routeIsLive: Bool { !(controller.isRunning && bothEnded) }
+
+    // MARK: Nominating an opener
+
+    /// Aiming the courier only means something before a run. Once the relay
+    /// is going the message the pointer names is already written — paused, it
+    /// is captured and waiting — and there is only one place it can go.
+    private var canChooseOpener: Bool { !controller.isRunning }
+
+    private func nominate(_ speaker: Speaker) {
+        guard canChooseOpener else { return }
+        controller.firstSpeaker = speaker
+    }
+
+    private func flipOpener() {
+        nominate(controller.firstSpeaker == .chatgpt ? .claude : .chatgpt)
+    }
+
+    /// The nominated side, named the way its own card names it.
+    private var openerName: String {
+        switch controller.firstSpeaker {
+        case .chatgpt: controller.chatgptStatus.appName
+        case .claude: controller.claudeStatus.appName
+        }
     }
 
     // MARK: Setup (expanded, idle)

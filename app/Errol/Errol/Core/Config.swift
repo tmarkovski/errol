@@ -101,7 +101,8 @@ struct Config {
     /// protection, along with the message length cap, against two chatty
     /// models burning through usage limits.
     var turns = 10
-    var first = "chatgpt"
+    /// Which side sends the opening message; the other one answers it.
+    var first = Speaker.chatgpt
     var newChats = false
     /// The human's initial message. The relay wraps it in a framing preamble
     /// (see openingMessage/introMessage), so this should read like an ordinary

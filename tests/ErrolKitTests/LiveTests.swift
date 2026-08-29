@@ -119,7 +119,7 @@ final class LiveRelayTests: XCTestCase {
         config.turns = 8
         config.timeout = 120
         config.newChats = true
-        config.first = "chatgpt"
+        config.first = .chatgpt
         config.transcriptPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("errol-live-relay-transcript.md").path
         try? FileManager.default.removeItem(atPath: config.transcriptPath)

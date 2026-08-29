@@ -52,6 +52,15 @@ func introMessage(firstReply: String, from otherName: String) -> String {
 
 // MARK: - Run
 
+/// Which side of the relay a message belongs to. Only the opening message
+/// needs naming — every turn after it goes to whoever did not just speak —
+/// so this is what `config.first` holds and what the panel nominates before
+/// a run starts.
+enum Speaker: String {
+    case chatgpt
+    case claude
+}
+
 /// Per-side conversation state during a relay run, shown under each side's
 /// readiness card in the panel.
 enum ConversationStatus: String {
@@ -110,7 +119,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         }
     }
 
-    var speaker = config.first.lowercased() == "claude" ? claude : chatgpt
+    var speaker = config.first == .claude ? claude : chatgpt
     var listener = speaker.app == chatgpt.app ? claude : chatgpt
 
     var chatgptConversation = ConversationStatus.notStarted
