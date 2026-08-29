@@ -59,6 +59,11 @@ enum WireframeMetrics {
     static let expandedPanel = CGSize(width: Wire.cardWidth + 2 * Wire.cardMargin,
                                       height: Wire.expandedCardHeight + 2 * Wire.cardMargin)
     static let compactPanel = CGSize(width: expandedPanel.width, height: Wire.s(252))
+    /// The compact window with the steering editor's row added — sized for
+    /// the field at its three-line tallest. Expanded needs no counterpart:
+    /// the card height is pinned and the log absorbs the editor's row.
+    static let compactSteeringPanel = CGSize(width: expandedPanel.width,
+                                             height: Wire.s(318))
 }
 
 // MARK: - Instrument parts
@@ -403,6 +408,7 @@ private struct WireSeal: View {
 
 struct WireframePanelView: View {
     @ObservedObject var controller: RelayController
+    @FocusState private var steerFocus: Bool
 
     var body: some View {
         VStack(spacing: Wire.s(12)) {
@@ -410,9 +416,11 @@ struct WireframePanelView: View {
             instrumentRow
             if controller.compact {
                 compactFooter
+                if controller.isSteering { steerEditor }
             } else {
                 setup
                 actionRow
+                if controller.isSteering { steerEditor }
                 logWell
             }
         }
@@ -904,6 +912,10 @@ struct WireframePanelView: View {
             if controller.isRunning {
                 wireButton("COMPACT", disabled: false) { controller.compact = true }
                     .help("Shrink to the head unit")
+                wireButton("STEER", disabled: controller.isSteering) {
+                    controller.beginSteer()
+                }
+                .help(steerHelp)
                 wireButton(controller.isPaused ? "RESUME" : "PAUSE", disabled: false) {
                     controller.togglePause()
                 }
@@ -922,6 +934,46 @@ struct WireframePanelView: View {
         return controller.isHolding
             ? "Send the held reply and continue"
             : "Call off the pause and let the run carry on"
+    }
+
+    private var steerHelp: String {
+        "Hold the run and write a steering note into the conversation"
+    }
+
+    // MARK: Steering (in run)
+
+    /// The steering editor: a note from the human, posted into the relay.
+    /// It rides the next handoff to whoever replies next, and is echoed to
+    /// the other side a turn later. Opening it holds the run the way Pause
+    /// does — the ghost stop and the PAUSED readout already narrate that —
+    /// and Send lets go again, unless the pause was the user's own.
+    private var steerEditor: some View {
+        HStack(alignment: .bottom, spacing: Wire.s(8)) {
+            TextField("Steer the conversation\u{2026}", text: $controller.steeringText,
+                      axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(Wire.text(11))
+                .foregroundColor(Wire.ink)
+                .lineLimit(1...3)
+                .padding(.horizontal, Wire.s(8))
+                .padding(.vertical, Wire.s(6))
+                .background(Rectangle().fill(Wire.well))
+                .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
+                .focused($steerFocus)
+                .onSubmit { controller.sendSteering() }
+                .onExitCommand { controller.cancelSteer() }
+            wireButton("SEND", disabled: steeringNoteEmpty) { controller.sendSteering() }
+                .help("Post the note; it reaches whoever replies next, and the other side a turn later")
+            wireButton("CANCEL", disabled: false) { controller.cancelSteer() }
+                .help("Close without posting")
+        }
+        // Async because focus set in the same transaction that inserts the
+        // field does not reliably land in an NSHostingView.
+        .onAppear { DispatchQueue.main.async { steerFocus = true } }
+    }
+
+    private var steeringNoteEmpty: Bool {
+        controller.steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func wireButton(_ label: String, disabled: Bool,
@@ -986,6 +1038,10 @@ struct WireframePanelView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: Wire.s(8))
+            wireButton("STEER", disabled: controller.isSteering) {
+                controller.beginSteer()
+            }
+            .help(steerHelp)
             wireButton(controller.isPaused ? "RESUME" : "PAUSE", disabled: false) {
                 controller.togglePause()
             }
@@ -1018,6 +1074,20 @@ struct WireframePanelView: View {
     controller.compact = true
     controller.currentTurn = 7
     controller.chatgptConversation = .chatting
+    controller.claudeConversation = .waiting
+    return WireframePanelView(controller: controller)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Wireframe steer (held at handoff)") {
+    let controller = RelayController()
+    controller.isRunning = true
+    controller.compact = true
+    controller.currentTurn = 4
+    controller.isPaused = true
+    controller.isHolding = true
+    controller.isSteering = true
+    controller.chatgptConversation = .replied
     controller.claudeConversation = .waiting
     return WireframePanelView(controller: controller)
         .background(Color(white: 0.75))

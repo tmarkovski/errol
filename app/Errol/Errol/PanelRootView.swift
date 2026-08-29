@@ -26,7 +26,8 @@ enum PanelStyle {
 /// shell animates the window between these as the presentation state
 /// changes; the classic skin has one fixed size.
 enum PanelLayout {
-    static func size(style: PanelStyle, compact: Bool, logOpen: Bool) -> CGSize {
+    static func size(style: PanelStyle, compact: Bool, logOpen: Bool,
+                     steering: Bool) -> CGSize {
         switch style {
         case .classic:
             CGSize(width: 440, height: 620)
@@ -38,8 +39,12 @@ enum PanelLayout {
             }
         case .wireframe:
             // Derived from the card the skin draws (WireframeMetrics), so
-            // rescaling the instrument moves the window with it.
-            compact ? WireframeMetrics.compactPanel : WireframeMetrics.expandedPanel
+            // rescaling the instrument moves the window with it. The head
+            // unit grows a row while the steering editor is open; expanded,
+            // the fixed card lends the editor the log's room instead.
+            compact ? (steering ? WireframeMetrics.compactSteeringPanel
+                                : WireframeMetrics.compactPanel)
+                    : WireframeMetrics.expandedPanel
         }
     }
 }

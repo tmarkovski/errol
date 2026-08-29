@@ -39,6 +39,16 @@ final class RelayController: ObservableObject {
     /// the agent that was composing is still finishing its reply, which is
     /// the gap the panel's route draws.
     @Published var isHolding = false
+    /// Whether the steering editor is open. Steer asks for a pause the way
+    /// the Pause control does — room to write — and posting or canceling
+    /// the note releases that pause only if Steer was what asked for it.
+    @Published var isSteering = false
+    /// The note being written in the steering editor.
+    @Published var steeringText = ""
+    /// Whether the current pause exists on Steer's account rather than a
+    /// Pause press of the user's own; cleared whenever the user toggles
+    /// the pause by hand, which takes ownership of it.
+    private var steerInitiatedPause = false
     /// Panel presentation state, glass skin only: a run shrinks the panel to
     /// the companion pane; the user can expand back mid-run. The AppKit shell
     /// watches this (with logOpen) to animate the glass panel's frame; the
@@ -146,7 +156,11 @@ final class RelayController: ObservableObject {
         isRunning = true
         isPaused = false
         isHolding = false
+        isSteering = false
+        steeringText = ""
+        steerInitiatedPause = false
         relayPaused.set(false)
+        relaySteering.clear()
         compact = true
         updateScanner()
         relayCancelled.set(false)
@@ -167,6 +181,9 @@ final class RelayController: ObservableObject {
                 self?.isRunning = false
                 self?.isPaused = false
                 self?.isHolding = false
+                self?.isSteering = false
+                self?.steeringText = ""
+                self?.steerInitiatedPause = false
                 relayPaused.set(false)
                 self?.compact = false
                 self?.updateScanner()
@@ -176,8 +193,12 @@ final class RelayController: ObservableObject {
 
     func stop() {
         guard isRunning else { return }
-        // Clear any pause so the loop wakes and reaches its cancel check.
+        // Clear any pause so the loop wakes and reaches its cancel check;
+        // a half-written steering note has nothing left to steer.
         isPaused = false
+        isSteering = false
+        steeringText = ""
+        steerInitiatedPause = false
         relayPaused.set(false)
         relayCancelled.set(true)
         append("Stop requested — ending the run at the next safe point...")
@@ -190,8 +211,55 @@ final class RelayController: ObservableObject {
         guard isRunning else { return }
         isPaused.toggle()
         relayPaused.set(isPaused)
+        // A pause toggled by hand is the user's own, whichever way it went.
+        steerInitiatedPause = false
         if isPaused {
             append("Pause requested — the run holds at the next handoff.")
+        }
+    }
+
+    /// Steer: hold the run and write a note into the conversation. The note
+    /// rides the next handoff to whoever replies next, and is echoed to the
+    /// other side a turn later, so both learn of it and in what order.
+    func beginSteer() {
+        guard isRunning, !isSteering else { return }
+        isSteering = true
+        steeringText = ""
+        if isPaused {
+            append("Steer — the run is already pausing; the note rides the handoff when you resume.")
+        } else {
+            steerInitiatedPause = true
+            isPaused = true
+            relayPaused.set(true)
+            append("Steer — the run holds at the next handoff while you write.")
+        }
+    }
+
+    func sendSteering() {
+        let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isRunning, isSteering, !note.isEmpty else { return }
+        relaySteering.post(note)
+        closeSteer()
+        append(isPaused
+            ? "Steering note posted — it rides the handoff when you resume."
+            : "Steering note posted — it rides the next handoff.")
+    }
+
+    func cancelSteer() {
+        guard isSteering else { return }
+        closeSteer()
+        append(isPaused ? "Steer called off — the run stays paused." : "Steer called off.")
+    }
+
+    /// Close the editor, and release the pause if Steer asked for it; a
+    /// pause the user requested themselves outlives the editor.
+    private func closeSteer() {
+        isSteering = false
+        steeringText = ""
+        if steerInitiatedPause {
+            steerInitiatedPause = false
+            isPaused = false
+            relayPaused.set(false)
         }
     }
 

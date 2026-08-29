@@ -12,7 +12,9 @@ func relayRules() -> String {
     """
     This is an automated agent-to-agent conversation: your replies are relayed \
     to another AI assistant, and its replies are relayed back to you. The human \
-    who set this up is not taking part in the conversation. Treat it as a real \
+    who set this up is not taking part in the conversation, though they may \
+    occasionally interject a steering note to guide it — such notes arrive in \
+    clearly marked sections, and both sides get to see them. Treat it as a real \
     multi-turn dialogue, not a one-shot answer: contribute incrementally and \
     leave room for the other assistant to build on your reply. When you want to \
     end the conversation, include \(config.stopSequence) anywhere in a reply — \
@@ -48,6 +50,50 @@ func introMessage(firstReply: String, from otherName: String) -> String {
 
     \(firstReply)
     """
+}
+
+/// A steering note as first delivered, to the side about to reply: it reads
+/// after the message it was written in response to, and says the peer has
+/// not seen it yet — the echo on the next turn is what closes that gap.
+func steeringNoteSection(_ note: String, unseenBy otherName: String) -> String {
+    """
+    --- Steering note from the human ---
+
+    The human paused the relay and wrote this note after \(otherName)'s \
+    message above. \(otherName) has not seen it yet; it will be shared with \
+    \(otherName) alongside your reply. Take it into account as you continue.
+
+    \(note)
+    """
+}
+
+/// A relayed reply, framed only when the human has steered. `noteAfter` is
+/// a note posted at this handoff: it reads after the reply it was written
+/// in response to. `noteBefore` is the note consumed at the previous
+/// handoff, echoed to the side whose reply it followed: it reads before
+/// the reply, because that is the order they happened in — the sender read
+/// it first and wrote the reply in its light. With neither, the reply
+/// passes through verbatim, which is the everyday case.
+func relayedReply(_ reply: String, from otherName: String,
+                  noteBefore: String? = nil, noteAfter: String? = nil) -> String {
+    guard noteBefore != nil || noteAfter != nil else { return reply }
+    var sections: [String] = []
+    if let note = noteBefore {
+        sections.append("""
+        --- Steering note from the human ---
+
+        After your last reply, the human paused the relay and wrote this \
+        note. \(otherName) read it before writing the reply below. Take it \
+        into account as you continue.
+
+        \(note)
+        """)
+    }
+    sections.append("--- \(otherName)'s reply ---\n\n\(reply)")
+    if let note = noteAfter {
+        sections.append(steeringNoteSection(note, unseenBy: otherName))
+    }
+    return sections.joined(separator: "\n\n")
 }
 
 // MARK: - Run
@@ -157,6 +203,11 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     // when two consecutive replies carry the stop sequence.
     var lastReplyEnded = false
 
+    // A steering note travels twice: with the handoff it lands on, and —
+    // echoed — with the next one, so the side whose reply it followed hears
+    // of it too. This holds the note between those two handoffs.
+    var steeringEcho: String?
+
     var turn = 0
     while true {
         turn += 1
@@ -222,9 +273,26 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
             break
         }
 
+        // A note posted while the reply was being written — or while the
+        // run stood held — rides this handoff, after the reply it answers.
+        let note = relaySteering.take()
+        if let note {
+            log("Relaying the human's steering note with this handoff.")
+            appendTranscript("## Steering note (from the human)\n\n\(note)\n\n")
+        }
+
         // The listener's first message carries the rules and full context;
-        // every later relay is the other agent's reply, untouched.
-        let payload = turn == 1 ? introMessage(firstReply: reply, from: speaker.name) : reply
+        // every later relay is the other agent's reply, untouched unless a
+        // steering note framed it.
+        let payload: String
+        if turn == 1 {
+            payload = introMessage(firstReply: reply, from: speaker.name)
+                + (note.map { "\n\n" + steeringNoteSection($0, unseenBy: speaker.name) } ?? "")
+        } else {
+            payload = relayedReply(reply, from: speaker.name,
+                                   noteBefore: steeringEcho, noteAfter: note)
+        }
+        steeringEcho = note
         baseline = responseBaseline(in: listener)
         guard send(payload, to: listener) else { break }
         baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)

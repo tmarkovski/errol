@@ -1,5 +1,6 @@
 // Timestamped logging to stdout plus an optional UI sink, the incremental
-// markdown transcript, and the cross-thread cancellation flag.
+// markdown transcript, the cross-thread run flags, and the steering-note
+// mailbox.
 
 import Foundation
 
@@ -30,6 +31,25 @@ let relayCancelled = CancelFlag()
 /// boundary — after a reply has been captured, before it is delivered — so
 /// neither app is touched while held.
 let relayPaused = CancelFlag()
+
+/// Posted from the panel's Steer editor (main thread) and consumed by the
+/// relay loop (worker thread) at the next handoff boundary: the note rides
+/// to the side about to reply, and is echoed to the other side a turn
+/// later. A mailbox rather than a flag — `take` consumes — and cleared at
+/// run start so a note that never found its handoff cannot leak into the
+/// next run.
+final class SteeringBox {
+    private let lock = NSLock()
+    private var note: String?
+    func post(_ text: String) { lock.lock(); note = text; lock.unlock() }
+    func take() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        let taken = note; note = nil; return taken
+    }
+    func clear() { lock.lock(); note = nil; lock.unlock() }
+}
+
+let relaySteering = SteeringBox()
 
 func appendTranscript(_ text: String) {
     let url = URL(fileURLWithPath: config.transcriptPath)
