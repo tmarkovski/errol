@@ -13,39 +13,65 @@ import ApplicationServices
 /// AX server (Electron) is intermittently unresponsive; fall back to the
 /// window server's front window, which needs no cooperation from the app.
 func isFrontmost(_ target: TargetApp) -> Bool {
-    if let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) {
-        var pid: pid_t = -1
-        AXUIElementGetPid(focused as! AXUIElement, &pid)
-        return pid == target.app.processIdentifier
-    }
+    if let pid = axFocusedPID() { return pid == target.app.processIdentifier }
+    return frontWindowOwnerPID() == target.app.processIdentifier
+}
+
+/// The pid the Accessibility API says holds keyboard focus. This is the one
+/// that predicts where a synthesized keystroke lands, which is why it is
+/// asked first everywhere below; it goes quiet when the focused app's own AX
+/// server does.
+func axFocusedPID() -> pid_t? {
+    guard let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) else { return nil }
+    var pid: pid_t = -1
+    AXUIElementGetPid(focused as! AXUIElement, &pid)
+    return pid
+}
+
+/// The pid owning the frontmost ordinary window, according to the window
+/// server. Needs no cooperation from the app, so this is what answers when the
+/// AX query above does not. Errol's own panels are above layer 0 and so are
+/// never mistaken for the front window.
+func frontWindowOwnerPID() -> pid_t? {
     guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                                kCGNullWindowID) as? [[String: Any]] else { return false }
+                                                kCGNullWindowID) as? [[String: Any]] else { return nil }
     for window in info {
         if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
            let pid = window[kCGWindowOwnerPID as String] as? pid_t {
-            return pid == target.app.processIdentifier
+            return pid
         }
     }
-    return false
+    return nil
+}
+
+/// What the focus checks actually saw, for the log line after a failed
+/// activation. Without it the failure names the target and nothing else,
+/// which is the one thing already known — an app that is hidden, minimized,
+/// on another Space, gone since the run resolved it, or simply outranked by a
+/// third app holding keyboard focus all fail identically from the outside.
+func focusReport(_ target: TargetApp) -> String {
+    func describe(_ pid: pid_t?) -> String {
+        guard let pid else { return "none" }
+        let name = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "unknown"
+        return "\(name) (pid \(pid))"
+    }
+    var state = [String]()
+    if target.app.isTerminated { state.append("terminated") }
+    if target.app.isHidden { state.append("hidden") }
+    return "wanted pid \(target.app.processIdentifier); "
+        + "AX focus \(describe(axFocusedPID())); "
+        + "front window \(describe(frontWindowOwnerPID()))"
+        + (state.isEmpty ? "" : "; target is \(state.joined(separator: " and "))")
 }
 
 /// Whatever app currently holds focus, detected the same dual-path way as
 /// isFrontmost (AX focused application, then the window server's front window).
 func currentFrontmostApp() -> NSRunningApplication? {
-    if let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) {
-        var pid: pid_t = -1
-        AXUIElementGetPid(focused as! AXUIElement, &pid)
-        if let app = NSRunningApplication(processIdentifier: pid) { return app }
+    if let pid = axFocusedPID(), let app = NSRunningApplication(processIdentifier: pid) {
+        return app
     }
-    if let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                             kCGNullWindowID) as? [[String: Any]] {
-        for window in info {
-            if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
-               let pid = window[kCGWindowOwnerPID as String] as? pid_t,
-               let app = NSRunningApplication(processIdentifier: pid) {
-                return app
-            }
-        }
+    if let pid = frontWindowOwnerPID(), let app = NSRunningApplication(processIdentifier: pid) {
+        return app
     }
     return NSWorkspace.shared.frontmostApplication
 }
@@ -55,16 +81,7 @@ func currentFrontmostApp() -> NSRunningApplication? {
 func refocus(to app: NSRunningApplication?) {
     guard let app, let bundleID = app.bundleIdentifier else { return }
     // Skip when it never lost focus (e.g. an inspection moves no windows).
-    if let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                             kCGNullWindowID) as? [[String: Any]] {
-        for window in info {
-            if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
-               let pid = window[kCGWindowOwnerPID as String] as? pid_t {
-                if pid == app.processIdentifier { return }
-                break
-            }
-        }
-    }
+    if frontWindowOwnerPID() == app.processIdentifier { return }
     let open = Process()
     open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
     open.arguments = ["-b", bundleID]
@@ -88,11 +105,32 @@ func activateViaLaunchServices(_ target: TargetApp) {
     open.waitUntilExit()
 }
 
+/// Let go of Errol's own keyboard focus before driving another app.
+///
+/// The panel is a non-activating floating panel that is nonetheless allowed to
+/// become key (KeyablePanel), because its text fields have to be typeable. But
+/// a key panel makes Errol the AX-focused application, and everything here
+/// reads focus to decide where a synthesized keystroke will land. Two things
+/// go wrong while Errol holds it. isFrontmost can never see the target, so
+/// activation times out however well it actually worked — Errol pinning the
+/// very signal it polls. And if it did type anyway, the paste would go into
+/// Errol's own instruction field instead of the chat.
+///
+/// Async on purpose: the relay drives this from its worker thread, and the
+/// caller polls for the result anyway.
+func resignOurOwnKeyStatus() {
+    DispatchQueue.main.async {
+        guard NSApp.isActive || NSApp.keyWindow != nil else { return }
+        NSApp.deactivate()
+    }
+}
+
 /// Bring the target app to the foreground and confirm it got there.
 /// NSRunningApplication.activate from a background process is ignored under
 /// macOS cooperative activation, so fall back to the AX frontmost attribute
 /// (which honors the Accessibility grant) and raising the chat window.
 func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Bool {
+    resignOurOwnKeyStatus()
     let deadline = Date().addingTimeInterval(seconds)
     var attempt = 0
     while Date() < deadline {

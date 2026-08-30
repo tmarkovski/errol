@@ -68,6 +68,7 @@ func send(_ text: String, to target: TargetApp) -> Bool {
     // never type unless the target is verified frontmost.
     guard makeFrontmost(target) else {
         log("\(target.name): could not bring app to front; refusing to type into another app's window")
+        log("\(target.name): \(focusReport(target))")
         return false
     }
 
