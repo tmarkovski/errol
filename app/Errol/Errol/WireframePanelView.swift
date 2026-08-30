@@ -295,6 +295,53 @@ private struct WireLens {
                                  glass: Color(red: 0.72, green: 0.37, blue: 0.02))
 }
 
+/// The drawn face of a lamp. A pulsing lamp animates both the bulb opacity
+/// and the halo's color, so these two properties deliberately share one
+/// state without owning the animation that drives it.
+private struct WireLampFace: View {
+    var lens: WireLens?
+    var dimmed: Bool
+
+    /// Filament off-center, the way a bulb sits behind its lens.
+    private var glass: AnyShapeStyle {
+        guard let lens else { return AnyShapeStyle(Wire.paper) }
+        return AnyShapeStyle(RadialGradient(colors: [lens.core, lens.glass],
+                                           center: UnitPoint(x: 0.36, y: 0.32),
+                                           startRadius: 0, endRadius: Wire.s(11)))
+    }
+
+    var body: some View {
+        Circle()
+            .fill(glass)
+            .opacity(dimmed ? 0.32 : 1)
+            .overlay(Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
+                                                 : Wire.ink.opacity(0.55),
+                                     lineWidth: Wire.s(1)))
+            .frame(width: Wire.s(14), height: Wire.s(14))
+            .shadow(color: (lens?.glass ?? .clear).opacity(dimmed ? 0.15 : 0.55),
+                    radius: Wire.s(4))
+    }
+}
+
+/// Own the endless animation in a child that exists only while the lamp is
+/// live. Removing this child removes the animated shadow render node too;
+/// trying to cancel only `dimmed` left that halo's presentation animation
+/// breathing after the core had stopped.
+private struct WirePulsingBulb: View {
+    let lens: WireLens
+    @State private var dimmed = false
+
+    var body: some View {
+        WireLampFace(lens: lens, dimmed: dimmed)
+            .onAppear {
+                dimmed = false
+                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                    dimmed = true
+                }
+            }
+    }
+}
+
 /// A signal lamp: a glass lens in a metal bezel, or — with no lens — the
 /// plain dark-ringed dot the gray lamps show when off, since a tinted unlit
 /// lens reads as a third state rather than as nothing. `pulsing` gives it
@@ -307,27 +354,13 @@ private struct WireSignalLamp: View {
     var lens: WireLens?
     var pulsing = false
 
-    @State private var dimmed = false
-
-    /// Filament off-center, the way a bulb sits behind its lens.
-    private var glass: AnyShapeStyle {
-        guard let lens else { return AnyShapeStyle(Wire.paper) }
-        return AnyShapeStyle(RadialGradient(colors: [lens.core, lens.glass],
-                                           center: UnitPoint(x: 0.36, y: 0.32),
-                                           startRadius: 0, endRadius: Wire.s(11)))
-    }
-
     var body: some View {
         VStack(spacing: Wire.s(3)) {
-            Circle()
-                .fill(glass)
-                .opacity(dimmed ? 0.32 : 1)
-                .overlay(Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
-                                                     : Wire.ink.opacity(0.55),
-                                         lineWidth: Wire.s(1)))
-                .frame(width: Wire.s(14), height: Wire.s(14))
-                .shadow(color: (lens?.glass ?? .clear).opacity(dimmed ? 0.15 : 0.55),
-                        radius: Wire.s(4))
+            if pulsing, let lens {
+                WirePulsingBulb(lens: lens)
+            } else {
+                WireLampFace(lens: lens, dimmed: false)
+            }
             Text(label)
                 .font(Wire.mono(7, .bold))
                 .tracking(0.5)
@@ -337,30 +370,6 @@ private struct WireSignalLamp: View {
                 // change never grows the row.
                 .lineLimit(1)
                 .fixedSize()
-        }
-        // initial: true starts the fade on a lamp that is already lit when
-        // the panel opens mid-run, not only on the transition into one.
-        .onChange(of: pulsing, initial: true) { _, on in
-            guard on else {
-                // Stopping takes an animation of its own. A repeatForever
-                // animation stays attached to the opacity it drives, and a
-                // bare assignment does not displace it — only another
-                // animation on the same property does. Without this the lamp
-                // went on breathing after its lens had gone dark, since the
-                // unlit lens is a visible gray dot rather than nothing.
-                //
-                // Zero duration rather than a graceful fade: `lens` goes nil
-                // in the same update that clears `pulsing`, so by the time
-                // this runs there is no lit lamp left to fade out. A fade
-                // would instead show the gray dot brightening on its way to
-                // rest, which is motion on a lamp that just went out.
-                withAnimation(.linear(duration: 0)) { dimmed = false }
-                return
-            }
-            dimmed = false
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
-                dimmed = true
-            }
         }
     }
 }
