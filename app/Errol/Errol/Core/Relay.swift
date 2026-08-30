@@ -186,15 +186,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         }
     }
 
-    if config.newChats {
-        for target in [chatgpt, claude] {
-            guard startNewChat(in: target) else {
-                log("ERROR: \(target.name): could not start a new chat.")
-                return false
-            }
-        }
-    }
-
     var speaker = config.first == .claude ? claude : chatgpt
     var listener = speaker.app == chatgpt.app ? claude : chatgpt
 

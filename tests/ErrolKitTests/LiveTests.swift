@@ -118,14 +118,16 @@ final class LiveRelayTests: XCTestCase {
         config.limitTurns = true
         config.turns = 8
         config.timeout = 120
-        config.newChats = true
         config.first = .chatgpt
         config.transcriptPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("errol-live-relay-transcript.md").path
         try? FileManager.default.removeItem(atPath: config.transcriptPath)
         relayCancelled.set(false)
 
-        print("live-relay: running a real \(config.turns)-turn relay in fresh chats — hands off until it finishes")
+        // The relay no longer opens chats of its own, so this runs in whatever
+        // conversations happen to be open. Open a fresh one on each side first,
+        // or the test seeds its small talk into the middle of real work.
+        print("live-relay: running a real \(config.turns)-turn relay in the open chats — hands off until it finishes")
         XCTAssertTrue(runRelay(chatgpt: chatgpt, claude: claude),
                       "runRelay preflight or seeding failed — see the log above")
 

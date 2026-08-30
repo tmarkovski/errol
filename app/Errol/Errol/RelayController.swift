@@ -33,7 +33,6 @@ final class RelayController: ObservableObject {
     /// wireframe skin's courier points at whoever is nominated — and copied
     /// into config at Start, which is where the relay loop reads it.
     @Published var firstSpeaker = Speaker.chatgpt
-    @Published var newChats = false
     @Published var tileWindows = false
     @Published var isRunning = false
     /// Whether a pause has been *asked for* (see relayPaused). The run keeps
@@ -248,7 +247,6 @@ final class RelayController: ObservableObject {
         config.limitTurns = limitTurns
         turns = max(1, turns)
         config.turns = turns
-        config.newChats = newChats
         config.first = firstSpeaker
         let tile = tileWindows
 

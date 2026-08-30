@@ -379,7 +379,6 @@ struct GlassPanelView: View {
                 .labelsHidden()
                 .disabled(!controller.limitTurns)
             Divider().frame(height: 12)
-            Toggle("New chats", isOn: $controller.newChats)
             Toggle("Tile windows", isOn: $controller.tileWindows)
                 .help("Tile the chat windows side by side when the run starts")
             Spacer(minLength: 0)

@@ -117,7 +117,6 @@ struct Config {
     var turns = 10
     /// Which side sends the opening message; the other one answers it.
     var first = Speaker.chatgpt
-    var newChats = false
     /// The human's initial message. The relay wraps it in a framing preamble
     /// (see openingMessage/introMessage), so this should read like an ordinary
     /// user request, not an explanation of the relay.

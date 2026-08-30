@@ -16,5 +16,4 @@ func keystroke(_ virtualKey: CGKeyCode, flags: CGEventFlags = []) {
 }
 
 let keyV: CGKeyCode = 9
-let keyN: CGKeyCode = 45
 let keyReturn: CGKeyCode = 36

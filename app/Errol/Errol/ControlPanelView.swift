@@ -24,7 +24,6 @@ struct ControlPanelView: View {
                     Stepper("", value: $controller.turns, in: 1...99)
                         .labelsHidden()
                         .disabled(!controller.limitTurns)
-                    Toggle("Start new chats", isOn: $controller.newChats)
                     Spacer()
                 }
 

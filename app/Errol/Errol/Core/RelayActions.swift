@@ -3,26 +3,6 @@
 import AppKit
 import ApplicationServices
 
-/// Cmd+N opens a fresh conversation in both apps (reusing the window).
-/// Confirmed fresh when no per-message affordances remain in the chat window.
-func startNewChat(in target: TargetApp) -> Bool {
-    guard makeFrontmost(target) else {
-        log("\(target.name): could not bring app to front for Cmd+N")
-        return false
-    }
-    keystroke(keyN, flags: .maskCommand)
-    let deadline = Date().addingTimeInterval(4)
-    while Date() < deadline {
-        if messageAffordances(in: target).isEmpty {
-            log("\(target.name): new chat ready")
-            return true
-        }
-        usleep(200_000)
-    }
-    log("\(target.name): WARNING: could not confirm a fresh chat, continuing in the current one")
-    return true
-}
-
 /// When the newest message's affordance is the collapsed actions toggle
 /// (Claude Code), press it and wait for the bar's copy button to mount —
 /// the AXPress equivalent of the hover that normally expands it.

@@ -35,8 +35,9 @@ final class ChatGPTScenarioTests: XCTestCase {
         // ("Select ChatGPT model") remains — reported as "Default".
         XCTAssertEqual(d.status.model, "Default")
         XCTAssertEqual(d.excluded, [false])
-        // An empty chat exposes no copy buttons; this is the fresh-chat
-        // confirmation startNewChat polls for, not selector breakage.
+        // An empty chat exposes no copy buttons. That is the home screen
+        // itself, not selector breakage — the baseline a run seeded here
+        // starts counting affordances up from.
         XCTAssertTrue(d.affordanceLabels.isEmpty)
         XCTAssertTrue(d.copyLabels.isEmpty)
         XCTAssertFalse(d.streaming)

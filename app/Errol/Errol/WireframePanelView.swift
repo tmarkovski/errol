@@ -966,7 +966,6 @@ struct WireframePanelView: View {
             }
             .disabled(!controller.limitTurns)
             .opacity(controller.limitTurns ? 1 : 0.45)
-            wireToggle("NEW CHATS", isOn: $controller.newChats)
             wireToggle("TILE", isOn: $controller.tileWindows)
                 .help("Tile the chat windows side by side when the run starts")
             Spacer(minLength: 0)
