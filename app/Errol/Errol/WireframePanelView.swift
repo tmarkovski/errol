@@ -334,8 +334,23 @@ private struct WireSignalLamp: View {
         // initial: true starts the fade on a lamp that is already lit when
         // the panel opens mid-run, not only on the transition into one.
         .onChange(of: pulsing, initial: true) { _, on in
+            guard on else {
+                // Stopping takes an animation of its own. A repeatForever
+                // animation stays attached to the opacity it drives, and a
+                // bare assignment does not displace it — only another
+                // animation on the same property does. Without this the lamp
+                // went on breathing after its lens had gone dark, since the
+                // unlit lens is a visible gray dot rather than nothing.
+                //
+                // Zero duration rather than a graceful fade: `lens` goes nil
+                // in the same update that clears `pulsing`, so by the time
+                // this runs there is no lit lamp left to fade out. A fade
+                // would instead show the gray dot brightening on its way to
+                // rest, which is motion on a lamp that just went out.
+                withAnimation(.linear(duration: 0)) { dimmed = false }
+                return
+            }
             dimmed = false
-            guard on else { return }
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
                 dimmed = true
             }
