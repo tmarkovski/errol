@@ -1,0 +1,34 @@
+// Release signing for distribution builds.
+//
+// This file is the single place the distribution identity is written down.
+// It is NOT wired into the Xcode project on purpose: the target already sets
+// CODE_SIGN_IDENTITY and DEVELOPMENT_TEAM in project.pbxproj, and target-level
+// settings win over a base configuration file, so attaching it would silently
+// do nothing. Instead the release workflow parses these lines and passes them
+// to xcodebuild as command-line build settings, which have the highest
+// precedence and definitively override the project. Local Xcode builds are
+// untouched, which matters here: re-signing the app invalidates its
+// Accessibility grant.
+//
+// Once a Developer ID certificate exists and someone is at Xcode, the tidier
+// end state is to delete the signing settings from project.pbxproj and attach
+// this file as the target's Release base configuration.
+
+// The team the app publishes under. Currently pending Apple Developer Program
+// enrollment; project.pbxproj still carries ABWMP9KRVE at the target level and
+// JN3SN725AZ at the project level. Nothing has shipped, so changing this is
+// still free -- it stops being free the moment the first release is public.
+DEVELOPMENT_TEAM = JN3SN725AZ
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Developer ID Application
+PROVISIONING_PROFILE_SPECIFIER =
+
+// Required by notarization. Hardened runtime is already YES in the project;
+// it is repeated here so this file describes the whole distribution identity.
+ENABLE_HARDENED_RUNTIME = YES
+OTHER_CODE_SIGN_FLAGS = --timestamp
+
+// App Sandbox stays off -- a sandboxed Errol can neither hold the Accessibility
+// grant nor post keystrokes. See README "Build settings that matter".
+ENABLE_APP_SANDBOX = NO
