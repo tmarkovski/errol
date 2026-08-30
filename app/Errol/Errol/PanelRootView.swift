@@ -27,7 +27,7 @@ enum PanelStyle {
 /// changes; the classic skin has one fixed size.
 enum PanelLayout {
     static func size(style: PanelStyle, compact: Bool, logOpen: Bool,
-                     steering: Bool) -> CGSize {
+                     steering: Bool, fullPrompt: Bool) -> CGSize {
         switch style {
         case .classic:
             CGSize(width: 440, height: 620)
@@ -35,7 +35,9 @@ enum PanelLayout {
             if compact {
                 CGSize(width: 430, height: 160)
             } else {
-                CGSize(width: 560, height: logOpen ? 660 : 470)
+                CGSize(width: 560,
+                       height: logOpen ? (fullPrompt ? 760 : 660)
+                                       : (fullPrompt ? 570 : 470))
             }
         case .wireframe:
             // Derived from the card the skin draws (WireframeMetrics), so

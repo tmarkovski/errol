@@ -51,40 +51,57 @@ struct ControlPanelView: View {
         .frame(width: 440, height: 620)
     }
 
-    /// The shape picker with, for a template, a topic field and the "Edit
-    /// instructions" link (which hands the composed text to Custom); Custom
-    /// is the only state that shows the full editor.
+    /// Shape selection and full-prompt editing are independent: Edit keeps the
+    /// current shape selected, and choosing another shape keeps the editor at
+    /// the same level of detail. Custom is only for writing from scratch.
     @ViewBuilder
     private var conversationSetup: some View {
         HStack(spacing: 8) {
-            Picker("", selection: $controller.conversation) {
+            Picker("", selection: Binding(
+                get: { controller.conversation },
+                set: { controller.selectConversation($0) }
+            )) {
                 ForEach(conversationTemplates) { template in
                     Text(template.name).tag(template.name)
                 }
                 Divider()
-                Text(RelayController.customConversation)
+                Text("Write from scratch")
                     .tag(RelayController.customConversation)
             }
             .labelsHidden()
             .fixedSize()
             Spacer()
             if controller.selectedTemplate != nil {
-                Button("Edit instructions") { controller.editInstructions() }
+                Button(controller.isEditingInstructions
+                       ? "Back to simple setup" : "Edit full prompt") {
+                    if controller.isEditingInstructions {
+                        controller.resetInstructionsToTemplate()
+                    } else {
+                        controller.editInstructions()
+                    }
+                }
                     .buttonStyle(.link)
-                    .help("Show the full opening message this shape composes, and edit it freely")
+                    .help(controller.isEditingInstructions
+                          ? "Discard full-prompt edits and return to the simple topic field"
+                          : "Edit the full opening prompt without changing the selected shape")
             }
         }
-        if let template = controller.selectedTemplate {
+        if !controller.showsFullInstructionsEditor,
+           let template = controller.selectedTemplate {
             TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
                 .lineLimit(1...4)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 13))
         } else {
-            TextEditor(text: $controller.customInstructions)
-                .font(.system(size: 13))
-                .frame(height: 100)
+            GrowingTextEditor(text: $controller.customInstructions,
+                              font: .systemFont(ofSize: 13),
+                              placeholder: controller.promptEditorPlaceholder)
+                .padding(6)
                 .overlay(RoundedRectangle(cornerRadius: 5)
                     .stroke(Color(nsColor: .separatorColor)))
+                .help(controller.selectedTemplate == nil
+                      ? "Write the complete opening prompt"
+                      : "Editing the complete \(controller.conversation) prompt; choosing another shape keeps this editor open")
         }
     }
 
@@ -188,4 +205,3 @@ private struct SideStatusCard: View {
 #Preview {
     ControlPanelView(controller: RelayController())
 }
-

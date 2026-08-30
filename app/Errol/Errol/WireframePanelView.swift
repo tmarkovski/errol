@@ -793,11 +793,13 @@ struct WireframePanelView: View {
         HStack(spacing: Wire.s(8)) {
             Menu {
                 ForEach(conversationTemplates) { template in
-                    Button(template.name) { controller.conversation = template.name }
+                    Button(template.name) {
+                        controller.selectConversation(template.name)
+                    }
                 }
                 Divider()
-                Button(RelayController.customConversation) {
-                    controller.conversation = RelayController.customConversation
+                Button("Write from scratch") {
+                    controller.selectConversation(RelayController.customConversation)
                 }
             } label: {
                 Text("[ \(controller.conversation.uppercased()) \u{25BE} ]")
@@ -811,22 +813,30 @@ struct WireframePanelView: View {
             Spacer()
             if controller.selectedTemplate != nil {
                 Button {
-                    controller.editInstructions()
+                    if controller.isEditingInstructions {
+                        controller.resetInstructionsToTemplate()
+                    } else {
+                        controller.editInstructions()
+                    }
                 } label: {
-                    Text("EDIT INSTRUCTIONS")
+                    Text(controller.isEditingInstructions
+                         ? "BACK TO SIMPLE SETUP" : "EDIT FULL PROMPT")
                         .font(Wire.mono(8, .bold))
                         .underline()
                         .foregroundColor(Wire.faint)
                 }
                 .buttonStyle(.plain)
-                .help("Show the full opening message this shape composes, and edit it freely")
+                .help(controller.isEditingInstructions
+                      ? "Discard full-prompt edits and return to the simple topic field"
+                      : "Edit the full opening prompt without changing the selected shape")
             }
         }
     }
 
     @ViewBuilder
     private var topicInput: some View {
-        if let template = controller.selectedTemplate {
+        if !controller.showsFullInstructionsEditor,
+           let template = controller.selectedTemplate {
             TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(Wire.text(11))
@@ -837,14 +847,17 @@ struct WireframePanelView: View {
                 .background(Rectangle().fill(Wire.well))
                 .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
         } else {
-            TextEditor(text: $controller.customInstructions)
-                .font(Wire.text(11))
-                .foregroundColor(Wire.ink)
-                .scrollContentBackground(.hidden)
-                .frame(height: Wire.s(88))
-                .padding(Wire.s(4))
+            GrowingTextEditor(text: $controller.customInstructions,
+                              font: .systemFont(ofSize: Wire.s(11)),
+                              textColor: NSColor(calibratedWhite: 0.20, alpha: 1),
+                              placeholder: controller.promptEditorPlaceholder)
+                .padding(.horizontal, Wire.s(8))
+                .padding(.vertical, Wire.s(6))
                 .background(Rectangle().fill(Wire.well))
                 .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
+                .help(controller.selectedTemplate == nil
+                      ? "Write the complete opening prompt"
+                      : "Editing the complete \(controller.conversation) prompt; choosing another shape keeps this editor open")
         }
     }
 

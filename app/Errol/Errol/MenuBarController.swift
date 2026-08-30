@@ -116,7 +116,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// animates with the console/companion morph.
     private func buildPanel() {
         let size = PanelLayout.size(style: activePanelStyle, compact: relay.compact,
-                                    logOpen: relay.logOpen, steering: relay.isSteering)
+                                    logOpen: relay.logOpen, steering: relay.isSteering,
+                                    fullPrompt: relay.showsFullInstructionsEditor)
         switch activePanelStyle {
         case .classic:
             panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
@@ -136,10 +137,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel.isMovableByWindowBackground = true
             // Follow presentation changes with an animated frame change,
             // anchored top-center so the panel hangs from the status item.
-            layoutWatcher = Publishers.CombineLatest3(relay.$compact, relay.$logOpen,
-                                                      relay.$isSteering)
+            layoutWatcher = Publishers.CombineLatest4(relay.$compact, relay.$logOpen,
+                                                       relay.$isSteering,
+                                                       relay.$isEditingInstructions)
                 .map { PanelLayout.size(style: activePanelStyle, compact: $0,
-                                        logOpen: $1, steering: $2) }
+                                        logOpen: $1, steering: $2, fullPrompt: $3) }
                 .removeDuplicates()
                 .sink { [weak self] size in self?.resizePanel(to: size) }
         }

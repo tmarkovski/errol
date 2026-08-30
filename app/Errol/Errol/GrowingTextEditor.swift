@@ -1,0 +1,141 @@
+// A multiline prompt editor that follows its content from a useful minimum
+// through a bounded maximum, then scrolls. SwiftUI's TextEditor always takes
+// the fixed frame it is given; wrapping NSTextView lets the prompt remain a
+// real textarea (including Return for paragraph breaks) while participating
+// in the panel's layout.
+
+import AppKit
+import SwiftUI
+
+struct GrowingTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    var font: NSFont
+    var textColor: NSColor = .labelColor
+    var placeholder: String?
+    var minimumLines = 8
+    var maximumLines = 13
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+
+        let textView = TrailingPlaceholderTextView(frame: .zero)
+        textView.delegate = context.coordinator
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.allowsUndo = true
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainerInset = NSSize(width: 0, height: 2)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = false
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.font = font
+        textView.textColor = textColor
+        textView.string = text
+        textView.trailingPlaceholder = placeholder
+
+        scrollView.documentView = textView
+        context.coordinator.scrollView = scrollView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let textView = scrollView.documentView as? TrailingPlaceholderTextView else {
+            return
+        }
+        textView.font = font
+        textView.textColor = textColor
+        textView.trailingPlaceholder = placeholder
+        if textView.string != text {
+            textView.string = text
+        }
+        scrollView.invalidateIntrinsicContentSize()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
+                      context: Context) -> CGSize? {
+        guard let textView = scrollView.documentView as? NSTextView,
+              let textContainer = textView.textContainer,
+              let layoutManager = textView.layoutManager else { return nil }
+
+        let width = proposal.width ?? scrollView.frame.width
+        guard width > 0 else {
+            return CGSize(width: width, height: lineHeight * CGFloat(minimumLines))
+        }
+
+        textView.frame.size.width = width
+        textContainer.containerSize = NSSize(width: width,
+                                             height: .greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+
+        let insets = textView.textContainerInset.height * 2
+        let contentHeight = ceil(layoutManager.usedRect(for: textContainer).height + insets)
+        let minimumHeight = lineHeight * CGFloat(minimumLines) + insets
+        let maximumHeight = lineHeight * CGFloat(maximumLines) + insets
+        let height = min(max(contentHeight, minimumHeight), maximumHeight)
+        return CGSize(width: width, height: height)
+    }
+
+    private var lineHeight: CGFloat {
+        ceil(NSLayoutManager().defaultLineHeight(for: font))
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: GrowingTextEditor
+        weak var scrollView: NSScrollView?
+
+        init(parent: GrowingTextEditor) {
+            self.parent = parent
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? TrailingPlaceholderTextView else {
+                return
+            }
+            // Do not leave the hint painted under the first character while
+            // SwiftUI propagates the new binding back through updateNSView.
+            textView.trailingPlaceholder = nil
+            parent.text = textView.string
+            scrollView?.invalidateIntrinsicContentSize()
+            scrollView?.superview?.needsLayout = true
+        }
+    }
+}
+
+/// Draws a hint in NSTextView's extra line fragment — the insertion line
+/// after the template body — without adding those characters to its storage.
+private final class TrailingPlaceholderTextView: NSTextView {
+    var trailingPlaceholder: String? {
+        didSet {
+            if trailingPlaceholder != oldValue { needsDisplay = true }
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let trailingPlaceholder, !trailingPlaceholder.isEmpty,
+              let layoutManager else { return }
+
+        let fragment = layoutManager.extraLineFragmentRect
+        let origin = NSPoint(x: textContainerOrigin.x + fragment.minX,
+                             y: textContainerOrigin.y + fragment.minY)
+        NSAttributedString(
+            string: trailingPlaceholder,
+            attributes: [
+                .font: font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                .foregroundColor: NSColor.placeholderTextColor,
+            ]
+        ).draw(at: origin)
+    }
+}

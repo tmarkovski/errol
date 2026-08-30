@@ -180,10 +180,10 @@ var config = Config()
 /// A canned conversation shape selectable in the panel's picker. The body
 /// carries the purpose and its pacing and refers to the user's topic as
 /// "below"; composing appends the topic after a blank line. Templates are
-/// starting text, not hidden framing — the panel's "Edit instructions" link
-/// reveals the composed message for free editing, and only that text is ever
-/// sent. The relay's standing rules (relayRules) own the sign-off mechanics,
-/// so bodies must not mention the stop sequence.
+/// starting text, not hidden framing — the panel's full-prompt editor reveals
+/// the composed message without changing the selected template, and only that
+/// text is ever sent. The relay's standing rules (relayRules) own the sign-off
+/// mechanics, so bodies must not mention the stop sequence.
 struct ConversationTemplate: Identifiable {
     let name: String
     /// Placeholder shown in the panel's topic field.

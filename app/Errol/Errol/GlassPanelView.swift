@@ -1,6 +1,6 @@
 // The glass skin: the Liquid Glass console from DesignMockupsTake3 made
 // real. Same UX surface as the classic skin — readiness cards, shape
-// picker with topic and free "Edit instructions" handoff, run options,
+// picker with topic and a full-prompt editor, run options,
 // Start/Stop, live log — restyled as floating glass over the desktop
 // (the panel window is transparent; see MenuBarController).
 //
@@ -297,11 +297,13 @@ struct GlassPanelView: View {
         HStack(spacing: 10) {
             Menu {
                 ForEach(conversationTemplates) { template in
-                    Button(template.name) { controller.conversation = template.name }
+                    Button(template.name) {
+                        controller.selectConversation(template.name)
+                    }
                 }
                 Divider()
-                Button(RelayController.customConversation) {
-                    controller.conversation = RelayController.customConversation
+                Button("Write from scratch") {
+                    controller.selectConversation(RelayController.customConversation)
                 }
             } label: {
                 HStack(spacing: 5) {
@@ -321,14 +323,24 @@ struct GlassPanelView: View {
             .glassEffect(.regular, in: .capsule)
             Spacer()
             if controller.selectedTemplate != nil {
-                Button("Edit instructions") { controller.editInstructions() }
+                Button(controller.isEditingInstructions
+                       ? "Back to simple setup" : "Edit full prompt") {
+                    if controller.isEditingInstructions {
+                        controller.resetInstructionsToTemplate()
+                    } else {
+                        controller.editInstructions()
+                    }
+                }
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .help("Show the full opening message this shape composes, and edit it freely")
+                    .help(controller.isEditingInstructions
+                          ? "Discard full-prompt edits and return to the simple topic field"
+                          : "Edit the full opening prompt without changing the selected shape")
             }
         }
-        if let template = controller.selectedTemplate {
+        if !controller.showsFullInstructionsEditor,
+           let template = controller.selectedTemplate {
             TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
@@ -337,12 +349,15 @@ struct GlassPanelView: View {
                 .padding(.vertical, 9)
                 .glassEffect(.regular, in: .rect(cornerRadius: 14))
         } else {
-            TextEditor(text: $controller.customInstructions)
-                .font(.system(size: 12))
-                .scrollContentBackground(.hidden)
-                .frame(height: 100)
-                .padding(6)
+            GrowingTextEditor(text: $controller.customInstructions,
+                              font: .systemFont(ofSize: 12),
+                              placeholder: controller.promptEditorPlaceholder)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
                 .glassEffect(.regular, in: .rect(cornerRadius: 14))
+                .help(controller.selectedTemplate == nil
+                      ? "Write the complete opening prompt"
+                      : "Editing the complete \(controller.conversation) prompt; choosing another shape keeps this editor open")
         }
     }
 
@@ -441,7 +456,7 @@ struct GlassPanelView: View {
                 Button {} label: { label.foregroundStyle(.tertiary) }
                     .buttonStyle(.glass)
                     .disabled(true)
-                    .help(controller.selectedTemplate == nil
+                    .help(controller.showsFullInstructionsEditor
                           ? "Write the instructions first"
                           : "Add a topic first")
             }
