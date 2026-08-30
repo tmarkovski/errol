@@ -55,6 +55,41 @@ func truncatedForRelay(_ text: String) -> String {
     return String(text.prefix(config.maxChars)) + "\n\n[truncated by relay]"
 }
 
+enum PasteReceipt: Equatable {
+    case text
+    case attachment
+}
+
+/// A paste is visible either as ordinary composer text or as a newly mounted
+/// pasted-text attachment. ChatGPT removes long paste contents from AXValue
+/// when it builds the attachment chip, so checking text alone causes the
+/// recovery path to paste the same payload a second time.
+func observedPasteReceipt(needle: String, composerValue: String?,
+                          attachmentsBefore: Int, attachmentsNow: Int) -> PasteReceipt? {
+    if needle.isEmpty || composerValue?.contains(needle) == true { return .text }
+    if attachmentsNow > attachmentsBefore { return .attachment }
+    return nil
+}
+
+func waitForPasteReceipt(needle: String, input: AXUIElement?, selectors: AppSelectors,
+                         attachmentsBefore: Int,
+                         within seconds: TimeInterval = 2) -> PasteReceipt? {
+    let deadline = Date().addingTimeInterval(seconds)
+    repeat {
+        let value = input.flatMap { axAttribute($0, kAXValueAttribute) as? String }
+        let attachmentCount = input.map {
+            pastedTextAttachmentCount(around: $0, selectors: selectors)
+        } ?? attachmentsBefore
+        if let receipt = observedPasteReceipt(needle: needle, composerValue: value,
+                                              attachmentsBefore: attachmentsBefore,
+                                              attachmentsNow: attachmentCount) {
+            return receipt
+        }
+        if Date() >= deadline { return nil }
+        usleep(100_000)
+    } while true
+}
+
 func send(_ text: String, to target: TargetApp) -> Bool {
     let payload = truncatedForRelay(text)
     if payload.count != text.count {
@@ -75,22 +110,30 @@ func send(_ text: String, to target: TargetApp) -> Bool {
     // Synthesized keystrokes follow the KEY window, which can lag behind the
     // active app (isFrontmost true while another window keeps key status —
     // e.g. Errol's own non-activating panel). So the paste must be verified
-    // in the composer, not assumed: paste, check for the payload text, and on
-    // a miss force a LaunchServices activation (the one call that moves key
-    // status too) and paste again.
+    // in the composer, not assumed: paste, check for the payload text or a new
+    // pasted-text attachment chip, and on a miss force a LaunchServices
+    // activation (the one call that moves key status too) and paste again.
     let needle = String(payload.prefix(while: { $0 != "\n" }).prefix(32))
-    for attempt in 0..<2 {
-        if let input = inputArea(in: target) {
+    pasteAttempts: for attempt in 0..<2 {
+        let input = inputArea(in: target)
+        let attachmentsBefore = input.map {
+            pastedTextAttachmentCount(around: $0, selectors: target.selectors)
+        } ?? 0
+        if let input {
             AXUIElementSetAttributeValue(input, kAXFocusedAttribute as CFString, kCFBooleanTrue)
             usleep(150_000)
         } else {
             log("\(target.name): could not locate input area, pasting into current focus")
         }
         keystroke(keyV, flags: .maskCommand)
-        // Give the app time to render the paste; large messages need it before sending.
-        let renderDelay = min(2_000_000, 300_000 + payload.count * 20)
-        usleep(useconds_t(renderDelay))
-        if needle.isEmpty || composerValue(in: target)?.contains(needle) == true { break }
+        if let receipt = waitForPasteReceipt(needle: needle, input: input,
+                                             selectors: target.selectors,
+                                             attachmentsBefore: attachmentsBefore) {
+            if receipt == .attachment {
+                log("\(target.name): paste landed as a text attachment")
+            }
+            break pasteAttempts
+        }
         if attempt == 0 {
             log("\(target.name): paste did not land in the composer; forcing activation and retrying")
             activateViaLaunchServices(target)

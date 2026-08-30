@@ -35,6 +35,10 @@ struct AppSelectors {
     /// Reject send buttons whose label also contains any of these. Claude
     /// Code's "Send feedback" button matches the bare send keyword.
     var sendExcludeKeywords: [String] = []
+    /// Label of the remove control mounted for each long paste that the app
+    /// turns into a text attachment instead of leaving in the text area. nil
+    /// where the app does not expose this behavior over AX.
+    var pastedTextAttachmentRemoveLabel: String?
     /// A window containing a button or text field with any of these labels is
     /// not a chat window (e.g. Claude Code session windows inside Claude Desktop).
     var windowExcludeLabels: [String] = []
@@ -143,6 +147,10 @@ struct Config {
         copyExcludeKeywords: ["message", "table", "link", "code"],
         // The echo's "Copy message" is excluded above, so it never counts.
         echoCountsAsAffordance: false,
+        // Long pastes become a pasted-text.txt chip. Its contents disappear
+        // from the text area's AXValue, but this composer-local remove button
+        // mounts once per chip (verified live Aug 30 2026).
+        pastedTextAttachmentRemoveLabel: "Remove pasted text attachment",
         modePopupPrefix: "Switch mode, current mode:",
         modeNames: ["chatgpt": "Chat"],
         // The Chat/Work toggle pair in the "Composer mode" group (AXCheckBox

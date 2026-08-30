@@ -132,6 +132,44 @@ final class SendSelectorTests: XCTestCase {
     }
 }
 
+final class PasteReceiptTests: XCTestCase {
+    let chatgpt = config.chatgptSelectors
+
+    func testChatGPTLongPasteAttachmentSelector() {
+        XCTAssertEqual(chatgpt.pastedTextAttachmentRemoveLabel,
+                       "Remove pasted text attachment")
+        XCTAssertNil(config.claudeSelectors.pastedTextAttachmentRemoveLabel)
+
+        let composer = FixtureElement(role: "AXGroup", children: [
+            FixtureElement(role: "AXButton",
+                           axDescription: "Remove pasted text attachment"),
+            FixtureElement(role: "AXTextArea", axDescription: "Do anything",
+                           value: .string("\nDo anything")),
+        ])
+        XCTAssertEqual(pastedTextAttachmentCount(under: composer, selectors: chatgpt), 1)
+        XCTAssertEqual(pastedTextAttachmentCount(under: composer,
+                                                 selectors: config.claudeSelectors), 0)
+    }
+
+    func testOrdinaryTextConfirmsPaste() {
+        XCTAssertEqual(observedPasteReceipt(
+            needle: "The first words", composerValue: "The first words of the payload",
+            attachmentsBefore: 0, attachmentsNow: 0), .text)
+    }
+
+    func testNewAttachmentConfirmsPasteWhenComposerKeepsPlaceholder() {
+        XCTAssertEqual(observedPasteReceipt(
+            needle: "The first words", composerValue: "\nDo anything",
+            attachmentsBefore: 0, attachmentsNow: 1), .attachment)
+    }
+
+    func testExistingAttachmentDoesNotConfirmAnotherPaste() {
+        XCTAssertNil(observedPasteReceipt(
+            needle: "The first words", composerValue: "\nDo anything",
+            attachmentsBefore: 1, attachmentsNow: 1))
+    }
+}
+
 final class AnnouncementParsingTests: XCTestCase {
     func testValueAfterPrefix() {
         XCTAssertEqual(ErrolKit.value(after: "Model:", in: "Model: Fable 5 · Extra"), "Fable 5 · Extra")

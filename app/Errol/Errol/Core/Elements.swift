@@ -166,6 +166,21 @@ func sendButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) ->
     return results.first
 }
 
+/// Count the long-paste attachment chips under one composer container. The
+/// caller deliberately supplies the composer's immediate parent rather than
+/// the whole window: sent messages retain the same pasted-text controls in the
+/// conversation history and must not confirm a new paste.
+func pastedTextAttachmentCount<Node: ElementNode>(under root: Node,
+                                                   selectors: AppSelectors) -> Int {
+    guard let removeLabel = selectors.pastedTextAttachmentRemoveLabel else { return 0 }
+    var results: [Node] = []
+    findAll(in: root, where: { element in
+        element.role == kAXButtonRole as String
+            && element.label.localizedCaseInsensitiveContains(removeLabel)
+    }, into: &results)
+    return results.count
+}
+
 /// The last text input in the window — composers sit at the bottom. The live
 /// inputArea prefers the focused element; this is its shared fallback.
 func composerElement<Node: ElementNode>(under root: Node) -> Node? {
@@ -218,6 +233,16 @@ func hasStopButton(in target: TargetApp) -> Bool {
 func sendButton(in target: TargetApp) -> AXUIElement? {
     guard let root = chatWindow(in: target) else { return nil }
     return sendButton(under: LiveElement(ax: root), selectors: target.selectors)?.ax
+}
+
+/// The live attachment-chip count beside this exact input. In the current
+/// ChatGPT tree the input and every "Remove pasted text attachment" button are
+/// siblings under one AXGroup, while historical attachments live elsewhere.
+func pastedTextAttachmentCount(around input: AXUIElement,
+                               selectors: AppSelectors) -> Int {
+    guard let parent = axAttribute(input, kAXParentAttribute) else { return 0 }
+    return pastedTextAttachmentCount(under: LiveElement(ax: parent as! AXUIElement),
+                                     selectors: selectors)
 }
 
 func inputArea(in target: TargetApp) -> AXUIElement? {
