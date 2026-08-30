@@ -104,9 +104,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     @objc private func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
-            menu.addItem(withTitle: "Open Transcript", action: #selector(openTranscript), keyEquivalent: "").target = self
-            menu.addItem(withTitle: "Restore Window Positions", action: #selector(restoreWindows), keyEquivalent: "").target = self
-            menu.addItem(.separator())
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
@@ -116,14 +113,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             return
         }
         togglePanel()
-    }
-
-    @objc private func openTranscript() {
-        relay.openTranscript()
-    }
-
-    @objc private func restoreWindows() {
-        relay.restoreWindows()
     }
 
     @objc private func quit() {

@@ -1,11 +1,11 @@
 // The wireframe instrument skin (see PanelRootView for skin selection):
 // DesignMockups' Option A made real. The study's rule carries over as the
 // design itself — every state is legible from lamps, needles, counters,
-// and labels alone; four grays and no chassis color. The exceptions are
-// the two bright glass signal lamps — RDY burning red, amber, or green,
-// and THINK an orange bulb breathing while a side composes; everything
-// they say is still said in words on the line below them, so the rule
-// holds. The panel window is borderless
+// and labels alone; four grays, no glow, no chassis color. The exceptions
+// are the two signal lamps in the old machine-panel idiom — the readiness
+// lamp burning red, amber, or green, and THINK an orange bulb breathing
+// while a side composes; everything they say is still said in words on the
+// nameplate below them, so the rule holds. The panel window is borderless
 // (MenuBarController), so the paper card this view paints is the panel's
 // own edge.
 //
@@ -20,8 +20,9 @@ import SwiftUI
 
 // MARK: - Palette
 
-/// The skin draws from four grays, plus the vivid red, green, and gold of
-/// its signal lenses. Color is concentrated here so the lamps can feel lit.
+/// The skin draws from four grays, plus the lens colors the two signal
+/// lamps burn — the muted red, jade green, and orange of old equipment
+/// panels rather than screen primaries.
 /// Internal, not private: the settings card (SettingsView) speaks the same
 /// idiom from these tokens.
 enum Wire {
@@ -271,27 +272,29 @@ private struct WireGauge: View {
     }
 }
 
-/// A colored bulb behind glass: a white-hot filament inside a saturated
-/// lens. The chassis stays quiet so these are the brightest things on it.
+/// A colored bulb behind glass: a bright filament core inside deeper glass,
+/// or the cloudy tint of the same lens with nothing lit behind it.
 private struct WireLens {
     var core: Color
     var glass: Color
 
-    static let green = WireLens(core: Color(red: 0.78, green: 1.00, blue: 0.67),
-                                glass: Color(red: 0.14, green: 0.69, blue: 0.25))
-    static let amber = WireLens(core: Color(red: 1.00, green: 0.92, blue: 0.48),
-                                glass: Color(red: 0.94, green: 0.57, blue: 0.06))
-    static let red = WireLens(core: Color(red: 1.00, green: 0.66, blue: 0.51),
-                              glass: Color(red: 0.84, green: 0.16, blue: 0.10))
-    static let orange = WireLens(core: Color(red: 1.00, green: 0.88, blue: 0.39),
-                                 glass: Color(red: 0.95, green: 0.45, blue: 0.03))
+    static let green = WireLens(core: Color(red: 0.60, green: 0.92, blue: 0.53),
+                                glass: Color(red: 0.11, green: 0.42, blue: 0.19))
+    static let amber = WireLens(core: Color(red: 0.99, green: 0.80, blue: 0.38),
+                                glass: Color(red: 0.54, green: 0.33, blue: 0.04))
+    static let red = WireLens(core: Color(red: 0.97, green: 0.42, blue: 0.26),
+                              glass: Color(red: 0.51, green: 0.09, blue: 0.06))
+    static let orange = WireLens(core: Color(red: 1.00, green: 0.78, blue: 0.30),
+                                 glass: Color(red: 0.72, green: 0.37, blue: 0.02))
 }
 
 /// A signal lamp: a glass lens in a metal bezel, or — with no lens — the
 /// plain dark-ringed dot the gray lamps show when off, since a tinted unlit
 /// lens reads as a third state rather than as nothing. `pulsing` gives it
 /// the slow breathing fade of a lamp wired to something still working, so
-/// THINK reads as activity rather than as one more steady state.
+/// THINK reads as activity rather than as one more steady state. The bezel
+/// is centered over the nameplate, and the row below hands each lamp a
+/// fixed share of the card, so the label's length never moves the light.
 private struct WireSignalLamp: View {
     var label: String
     var lens: WireLens?
@@ -299,62 +302,41 @@ private struct WireSignalLamp: View {
 
     @State private var dimmed = false
 
-    /// Filament off-center, the way a bulb sits behind its lens. A small
-    /// white center makes the color read as emitted light rather than paint.
+    /// Filament off-center, the way a bulb sits behind its lens.
     private var glass: AnyShapeStyle {
         guard let lens else { return AnyShapeStyle(Wire.paper) }
-        return AnyShapeStyle(
-            RadialGradient(stops: [
-                .init(color: .white, location: 0),
-                .init(color: lens.core, location: 0.28),
-                .init(color: lens.glass, location: 1)
-            ], center: UnitPoint(x: 0.34, y: 0.28),
-               startRadius: 0, endRadius: Wire.s(7))
-        )
+        return AnyShapeStyle(RadialGradient(colors: [lens.core, lens.glass],
+                                           center: UnitPoint(x: 0.36, y: 0.32),
+                                           startRadius: 0, endRadius: Wire.s(11)))
     }
 
     var body: some View {
         VStack(spacing: Wire.s(3)) {
-            ZStack {
-                if let lens {
-                    Circle()
-                        .fill(lens.core.opacity(dimmed ? 0.12 : 0.34))
-                        .frame(width: Wire.s(21), height: Wire.s(21))
-                        .blur(radius: Wire.s(4.5))
-                    Circle()
-                        .fill(lens.core.opacity(dimmed ? 0.16 : 0.42))
-                        .frame(width: Wire.s(16), height: Wire.s(16))
-                        .blur(radius: Wire.s(2))
-                }
-                Circle()
-                    .fill(glass)
-                    .opacity(dimmed ? 0.34 : 1)
-                    .overlay(
-                        Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
-                                                   : Color.white.opacity(0.72),
-                                        lineWidth: Wire.s(0.65))
-                    )
-                    .overlay(
-                        Circle().stroke(lens == nil ? Color.clear
-                                                   : Wire.ink.opacity(0.42),
-                                        lineWidth: Wire.s(1))
-                    )
-                    .frame(width: Wire.s(12), height: Wire.s(12))
-                    .shadow(color: (lens?.core ?? .clear).opacity(dimmed ? 0.18 : 0.92),
-                            radius: Wire.s(5))
-            }
-            .frame(width: Wire.s(22), height: Wire.s(18))
+            Circle()
+                .fill(glass)
+                .opacity(dimmed ? 0.32 : 1)
+                .overlay(Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
+                                                     : Wire.ink.opacity(0.55),
+                                         lineWidth: Wire.s(1)))
+                .frame(width: Wire.s(14), height: Wire.s(14))
+                .shadow(color: (lens?.glass ?? .clear).opacity(dimmed ? 0.15 : 0.55),
+                        radius: Wire.s(4))
             Text(label)
                 .font(Wire.mono(7, .bold))
                 .tracking(0.5)
                 .foregroundColor(Wire.faint)
+                // A nameplate that changes with the state ("NOT READY") has
+                // a space in it to wrap at; one line, always, so a state
+                // change never grows the row.
+                .lineLimit(1)
+                .fixedSize()
         }
         // initial: true starts the fade on a lamp that is already lit when
         // the panel opens mid-run, not only on the transition into one.
         .onChange(of: pulsing, initial: true) { _, on in
             dimmed = false
             guard on else { return }
-            withAnimation(.easeInOut(duration: 0.78).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
                 dimmed = true
             }
         }
@@ -404,30 +386,6 @@ private struct WireDigitWheel: View {
         // rather than typed.
         .overlay(Rectangle().fill(Wire.paper.opacity(0.16)).frame(height: Wire.s(0.5)))
         .animation(.easeInOut(duration: 0.3), value: digit)
-    }
-}
-
-/// The per-side sign-off indicator: an armed ring that fills when that
-/// side ends the conversation.
-private struct WireSeal: View {
-    var sealed: Bool
-
-    var body: some View {
-        VStack(spacing: Wire.s(3)) {
-            ZStack {
-                Circle()
-                    .stroke(Wire.ink.opacity(sealed ? 1 : 0.35), lineWidth: Wire.s(1.5))
-                    .frame(width: Wire.s(13), height: Wire.s(13))
-                if sealed {
-                    Circle().fill(Wire.ink).frame(width: Wire.s(6), height: Wire.s(6))
-                }
-            }
-            .frame(width: Wire.s(14), height: Wire.s(9))
-            Text("SEAL")
-                .font(Wire.mono(7, .bold))
-                .tracking(0.5)
-                .foregroundColor(Wire.faint)
-        }
     }
 }
 
@@ -566,17 +524,28 @@ struct WireframePanelView: View {
             .font(Wire.mono(8.5))
             .lineLimit(1)
             .truncationMode(.tail)
-            HStack(spacing: Wire.s(10)) {
-                WireSignalLamp(label: "RDY", lens: readyLens(status.state))
+            // Half the card each, lamp centered in its half. Spacing the pair
+            // by their own edges instead would hang the bezels off however
+            // long the nameplates happen to be, and a renamed lamp would
+            // shift both; halves are fixed, so the text underneath can say
+            // anything. The negative inset cancels the card's padding for
+            // this row alone, because the halves worth dividing are the drawn
+            // card's, not the padded content box's.
+            HStack(spacing: 0) {
+                WireSignalLamp(label: readyLabel(status.state),
+                               lens: readyLens(status.state))
+                    .frame(maxWidth: .infinity)
                 WireSignalLamp(label: "THINK",
                                lens: conversation == .chatting ? .orange : nil,
                                pulsing: conversation == .chatting)
-                WireSeal(sealed: conversation == .ended)
+                    .frame(maxWidth: .infinity)
             }
-            // The one transient with no lamp of its own: a held reply,
-            // captured but undelivered (in an uninterrupted run a side is
-            // never seen in .replied). Blank otherwise, height held.
-            Text(conversation == .replied ? conversation.rawValue : " ")
+            .padding(.horizontal, -Wire.s(10))
+            // The states with no lamp of their own: a held reply, captured
+            // but undelivered (in an uninterrupted run a side is never seen
+            // in .replied), and the side's own sign-off, which a SEAL
+            // indicator used to mark. Blank otherwise, height held.
+            Text(footnote(conversation))
                 .foregroundColor(Wire.ink.opacity(0.75))
                 .font(Wire.mono(8.5))
                 .lineLimit(1)
@@ -610,6 +579,18 @@ struct WireframePanelView: View {
                                        dash: upNext ? [Wire.s(2.5), Wire.s(2.5)] : []))
     }
 
+    /// The readiness lamp's nameplate reads out the state rather than naming
+    /// the instrument, because a red lamp under the word READY says the
+    /// opposite of what it means at a glance. The lens is what the eye
+    /// catches first; this is what settles it.
+    private func readyLabel(_ state: ReadyState) -> String {
+        switch state {
+        case .ready: "READY"
+        case .checking: "CHECKING"
+        case .notReady, .missing: "NOT READY"
+        }
+    }
+
     /// Green when the side is relayable, red when it is not, amber while the
     /// first sweep is still out. The readiness lamp is never dark — an unlit
     /// one would read as "no signal" rather than "not ready".
@@ -618,6 +599,16 @@ struct WireframePanelView: View {
         case .ready: .green
         case .checking: .amber
         case .notReady, .missing: .red
+        }
+    }
+
+    /// The line under the lamps (see its call site for why these two states
+    /// live in words rather than in a lamp).
+    private func footnote(_ conversation: ConversationStatus) -> String {
+        switch conversation {
+        case .replied: conversation.rawValue
+        case .ended: "Signed off"
+        default: " "
         }
     }
 
