@@ -53,6 +53,16 @@ enum Wire {
     /// The few proportional strings — what a person types, and the topic.
     static func text(_ size: CGFloat) -> Font { .system(size: s(size)) }
 
+    /// The two corners the skin cuts. The shell is the panel's own edge;
+    /// the box is every well set into it — the participant cards today.
+    /// The shell stays the rounder of the two so the card reads as the
+    /// thing the boxes are sitting in rather than as one more box, and the
+    /// box radius is named because three places have to agree on it: the
+    /// well's fill, the border drawn over it, and the rings that border
+    /// throws (WireSpeakerBorder), which are that same corner opened out.
+    static let shellCorner = s(16)
+    static let boxCorner = s(12)
+
     /// The fixed card size; the panel adds the outer padding. Expanded, the
     /// card height is pinned and the log absorbs the difference between the
     /// topic field and the taller custom-instructions editor; compact, the
@@ -481,7 +491,7 @@ private struct WireSpeakerBorder: View {
                 let elapsed = timeline.date.timeIntervalSince(started)
                 let card = CGRect(origin: .zero, size: size)
                     .insetBy(dx: Self.reach, dy: Self.reach)
-                let corner = Wire.s(6)
+                let corner = Wire.boxCorner
                 var drive = 0.0
 
                 for beat in WireBeatTrack.beats {
@@ -554,13 +564,17 @@ private struct WireSignalLamp: View {
     }
 }
 
-/// Boxed rolling digits: the turn counter.
+/// Boxed rolling digits: the turn counter. Sized to stand as the middle
+/// column's instrument rather than as a caption between the two gauges —
+/// the drums are cut to the gauge's own height (WireGauge), so the three
+/// readouts across the top of the head unit sit on one line and the turn
+/// count is legible from as far back as the lamps are.
 private struct WireOdometer: View {
     var value: Int
     var digits = 2
 
     var body: some View {
-        HStack(spacing: Wire.s(2)) {
+        HStack(spacing: Wire.s(3)) {
             let padded = String(format: "%0\(digits)d", value)
             ForEach(Array(padded.enumerated()), id: \.offset) { _, ch in
                 WireDigitWheel(digit: ch)
@@ -574,28 +588,34 @@ private struct WireOdometer: View {
 /// Drums only turn one way, so a count that jumps backward — a new run
 /// resetting to zero — rolls upward too rather than running in reverse.
 private struct WireDigitWheel: View {
+    /// The drum face. Named because the sliding digit and the window it
+    /// slides behind have to be cut to the same rectangle, and the height
+    /// is the gauge's so the head unit's three instruments align.
+    private static let face = CGSize(width: Wire.s(24), height: Wire.s(32))
+
     var digit: Character
 
-    private var window: RoundedRectangle { RoundedRectangle(cornerRadius: Wire.s(3)) }
+    private var window: RoundedRectangle { RoundedRectangle(cornerRadius: Wire.s(5)) }
 
     var body: some View {
         ZStack {
             Text(String(digit))
-                .font(Wire.mono(13, .bold))
+                .font(Wire.mono(20, .bold))
                 .foregroundColor(Wire.paper)
                 // A full-box frame makes the slide a whole drum face, so the
                 // outgoing digit is gone before the incoming one appears.
-                .frame(width: Wire.s(16), height: Wire.s(21))
+                .frame(width: Self.face.width, height: Self.face.height)
                 .id(digit)
                 .transition(.asymmetric(insertion: .move(edge: .bottom),
                                         removal: .move(edge: .top)))
         }
-        .frame(width: Wire.s(16), height: Wire.s(21))
+        .frame(width: Self.face.width, height: Self.face.height)
         .background(window.fill(Wire.ink))
         .clipShape(window)
         // The drum's seam, which is what makes a counter read as turned
-        // rather than typed.
-        .overlay(Rectangle().fill(Wire.paper.opacity(0.16)).frame(height: Wire.s(0.5)))
+        // rather than typed. It stays a hairline as the drum grows — a seam
+        // that scaled with the face would read as a painted stripe.
+        .overlay(Rectangle().fill(Wire.paper.opacity(0.16)).frame(height: Wire.s(0.75)))
         .animation(.easeInOut(duration: 0.3), value: digit)
     }
 }
@@ -662,7 +682,7 @@ struct WireframePanelView: View {
         .frame(width: Wire.cardWidth,
                height: controller.compact ? nil : Wire.expandedCardHeight)
         .background(
-            RoundedRectangle(cornerRadius: Wire.s(10)).fill(Wire.paper)
+            RoundedRectangle(cornerRadius: Wire.shellCorner).fill(Wire.paper)
                 .shadow(color: .black.opacity(0.28), radius: Wire.s(9), y: Wire.s(4))
                 // Bare paper — the card's padding and the gaps between rows
                 // — moves the window. See WireHeader for why the card asks
@@ -670,7 +690,7 @@ struct WireframePanelView: View {
                 // background.
                 .gesture(WindowDragGesture())
         )
-        .overlay(RoundedRectangle(cornerRadius: Wire.s(10)).stroke(Wire.ink.opacity(0.3)))
+        .overlay(RoundedRectangle(cornerRadius: Wire.shellCorner).stroke(Wire.ink.opacity(0.3)))
         .environment(\.colorScheme, .light)
         .padding(Wire.cardMargin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -841,7 +861,7 @@ private struct WireInstrumentHead: View {
         }
         .padding(Wire.s(10))
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: Wire.s(6)).fill(Wire.well))
+        .background(RoundedRectangle(cornerRadius: Wire.boxCorner).fill(Wire.well))
         .overlay(cardStroke(for: speaker, conversation: conversation))
         // Clicking a card nominates that side to open the next run — the
         // largest target for the plainest statement of it. The courier's
@@ -868,7 +888,7 @@ private struct WireInstrumentHead: View {
             WireSpeakerBorder()
         } else {
             let upNext = nextTaker == speaker
-            RoundedRectangle(cornerRadius: Wire.s(6))
+            RoundedRectangle(cornerRadius: Wire.boxCorner)
                 .stroke(upNext ? Wire.ink : Wire.faint.opacity(0.5),
                         style: StrokeStyle(lineWidth: Wire.s(1),
                                            dash: upNext ? [Wire.s(2.5), Wire.s(2.5)] : []))
