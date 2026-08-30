@@ -79,10 +79,14 @@ final class RelayController: ObservableObject {
     private var templatesWatcher: AnyCancellable?
 
     init() {
+        // Most sweeps see the same picture as the last one; publishing them
+        // anyway would re-render every observing skin each poll, so only
+        // changed statuses reach the @Published properties.
         scanner.onUpdate = { [weak self] chatgpt, claude in
             DispatchQueue.main.async {
-                self?.chatgptStatus = chatgpt
-                self?.claudeStatus = claude
+                guard let self else { return }
+                if self.chatgptStatus != chatgpt { self.chatgptStatus = chatgpt }
+                if self.claudeStatus != claude { self.claudeStatus = claude }
             }
         }
         conversationStatusSink = { [weak self] chatgpt, claude in

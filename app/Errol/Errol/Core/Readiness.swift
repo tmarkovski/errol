@@ -28,7 +28,9 @@ enum ReadyState {
     case ready      // chat window with a composer found
 }
 
-struct SideStatus {
+/// Equatable so the controller can drop no-change sweeps instead of
+/// republishing (and re-rendering the skins) every poll.
+struct SideStatus: Equatable {
     var appName: String
     var state = ReadyState.checking
     var headline = "Checking..."
