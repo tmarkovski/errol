@@ -30,7 +30,7 @@ private enum GlassTheme {
 }
 
 struct GlassPanelView: View {
-    @ObservedObject var controller: RelayController
+    @Bindable var controller: RelayController
     @Namespace private var morph
 
     var body: some View {
@@ -473,7 +473,7 @@ struct GlassPanelView: View {
     private var logPanel: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(controller.logLines) { line in
                         Text(line.text)
                             .font(.system(size: 11, design: .monospaced))

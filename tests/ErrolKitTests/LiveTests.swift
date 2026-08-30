@@ -122,7 +122,7 @@ final class LiveRelayTests: XCTestCase {
         config.transcriptPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("errol-live-relay-transcript.md").path
         try? FileManager.default.removeItem(atPath: config.transcriptPath)
-        relayCancelled.set(false)
+        relayControl.reset()
 
         // The relay no longer opens chats of its own, so this runs in whatever
         // conversations happen to be open. Open a fresh one on each side first,

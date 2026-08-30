@@ -1,87 +1,91 @@
 // The app's model: form state, the log, and the start/stop wiring around
-// the relay engine. UI-facing state is @Published and mutated on the main
+// the relay engine. UI-facing state is Observable and mutated on the main
 // thread only; runs and inspections live on worker threads so the panel's
-// event loop stays free.
+// event loop stays free. Observation tracks per property, so a view body
+// re-evaluates only for the properties it actually read — which is why the
+// skins are split into child views along update boundaries.
 
 import AppKit
 import ApplicationServices
 import Combine
 import Foundation
+import Observation
 
 struct LogLine: Identifiable {
     let id: Int
     let text: String
 }
 
-final class RelayController: ObservableObject {
+@Observable
+final class RelayController {
     /// The picker tag for free-form instructions; not a ConversationTemplate.
     static let customConversation = "Custom"
     /// The selected template's name, or customConversation.
-    @Published var conversation = conversationTemplates[0].name
+    var conversation = conversationTemplates[0].name
     /// Completes the selected template ("What to brainstorm about").
-    @Published var topic = ""
+    var topic = ""
     /// The full opening text while the editor is open. The picker continues
     /// to name the selected template; Custom is reserved for a prompt written
     /// from scratch.
-    @Published var customInstructions = ""
+    var customInstructions = ""
     /// Editing is presentation state, not a conversation choice. Keeping it
     /// separate prevents Edit from silently changing the picker to Custom.
-    @Published private(set) var isEditingInstructions = false
-    @Published var limitTurns = config.limitTurns
-    @Published var turns = config.turns
+    private(set) var isEditingInstructions = false
+    var limitTurns = config.limitTurns
+    var turns = config.turns
     /// Which side sends the opening message. Chosen before a run — the
     /// wireframe skin's courier points at whoever is nominated — and copied
     /// into config at Start, which is where the relay loop reads it.
-    @Published var firstSpeaker = Speaker.chatgpt
-    @Published var tileWindows = false
-    @Published var isRunning = false
-    /// Whether a pause has been *asked for* (see relayPaused). The run keeps
-    /// going until it reaches the next handoff.
-    @Published var isPaused = false
+    var firstSpeaker = Speaker.chatgpt
+    var tileWindows = false
+    var isRunning = false
+    /// Whether a pause has been *asked for* (see RelayControl). The run
+    /// keeps going until it reaches the next handoff.
+    var isPaused = false
     /// Whether the run has actually parked at that handoff. Between the two
     /// the agent that was composing is still finishing its reply, which is
     /// the gap the panel's route draws.
-    @Published var isHolding = false
+    var isHolding = false
     /// Whether the steering editor is open. Steer asks for a pause the way
     /// the Pause control does — room to write — and posting or canceling
     /// the note releases that pause only if Steer was what asked for it.
-    @Published var isSteering = false
+    var isSteering = false
     /// The note being written in the steering editor.
-    @Published var steeringText = ""
+    var steeringText = ""
     /// Whether the current pause exists on Steer's account rather than a
     /// Pause press of the user's own; cleared whenever the user toggles
     /// the pause by hand, which takes ownership of it.
-    private var steerInitiatedPause = false
+    @ObservationIgnored private var steerInitiatedPause = false
     /// Panel presentation state, glass skin only: a run shrinks the panel to
     /// the companion pane; the user can expand back mid-run. The AppKit shell
     /// watches this (with logOpen) to animate the glass panel's frame; the
     /// classic skin ignores it.
-    @Published var compact = false
+    var compact = false
     /// Whether the glass skin's log drawer is open.
-    @Published var logOpen = false
-    @Published var logLines: [LogLine] = []
-    @Published var chatgptStatus = SideStatus(appName: "ChatGPT")
-    @Published var claudeStatus = SideStatus(appName: "Claude")
-    @Published var chatgptConversation = ConversationStatus.notStarted
-    @Published var claudeConversation = ConversationStatus.notStarted
+    var logOpen = false
+    var logLines: [LogLine] = []
+    var chatgptStatus = SideStatus(appName: "ChatGPT")
+    var claudeStatus = SideStatus(appName: "Claude")
+    var chatgptConversation = ConversationStatus.notStarted
+    var claudeConversation = ConversationStatus.notStarted
     /// The running turn number (1-based) during a relay run; 0 outside one.
     /// Feeds the wireframe skin's odometer.
-    @Published var currentTurn = 0
-    private var nextLogID = 0
+    var currentTurn = 0
+    @ObservationIgnored private var nextLogID = 0
     /// Preserve in-progress full-prompt edits while someone compares shapes.
     /// A deliberate reset removes the draft for that shape.
-    private var instructionDrafts: [String: String] = [:]
-    private let scanner = ReadinessScanner()
-    private var panelVisible = false
+    @ObservationIgnored private var instructionDrafts: [String: String] = [:]
+    @ObservationIgnored private let scanner = ReadinessScanner()
+    @ObservationIgnored private var panelVisible = false
     /// Set by the AppKit shell; the skins' gear button routes here to open
     /// the settings window above the panel.
-    var openSettingsHandler: (() -> Void)?
-    private var templatesWatcher: AnyCancellable?
+    @ObservationIgnored var openSettingsHandler: (() -> Void)?
+    @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
     init() {
         // Most sweeps see the same picture as the last one; publishing them
-        // anyway would re-render every observing skin each poll, so only
-        // changed statuses reach the @Published properties.
+        // anyway would re-render the status views each poll, so only
+        // changed statuses reach the observable properties.
         scanner.onUpdate = { [weak self] chatgpt, claude in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -89,17 +93,25 @@ final class RelayController: ObservableObject {
                 if self.claudeStatus != claude { self.claudeStatus = claude }
             }
         }
-        conversationStatusSink = { [weak self] chatgpt, claude in
-            DispatchQueue.main.async {
-                self?.chatgptConversation = chatgpt
-                self?.claudeConversation = claude
+        // The engine's ordered event stream, delivered on the main thread.
+        // Consuming it in one place keeps related updates — a turn, a hold,
+        // the log line about them — from interleaving the way the separate
+        // callbacks it replaced could.
+        relayEvents.onEvent { [weak self] event in
+            guard let self else { return }
+            switch event {
+            case .log(let line):
+                append(line)
+            case .conversation(let chatgpt, let claude):
+                chatgptConversation = chatgpt
+                claudeConversation = claude
+            case .turn(let turn):
+                currentTurn = turn
+            case .holding(let holding):
+                isHolding = holding
+            case .finished:
+                finishRun()
             }
-        }
-        relayTurnSink = { [weak self] turn in
-            DispatchQueue.main.async { self?.currentTurn = turn }
-        }
-        relayHoldingSink = { [weak self] holding in
-            DispatchQueue.main.async { self?.isHolding = holding }
         }
         // A shape deleted or renamed in Settings can leave the picker
         // pointing at nothing; follow the list to its first shape (which
@@ -230,10 +242,19 @@ final class RelayController: ObservableObject {
         scanner.setActive(panelVisible && !isRunning)
     }
 
-    /// Main thread only (the logSink wrapper in MenuBarController dispatches).
+    /// The log well keeps a bounded tail — the transcript file holds the
+    /// whole run — and trims in chunks so removeFirst's element shuffle
+    /// stays off the per-line path.
+    private static let logCap = 500
+    private static let logTrimSlack = 100
+
+    /// Main thread only (relay events deliver here on the main thread).
     func append(_ line: String) {
         logLines.append(LogLine(id: nextLogID, text: line))
         nextLogID += 1
+        if logLines.count > Self.logCap + Self.logTrimSlack {
+            logLines.removeFirst(logLines.count - Self.logCap)
+        }
     }
 
     func start() {
@@ -260,36 +281,41 @@ final class RelayController: ObservableObject {
         isSteering = false
         steeringText = ""
         steerInitiatedPause = false
-        relayPaused.set(false)
-        relaySteering.clear()
+        relayControl.reset()
         compact = true
         updateScanner()
-        relayCancelled.set(false)
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
         currentTurn = 0
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
 
-        runOnWorkerThread { [weak self] in
-            enableElectronAccessibility(apps.chatgpt)
-            enableElectronAccessibility(apps.claude)
-            usleep(700_000) // let the trees populate
+        runOnWorkerThread {
+            // First contact only: the scanner has usually nudged both long
+            // ago, and then the trees are already populated and the settle
+            // wait would just delay the run.
+            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
+            let freshClaude = electronNudges.beginContact(apps.claude)
+            if freshChatgpt || freshClaude { usleep(700_000) }
             if tile { arrangeSideBySide(left: apps.chatgpt, right: apps.claude) }
             _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude)
             refocus(to: origin)
-            DispatchQueue.main.async {
-                self?.isRunning = false
-                self?.isPaused = false
-                self?.isHolding = false
-                self?.isSteering = false
-                self?.steeringText = ""
-                self?.steerInitiatedPause = false
-                relayPaused.set(false)
-                self?.compact = false
-                self?.updateScanner()
-            }
+            relayEvents.post(.finished)
         }
+    }
+
+    /// The run's `.finished` event: put the panel back to idle. Ordered
+    /// after every line the run logged, because it rides the same stream.
+    private func finishRun() {
+        isRunning = false
+        isPaused = false
+        isHolding = false
+        isSteering = false
+        steeringText = ""
+        steerInitiatedPause = false
+        relayControl.setPaused(false)
+        compact = false
+        updateScanner()
     }
 
     func stop() {
@@ -300,8 +326,8 @@ final class RelayController: ObservableObject {
         isSteering = false
         steeringText = ""
         steerInitiatedPause = false
-        relayPaused.set(false)
-        relayCancelled.set(true)
+        relayControl.setPaused(false)
+        relayControl.cancel()
         append("Stop requested — ending the run at the next safe point...")
     }
 
@@ -311,7 +337,7 @@ final class RelayController: ObservableObject {
     func togglePause() {
         guard isRunning else { return }
         isPaused.toggle()
-        relayPaused.set(isPaused)
+        relayControl.setPaused(isPaused)
         // A pause toggled by hand is the user's own, whichever way it went.
         steerInitiatedPause = false
         if isPaused {
@@ -331,7 +357,7 @@ final class RelayController: ObservableObject {
         } else {
             steerInitiatedPause = true
             isPaused = true
-            relayPaused.set(true)
+            relayControl.setPaused(true)
             append("Steer — the run holds at the next handoff while you write.")
         }
     }
@@ -339,7 +365,7 @@ final class RelayController: ObservableObject {
     func sendSteering() {
         let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isRunning, isSteering, !note.isEmpty else { return }
-        relaySteering.post(note)
+        relayControl.postSteering(note)
         closeSteer()
         append(isPaused
             ? "Steering note posted — it rides the handoff when you resume."
@@ -360,7 +386,7 @@ final class RelayController: ObservableObject {
         if steerInitiatedPause {
             steerInitiatedPause = false
             isPaused = false
-            relayPaused.set(false)
+            relayControl.setPaused(false)
         }
     }
 
@@ -371,9 +397,9 @@ final class RelayController: ObservableObject {
         guard ensureTrusted(), let apps = resolveApps() else { return }
         append("Inspecting both apps...")
         runOnWorkerThread { [weak self] in
-            enableElectronAccessibility(apps.chatgpt)
-            enableElectronAccessibility(apps.claude)
-            usleep(700_000)
+            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
+            let freshClaude = electronNudges.beginContact(apps.claude)
+            if freshChatgpt || freshClaude { usleep(700_000) }
             let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
             DispatchQueue.main.async { self?.append(report) }
         }

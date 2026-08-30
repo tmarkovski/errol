@@ -14,6 +14,13 @@
 // the head unit alone (controller.compact drives the AppKit frame change;
 // PanelLayout has the sizes). EXPAND brings the full console back mid-run
 // with the setup rows disabled.
+//
+// The skin is split into child views along update boundaries, not visual
+// ones: the controller is Observable, so each struct re-renders only for
+// the properties its own body read. The editor sits in its own scope so a
+// keystroke never touches the instruments, and the log well owns the one
+// list that grows. Extracted computed properties would not do this — only
+// a child struct starts a new observation scope.
 
 import AppKit
 import SwiftUI
@@ -404,24 +411,62 @@ private struct WireDigitWheel: View {
     }
 }
 
+/// The skin's boxed control, shared by the action row, the steering
+/// editor, and the compact footer.
+private struct WireButton: View {
+    var label: String
+    var disabled: Bool
+    /// Return triggers the control (the RUN button).
+    var isDefault = false
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(Wire.mono(9, .bold))
+                .foregroundColor(disabled ? Wire.faint : Wire.ink)
+                .padding(.horizontal, Wire.s(8))
+                .padding(.vertical, Wire.s(3))
+                .overlay(Rectangle().stroke(disabled ? Wire.faint : Wire.ink,
+                                            lineWidth: Wire.s(1)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .keyboardShortcut(isDefault ? .defaultAction : nil)
+    }
+}
+
+/// Pause/Steer wording shared by the action row and the compact footer.
+private func wirePauseHelp(isPaused: Bool, isHolding: Bool) -> String {
+    guard isPaused else { return "Hold the run at the next handoff" }
+    return isHolding
+        ? "Send the held reply and continue"
+        : "Call off the pause and let the run carry on"
+}
+
+private let wireSteerHelp = "Hold the run and write a steering note into the conversation"
+
 // MARK: - Skin
 
+/// The shell: structure only. It reads the two properties that decide
+/// which children mount (compact, isSteering); everything else is read
+/// inside the child views, which is what keeps their invalidation apart.
 struct WireframePanelView: View {
-    @ObservedObject var controller: RelayController
-    @FocusState private var steerFocus: Bool
+    let controller: RelayController
 
     var body: some View {
         VStack(spacing: Wire.s(12)) {
-            header
-            instrumentRow
+            WireHeader(controller: controller)
+            WireInstrumentHead(controller: controller)
             if controller.compact {
-                compactFooter
-                if controller.isSteering { steerEditor }
+                WireCompactFooter(controller: controller)
+                if controller.isSteering { WireSteeringEditor(controller: controller) }
             } else {
-                setup
-                actionRow
-                if controller.isSteering { steerEditor }
-                logWell
+                WireConversationSetup(controller: controller)
+                WireActionControls(controller: controller)
+                if controller.isSteering { WireSteeringEditor(controller: controller) }
+                WireLogWell(controller: controller)
             }
         }
         .padding(Wire.s(16))
@@ -431,8 +476,9 @@ struct WireframePanelView: View {
             RoundedRectangle(cornerRadius: Wire.s(10)).fill(Wire.paper)
                 .shadow(color: .black.opacity(0.28), radius: Wire.s(9), y: Wire.s(4))
                 // Bare paper — the card's padding and the gaps between rows
-                // — moves the window. See `header` for why the card asks for
-                // the drag instead of leaving it to the window background.
+                // — moves the window. See WireHeader for why the card asks
+                // for the drag instead of leaving it to the window
+                // background.
                 .gesture(WindowDragGesture())
         )
         .overlay(RoundedRectangle(cornerRadius: Wire.s(10)).stroke(Wire.ink.opacity(0.3)))
@@ -440,18 +486,22 @@ struct WireframePanelView: View {
         .padding(Wire.cardMargin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
+}
 
-    // MARK: Header
+// MARK: Header
 
-    /// The name-and-state line doubles as the card's title bar: the panel is
-    /// borderless, so this is the one strip that always drags the window no
-    /// matter what state the console is in. It asks for the drag outright
-    /// rather than relying on `isMovableByWindowBackground`, which only moves
-    /// a window when AppKit judges that nothing in the content wanted the
-    /// click — an inference that does not hold on every macOS release. Text
-    /// selection in the log and the instruction editor is untouched, because
-    /// the gesture lives here and on the bare paper, not over those.
-    private var header: some View {
+/// The name-and-state line doubles as the card's title bar: the panel is
+/// borderless, so this is the one strip that always drags the window no
+/// matter what state the console is in. It asks for the drag outright
+/// rather than relying on `isMovableByWindowBackground`, which only moves
+/// a window when AppKit judges that nothing in the content wanted the
+/// click — an inference that does not hold on every macOS release. Text
+/// selection in the log and the instruction editor is untouched, because
+/// the gesture lives here and on the bare paper, not over those.
+private struct WireHeader: View {
+    let controller: RelayController
+
+    var body: some View {
         // Split by what the two ends are about: the app's own name and the
         // way into its settings on the left, what the run is doing right now
         // on the right. The gear sat beside the state word before, which read
@@ -523,10 +573,18 @@ struct WireframePanelView: View {
     private var bothEnded: Bool {
         controller.chatgptConversation == .ended && controller.claudeConversation == .ended
     }
+}
 
-    // MARK: Instrument head
+// MARK: Instrument head
 
-    private var instrumentRow: some View {
+/// Both participant cards, the route with its courier, the status plates,
+/// and the odometer. One view on purpose: everything here depends on the
+/// same relay-state cluster, so splitting it further would add plumbing
+/// without separating meaningful updates.
+private struct WireInstrumentHead: View {
+    let controller: RelayController
+
+    var body: some View {
         HStack(alignment: .top, spacing: Wire.s(14)) {
             participant(.chatgpt, status: controller.chatgptStatus,
                         conversation: controller.chatgptConversation)
@@ -534,6 +592,14 @@ struct WireframePanelView: View {
             participant(.claude, status: controller.claudeStatus,
                         conversation: controller.claudeConversation)
         }
+    }
+
+    private var bothReady: Bool {
+        controller.chatgptStatus.state == .ready && controller.claudeStatus.state == .ready
+    }
+
+    private var bothEnded: Bool {
+        controller.chatgptConversation == .ended && controller.claudeConversation == .ended
     }
 
     private func participant(_ speaker: Speaker, status: SideStatus,
@@ -860,14 +926,17 @@ struct WireframePanelView: View {
         case .claude: controller.claudeStatus.appName
         }
     }
+}
 
-    // MARK: Setup (expanded, idle)
+// MARK: Setup (expanded, idle)
 
-    @ViewBuilder
-    private var setup: some View {
+private struct WireConversationSetup: View {
+    @Bindable var controller: RelayController
+
+    var body: some View {
         Group {
             shapeRow
-            topicInput
+            WirePromptEditor(controller: controller)
             optionsRow
         }
         .disabled(controller.isRunning)
@@ -915,34 +984,6 @@ struct WireframePanelView: View {
                       ? "Discard full-prompt edits and return to the simple topic field"
                       : "Edit the full opening prompt without changing the selected shape")
             }
-        }
-    }
-
-    @ViewBuilder
-    private var topicInput: some View {
-        if !controller.showsFullInstructionsEditor,
-           let template = controller.selectedTemplate {
-            TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(Wire.text(11))
-                .foregroundColor(Wire.ink)
-                .lineLimit(1...3)
-                .padding(.horizontal, Wire.s(8))
-                .padding(.vertical, Wire.s(6))
-                .background(Rectangle().fill(Wire.well))
-                .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
-        } else {
-            GrowingTextEditor(text: $controller.customInstructions,
-                              font: .systemFont(ofSize: Wire.s(11)),
-                              textColor: NSColor(calibratedWhite: 0.20, alpha: 1),
-                              placeholder: controller.promptEditorPlaceholder)
-                .padding(.horizontal, Wire.s(8))
-                .padding(.vertical, Wire.s(6))
-                .background(Rectangle().fill(Wire.well))
-                .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
-                .help(controller.selectedTemplate == nil
-                      ? "Write the complete opening prompt"
-                      : "Editing the complete \(controller.conversation) prompt; choosing another shape keeps this editor open")
         }
     }
 
@@ -996,55 +1037,95 @@ struct WireframePanelView: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    // MARK: Actions & log (expanded)
+/// The topic field or the full-prompt editor. Its own view so a keystroke
+/// invalidates only this scope (plus the run gate reading the prompt), not
+/// the picker and options around it.
+private struct WirePromptEditor: View {
+    @Bindable var controller: RelayController
 
-    private var actionRow: some View {
+    var body: some View {
+        if !controller.showsFullInstructionsEditor,
+           let template = controller.selectedTemplate {
+            TextField(template.topicPrompt, text: $controller.topic, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(Wire.text(11))
+                .foregroundColor(Wire.ink)
+                .lineLimit(1...3)
+                .padding(.horizontal, Wire.s(8))
+                .padding(.vertical, Wire.s(6))
+                .background(Rectangle().fill(Wire.well))
+                .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
+        } else {
+            GrowingTextEditor(text: $controller.customInstructions,
+                              font: .systemFont(ofSize: Wire.s(11)),
+                              textColor: NSColor(calibratedWhite: 0.20, alpha: 1),
+                              placeholder: controller.promptEditorPlaceholder)
+                .padding(.horizontal, Wire.s(8))
+                .padding(.vertical, Wire.s(6))
+                .background(Rectangle().fill(Wire.well))
+                .overlay(Rectangle().stroke(Wire.faint.opacity(0.5)))
+                .help(controller.selectedTemplate == nil
+                      ? "Write the complete opening prompt"
+                      : "Editing the complete \(controller.conversation) prompt; choosing another shape keeps this editor open")
+        }
+    }
+}
+
+// MARK: Actions (expanded)
+
+/// Inspect/Run/Stop/Compact/Steer/Pause. Updates while the prompt is
+/// typed — Run eligibility reads it — which is a small, deliberate
+/// invalidation.
+private struct WireActionControls: View {
+    let controller: RelayController
+
+    var body: some View {
         HStack(spacing: Wire.s(8)) {
-            wireButton("INSPECT", disabled: controller.isRunning) {
+            WireButton(label: "INSPECT", disabled: controller.isRunning) {
                 controller.runInspect()
             }
             .help("Dump both apps' windows, buttons, and selector matches into the log")
             Spacer()
             if controller.isRunning {
-                wireButton("COMPACT", disabled: false) { controller.compact = true }
+                WireButton(label: "COMPACT", disabled: false) { controller.compact = true }
                     .help("Shrink to the head unit")
-                wireButton("STEER", disabled: controller.isSteering) {
+                WireButton(label: "STEER", disabled: controller.isSteering) {
                     controller.beginSteer()
                 }
-                .help(steerHelp)
-                wireButton(controller.isPaused ? "RESUME" : "PAUSE", disabled: false) {
+                .help(wireSteerHelp)
+                WireButton(label: controller.isPaused ? "RESUME" : "PAUSE",
+                           disabled: false) {
                     controller.togglePause()
                 }
-                .help(pauseHelp)
+                .help(wirePauseHelp(isPaused: controller.isPaused,
+                                    isHolding: controller.isHolding))
             }
-            wireButton("RUN", disabled: controller.isRunning || !controller.instructionsReady) {
+            WireButton(label: "RUN",
+                       disabled: controller.isRunning || !controller.instructionsReady,
+                       isDefault: true) {
                 controller.start()
             }
-            .keyboardShortcut(.defaultAction)
-            wireButton("STOP", disabled: !controller.isRunning) { controller.stop() }
+            WireButton(label: "STOP", disabled: !controller.isRunning) { controller.stop() }
         }
     }
+}
 
-    private var pauseHelp: String {
-        guard controller.isPaused else { return "Hold the run at the next handoff" }
-        return controller.isHolding
-            ? "Send the held reply and continue"
-            : "Call off the pause and let the run carry on"
-    }
+// MARK: Steering (in run)
 
-    private var steerHelp: String {
-        "Hold the run and write a steering note into the conversation"
-    }
+/// The steering editor: a note from the human, posted into the relay.
+/// It rides the next handoff to whoever replies next, and is echoed to
+/// the other side a turn later. Opening it holds the run the way Pause
+/// does — the ghost stop and the PAUSED readout already narrate that —
+/// and Send lets go again, unless the pause was the user's own.
+/// Isolated with its own focus state so typing the note stays in this
+/// scope.
+private struct WireSteeringEditor: View {
+    @Bindable var controller: RelayController
+    @FocusState private var steerFocus: Bool
 
-    // MARK: Steering (in run)
-
-    /// The steering editor: a note from the human, posted into the relay.
-    /// It rides the next handoff to whoever replies next, and is echoed to
-    /// the other side a turn later. Opening it holds the run the way Pause
-    /// does — the ghost stop and the PAUSED readout already narrate that —
-    /// and Send lets go again, unless the pause was the user's own.
-    private var steerEditor: some View {
+    var body: some View {
         HStack(alignment: .bottom, spacing: Wire.s(8)) {
             TextField("Steer the conversation\u{2026}", text: $controller.steeringText,
                       axis: .vertical)
@@ -1059,9 +1140,11 @@ struct WireframePanelView: View {
                 .focused($steerFocus)
                 .onSubmit { controller.sendSteering() }
                 .onExitCommand { controller.cancelSteer() }
-            wireButton("SEND", disabled: steeringNoteEmpty) { controller.sendSteering() }
-                .help("Post the note; it reaches whoever replies next, and the other side a turn later")
-            wireButton("CANCEL", disabled: false) { controller.cancelSteer() }
+            WireButton(label: "SEND", disabled: steeringNoteEmpty) {
+                controller.sendSteering()
+            }
+            .help("Post the note; it reaches whoever replies next, and the other side a turn later")
+            WireButton(label: "CANCEL", disabled: false) { controller.cancelSteer() }
                 .help("Close without posting")
         }
         // Async because focus set in the same transaction that inserts the
@@ -1072,24 +1155,14 @@ struct WireframePanelView: View {
     private var steeringNoteEmpty: Bool {
         controller.steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+}
 
-    private func wireButton(_ label: String, disabled: Bool,
-                            action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(Wire.mono(9, .bold))
-                .foregroundColor(disabled ? Wire.faint : Wire.ink)
-                .padding(.horizontal, Wire.s(8))
-                .padding(.vertical, Wire.s(3))
-                .overlay(Rectangle().stroke(disabled ? Wire.faint : Wire.ink,
-                                            lineWidth: Wire.s(1)))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-    }
+// MARK: Log (expanded)
 
-    private var logWell: some View {
+private struct WireLogWell: View {
+    let controller: RelayController
+
+    var body: some View {
         VStack(alignment: .leading, spacing: Wire.s(4)) {
             Text("LOG")
                 .font(Wire.mono(8, .bold))
@@ -1097,7 +1170,7 @@ struct WireframePanelView: View {
                 .foregroundColor(Wire.faint)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Wire.s(2)) {
+                    LazyVStack(alignment: .leading, spacing: Wire.s(2)) {
                         ForEach(controller.logLines) { line in
                             Text(line.text)
                                 .font(Wire.mono(10.5))
@@ -1119,12 +1192,16 @@ struct WireframePanelView: View {
             }
         }
     }
+}
 
-    // MARK: Compact footer (in run)
+// MARK: Compact footer (in run)
 
-    /// The head unit's bottom row: the loaded shape and topic on the left,
-    /// the run controls on the right.
-    private var compactFooter: some View {
+/// The head unit's bottom row: the loaded shape and topic on the left,
+/// the run controls on the right.
+private struct WireCompactFooter: View {
+    let controller: RelayController
+
+    var body: some View {
         HStack(spacing: Wire.s(8)) {
             Text("[ \(controller.conversation.uppercased()) ]")
                 .font(Wire.mono(9, .bold))
@@ -1135,16 +1212,17 @@ struct WireframePanelView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: Wire.s(8))
-            wireButton("STEER", disabled: controller.isSteering) {
+            WireButton(label: "STEER", disabled: controller.isSteering) {
                 controller.beginSteer()
             }
-            .help(steerHelp)
-            wireButton(controller.isPaused ? "RESUME" : "PAUSE", disabled: false) {
+            .help(wireSteerHelp)
+            WireButton(label: controller.isPaused ? "RESUME" : "PAUSE", disabled: false) {
                 controller.togglePause()
             }
-            .help(pauseHelp)
-            wireButton("STOP", disabled: false) { controller.stop() }
-            wireButton("EXPAND", disabled: false) { controller.compact = false }
+            .help(wirePauseHelp(isPaused: controller.isPaused,
+                                isHolding: controller.isHolding))
+            WireButton(label: "STOP", disabled: false) { controller.stop() }
+            WireButton(label: "EXPAND", disabled: false) { controller.compact = false }
                 .help("Expand the full console")
         }
     }
@@ -1197,7 +1275,7 @@ struct WireframePanelView: View {
 /// preview here is a frozen state, and a frozen state cannot show an
 /// animation that has stopped working.
 private struct WireframeHandoffPreview: View {
-    @StateObject private var controller: RelayController = {
+    @State private var controller: RelayController = {
         let c = RelayController()
         c.isRunning = true
         c.compact = true

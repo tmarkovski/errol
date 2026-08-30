@@ -12,7 +12,7 @@
 
 import AppKit
 import ApplicationServices
-import Combine
+import Observation
 import SwiftUI
 
 /// NSPanel refuses key status in some non-activating configurations, which
@@ -24,9 +24,6 @@ final class KeyablePanel: NSPanel {
     var onVisibilityChange: ((Bool) -> Void)?
 
     override var canBecomeKey: Bool { true }
-    /// Frame changes (the console/companion morph) pace themselves to the
-    /// SwiftUI content animation.
-    override func animationResizeTime(_ newFrame: NSRect) -> TimeInterval { 0.32 }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
     override func makeKeyAndOrderFront(_ sender: Any?) {
         super.makeKeyAndOrderFront(sender)
@@ -42,12 +39,22 @@ final class KeyablePanel: NSPanel {
     }
 }
 
+/// Carries a main-thread callback into withObservationTracking's @Sendable
+/// onChange without capturing the (non-Sendable) shell there. Unchecked is
+/// sound because the work both closes over and executes on the main queue.
+private struct MainQueueHop: @unchecked Sendable {
+    private let work: () -> Void
+    init(_ work: @escaping () -> Void) { self.work = work }
+    func run() { DispatchQueue.main.async(execute: work) }
+}
+
 final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: KeyablePanel!
     private let relay = RelayController()
-    private var iconWatcher: AnyCancellable?
-    private var layoutWatcher: AnyCancellable?
+    /// What the layout tracker last applied, so re-runs that land on the
+    /// same size don't restart the frame animation.
+    private var lastPanelSize: CGSize?
     /// Settings rides the same non-activating panel machinery as the console
     /// and floats one level above it, so it opens over the panel without
     /// stealing focus; only the system close button distinguishes its chrome.
@@ -62,12 +69,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         buildStatusItem()
         buildPanel()
-        logSink = { [relay] line in
-            DispatchQueue.main.async { relay.append(line) }
-        }
-        iconWatcher = relay.$isRunning.sink { [weak self] running in
-            self?.statusItem.button?.image = self?.statusIcon(running: running)
-        }
+        trackStatusIcon()
         relay.openSettingsHandler = { [weak self] in self?.showSettings() }
         // A menu-bar app with no window gives a first-time user nothing to
         // discover the permission need from, so while the grant is missing
@@ -116,7 +118,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        relayCancelled.set(true)
+        relayControl.cancel()
         NSApp.terminate(nil)
     }
 
@@ -151,22 +153,62 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel.isMovableByWindowBackground = true
             // Follow presentation changes with an animated frame change,
             // anchored top-center so the panel hangs from the status item.
-            layoutWatcher = Publishers.CombineLatest4(relay.$compact, relay.$logOpen,
-                                                       relay.$isSteering,
-                                                       relay.$isEditingInstructions)
-                .map { PanelLayout.size(style: activePanelStyle, compact: $0,
-                                        logOpen: $1, steering: $2, fullPrompt: $3) }
-                .removeDuplicates()
-                .sink { [weak self] size in self?.resizePanel(to: size) }
+            trackPanelLayout()
         }
         panel.title = "Errol"
-        panel.onVisibilityChange = { [relay] visible in relay.setPanelVisible(visible) }
+        // Ordering and occlusion combine into one effective visibility: a
+        // panel parked behind other windows is still "visible" to AppKit's
+        // ordering, but every sweep it drives is synchronous IPC into the
+        // chat apps, so fully occluded counts as hidden. The notification
+        // center retains the block observer for the app's life.
+        panel.onVisibilityChange = { [weak self] _ in self?.pushPanelVisibility() }
+        _ = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: panel, queue: .main) { [weak self] _ in
+            self?.pushPanelVisibility()
+        }
         panel.level = .floating
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = NSHostingView(rootView: PanelRootView(controller: relay))
+    }
+
+    private func pushPanelVisibility() {
+        guard let panel else { return }
+        relay.setPanelVisible(panel.isVisible && panel.occlusionState.contains(.visible))
+    }
+
+    // MARK: Observation bridges
+
+    // Observation replaced the Combine publishers when the model moved to
+    // @Observable: each tracker reads its dependencies inside
+    // withObservationTracking and re-arms itself on the main queue after a
+    // change. onChange fires at willSet — the mutated values aren't
+    // readable yet — so the re-run waits a turn of the run loop, which also
+    // coalesces a burst of changes into one application.
+
+    private func trackStatusIcon() {
+        let rearm = MainQueueHop { [weak self] in self?.trackStatusIcon() }
+        let running = withObservationTracking { relay.isRunning } onChange: {
+            rearm.run()
+        }
+        statusItem.button?.image = statusIcon(running: running)
+    }
+
+    private func trackPanelLayout() {
+        let rearm = MainQueueHop { [weak self] in self?.trackPanelLayout() }
+        let size = withObservationTracking {
+            PanelLayout.size(style: activePanelStyle, compact: relay.compact,
+                             logOpen: relay.logOpen, steering: relay.isSteering,
+                             fullPrompt: relay.showsFullInstructionsEditor)
+        } onChange: {
+            rearm.run()
+        }
+        guard size != lastPanelSize else { return }
+        lastPanelSize = size
+        resizePanel(to: size)
     }
 
     private func resizePanel(to size: CGSize) {
@@ -180,7 +222,20 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             frame.origin.x = max(visible.minX + 8,
                                  min(frame.origin.x, visible.maxX - size.width - 8))
         }
-        panel.setFrame(frame, display: true, animate: panel.isVisible)
+        guard panel.isVisible else {
+            panel.setFrame(frame, display: true)
+            return
+        }
+        // The animator proxy animates on the run loop, where the synchronous
+        // setFrame(_:display:animate:) would hold the main thread inside a
+        // nested animation loop for the whole 0.32s; a morph arriving
+        // mid-flight retargets the animation instead of queueing behind it.
+        // The duration paces the frame to the SwiftUI content animation.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.32
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
+        }
     }
 
     private func togglePanel() {

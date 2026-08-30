@@ -134,7 +134,7 @@ func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Boo
     let deadline = Date().addingTimeInterval(seconds)
     var attempt = 0
     while Date() < deadline {
-        if relayCancelled.isSet { return false }
+        if relayControl.isCancelled { return false }
         if isFrontmost(target) { return true }
         switch attempt % 3 {
         case 0:

@@ -134,21 +134,6 @@ enum ConversationStatus: String {
     case ended = "Conversation ended"
 }
 
-/// Set by the app layer; called on the relay worker thread with both sides'
-/// statuses (ChatGPT first) whenever either changes.
-var conversationStatusSink: ((ConversationStatus, ConversationStatus) -> Void)?
-
-/// Set by the app layer; called on the relay worker thread as each turn
-/// begins (1-based). The app resets its own counter when a run starts.
-var relayTurnSink: ((Int) -> Void)?
-
-/// Set by the app layer; called on the relay worker thread when the run
-/// parks at a handoff to wait for Resume, and again when it lets go. Asking
-/// for a pause and the run acting on it are different moments — the request
-/// lands mid-reply and takes effect only once that reply is captured — and
-/// nothing else the app can see tells them apart.
-var relayHoldingSink: ((Bool) -> Void)?
-
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
 func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
@@ -194,7 +179,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     func setConversation(_ target: TargetApp, _ status: ConversationStatus) {
         if target.app == chatgpt.app { chatgptConversation = status }
         else { claudeConversation = status }
-        conversationStatusSink?(chatgptConversation, claudeConversation)
+        relayEvents.post(.conversation(chatgpt: chatgptConversation,
+                                       claude: claudeConversation))
     }
 
     appendTranscript("# Errol transcript, \(iso.string(from: Date()))\n\n")
@@ -220,9 +206,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     var turn = 0
     while true {
         turn += 1
-        relayTurnSink?(turn)
+        relayEvents.post(.turn(turn))
         guard waitForResponse(in: speaker, baseline: baseline) else {
-            if relayCancelled.isSet {
+            if relayControl.isCancelled {
                 log("Run stopped by user.")
                 appendTranscript("_Run stopped by user._\n\n")
             } else {
@@ -265,18 +251,18 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
 
         // Pause parks the run here — the reply is safely captured and nothing
         // has been typed into the listener yet. Stop stays responsive.
-        if relayPaused.isSet, !relayCancelled.isSet {
+        if relayControl.isPaused, !relayControl.isCancelled {
             log("Paused — holding \(speaker.name)'s reply before it reaches \(listener.name).")
             // The reply is in hand, so whoever wrote it has stopped. A
             // sign-off already put them in a state worth keeping.
             if !signedOff { setConversation(speaker, .replied) }
-            relayHoldingSink?(true)
-            while relayPaused.isSet, !relayCancelled.isSet { usleep(200_000) }
-            relayHoldingSink?(false)
-            if !relayCancelled.isSet { log("Resumed.") }
+            relayEvents.post(.holding(true))
+            while relayControl.isPaused, !relayControl.isCancelled { usleep(200_000) }
+            relayEvents.post(.holding(false))
+            if !relayControl.isCancelled { log("Resumed.") }
         }
 
-        if relayCancelled.isSet {
+        if relayControl.isCancelled {
             log("Run stopped by user.")
             appendTranscript("_Run stopped by user._\n\n")
             break
@@ -284,7 +270,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
 
         // A note posted while the reply was being written — or while the
         // run stood held — rides this handoff, after the reply it answers.
-        let note = relaySteering.take()
+        let note = relayControl.takeSteering()
         if let note {
             log("Relaying the human's steering note with this handoff.")
             appendTranscript("## Steering note (from the human)\n\n\(note)\n\n")

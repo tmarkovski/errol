@@ -5,7 +5,7 @@
 import SwiftUI
 
 struct ControlPanelView: View {
-    @ObservedObject var controller: RelayController
+    @Bindable var controller: RelayController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -127,7 +127,7 @@ struct ControlPanelView: View {
     private var logView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(controller.logLines) { line in
                         Text(line.text)
                             .font(.system(size: 11, design: .monospaced))

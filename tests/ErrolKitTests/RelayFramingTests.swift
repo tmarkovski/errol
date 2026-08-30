@@ -149,17 +149,17 @@ final class RelayFramingTests: XCTestCase {
         XCTAssertTrue(payload.contains("--- Steering note from the human ---"))
     }
 
-    func testSteeringBoxTakeConsumesAndClearDiscards() {
+    func testSteeringMailboxTakeConsumesAndResetDiscards() {
         // One note per handoff: take hands the note over exactly once, and
         // a run starting fresh can discard a note that never found its
         // handoff.
-        let box = SteeringBox()
-        XCTAssertNil(box.take())
-        box.post("Focus on the geology.")
-        XCTAssertEqual(box.take(), "Focus on the geology.")
-        XCTAssertNil(box.take(), "a taken note must not ride two handoffs")
-        box.post("Leftover from a dead run.")
-        box.clear()
-        XCTAssertNil(box.take())
+        let control = RelayControl()
+        XCTAssertNil(control.takeSteering())
+        control.postSteering("Focus on the geology.")
+        XCTAssertEqual(control.takeSteering(), "Focus on the geology.")
+        XCTAssertNil(control.takeSteering(), "a taken note must not ride two handoffs")
+        control.postSteering("Leftover from a dead run.")
+        control.reset()
+        XCTAssertNil(control.takeSteering())
     }
 }

@@ -251,7 +251,7 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline) -> Bool {
     var stableTicks = 0
     var sawStreaming = false
     while Date() < deadline {
-        if relayCancelled.isSet { return false }
+        if relayControl.isCancelled { return false }
         let sighting = ResponseSighting(affordances: messageAffordances(in: target).count,
                                         lastOrdinal: lastMessageOrdinal(in: target),
                                         streaming: hasStopButton(in: target))

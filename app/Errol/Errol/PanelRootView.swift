@@ -52,7 +52,7 @@ enum PanelLayout {
 }
 
 struct PanelRootView: View {
-    @ObservedObject var controller: RelayController
+    let controller: RelayController
 
     var body: some View {
         switch activePanelStyle {
