@@ -815,20 +815,16 @@ private struct WireInstrumentHead: View {
                              conversation: ConversationStatus) -> some View {
         VStack(spacing: Wire.s(8)) {
             WireGauge(level: gaugeLevel(conversation))
-            // The nameplate: who this is, the surface it is on, the model
-            // behind it — identity in one block, state in the instruments
-            // below. Every row reserves its height with a single space so
-            // the lamps sit level on both cards whatever is missing.
+            // The nameplate: who this is and what it is showing, then the
+            // model behind it — identity in two rows, state in the
+            // instruments below. Both rows reserve their height whatever is
+            // missing, so the lamps sit level on both cards.
             VStack(spacing: Wire.s(2)) {
-                Text(status.appName.uppercased())
-                    .font(Wire.mono(10, .bold))
-                    .foregroundColor(Wire.ink)
-                let surface = surfaceRow(status)
-                Text(surface.text)
-                    .foregroundColor(surface.diagnosis ? Wire.ink.opacity(0.75)
-                                                       : Wire.faint)
-                Text(modelRow(status))
-                    .foregroundColor(Wire.faint)
+                nameplate(status)
+                let detail = detailRow(status)
+                Text(detail.text)
+                    .foregroundColor(detail.diagnosis ? Wire.ink.opacity(0.75)
+                                                      : Wire.faint)
             }
             .font(Wire.mono(8.5))
             .lineLimit(1)
@@ -870,6 +866,51 @@ private struct WireInstrumentHead: View {
         .onTapGesture { nominate(speaker) }
         .modifier(WireHandCursor(active: canChooseOpener))
         .help(canChooseOpener ? "Have \(status.appName) send the opening message" : "")
+    }
+
+    /// The name, and beside it the surface that side is showing — the app's
+    /// own mode word ("Chat", "Cowork", "Code"), kept muted and a size down
+    /// so the pair reads as a name wearing a label rather than as two
+    /// labels. It rides the name's line instead of taking a row under it
+    /// because a mode belongs to the thing it is a mode of, and because the
+    /// row it gives back is a row the card was spending on a single word.
+    ///
+    /// The mode is the one part of the nameplate that arrives from a sweep
+    /// rather than from the layout, so it is animated in. The pair is
+    /// centered, so a mode widening from nothing walks the name off center
+    /// and itself out from behind it; a word that blinked into place would
+    /// read as a glitch on a panel where nothing else appears unasked. The
+    /// same animation covers a mode that changes — the word cross-fades
+    /// while the name slides over to make room — and one that goes away,
+    /// which is the arrival run backwards.
+    private func nameplate(_ status: SideStatus) -> some View {
+        let mode = status.surface ?? ""
+        return HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(status.appName.uppercased())
+                .font(Wire.mono(10, .bold))
+                .foregroundColor(Wire.ink)
+                // Who the card is never truncates. A side with no chat
+                // window reports its open surfaces here as one joined
+                // string, which is the one mode long enough to crowd the
+                // name off its own plate; the priority spends that overflow
+                // on the mode's tail instead.
+                .layoutPriority(1)
+            Text(mode)
+                .foregroundColor(Wire.faint)
+                // The gutter belongs to the mode rather than to the stack:
+                // an HStack's own spacing would sit there holding the name
+                // off center on a card that has no mode to show.
+                .padding(.leading, mode.isEmpty ? 0 : Wire.s(4))
+            // The mode's line, with none of its width. A row measured from
+            // the name alone stands a point shorter than one carrying a
+            // mode, so a card still waiting on its first sweep would sit
+            // its lamps a point off the other card's, and the mode's
+            // arrival would land with a hop. The strut holds that point
+            // open from the start and costs no centering to do it.
+            Text(" ").frame(width: 0)
+        }
+        .contentTransition(.opacity)
+        .animation(.easeInOut(duration: 0.3), value: mode)
     }
 
     /// The border tells the card's place in the turn. Waiting its turn, it
@@ -938,25 +979,25 @@ private struct WireInstrumentHead: View {
         }
     }
 
-    /// The nameplate's surface row doubles as the diagnosis while the side
-    /// is not relayable: a red lens conflates four failures whose remedies
-    /// differ — launch the app, open a chat window, grant Accessibility —
-    /// and a side in that state has no surface to name anyway. The
-    /// isRunning guard keeps a stale diagnosis off a card mid-run, when
-    /// the readiness scanner is paused.
-    private func surfaceRow(_ status: SideStatus) -> (text: String, diagnosis: Bool) {
+    /// The row under the nameplate: model and effort as one plate ("5.6 Sol
+    /// High", "Fable 5 Extra"). The separator Readiness composes is for the
+    /// skins that join surface and model on a single line; here the surface
+    /// has gone up to sit beside the name, so the model has the row to
+    /// itself.
+    ///
+    /// It gives that row over to the diagnosis while the side is not
+    /// relayable: a red lens conflates four failures whose remedies differ
+    /// — launch the app, open a chat window, grant Accessibility — and a
+    /// side in that state has no model to name anyway. The isRunning guard
+    /// keeps a stale diagnosis off a card mid-run, when the readiness
+    /// scanner is paused. A space when there is neither, so the row holds
+    /// its height.
+    private func detailRow(_ status: SideStatus) -> (text: String, diagnosis: Bool) {
         if !controller.isRunning,
            status.state == .notReady || status.state == .missing {
             return (status.headline, true)
         }
-        return (status.surface ?? " ", false)
-    }
-
-    /// Model and effort as one plate ("5.6 Sol High", "Fable 5 Extra") —
-    /// the separator Readiness composes is for the skins that join surface
-    /// and model on a single line, and this card gives each its own row.
-    private func modelRow(_ status: SideStatus) -> String {
-        status.model?.replacingOccurrences(of: " \u{00B7} ", with: " ") ?? " "
+        return (status.model?.replacingOccurrences(of: " \u{00B7} ", with: " ") ?? " ", false)
     }
 
     private var centerDeck: some View {
