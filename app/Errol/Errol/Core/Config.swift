@@ -110,6 +110,11 @@ struct Config {
     var seed = ""
     /// A reply containing this marker (or an empty reply) ends the run early.
     var stopSequence = "[[END-CONVERSATION]]"
+    /// The framing preamble's text, with RelayRules.stopSequenceToken where
+    /// the marker goes. RelayController copies the Settings edit (if any)
+    /// here at Start; tools and tests that drive runRelay directly get the
+    /// shipped default.
+    var relayRulesTemplate = RelayRules.defaultTemplate
     var timeout: TimeInterval = 300
     var maxChars = 12000
     /// Run artifacts live in Documents: the app is launched from Finder with
@@ -184,12 +189,14 @@ var config = Config()
 /// the composed message without changing the selected template, and only that
 /// text is ever sent. The relay's standing rules (relayRules) own the sign-off
 /// mechanics, so bodies must not mention the stop sequence.
-struct ConversationTemplate: Identifiable {
-    let name: String
+struct ConversationTemplate: Identifiable, Codable, Equatable {
+    /// The picker's label and the shape's identity — per-shape drafts and
+    /// the panel's selection key on it, so SettingsStore keeps names unique.
+    var name: String
     /// Placeholder shown in the panel's topic field.
-    let topicPrompt: String
+    var topicPrompt: String
     /// The purpose and pacing framing; refers to the topic as "below".
-    let body: String
+    var body: String
     var id: String { name }
 
     func composed(topic: String) -> String {
@@ -197,10 +204,12 @@ struct ConversationTemplate: Identifiable {
     }
 }
 
-/// The picker's shapes, in display order. Pacing differs by purpose on top of
+/// The shipped shapes, in display order. Pacing differs by purpose on top of
 /// the standing rules' baseline (never sign off in a first reply): brainstorms
 /// need divergence time, a review legitimately ends when the findings run out.
-let conversationTemplates = [
+/// These are the defaults Settings edits are measured against; the picker and
+/// the relay read `conversationTemplates` below, which applies those edits.
+let defaultConversationTemplates = [
     ConversationTemplate(
         name: "Brainstorm",
         topicPrompt: "What to brainstorm about",
@@ -246,6 +255,13 @@ let conversationTemplates = [
             whether the proposal survives and in what amended form.
             """),
 ]
+
+/// The picker's shapes: the shipped defaults with any Settings edits applied.
+/// Computed so every reader — the three skins' pickers, the controller's
+/// compose path — sees an edit the moment it lands.
+var conversationTemplates: [ConversationTemplate] {
+    SettingsStore.shared.templates
+}
 
 /// Known empty-composer placeholder values across both apps' surfaces. The
 /// harness tiers and the live tests refuse to act on a composer holding

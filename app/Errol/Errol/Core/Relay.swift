@@ -5,25 +5,38 @@ import Foundation
 
 // MARK: - Message framing
 
+/// The ground rules' shipped text and the token it carries. The text is
+/// editable in Settings (behind a warning — it defines how runs end), so it
+/// lives as a template rather than an interpolated literal: the token stands
+/// in for `config.stopSequence` and is substituted at send time, keeping the
+/// marker itself a single source of truth however the prose is rewritten.
+enum RelayRules {
+    static let stopSequenceToken = "{{stopSequence}}"
+    static let defaultTemplate = """
+        This is an automated agent-to-agent conversation: your replies are relayed \
+        to another AI assistant, and its replies are relayed back to you. The human \
+        who set this up is not taking part in the conversation, though they may \
+        occasionally interject a steering note to guide it — such notes arrive in \
+        clearly marked sections, and both sides get to see them. Treat it as a real \
+        multi-turn dialogue, not a one-shot answer: contribute incrementally and \
+        leave room for the other assistant to build on your reply. When you want to \
+        end the conversation, include {{stopSequence}} anywhere in a reply — \
+        but only once the exchange has genuinely run its course; never initiate \
+        the sign-off in your first reply. When the other assistant sends it, reply \
+        with your own goodbye containing {{stopSequence}} — the conversation \
+        closes once both sides have sent it. Replying with an empty message ends \
+        the conversation immediately.
+        """
+}
+
 /// Ground rules given to each agent once, at the start of its side of the
 /// conversation. Everything after these two framing messages passes through
-/// verbatim.
+/// verbatim. Reads the template from `config` (copied there at Start), not
+/// the settings store — this runs on the relay worker thread.
 func relayRules() -> String {
-    """
-    This is an automated agent-to-agent conversation: your replies are relayed \
-    to another AI assistant, and its replies are relayed back to you. The human \
-    who set this up is not taking part in the conversation, though they may \
-    occasionally interject a steering note to guide it — such notes arrive in \
-    clearly marked sections, and both sides get to see them. Treat it as a real \
-    multi-turn dialogue, not a one-shot answer: contribute incrementally and \
-    leave room for the other assistant to build on your reply. When you want to \
-    end the conversation, include \(config.stopSequence) anywhere in a reply — \
-    but only once the exchange has genuinely run its course; never initiate \
-    the sign-off in your first reply. When the other assistant sends it, reply \
-    with your own goodbye containing \(config.stopSequence) — the conversation \
-    closes once both sides have sent it. Replying with an empty message ends \
-    the conversation immediately.
-    """
+    config.relayRulesTemplate
+        .replacingOccurrences(of: RelayRules.stopSequenceToken,
+                              with: config.stopSequence)
 }
 
 /// What the first agent receives: the rules plus the human's initial message.

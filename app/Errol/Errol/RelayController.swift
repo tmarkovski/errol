@@ -74,6 +74,10 @@ final class RelayController: ObservableObject {
     private var instructionDrafts: [String: String] = [:]
     private let scanner = ReadinessScanner()
     private var panelVisible = false
+    /// Set by the AppKit shell; the skins' gear button routes here to open
+    /// the settings window above the panel.
+    var openSettingsHandler: (() -> Void)?
+    private var templatesWatcher: AnyCancellable?
 
     init() {
         scanner.onUpdate = { [weak self] chatgpt, claude in
@@ -94,6 +98,21 @@ final class RelayController: ObservableObject {
         relayHoldingSink = { [weak self] holding in
             DispatchQueue.main.async { self?.isHolding = holding }
         }
+        // A shape deleted or renamed in Settings can leave the picker
+        // pointing at nothing; follow the list to its first shape (which
+        // always exists — the store refuses to empty the list).
+        templatesWatcher = SettingsStore.shared.$templates
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] templates in
+                guard let self, conversation != Self.customConversation,
+                      !templates.contains(where: { $0.name == self.conversation })
+                else { return }
+                selectConversation(templates.first?.name ?? Self.customConversation)
+            }
+    }
+
+    func openSettings() {
+        openSettingsHandler?()
     }
 
     /// nil means the picker is on Custom.

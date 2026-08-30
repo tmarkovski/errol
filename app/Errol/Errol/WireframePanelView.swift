@@ -1,11 +1,11 @@
 // The wireframe instrument skin (see PanelRootView for skin selection):
 // DesignMockups' Option A made real. The study's rule carries over as the
 // design itself — every state is legible from lamps, needles, counters,
-// and labels alone; four grays, no glow, no chassis color. The exceptions
-// are the two signal lamps in the old machine-panel idiom — RDY burning
-// red, amber, or green, and THINK an orange bulb breathing while a side
-// composes; everything they say is still said in words on the line below
-// them, so the rule holds. The panel window is borderless
+// and labels alone; four grays and no chassis color. The exceptions are
+// the two bright glass signal lamps — RDY burning red, amber, or green,
+// and THINK an orange bulb breathing while a side composes; everything
+// they say is still said in words on the line below them, so the rule
+// holds. The panel window is borderless
 // (MenuBarController), so the paper card this view paints is the panel's
 // own edge.
 //
@@ -20,10 +20,11 @@ import SwiftUI
 
 // MARK: - Palette
 
-/// The skin draws from four grays, plus the lens colors the two signal
-/// lamps burn — the muted red, jade green, and orange of old equipment
-/// panels rather than screen primaries.
-private enum Wire {
+/// The skin draws from four grays, plus the vivid red, green, and gold of
+/// its signal lenses. Color is concentrated here so the lamps can feel lit.
+/// Internal, not private: the settings card (SettingsView) speaks the same
+/// idiom from these tokens.
+enum Wire {
     static let ink = Color(white: 0.20)
     static let faint = Color(white: 0.52)
     static let paper = Color(white: 0.94)
@@ -270,20 +271,20 @@ private struct WireGauge: View {
     }
 }
 
-/// A colored bulb behind glass: a bright filament core inside deeper glass,
-/// or the cloudy tint of the same lens with nothing lit behind it.
+/// A colored bulb behind glass: a white-hot filament inside a saturated
+/// lens. The chassis stays quiet so these are the brightest things on it.
 private struct WireLens {
     var core: Color
     var glass: Color
 
-    static let green = WireLens(core: Color(red: 0.60, green: 0.92, blue: 0.53),
-                                glass: Color(red: 0.11, green: 0.42, blue: 0.19))
-    static let amber = WireLens(core: Color(red: 0.99, green: 0.80, blue: 0.38),
-                                glass: Color(red: 0.54, green: 0.33, blue: 0.04))
-    static let red = WireLens(core: Color(red: 0.97, green: 0.42, blue: 0.26),
-                              glass: Color(red: 0.51, green: 0.09, blue: 0.06))
-    static let orange = WireLens(core: Color(red: 1.00, green: 0.78, blue: 0.30),
-                                 glass: Color(red: 0.72, green: 0.37, blue: 0.02))
+    static let green = WireLens(core: Color(red: 0.78, green: 1.00, blue: 0.67),
+                                glass: Color(red: 0.14, green: 0.69, blue: 0.25))
+    static let amber = WireLens(core: Color(red: 1.00, green: 0.92, blue: 0.48),
+                                glass: Color(red: 0.94, green: 0.57, blue: 0.06))
+    static let red = WireLens(core: Color(red: 1.00, green: 0.66, blue: 0.51),
+                              glass: Color(red: 0.84, green: 0.16, blue: 0.10))
+    static let orange = WireLens(core: Color(red: 1.00, green: 0.88, blue: 0.39),
+                                 glass: Color(red: 0.95, green: 0.45, blue: 0.03))
 }
 
 /// A signal lamp: a glass lens in a metal bezel, or — with no lens — the
@@ -298,25 +299,51 @@ private struct WireSignalLamp: View {
 
     @State private var dimmed = false
 
-    /// Filament off-center, the way a bulb sits behind its lens.
+    /// Filament off-center, the way a bulb sits behind its lens. A small
+    /// white center makes the color read as emitted light rather than paint.
     private var glass: AnyShapeStyle {
         guard let lens else { return AnyShapeStyle(Wire.paper) }
-        return AnyShapeStyle(RadialGradient(colors: [lens.core, lens.glass],
-                                           center: UnitPoint(x: 0.36, y: 0.32),
-                                           startRadius: 0, endRadius: Wire.s(7)))
+        return AnyShapeStyle(
+            RadialGradient(stops: [
+                .init(color: .white, location: 0),
+                .init(color: lens.core, location: 0.28),
+                .init(color: lens.glass, location: 1)
+            ], center: UnitPoint(x: 0.34, y: 0.28),
+               startRadius: 0, endRadius: Wire.s(7))
+        )
     }
 
     var body: some View {
         VStack(spacing: Wire.s(3)) {
-            Circle()
-                .fill(glass)
-                .opacity(dimmed ? 0.32 : 1)
-                .overlay(Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
-                                                     : Wire.ink.opacity(0.55),
-                                         lineWidth: Wire.s(1)))
-                .frame(width: Wire.s(9), height: Wire.s(9))
-                .shadow(color: (lens?.glass ?? .clear).opacity(dimmed ? 0.15 : 0.55),
-                        radius: Wire.s(2.5))
+            ZStack {
+                if let lens {
+                    Circle()
+                        .fill(lens.core.opacity(dimmed ? 0.12 : 0.34))
+                        .frame(width: Wire.s(21), height: Wire.s(21))
+                        .blur(radius: Wire.s(4.5))
+                    Circle()
+                        .fill(lens.core.opacity(dimmed ? 0.16 : 0.42))
+                        .frame(width: Wire.s(16), height: Wire.s(16))
+                        .blur(radius: Wire.s(2))
+                }
+                Circle()
+                    .fill(glass)
+                    .opacity(dimmed ? 0.34 : 1)
+                    .overlay(
+                        Circle().stroke(lens == nil ? Wire.faint.opacity(0.35)
+                                                   : Color.white.opacity(0.72),
+                                        lineWidth: Wire.s(0.65))
+                    )
+                    .overlay(
+                        Circle().stroke(lens == nil ? Color.clear
+                                                   : Wire.ink.opacity(0.42),
+                                        lineWidth: Wire.s(1))
+                    )
+                    .frame(width: Wire.s(12), height: Wire.s(12))
+                    .shadow(color: (lens?.core ?? .clear).opacity(dimmed ? 0.18 : 0.92),
+                            radius: Wire.s(5))
+            }
+            .frame(width: Wire.s(22), height: Wire.s(18))
             Text(label)
                 .font(Wire.mono(7, .bold))
                 .tracking(0.5)
@@ -327,7 +354,7 @@ private struct WireSignalLamp: View {
         .onChange(of: pulsing, initial: true) { _, on in
             dimmed = false
             guard on else { return }
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 0.78).repeatForever(autoreverses: true)) {
                 dimmed = true
             }
         }
@@ -462,11 +489,27 @@ struct WireframePanelView: View {
                 .font(Wire.mono(8, .bold))
                 .tracking(1.2)
                 .foregroundColor(Wire.ink)
+            settingsButton
         }
         // The Spacer between the two labels is empty; without a content
         // shape the middle of the strip would not take the press.
         .contentShape(Rectangle())
         .gesture(WindowDragGesture())
+    }
+
+    /// The way into the settings card, kept in the title strip so it is
+    /// reachable in every console state, compact head unit included.
+    private var settingsButton: some View {
+        Button {
+            controller.openSettings()
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: Wire.s(9), weight: .bold))
+                .foregroundColor(Wire.faint)
+        }
+        .buttonStyle(.plain)
+        .modifier(WireHandCursor(active: true))
+        .help("Edit the conversation shapes")
     }
 
     private var stateWord: String {

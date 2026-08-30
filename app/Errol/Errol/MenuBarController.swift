@@ -11,6 +11,7 @@
 // activating the app.
 
 import AppKit
+import ApplicationServices
 import Combine
 import SwiftUI
 
@@ -47,6 +48,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private let relay = RelayController()
     private var iconWatcher: AnyCancellable?
     private var layoutWatcher: AnyCancellable?
+    /// Settings rides the same non-activating panel machinery as the console
+    /// and floats one level above it, so it opens over the panel without
+    /// stealing focus; only the system close button distinguishes its chrome.
+    /// The permission explainer stays an ordinary activating window — it
+    /// greets a first launch, when there is nothing to avoid deactivating.
+    private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // LSUIElement in the Info.plist already hides the Dock icon; this
@@ -59,6 +67,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
         iconWatcher = relay.$isRunning.sink { [weak self] running in
             self?.statusItem.button?.image = self?.statusIcon(running: running)
+        }
+        relay.openSettingsHandler = { [weak self] in self?.showSettings() }
+        // A menu-bar app with no window gives a first-time user nothing to
+        // discover the permission need from, so while the grant is missing
+        // every launch opens the explainer instead of waiting for a Start
+        // press to fail. It closes itself out of the way once granted.
+        if !AXIsProcessTrusted() {
+            showPermissionOnboarding()
         }
     }
 
@@ -90,6 +106,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             let menu = NSMenu()
             menu.addItem(withTitle: "Open Transcript", action: #selector(openTranscript), keyEquivalent: "").target = self
             menu.addItem(withTitle: "Restore Window Positions", action: #selector(restoreWindows), keyEquivalent: "").target = self
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
             if let button = statusItem.button {
@@ -202,5 +220,69 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             }
         }
         panel.setFrameTopLeftPoint(NSPoint(x: x, y: y))
+    }
+
+    // MARK: Settings window
+
+    /// The settings card wears the wireframe skin, so its window chrome
+    /// follows the panel's: non-activating (typing works — KeyablePanel
+    /// forces key status), titled but bare so only the system close button
+    /// shows over the card's paper, and a level above the floating console
+    /// so it always opens on top of it.
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            let window = KeyablePanel(contentRect: .zero,
+                                      styleMask: [.titled, .closable,
+                                                  .fullSizeContentView,
+                                                  .nonactivatingPanel],
+                                      backing: .buffered, defer: false)
+            window.title = "Errol Settings"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.isFloatingPanel = true
+            window.hidesOnDeactivate = false
+            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            window.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1)
+            window.contentViewController = NSHostingController(rootView: SettingsView())
+            window.center()
+            settingsWindow = window
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: Permission explainer
+
+    private func showPermissionOnboarding() {
+        if onboardingWindow == nil {
+            let view = PermissionOnboardingView(
+                onFinished: { [weak self] in
+                    self?.onboardingWindow?.close()
+                    self?.showPanel()
+                },
+                onDismiss: { [weak self] in
+                    self?.onboardingWindow?.close()
+                })
+            let window = NSWindow(contentViewController:
+                NSHostingController(rootView: view))
+            // Onboarding chrome: closable but title-less, dragged by its
+            // own background like the system's first-run sheets.
+            window.styleMask = [.titled, .closable, .fullSizeContentView]
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.center()
+            onboardingWindow = window
+        }
+        onboardingWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    private func showPanel() {
+        guard !panel.isVisible else { return }
+        positionPanel()
+        panel.makeKeyAndOrderFront(nil)
     }
 }
