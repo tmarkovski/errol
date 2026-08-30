@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="434"
+     height="320"
+     viewBox="0 0 434 320"
+     role="img"
+     aria-labelledby="title desc">
+  <title id="title">Monochrome owl relay logo</title>
+  <desc id="desc">A one-color owl with outward-pointing relay arrows, round eyes, and a diamond beak.</desc>
+
+  <!-- Transparent canvas. Change this one fill value to recolor the full mark. -->
+  <g id="owl-logo" fill="#1E3449">
+    <g id="relay-arrows-and-brow">
+      <path id="crown"
+            d="M 134,71
+               C 177,45 257,45 300,71
+               C 284,76 268,78 253,78
+               C 243,76 230,75 217,75
+               C 204,75 191,76 181,78
+               C 166,78 150,76 134,71 Z"/>
+      <path id="outward-arrows"
+            d="M 60,37
+               L 118,50
+               L 102,66
+               C 118,77 140,82 168,83
+               C 189,84 204,93 217,110
+               C 230,93 245,84 266,83
+               C 294,82 316,77 332,66
+               L 316,50
+               L 374,37
+               L 363,96
+               L 347,81
+               C 327,96 303,101 272,102
+               C 245,103 226,121 217,155
+               C 208,121 189,103 162,102
+               C 131,101 107,96 87,81
+               L 71,96 Z"/>
+    </g>
+
+    <path id="owl-outline"
+          d="M 101,98
+             L 124,104
+             C 105,121 96,140 96,162
+             C 96,203 127,234 167,234
+             L 193,234
+             C 201,234 206,240 206,248
+             L 206,267
+             L 252,234
+             L 268,234
+             C 307,234 338,203 338,162
+             C 338,140 329,121 310,104
+             L 333,98
+             C 350,116 359,139 359,162
+             C 359,211 321,251 273,254
+             L 263,254
+             L 208,296
+             C 203,300 197,301 192,298
+             C 187,296 185,291 185,285
+             L 185,254
+             L 165,254
+             C 115,253 75,213 75,162
+             C 75,139 84,116 101,98 Z"/>
+
+    <g id="eyes" fill-rule="evenodd">
+      <path id="left-eye"
+            d="M 194,162
+               A 37,37 0 1 1 120,162
+               A 37,37 0 1 1 194,162 Z
+               M 176,162
+               A 19,19 0 1 0 138,162
+               A 19,19 0 1 0 176,162 Z"/>
+      <path id="right-eye"
+            d="M 314,162
+               A 37,37 0 1 1 240,162
+               A 37,37 0 1 1 314,162 Z
+               M 296,162
+               A 19,19 0 1 0 258,162
+               A 19,19 0 1 0 296,162 Z"/>
+    </g>
+
+    <path id="beak"
+          d="M 217,170 L 235,196 L 217,221 L 199,196 Z"/>
+  </g>
+</svg>

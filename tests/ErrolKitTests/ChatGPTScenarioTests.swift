@@ -91,7 +91,7 @@ final class ChatGPTScenarioTests: XCTestCase {
         let d = detectChatGPT("chatgpt-codex-conversation")
         // No toggles, no placeholder: the mode switcher still distinguishes
         // Codex, the one mode it reports faithfully.
-        XCTAssertEqual(d.status.surface, "Codex mode")
+        XCTAssertEqual(d.status.surface, "Codex")
         XCTAssertEqual(d.status.model, "Default")
         XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
     }

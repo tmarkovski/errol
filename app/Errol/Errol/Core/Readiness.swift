@@ -33,7 +33,7 @@ struct SideStatus {
     var state = ReadyState.checking
     var headline = "Checking..."
     /// The chosen window's active surface ("Chat", "Work", "Cowork",
-    /// "Code", "Codex mode"). Shown under the app's own name, so the names
+    /// "Code", "Codex"). Shown under the app's own name, so the names
     /// carry no vendor prefix.
     var surface: String?
     /// The chosen window's active model plus effort ("Fable 5 · Extra",
@@ -179,13 +179,13 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
 /// composer tab (ChatGPT's mode popup says "ChatGPT" for both Chat and Work,
 /// and Claude's Chat/Cowork share a URL, so the tab outranks everything),
 /// then the composer placeholder (ChatGPT unmounts the tab pair inside a
-/// conversation), then the app's mode switcher (still names Codex mode),
+/// conversation), then the app's mode switcher (still tells Codex apart),
 /// then the claude.ai URL, then the exclusion markers.
 func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
     if let tab = scan.surfaceTab { return tab }
     if let surface = scan.composerSurface { return surface }
     if let mode = scan.modeLabel {
-        return (selectors.modeNames[mode.lowercased()] ?? mode) + " mode"
+        return selectors.modeNames[mode.lowercased()] ?? mode
     }
     if let path = scan.surfacePath {
         // Unmapped paths read fine capitalized ("cowork" -> "Cowork"); the

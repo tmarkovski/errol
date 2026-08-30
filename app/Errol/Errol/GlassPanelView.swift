@@ -185,16 +185,12 @@ struct GlassPanelView: View {
             }
             HStack(spacing: 7) {
                 stateIcon(status.state, tint: tint)
-                Text(status.headline)
+                Text(statusLine(status))
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            Text(surfaceLine(status))
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             Text(detailLine(status: status, conversation: conversation))
                 .font(.system(size: 10.5))
                 .foregroundStyle(conversation == .ended
@@ -256,18 +252,28 @@ struct GlassPanelView: View {
         .frame(width: 12)
     }
 
-    /// A single space keeps the row height stable with nothing to show,
-    /// the same trick the classic card uses.
-    private func surfaceLine(_ status: SideStatus) -> String {
+    /// One line beside the state icon, kept for what the icon and badge
+    /// cannot say: which failure the warning icon means while the side is
+    /// not relayable (launch the app, open a chat, grant Accessibility),
+    /// and the detected surface and model once it is. A single space keeps
+    /// the row height stable with nothing to show, the same trick the
+    /// classic card uses.
+    private func statusLine(_ status: SideStatus) -> String {
+        if !controller.isRunning,
+           status.state == .notReady || status.state == .missing {
+            return status.headline
+        }
         let line = [status.surface, status.model].compactMap { $0 }
             .joined(separator: " \u{00B7} ")
         return line.isEmpty ? " " : line
     }
 
+    /// In a run the badge already tells the conversation state, so the
+    /// detail row only marks the run's end (the one state that outlives
+    /// the badge — the badge reverts to READY/PREP once the run stops).
     private func detailLine(status: SideStatus, conversation: ConversationStatus) -> String {
-        if controller.isRunning || conversation == .ended {
-            return conversation.rawValue
-        }
+        if conversation == .ended { return conversation.rawValue }
+        if controller.isRunning { return " " }
         return status.detail ?? " "
     }
 

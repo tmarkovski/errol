@@ -74,7 +74,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func statusIcon(running: Bool) -> NSImage? {
-        NSImage(systemSymbolName: running ? "bird.fill" : "bird", accessibilityDescription: "Errol")
+        if let image = NSImage(named: "MenuBarIcon")?.copy() as? NSImage {
+            image.size = NSSize(width: 18, height: 18)
+            image.isTemplate = true
+            image.accessibilityDescription = running ? "Errol is running" : "Errol"
+            return image
+        }
+
+        return NSImage(systemSymbolName: running ? "bird.fill" : "bird", accessibilityDescription: "Errol")
             ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "Errol")
     }
 

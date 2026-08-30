@@ -505,9 +505,24 @@ struct WireframePanelView: View {
                              conversation: ConversationStatus) -> some View {
         VStack(spacing: Wire.s(8)) {
             WireGauge(level: gaugeLevel(conversation))
-            Text(status.appName.uppercased())
-                .font(Wire.mono(10, .bold))
-                .foregroundColor(Wire.ink)
+            // The nameplate: who this is, the surface it is on, the model
+            // behind it — identity in one block, state in the instruments
+            // below. Every row reserves its height with a single space so
+            // the lamps sit level on both cards whatever is missing.
+            VStack(spacing: Wire.s(2)) {
+                Text(status.appName.uppercased())
+                    .font(Wire.mono(10, .bold))
+                    .foregroundColor(Wire.ink)
+                let surface = surfaceRow(status)
+                Text(surface.text)
+                    .foregroundColor(surface.diagnosis ? Wire.ink.opacity(0.75)
+                                                       : Wire.faint)
+                Text(modelRow(status))
+                    .foregroundColor(Wire.faint)
+            }
+            .font(Wire.mono(8.5))
+            .lineLimit(1)
+            .truncationMode(.tail)
             HStack(spacing: Wire.s(10)) {
                 WireSignalLamp(label: "RDY", lens: readyLens(status.state))
                 WireSignalLamp(label: "THINK",
@@ -515,15 +530,13 @@ struct WireframePanelView: View {
                                pulsing: conversation == .chatting)
                 WireSeal(sealed: conversation == .ended)
             }
-            VStack(spacing: Wire.s(2)) {
-                Text(primaryLine(status: status, conversation: conversation))
-                    .foregroundColor(Wire.ink.opacity(0.75))
-                Text(surfaceLine(status))
-                    .foregroundColor(Wire.faint)
-            }
-            .font(Wire.mono(8.5))
-            .lineLimit(1)
-            .truncationMode(.tail)
+            // The one transient with no lamp of its own: a held reply,
+            // captured but undelivered (in an uninterrupted run a side is
+            // never seen in .replied). Blank otherwise, height held.
+            Text(conversation == .replied ? conversation.rawValue : " ")
+                .foregroundColor(Wire.ink.opacity(0.75))
+                .font(Wire.mono(8.5))
+                .lineLimit(1)
         }
         .padding(Wire.s(10))
         .frame(maxWidth: .infinity)
@@ -575,21 +588,25 @@ struct WireframePanelView: View {
         }
     }
 
-    /// During a run the readiness scanner is off, so the line switches to
-    /// the live conversation state; idle it reports readiness.
-    private func primaryLine(status: SideStatus,
-                             conversation: ConversationStatus) -> String {
-        if controller.isRunning || conversation == .ended {
-            return conversation.rawValue
+    /// The nameplate's surface row doubles as the diagnosis while the side
+    /// is not relayable: a red lens conflates four failures whose remedies
+    /// differ — launch the app, open a chat window, grant Accessibility —
+    /// and a side in that state has no surface to name anyway. The
+    /// isRunning guard keeps a stale diagnosis off a card mid-run, when
+    /// the readiness scanner is paused.
+    private func surfaceRow(_ status: SideStatus) -> (text: String, diagnosis: Bool) {
+        if !controller.isRunning,
+           status.state == .notReady || status.state == .missing {
+            return (status.headline, true)
         }
-        return status.headline
+        return (status.surface ?? " ", false)
     }
 
-    /// A single space keeps the row height stable with nothing to show.
-    private func surfaceLine(_ status: SideStatus) -> String {
-        let line = [status.surface, status.model].compactMap { $0 }
-            .joined(separator: " \u{00B7} ")
-        return line.isEmpty ? " " : line
+    /// Model and effort as one plate ("5.6 Sol High", "Fable 5 Extra") —
+    /// the separator Readiness composes is for the skins that join surface
+    /// and model on a single line, and this card gives each its own row.
+    private func modelRow(_ status: SideStatus) -> String {
+        status.model?.replacingOccurrences(of: " \u{00B7} ", with: " ") ?? " "
     }
 
     private var centerDeck: some View {
