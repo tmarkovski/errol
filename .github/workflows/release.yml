@@ -247,13 +247,14 @@ jobs:
           done
           rm -f "$RUNNER_TEMP/updates/"*-dSYMs.zip
 
-          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$RUNNER_TEMP/ed_priv"
-          "$BIN/generate_appcast" \
-            --ed-key-file "$RUNNER_TEMP/ed_priv" \
+          # --ed-key-file - reads the key from stdin, so the private half is
+          # never written to the runner's disk where a later step, a cache
+          # action, or an uploaded artifact could pick it up.
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$BIN/generate_appcast" \
+            --ed-key-file - \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.marketing }}/" \
             --maximum-versions 5 \
             "$RUNNER_TEMP/updates"
-          rm -f "$RUNNER_TEMP/ed_priv"
           cp "$RUNNER_TEMP/updates/appcast.xml" dist/appcast.xml
           xmllint --noout dist/appcast.xml && echo "appcast well-formed"
 

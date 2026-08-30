@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Partial Info.plist: Sparkle's configuration only.
+
+	     GENERATE_INFOPLIST_FILE stays YES, so Xcode merges its generated keys
+	     (CFBundleIdentifier, CFBundleShortVersionString, CFBundleVersion,
+	     LSUIElement, LSMinimumSystemVersion, …) on top of this file. Do not
+	     add those here — they are driven by build settings, and the release
+	     workflow sets the two version numbers from the git tag and commit
+	     count. Duplicating them here would let them drift. -->
+
+	<!-- The update feed. Published only after a release passes its manual
+	     smoke test, so tagging a build never exposes it to installed copies. -->
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/tmarkovski/errol/main/appcast.xml</string>
+
+	<!-- The public half of the EdDSA pair that signs updates. Public by
+	     design: it belongs in the shipped bundle, and committing it is how
+	     every installed copy learns which signature to trust.
+
+	     The private half lives in the login keychain of the machine that ran
+	     generate_keys and must also reach CI as the SPARKLE_ED_PRIVATE_KEY
+	     secret. Sparkle refuses any update whose signature does not verify
+	     against this value, so losing the private key means no existing
+	     install can ever be updated again — changing this string strands
+	     everyone already running Errol. Treat it as permanent. -->
+	<key>SUPublicEDKey</key>
+	<string>runfNzlntZCRTXFw7Fje7Lxs/lM5RKVgbskZc/s4oIA=</string>
+
+	<!-- Check every six hours rather than the one-day default. Errol breaks
+	     when the apps it drives ship updates that move their accessibility
+	     trees, so a corrective release needs to reach people quickly. -->
+	<key>SUScheduledCheckInterval</key>
+	<integer>21600</integer>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+
+	<!-- Checking and downloading in the background is fine. Installing is not:
+	     a relay run owns the screen focus and the clipboard for minutes at a
+	     time, and an update that relaunched the app mid-run would destroy it.
+	     For v1 installation stays user-mediated, and UpdaterController holds
+	     back even the user-initiated path while a run is live. -->
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+
+	<!-- Off deliberately: no system profile is sent with update checks. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+
+	<!-- SUEnableInstallerLauncherService is intentionally absent. Sparkle
+	     documents that XPC service as being for sandboxed apps, and Errol is
+	     unsandboxed by necessity — a sandboxed build can neither hold the
+	     Accessibility grant nor post keystrokes. -->
+</dict>
+</plist>

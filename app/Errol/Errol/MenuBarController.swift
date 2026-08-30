@@ -62,11 +62,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// greets a first launch, when there is nothing to avoid deactivating.
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
+    /// Auto-update. Created at launch so background checks start immediately;
+    /// everything that could interrupt a run is gated inside it.
+    private var updater: UpdaterController!
+    /// Edge detection for the run-finished hook below. The observation
+    /// callback also fires once at launch, which is not a transition.
+    private var wasRunning = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // LSUIElement in the Info.plist already hides the Dock icon; this
         // keeps the behavior if the binary is ever run outside the bundle.
         NSApp.setActivationPolicy(.accessory)
+        updater = UpdaterController { [weak self] in self?.relay.isRunning ?? false }
         buildStatusItem()
         buildPanel()
         trackStatusIcon()
@@ -106,7 +113,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     @objc private func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
+            menu.autoenablesItems = false
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
+            let checkForUpdatesItem = menu.addItem(
+                withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+            checkForUpdatesItem.target = self
+            // Refused rather than queued during a run: queueing would only
+            // surface Sparkle's window later, at a moment nobody chose.
+            checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
             if let button = statusItem.button {
@@ -117,9 +131,21 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         togglePanel()
     }
 
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
     @objc private func quit() {
         relayControl.cancel()
         NSApp.terminate(nil)
+    }
+
+    /// Every termination path, not just the Quit item: logout, and Sparkle's
+    /// own install-on-quit. Cancelling is idempotent, so the Quit item having
+    /// already done it costs nothing.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if relay.isRunning { relayControl.cancel() }
+        return .terminateNow
     }
 
     // MARK: Panel
@@ -195,6 +221,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             rearm.run()
         }
         statusItem.button?.image = statusIcon(running: running)
+        // A run reaching idle is when the updater can release what it held
+        // back: a staged install, or an update it found but never presented.
+        if wasRunning, !running { updater?.relayDidFinish() }
+        wasRunning = running
     }
 
     private func trackPanelLayout() {
