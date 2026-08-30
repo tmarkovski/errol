@@ -38,6 +38,20 @@ struct AppSelectors {
     /// A window containing a button or text field with any of these labels is
     /// not a chat window (e.g. Claude Code session windows inside Claude Desktop).
     var windowExcludeLabels: [String] = []
+    /// Name of the option in the app's own world switcher that means "this
+    /// window is not a chat". Claude Desktop's top-level AXRadioGroup carries
+    /// "Chat and Cowork" and "Code" with AXValue 1 on the mounted world, and
+    /// appends live session state after a comma ("Code, awaiting your input"),
+    /// so the name is the part before that comma.
+    ///
+    /// This asks the app which world it is showing. windowExcludeLabels only
+    /// infer it from furniture that happens to sit around in one world and not
+    /// the other, which is fragile in both directions: a rename breaks the
+    /// match silently, and "Rewind to here" lives inside a message's
+    /// hover-gated action bar, so it is unmounted whenever no bar is expanded
+    /// and the very same Code session classifies as a chat. Both signals are
+    /// ORed rather than one replacing the other — see isExclusionMarker.
+    var excludedWorldName: String?
     /// Allow targeting an excluded-surface window that has a composer when
     /// the app has no chat window at all (e.g. Claude Desktop showing only a
     /// Claude Code session). An open chat window always wins.
@@ -152,10 +166,14 @@ struct Config {
         // (observed live, Aug 2026); the chat surface has no such trap but
         // the exclude is harmless there.
         sendExcludeKeywords: ["feedback"],
-        // Of these, only "Rewind to here" is present in current Claude Code
+        // The backstop under the world switcher below, for builds that have
+        // no switcher (the older multi-window layout) or that move it. Of
+        // these, only "Rewind to here" is present in current Claude Code
         // trees (Aug 2026); the terminal labels appear only with a terminal
         // pane open. Markers are ORed, so stale extras cost nothing.
         windowExcludeLabels: ["Terminal input", "New terminal", "Rewind to here"],
+        // The switcher's own name for the Claude Code world.
+        excludedWorldName: "Code",
         excludedSurfaceIsFallback: true,
         excludedSurfaceName: "Code",
         // Only paths whose display name differs from the capitalized path

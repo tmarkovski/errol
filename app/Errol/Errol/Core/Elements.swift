@@ -13,15 +13,44 @@ func axWindows(_ target: TargetApp) -> [AXUIElement] {
 
 // MARK: - Generic detection cores
 
+/// A world-switcher option's name, with the live session state the app
+/// appends after a comma stripped off ("Code, awaiting your input" -> "Code").
+func worldName(_ label: String) -> String {
+    (label.split(separator: ",", maxSplits: 1).first.map(String.init) ?? label)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+/// Whether this element marks its window as something other than a chat.
+///
+/// Two signals, ORed. The app's own world switcher is the direct one — the
+/// selected option states which world is mounted — and the furniture labels in
+/// windowExcludeLabels are the backstop for builds that predate the switcher
+/// or move it. ORing rather than letting the switcher overrule them keeps the
+/// asymmetry right: failing to recognize a Claude Code session means typing a
+/// relayed conversation into it, while a spurious exclusion only mislabels the
+/// surface and, where the fallback is on, still targets the window.
+///
+/// `role` is passed in because callers have already read it, and every AX
+/// attribute read is synchronous IPC into the other app.
+func isExclusionMarker<Node: ElementNode>(_ element: Node, role: String,
+                                          selectors: AppSelectors) -> Bool {
+    if role == kAXRadioButtonRole as String {
+        guard let world = selectors.excludedWorldName, element.numberValue == 1 else { return false }
+        return worldName(element.label).caseInsensitiveCompare(world) == .orderedSame
+    }
+    guard role == kAXButtonRole as String || role == kAXTextFieldRole as String,
+          !selectors.windowExcludeLabels.isEmpty else { return false }
+    let label = element.label
+    return selectors.windowExcludeLabels.contains { label.localizedCaseInsensitiveContains($0) }
+}
+
 func isExcludedWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> Bool {
-    guard !selectors.windowExcludeLabels.isEmpty else { return false }
+    guard selectors.excludedWorldName != nil || !selectors.windowExcludeLabels.isEmpty
+    else { return false }
     var hits: [Node] = []
     findAll(in: window, where: { el in
-        guard let role = el.role,
-              role == kAXButtonRole as String || role == kAXTextFieldRole as String
-        else { return false }
-        let label = el.label
-        return selectors.windowExcludeLabels.contains { label.localizedCaseInsensitiveContains($0) }
+        guard let role = el.role else { return false }
+        return isExclusionMarker(el, role: role, selectors: selectors)
     }, into: &hits)
     return !hits.isEmpty
 }

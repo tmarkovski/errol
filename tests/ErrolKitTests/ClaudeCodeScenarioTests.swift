@@ -1,10 +1,11 @@
 // Claude Code fixture scenarios: the fallback surface with hover-gated
-// action bars. Collapsed vs expanded matters twice over — the affordance
-// count leans on the collapsed "Show message actions" toggles, and the
-// window-exclusion marker ("Rewind to here") only exists while a bar is
-// expanded, which is the classification flap recorded in the README. Both
-// sides of that flap are pinned here; if either assertion moves, the flap
-// changed shape.
+// action bars. Collapsed vs expanded still matters for the affordance count,
+// which leans on the collapsed "Show message actions" toggles — but it no
+// longer moves the window's classification. It used to: the exclusion rested
+// on "Rewind to here", which lives inside an expanded action bar, so the same
+// Code session read as a chat window whenever no bar happened to be open.
+// Reading the world switcher instead settles it the same way in both states,
+// and these tests pin that agreement.
 
 import XCTest
 @testable import ErrolKit
@@ -20,10 +21,11 @@ final class ClaudeCodeScenarioTests: XCTestCase {
 
     func testCollapsedBarsCountTogglesAsAffordances() {
         let d = detectClaude("claude-code-collapsed")
-        // Flap, benign side: with every action bar collapsed the exclusion
-        // marker is unmounted, so the window classifies as a plain chat
-        // window and is chosen directly (harmless on the single-window build).
-        XCTAssertEqual(d.excluded, [false])
+        // Every action bar is collapsed, so no "Rewind to here" is mounted
+        // anywhere in this tree; the world switcher ("Code, idle", selected)
+        // is the only thing saying what this window is, and it is enough.
+        XCTAssertEqual(d.excluded, [true])
+        // Still targeted, through the excluded-surface fallback.
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertEqual(d.status.state, .ready)
         XCTAssertEqual(d.status.surface, "Code")
@@ -46,11 +48,12 @@ final class ClaudeCodeScenarioTests: XCTestCase {
 
     func testExpandedBarMountsCopyAndTheExclusionMarker() {
         let d = detectClaude("claude-code-expanded")
-        // Flap, other side: the expanded bar mounts "Rewind to here", so the
-        // same window now carries the exclusion marker...
+        // The expanded bar mounts "Rewind to here" on top of the switcher's
+        // "Code, awaiting your input" — two independent markers now, and the
+        // verdict matches the collapsed tree's above, which is the point.
         XCTAssertEqual(d.excluded, [true])
-        // ...and is still targeted, through the excluded-surface fallback
-        // (no chat window exists in this app).
+        // Still targeted, through the excluded-surface fallback (no chat
+        // window exists in this app).
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertEqual(d.status.state, .ready)
         XCTAssertEqual(d.status.surface, "Code")
@@ -64,6 +67,18 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         // "Awaiting input ...") must not read as stop, copy, or send.
         XCTAssertFalse(d.streaming)
         XCTAssertEqual(d.sendLabel, "Send")
+    }
+
+    func testClassificationSurvivesTheHoverState() {
+        // The regression this guards: whether a message's action bar happens
+        // to be expanded is a hover artifact, and it used to decide whether
+        // Errol saw a Claude Code session at all. On the older multi-window
+        // build that meant a collapsed Code window could be picked as the
+        // chat window and relayed into. All three trees are the same world.
+        for fixture in ["claude-code-collapsed", "claude-code-expanded",
+                        "claude-code-streaming"] {
+            XCTAssertEqual(detectClaude(fixture).excluded, [true], fixture)
+        }
     }
 
     func testStreamingShowsStopWhileEchoToggleCounts() {

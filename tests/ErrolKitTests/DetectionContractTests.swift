@@ -57,6 +57,68 @@ final class EchoAndAffordanceContractTests: XCTestCase {
     }
 }
 
+final class WorldSwitcherTests: XCTestCase {
+    let claude = config.claudeSelectors
+
+    /// A world-switcher option: the name arrives in AXDescription, and the
+    /// selected one carries AXValue 1.
+    private func world(_ description: String, selected: Bool) -> FixtureElement {
+        FixtureElement(role: "AXRadioButton", axDescription: description,
+                       value: .number(selected ? 1 : 0))
+    }
+
+    private func isMarker(_ element: FixtureElement) -> Bool {
+        isExclusionMarker(element, role: element.role ?? "", selectors: claude)
+    }
+
+    func testLiveSessionStateIsStrippedFromTheOptionName() {
+        // Claude appends the session's state to the Code option's description
+        // and, in at least one capture, to the chat option's too; all four
+        // spellings are live-observed in the fixtures.
+        XCTAssertEqual(worldName("Code"), "Code")
+        XCTAssertEqual(worldName("Code, idle"), "Code")
+        XCTAssertEqual(worldName("Code, awaiting your input"), "Code")
+        XCTAssertEqual(worldName("Chat and Cowork, awaiting your input"), "Chat and Cowork")
+    }
+
+    func testSelectedCodeWorldExcludesTheWindow() {
+        XCTAssertTrue(isMarker(world("Code, running", selected: true)))
+        XCTAssertTrue(isMarker(world("Code", selected: true)))
+    }
+
+    func testUnselectedCodeWorldDoesNot() {
+        // Both options are always mounted — only AXValue tells them apart, so
+        // matching on the label alone would exclude every Claude window.
+        XCTAssertFalse(isMarker(world("Code, idle", selected: false)))
+        XCTAssertFalse(isMarker(world("Chat and Cowork", selected: true)))
+    }
+
+    func testComposerSurfaceRadiosAreNotWorldOptions() {
+        // The Chat/Cowork pair sits at the composer, names itself in AXTitle
+        // rather than AXDescription, and must never read as a world.
+        XCTAssertFalse(isMarker(FixtureElement(role: "AXRadioButton", title: "Chat",
+                                               value: .number(1))))
+        XCTAssertFalse(isMarker(FixtureElement(role: "AXRadioButton", title: "Cowork",
+                                               value: .number(1))))
+    }
+
+    func testFurnitureMarkersStillExcludeOnTheirOwn() {
+        // The backstop for builds with no switcher: the old multi-window
+        // layout is classified entirely by these.
+        XCTAssertTrue(isMarker(FixtureElement(role: "AXButton",
+                                             axDescription: "Rewind to here")))
+        XCTAssertTrue(isMarker(FixtureElement(role: "AXTextField",
+                                             axDescription: "Terminal input")))
+        XCTAssertFalse(isMarker(FixtureElement(role: "AXButton", axDescription: "Copy")))
+    }
+
+    func testChatGPTHasNoWorldSwitcher() {
+        XCTAssertNil(config.chatgptSelectors.excludedWorldName)
+        XCTAssertFalse(isExclusionMarker(world("Code", selected: true), role: "AXRadioButton",
+                                         selectors: config.chatgptSelectors))
+    }
+}
+
 final class SendSelectorTests: XCTestCase {
     func testClaudeSendFeedbackTrap() {
         // Claude Code's "Send feedback" button matches the bare keyword;

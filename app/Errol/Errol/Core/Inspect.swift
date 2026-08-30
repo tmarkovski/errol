@@ -16,9 +16,15 @@ func inspectReport(_ target: TargetApp) -> String {
     for (index, window) in windows.enumerated() {
         let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? ""
         var status = ""
+        let isChosen = chosen.map { CFEqual(window, $0) } ?? false
         if isExcludedWindow(window, selectors: target.selectors) {
-            status = "  [excluded: not a chat window]"
-        } else if let chosen, CFEqual(window, chosen) {
+            // An excluded window can still be the target, through the
+            // no-chat-window fallback. Saying only that it was excluded reads
+            // as if nothing were chosen at all, which is the opposite of what
+            // this dump is consulted to find out.
+            status = isChosen ? "  [not a chat window, targeted anyway: no chat window open]"
+                              : "  [excluded: not a chat window]"
+        } else if isChosen {
             status = "  [chosen chat window]"
         }
         lines.append("\n-- Window \(index): \"\(title)\"\(status)")

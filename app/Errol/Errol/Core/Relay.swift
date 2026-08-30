@@ -173,7 +173,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? "untitled"
         log("\(target.name): targeting window \"\(title)\"")
         if isExcludedWindow(window, selectors: target.selectors) {
-            log("\(target.name): NOTE: no chat window is open; targeting a \(target.selectors.excludedSurfaceName ?? "non-chat") window instead. Everything relayed will land in that session.")
+            // Not a fault, and on the current single-window Claude Desktop not
+            // even unusual: the Code world replaces the chat inside the one
+            // window instead of opening beside it, so this fires on every run
+            // started while Code is up. Lead with what is being targeted; the
+            // absent chat is the reason for it, not the news.
+            log("\(target.name): NOTE: relaying into a \(target.selectors.excludedSurfaceName ?? "non-chat") session, since no chat conversation is open. Everything relayed lands in that session.")
         }
         if inputArea(in: target) == nil {
             log("ERROR: \(target.name): chat window has no composer text area.")

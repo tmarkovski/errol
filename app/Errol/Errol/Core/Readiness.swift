@@ -100,19 +100,19 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
     guard depth <= 80 else { return }
     let role = element.role ?? ""
 
+    // Shared with the relay's own window choice, rather than restated here:
+    // the strip must classify a window exactly the way chooseChatWindow will,
+    // and two copies of the rule drift.
+    if !scan.isExcluded, isExclusionMarker(element, role: role, selectors: selectors) {
+        scan.isExcluded = true
+    }
+
     if role == kAXTextAreaRole as String {
         scan.hasComposer = true
         if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
             let label = element.label
             scan.composerSurface = selectors.composerSurfaceNames
                 .first { label.contains($0.key) }?.value
-        }
-    } else if role == kAXButtonRole as String || role == kAXTextFieldRole as String {
-        if !scan.isExcluded, !selectors.windowExcludeLabels.isEmpty {
-            let label = element.label
-            if selectors.windowExcludeLabels.contains(where: { label.localizedCaseInsensitiveContains($0) }) {
-                scan.isExcluded = true
-            }
         }
     } else if role == kAXPopUpButtonRole as String {
         let wantsMode = scan.modeLabel == nil && selectors.modePopupPrefix != nil

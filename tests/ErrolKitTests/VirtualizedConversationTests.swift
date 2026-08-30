@@ -16,9 +16,10 @@ final class VirtualizedConversationScenarioTests: XCTestCase {
         let detection = detect(fixture: "claude-virtualized-conversation",
                                selectors: config.claudeSelectors, appName: "Claude")
         XCTAssertEqual(detection.windows.count, 1)
-        // A Claude Code session window ("Rewind to here" in a message action
-        // bar) with no chat window open: excluded, but targeted as the
-        // fallback — the surface the relay was deliberately run on.
+        // A Claude Code session window (the world switcher's "Code" option
+        // selected, and "Rewind to here" in an expanded message action bar)
+        // with no chat window open: excluded, but targeted as the fallback —
+        // the surface the relay was deliberately run on.
         XCTAssertEqual(detection.excluded, [true])
         XCTAssertEqual(detection.chosenIndex, 0)
         XCTAssertEqual(detection.status.surface, "Code")
