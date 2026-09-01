@@ -1,0 +1,583 @@
+<title>The Converged Composer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #f2f3f0;
+    --ink: #21251f;
+    --muted: #6d7268;
+    --hairline: #d8dad2;
+    --bench: #e7e9e2;
+    --bench-line: #d2d5ca;
+    --amber: #a06d14;
+    --frame-shadow: 0 18px 40px rgba(30, 34, 26, 0.14), 0 2px 8px rgba(30, 34, 26, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #171a17;
+      --ink: #e6e7e0;
+      --muted: #989c90;
+      --hairline: #31352e;
+      --bench: #1e221e;
+      --bench-line: #2b2f29;
+      --amber: #d8a13c;
+      --frame-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171a17;
+    --ink: #e6e7e0;
+    --muted: #989c90;
+    --hairline: #31352e;
+    --bench: #1e221e;
+    --bench-line: #2b2f29;
+    --amber: #d8a13c;
+    --frame-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 64px 24px 96px; }
+  .prose { max-width: 640px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: "Bricolage Grotesque", "Source Serif 4", serif;
+    font-size: clamp(38px, 6vw, 56px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: "Bricolage Grotesque", "Source Serif 4", serif;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 1em; }
+  ul { margin: 0 0 1em; padding-left: 1.2em; }
+  li { margin-bottom: 0.35em; }
+  .standfirst { font-size: 19px; }
+  .muted { color: var(--muted); }
+
+  section.direction { margin-top: 88px; }
+
+  .bench {
+    background: var(--bench);
+    border: 1px solid var(--bench-line);
+    border-radius: 18px;
+    padding: 44px 20px;
+    margin: 26px 0 14px;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+  }
+  .caption {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 22px;
+  }
+
+  .spec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px 28px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 18px;
+    max-width: 720px;
+  }
+  .spec dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin: 0 0 4px;
+  }
+  .spec dd { margin: 0; font-size: 15.5px; line-height: 1.55; }
+
+  .closing { margin-top: 96px; border-top: 1px solid var(--hairline); padding-top: 40px; }
+
+  /* ---------- shared mockup scaffolding ---------- */
+  .panel { width: 464px; flex: none; box-shadow: var(--frame-shadow); }
+  .panel, .panel * { box-sizing: border-box; }
+  .panel svg { display: block; }
+
+  /* ---------- Perch surface (from the skin studies) ---------- */
+  .per {
+    background: #fcfcfa;
+    border: 1px solid #e5e3dc;
+    border-radius: 18px;
+    padding: 16px 20px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    color: #2c2b27;
+  }
+  .per-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+  .per-mark { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; margin-right: auto; }
+  .per-ready {
+    font-size: 11px; font-weight: 500; color: #2f7d5b;
+    background: #e9f2ec; border-radius: 999px; padding: 3px 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .per-ready i { width: 6px; height: 6px; border-radius: 50%; background: #2f7d5b; display: inline-block; }
+  .per-ready.live { color: #a06d14; background: #f6efdd; }
+  .per-ready.live i { background: #d98e2b; }
+  .per-more { color: #8a887f; font-size: 15px; font-weight: 600; letter-spacing: 0.06em; line-height: 1; padding-bottom: 5px; }
+  .per-perches { display: flex; align-items: flex-start; }
+  .per-side { width: 132px; flex: none; text-align: center; }
+  .per-avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; color: #fff;
+    position: relative;
+  }
+  .per-avatar.g { background: #5d7a8c; }
+  .per-avatar.c { background: #c97e4a; }
+  .per-avatar i {
+    position: absolute; right: 1px; bottom: 1px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #43a373; border: 2px solid #fcfcfa;
+  }
+  .per-avatar i.talk { background: #d98e2b; }
+  .per-name { font-size: 13px; font-weight: 600; }
+  .per-sub { font-size: 11px; color: #8a887f; margin-top: 1px; }
+  .per-flight { flex: 1; align-self: center; padding: 0 6px; }
+  .per-turn { text-align: center; font-size: 11px; color: #8a887f; margin: 14px 0 16px; }
+  .per-turn b { color: #4b4a44; font-weight: 500; }
+  .per-composer { background: #f4f3ef; border-radius: 16px; padding: 12px 13px 11px; }
+  .per-text { font-size: 13.5px; line-height: 1.5; color: #a09d92; min-height: 44px; padding: 2px 2px 0; }
+  .per-text.typed { color: #2c2b27; }
+  .per-tools { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .per-hint { font-size: 11px; color: #a09d92; }
+  .per-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fcfcfa; border: 1px solid #e2e0d8; border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; font-weight: 500; color: #4b4a44;
+  }
+  .per-send {
+    margin-left: auto;
+    width: 37px; height: 37px; border-radius: 50%;
+    background: #d98e2b;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------- the converged pieces ---------- */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fcfcfa; border: 1px solid #e2e0d8; border-radius: 999px;
+    padding: 5px 11px; font-size: 12px; font-weight: 500; color: #4b4a44;
+  }
+  .pill.sel { background: #2c2b27; border-color: #2c2b27; color: #fcfcfa; }
+  .pill .glyph { font-size: 11px; line-height: 1; color: inherit; }
+  .preview {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-top: 8px;
+    background: #eceae2; border-radius: 10px;
+    padding: 7px 10px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; line-height: 1.5; color: #75726a;
+  }
+  .preview.amber { background: #f6efdd; color: #8a6412; }
+  .preview .edit { margin-left: auto; flex: none; color: #a09d92; }
+  .preview svg { flex: none; margin-top: 1px; }
+  .config-zone {
+    border-bottom: 1px solid #e6e4dc;
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+  }
+  .context-line {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 500; color: #8a887f;
+    padding: 1px 2px 8px;
+    border-bottom: 1px solid #e6e4dc;
+    margin-bottom: 8px;
+  }
+  .context-line .dot { color: #c9c6bc; }
+  .shelf { margin: 0 0 14px; }
+  .shelf .preview { background: #f4f3ef; }
+
+  /* ---------- wireframe surface ---------- */
+  .wir {
+    background: #f0f0ef;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 13px 16px 16px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    color: #333;
+  }
+  .wir-strip { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .wir-mark { font-size: 10px; font-weight: 600; letter-spacing: 0.28em; margin-right: auto; }
+  .wir-state { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: #858585; }
+  .wir-head { display: flex; gap: 10px; align-items: stretch; margin-bottom: 12px; }
+  .wir-card {
+    flex: 1; background: #f6f6f5; border: 1px solid #333; border-radius: 6px;
+    padding: 9px 8px 8px; text-align: center;
+  }
+  .wir-name { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; }
+  .wir-sub { font-size: 8.5px; color: #858585; letter-spacing: 0.08em; margin-top: 3px; }
+  .wir-deck { width: 108px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .wir-odo { border: 1px solid #333; border-radius: 4px; padding: 3px 10px; font-size: 14px; letter-spacing: 0.24em; background: #f6f6f5; }
+  .wir-tag { font-size: 8px; letter-spacing: 0.14em; color: #858585; }
+  .wir-well { background: #e2e2e0; border: 1px solid #333; border-radius: 6px; padding: 10px 11px 9px; }
+  .wir-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .wir-pill {
+    border: 1px solid #333; border-radius: 999px;
+    padding: 4px 10px; font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em;
+    color: #333; background: transparent;
+  }
+  .wir-pill.sel { background: #333; color: #f0f0ef; }
+  .wir-preview { font-size: 9px; line-height: 1.55; color: #858585; letter-spacing: 0.02em; margin-top: 8px; display: flex; gap: 7px; }
+  .wir-config { border-bottom: 1px solid #c6c6c3; padding-bottom: 9px; margin-bottom: 8px; }
+  .wir-preview .edit { margin-left: auto; flex: none; }
+  .wir-text { font-size: 11px; color: #858585; min-height: 36px; margin-top: 9px; }
+  .wir-tools { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+  .wir-chip { border: 1px solid #333; border-radius: 999px; padding: 4px 10px; font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em; color: #333; }
+  .wir-run {
+    margin-left: auto; width: 34px; height: 34px; border-radius: 50%;
+    background: #333; display: flex; align-items: center; justify-content: center;
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Errol · Chat Composer</p>
+  <h1>The Converged Composer</h1>
+  <div class="prose">
+    <p class="standfirst">Two explorations ran in parallel: the option studies in this directory (A, B, and the quick-type row of C) and the skin studies' Perch direction, alongside the composer that has since shipped in the wireframe skin. They agree on far more than they differ. This document merges them into one proposal and works the single open question — where the conversation shape lives — through in mockups.</p>
+    <p>The skeleton nobody disputes anymore: one composer is the command surface; a single primary action morphs with the run (Run → Pause → Send → Resume); run options are quiet configuration, not peers of Run; ending is demoted and deliberate; a finished run stays readable until New session clears it; steering begins by typing and holds the run at the next handoff, with precise copy about who is still finishing.</p>
+  </div>
+
+  <section class="direction">
+    <h2>Shapes on the composer</h2>
+    <div class="prose">
+      <p>Option C's move, wearing Perch's clothes. The quick row — Free chat, Brainstorm, Debate, More — sits as the composer's first line, styled as Perch chips with the selection inked in. Directly beneath it, the shape's instructions in a quiet mono band, with a pencil for a session-only edit. A hairline then closes the setup zone, giving the card an anatomy: the shape and its instructions above the line, your words below it, actions at the foot. The topic keeps the room; the options chip keeps the corner the skin studies gave it; the amber circle runs.</p>
+    </div>
+    <div class="bench">
+      <div class="panel per" role="img" aria-label="Converged idle state: quick shape pills and instruction preview at the top of the composer card">
+        <div class="per-strip">
+          <span class="per-mark">Errol</span>
+          <span class="per-ready"><i></i>Both ready</span>
+          <span class="per-more">···</span>
+        </div>
+        <div class="per-perches">
+          <div class="per-side">
+            <div class="per-avatar g">G<i></i></div>
+            <div class="per-name">ChatGPT</div>
+            <div class="per-sub">Chat · 5.6 Sol High</div>
+          </div>
+          <div class="per-flight">
+            <svg width="100%" height="44" viewBox="0 0 160 44" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M4 34 Q80 4 156 34" fill="none" stroke="#d5d2c8" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
+              <circle cx="80" cy="19" r="5" fill="#d98e2b"/>
+            </svg>
+          </div>
+          <div class="per-side">
+            <div class="per-avatar c">C<i></i></div>
+            <div class="per-name">Claude</div>
+            <div class="per-sub">Chat · Fable 5 Extra</div>
+          </div>
+        </div>
+        <div class="per-turn">Turn 0 · ChatGPT opens</div>
+        <div class="per-composer">
+          <div class="config-zone">
+          <div class="pill-row">
+            <span class="pill"><span class="glyph">○</span>Free chat</span>
+            <span class="pill sel">
+              <svg width="10" height="13" viewBox="0 0 10 13" aria-hidden="true"><path d="M5 .8a4.2 4.2 0 0 0-2.4 7.6c.5.4.8.9.8 1.4h3.2c0-.5.3-1 .8-1.4A4.2 4.2 0 0 0 5 .8z" fill="none" stroke="#fcfcfa" stroke-width="1.3"/><line x1="3.6" y1="11.4" x2="6.4" y2="11.4" stroke="#fcfcfa" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Brainstorm
+            </span>
+            <span class="pill"><span class="glyph">⇄</span>Debate</span>
+            <span class="pill"><span class="glyph">•••</span>More</span>
+          </div>
+          <div class="preview">
+            <svg width="10" height="13" viewBox="0 0 10 13" aria-hidden="true"><path d="M5 .8a4.2 4.2 0 0 0-2.4 7.6c.5.4.8.9.8 1.4h3.2c0-.5.3-1 .8-1.4A4.2 4.2 0 0 0 5 .8z" fill="none" stroke="#75726a" stroke-width="1.3"/><line x1="3.6" y1="11.4" x2="6.4" y2="11.4" stroke="#75726a" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span>Diverge for at least three rounds, build on each other's ideas, then converge on a shortlist.</span>
+            <span class="edit">✎</span>
+          </div>
+          </div>
+          <div class="per-text">What should we brainstorm about?</div>
+          <div class="per-tools">
+            <span class="per-chip">
+              <svg width="11" height="9" viewBox="0 0 11 9" aria-hidden="true"><g stroke="#4b4a44" stroke-width="1.4" stroke-linecap="round"><line x1="1" y1="1.5" x2="10" y2="1.5"/><line x1="1" y1="4.5" x2="10" y2="4.5"/><line x1="1" y1="7.5" x2="10" y2="7.5"/></g><g fill="#4b4a44"><circle cx="7.5" cy="1.5" r="1.5"/><circle cx="3.5" cy="4.5" r="1.5"/><circle cx="6" cy="7.5" r="1.5"/></g></svg>
+              10 turns
+              <svg width="8" height="6" viewBox="0 0 8 6" aria-hidden="true"><path d="M1 1l3 3 3-3" fill="none" stroke="#8a887f" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </span>
+            <span class="per-send" aria-label="Run">
+              <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden="true"><path d="M2.5 1.5l9 5.5-9 5.5z" fill="#fff"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">1 · Idle — pills and preview as the composer's first two lines (recommended)</p>
+    <div class="prose">
+      <p>The argument for this placement: the pills are input. Selecting Brainstorm changes the message that will be typed into the opener, so the control belongs on the surface that composes that message — while everything above the card stays observational. The hairline gives it the separation the shelf promises without the distance: the options are visibly a different zone from your text, but the card is still one object. And the anatomy survives the run — mid-run, the setup zone swaps for a one-line context row above the same hairline, so the card keeps its shape while nothing else moves. It is also the arrangement Option C already proved, so both explorations land on it without contortion.</p>
+    </div>
+  </section>
+
+  <section class="direction">
+    <h2>Shapes on a shelf</h2>
+    <div class="prose">
+      <p>The literal reading of "up top": the pill row leaves the card and becomes its own shelf between the instruments and the composer, with the preview hanging from it. The shape reads as a session mode — closer to a segmented control — and the composer card is pure input, the most chat-app version of the panel.</p>
+    </div>
+    <div class="bench">
+      <div class="panel per" role="img" aria-label="Alternative idle state: shape pills on their own shelf above the composer card">
+        <div class="per-strip">
+          <span class="per-mark">Errol</span>
+          <span class="per-ready"><i></i>Both ready</span>
+          <span class="per-more">···</span>
+        </div>
+        <div class="per-perches">
+          <div class="per-side">
+            <div class="per-avatar g">G<i></i></div>
+            <div class="per-name">ChatGPT</div>
+            <div class="per-sub">Chat · 5.6 Sol High</div>
+          </div>
+          <div class="per-flight">
+            <svg width="100%" height="44" viewBox="0 0 160 44" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M4 34 Q80 4 156 34" fill="none" stroke="#d5d2c8" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
+              <circle cx="80" cy="19" r="5" fill="#d98e2b"/>
+            </svg>
+          </div>
+          <div class="per-side">
+            <div class="per-avatar c">C<i></i></div>
+            <div class="per-name">Claude</div>
+            <div class="per-sub">Chat · Fable 5 Extra</div>
+          </div>
+        </div>
+        <div class="per-turn">Turn 0 · ChatGPT opens</div>
+        <div class="shelf">
+          <div class="pill-row">
+            <span class="pill"><span class="glyph">○</span>Free chat</span>
+            <span class="pill sel">
+              <svg width="10" height="13" viewBox="0 0 10 13" aria-hidden="true"><path d="M5 .8a4.2 4.2 0 0 0-2.4 7.6c.5.4.8.9.8 1.4h3.2c0-.5.3-1 .8-1.4A4.2 4.2 0 0 0 5 .8z" fill="none" stroke="#fcfcfa" stroke-width="1.3"/><line x1="3.6" y1="11.4" x2="6.4" y2="11.4" stroke="#fcfcfa" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Brainstorm
+            </span>
+            <span class="pill"><span class="glyph">⇄</span>Debate</span>
+            <span class="pill"><span class="glyph">•••</span>More</span>
+          </div>
+          <div class="preview">
+            <span>Diverge for at least three rounds, build on each other's ideas, then converge on a shortlist.</span>
+            <span class="edit">✎</span>
+          </div>
+        </div>
+        <div class="per-composer">
+          <div class="per-text">What should we brainstorm about?</div>
+          <div class="per-tools">
+            <span class="per-chip">
+              <svg width="11" height="9" viewBox="0 0 11 9" aria-hidden="true"><g stroke="#4b4a44" stroke-width="1.4" stroke-linecap="round"><line x1="1" y1="1.5" x2="10" y2="1.5"/><line x1="1" y1="4.5" x2="10" y2="4.5"/><line x1="1" y1="7.5" x2="10" y2="7.5"/></g><g fill="#4b4a44"><circle cx="7.5" cy="1.5" r="1.5"/><circle cx="3.5" cy="4.5" r="1.5"/><circle cx="6" cy="7.5" r="1.5"/></g></svg>
+              10 turns
+              <svg width="8" height="6" viewBox="0 0 8 6" aria-hidden="true"><path d="M1 1l3 3 3-3" fill="none" stroke="#8a887f" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </span>
+            <span class="per-send" aria-label="Run">
+              <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden="true"><path d="M2.5 1.5l9 5.5-9 5.5z" fill="#fff"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">2 · Idle — pills as a shelf between instruments and composer</p>
+    <div class="prose">
+      <p>It reads beautifully idle, but the shelf has no good home once a run starts: either it collapses (the panel's height jumps twice per session) or it lingers as disabled chrome between the live instruments and the steer field. And it separates the instructions from the field they configure by a card boundary. Worth seeing; not the one I'd build.</p>
+    </div>
+  </section>
+
+  <section class="direction">
+    <h2>Mid-run</h2>
+    <div class="prose">
+      <p>The collapse that placement 1 buys: the pill row and preview fold into one context line above the same hairline, everything else stays put. The composer invites a direction — typing is steering, no button — and the primary circle is now Pause. End session moves to the ··· menu, per the option studies; Pause is the safety action a panicked hand should hit.</p>
+    </div>
+    <div class="bench">
+      <div class="panel per" role="img" aria-label="Running state: pills collapsed to a context line, composer inviting a steering note, pause as the primary action">
+        <div class="per-strip">
+          <span class="per-mark">Errol</span>
+          <span class="per-ready live"><i></i>Running</span>
+          <span class="per-more">···</span>
+        </div>
+        <div class="per-perches">
+          <div class="per-side">
+            <div class="per-avatar g">G<i></i></div>
+            <div class="per-name">ChatGPT</div>
+            <div class="per-sub">Waiting</div>
+          </div>
+          <div class="per-flight">
+            <svg width="100%" height="44" viewBox="0 0 160 44" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M4 34 Q80 4 156 34" fill="none" stroke="#d5d2c8" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
+              <circle cx="122" cy="12" r="5" fill="#d98e2b"/>
+              <path d="M130 11l7 2-7 2 1.5-2z" fill="#d98e2b"/>
+            </svg>
+          </div>
+          <div class="per-side">
+            <div class="per-avatar c">C<i class="talk"></i></div>
+            <div class="per-name">Claude</div>
+            <div class="per-sub">Replying…</div>
+          </div>
+        </div>
+        <div class="per-turn"><b>Turn 4</b> · Claude is replying</div>
+        <div class="per-composer">
+          <div class="context-line">
+            <svg width="10" height="13" viewBox="0 0 10 13" aria-hidden="true"><path d="M5 .8a4.2 4.2 0 0 0-2.4 7.6c.5.4.8.9.8 1.4h3.2c0-.5.3-1 .8-1.4A4.2 4.2 0 0 0 5 .8z" fill="none" stroke="#8a887f" stroke-width="1.3"/><line x1="3.6" y1="11.4" x2="6.4" y2="11.4" stroke="#8a887f" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Brainstorm <span class="dot">·</span> 10 turns <span class="dot">·</span> Tile
+          </div>
+          <div class="per-text">Add a direction while they work…</div>
+          <div class="per-tools">
+            <span class="per-hint">Typing pauses at the next handoff</span>
+            <span class="per-send" aria-label="Pause">
+              <svg width="12" height="13" viewBox="0 0 12 13" aria-hidden="true"><g fill="#fff"><rect x="1.5" y="1" width="3.2" height="11" rx="1.1"/><rect x="7.3" y="1" width="3.2" height="11" rx="1.1"/></g></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">3 · Running — context line, open steer field, pause primary</p>
+
+    <div class="bench">
+      <div class="panel per" role="img" aria-label="Steering state: typed note, amber status band reporting the pending pause, send as the primary action">
+        <div class="per-strip">
+          <span class="per-mark">Errol</span>
+          <span class="per-ready live"><i></i>Pausing</span>
+          <span class="per-more">···</span>
+        </div>
+        <div class="per-perches">
+          <div class="per-side">
+            <div class="per-avatar g">G<i></i></div>
+            <div class="per-name">ChatGPT</div>
+            <div class="per-sub">Waiting</div>
+          </div>
+          <div class="per-flight">
+            <svg width="100%" height="44" viewBox="0 0 160 44" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M4 34 Q80 4 156 34" fill="none" stroke="#d5d2c8" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/>
+              <circle cx="122" cy="12" r="5" fill="#d98e2b"/>
+            </svg>
+          </div>
+          <div class="per-side">
+            <div class="per-avatar c">C<i class="talk"></i></div>
+            <div class="per-name">Claude</div>
+            <div class="per-sub">Finishing…</div>
+          </div>
+        </div>
+        <div class="per-turn"><b>Turn 4</b> · Will pause after Claude finishes</div>
+        <div class="per-composer">
+          <div class="config-zone">
+          <div class="preview amber" style="margin-top:0;">
+            <span>Holding at the next handoff — your note goes to ChatGPT with the reply.</span>
+          </div>
+          </div>
+          <div class="per-text typed">Push on the pricing question before you wrap up.</div>
+          <div class="per-tools">
+            <span class="per-hint">Esc clears the note and resumes</span>
+            <span class="per-send" aria-label="Send direction">
+              <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><path d="M6 13V2.5M2 6l4-4 4 4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">4 · Steering — precise copy about who is finishing; send rides the handoff</p>
+    <div class="prose">
+      <p>The shipped composer already behaves this way underneath — typing begins the steer and the hold, erasing cancels it, a hand-paused run stays paused after the note is sent. What the convergence adds is the copy discipline from the option studies ("Will pause after Claude finishes" instead of a bare "Paused") and the context line keeping the shape and options readable without their controls.</p>
+    </div>
+  </section>
+
+  <section class="direction">
+    <h2>The wireframe wears it too</h2>
+    <div class="prose">
+      <p>The convergence is placement and behavior, not palette. The same arrangement in today's production skin: pills as inked capsules, the preview in the well's mono voice, the options chip and the filled circle exactly where the wireframe composer already has them.</p>
+    </div>
+    <div class="bench">
+      <div class="panel wir" role="img" aria-label="The converged layout rendered in the wireframe skin's gray mono idiom">
+        <div class="wir-strip">
+          <span class="wir-mark">ERROL</span>
+          <span class="wir-state">READY</span>
+          <span class="per-more" style="color:#858585;">···</span>
+        </div>
+        <div class="wir-head">
+          <div class="wir-card">
+            <div class="wir-name">CHATGPT</div>
+            <div class="wir-sub">READY · CHAT</div>
+          </div>
+          <div class="wir-deck">
+            <div class="wir-odo">00</div>
+            <div class="wir-tag">CHATGPT OPENS</div>
+          </div>
+          <div class="wir-card">
+            <div class="wir-name">CLAUDE</div>
+            <div class="wir-sub">READY · COWORK</div>
+          </div>
+        </div>
+        <div class="wir-well">
+          <div class="wir-config">
+          <div class="wir-pills">
+            <span class="wir-pill">FREE CHAT</span>
+            <span class="wir-pill sel">BRAINSTORM</span>
+            <span class="wir-pill">DEBATE</span>
+            <span class="wir-pill">MORE ▾</span>
+          </div>
+          <div class="wir-preview">
+            <span>DIVERGE FOR THREE ROUNDS, BUILD ON EACH OTHER'S IDEAS, THEN CONVERGE ON A SHORTLIST.</span>
+            <span class="edit">✎</span>
+          </div>
+          </div>
+          <div class="wir-text">What should we brainstorm about?</div>
+          <div class="wir-tools">
+            <span class="wir-chip">10 TURNS ▾</span>
+            <span class="wir-run" aria-label="Run">
+              <svg width="11" height="12" viewBox="0 0 13 14" aria-hidden="true"><path d="M2.5 1.5l9 5.5-9 5.5z" fill="#f0f0ef"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">5 · The same layout in the wireframe idiom — a contained code change, not a redesign</p>
+  </section>
+
+  <section class="closing">
+    <h2>Recommendation</h2>
+    <div class="prose">
+      <p>Build placement 1: the pill row and instruction preview as the composer's first two lines, the options chip staying in the toolbar corner. Brainstorm does move up top, as suspected — but attached to the composer rather than floating above it, because the shape is part of the message, not part of the instruments. Free chat joins as the first-class default; the More menu owns the rest of the collection plus the two editing paths ("Customize for this session" via the pencil, "Manage conversation types…" to Settings).</p>
+      <p>In the wireframe skin this is a contained change to the composer card — the pill row replaces the toolbar's shape chip, the preview line is new, and everything underneath (typing-to-steer, the morphing primary, the run clock and New session) is already shipped. If Perch graduates from study to skin, it starts as a new panel style beside the wireframe and inherits the same layout.</p>
+    </div>
+    <dl class="spec">
+      <div>
+        <dt>From Option C</dt>
+        <dd>The quick row with Free chat first, the visible instruction preview beneath it, More as overflow into the full collection.</dd>
+      </div>
+      <div>
+        <dt>From Perch</dt>
+        <dd>The surface language — soft neutrals, chip styling, avatars and flight path, one amber primary that carries every state.</dd>
+      </div>
+      <div>
+        <dt>From the shipped composer</dt>
+        <dd>Typing-to-steer with the steer-owned pause, the morphing primary circle, run stats that persist until New session.</dd>
+      </div>
+      <div>
+        <dt>From Options A/B</dt>
+        <dd>Precise status copy over generic labels, End session demoted to the overflow menu, options as configuration that never competes with Run.</dd>
+      </div>
+    </dl>
+    <div class="prose" style="margin-top:28px;">
+      <p class="muted">Still open, deliberately: whether the quick set is fixed or learns from use (start fixed); whether the preview expands inline or in a popover (start with two lines and a popover); and how much of the instrument head survives in Perch (the wireframe keeps its own).</p>
+    </div>
+  </section>
+</div>

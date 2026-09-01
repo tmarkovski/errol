@@ -14,6 +14,31 @@ Open the standalone interactive studies in a browser:
 - [Option A — Modern composer](option-a-modern-composer.html)
 - [Option B — Modern instrument](option-b-modern-instrument.html)
 - [Option C — Quick conversation types](option-c-quick-conversation-types.html)
+- [The converged composer](converged-composer.html) — the merged proposal
+
+## Converged proposal
+
+[converged-composer.html](converged-composer.html) merges these options with the
+Perch direction from the separate skin studies and with the composer that has
+since shipped in the wireframe skin. Its recommendation:
+
+- Option C's quick row (Free chat, Brainstorm, Debate, More) and the visible
+  instruction preview become the composer's first two lines, rendered in
+  Perch's surface language. The pills are input — they change the message that
+  will be sent — so they live on the composing surface, not above it.
+- The turn-limit chip stays in the composer toolbar; run options remain
+  configuration and never compete with the primary action.
+- End session moves to the session overflow menu; Pause is the safety action.
+- Typing-to-steer (no Steer button) is retained from the shipped
+  implementation, with this document's precise status copy ("Will pause after
+  Claude finishes") adopted for the hold.
+- The document includes the same arrangement rendered in the current wireframe
+  skin, where it is a contained change to the existing composer card.
+
+An alternative placement — the pill row as its own shelf between the
+instruments and the composer — is mocked and argued against: the shelf has no
+good home mid-run, and it separates the instructions from the field they
+configure.
 
 All three studies include controls at the top for switching among the four
 principal states: before a run, running, steering/pausing, and complete. Their
