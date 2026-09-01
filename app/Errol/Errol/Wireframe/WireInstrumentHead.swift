@@ -35,7 +35,8 @@ struct WireInstrumentHead: View {
     private func participant(_ speaker: Speaker, status: SideStatus,
                              conversation: ConversationStatus) -> some View {
         VStack(spacing: Wire.s(8)) {
-            WireGauge(level: gaugeLevel(conversation))
+            WireGauge(level: gaugeLevel(conversation),
+                      driven: conversation == .chatting)
             // The nameplate: who this is and what it is showing, then the
             // model behind it — identity in two rows, state in the
             // instruments below. Both rows reserve their height whatever is
@@ -190,6 +191,10 @@ struct WireInstrumentHead: View {
         }
     }
 
+    /// Where the needle rests. Composing, it is also knocked about that
+    /// rest by the beat its own card's border is playing, so the gauge
+    /// carries the working state on its own rather than only agreeing with
+    /// the outline around it.
     private func gaugeLevel(_ conversation: ConversationStatus) -> Double {
         switch conversation {
         case .chatting: 0.72

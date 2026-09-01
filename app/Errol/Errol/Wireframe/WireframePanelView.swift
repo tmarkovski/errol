@@ -7,7 +7,8 @@
 // while a side composes; everything they say is still said in words on the
 // nameplate below them, so the rule holds. The working side's card keeps
 // the palette and spends motion instead: its border is played like a
-// speaker, thumping and throwing rings on an irregular beat, so the busy
+// speaker, thumping and throwing rings on an irregular beat, and the gauge
+// above it is knocked about its reading by those same hits, so the busy
 // actor is the one thing on the panel that moves. The panel window is
 // borderless (MenuBarController), so the paper card this view paints is
 // the panel's own edge.
@@ -31,11 +32,13 @@
 // WireRunControls, WireSteeringEditor, and WireLogWell. The instruments
 // those rows are built from — the courier, the gauge and odometer, the
 // lamps, the speaker border, the button — each have their own file, named
-// for the part. A part more than one file builds on had to give up its
-// private marker to move out here, and the Wire prefix stands in for what
-// that marker was doing; a part only its own file builds on — the lamp
-// face behind the signal lamps, the beat track behind the speaker border,
-// the digit wheel behind the odometer — still has it.
+// for the part, and so does the one thing that is not drawn at all: the
+// beat two of those instruments play to (WireRhythm). A part more than one
+// file builds on had to give up its private marker to move out here, and
+// the Wire prefix stands in for what that marker was doing; a part only
+// its own file builds on — the lamp face behind the signal lamps, the
+// needle and the face behind the gauge, the digit wheel behind the
+// odometer — still has it.
 
 import SwiftUI
 

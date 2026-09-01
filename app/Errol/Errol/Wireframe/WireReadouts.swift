@@ -5,7 +5,98 @@
 import SwiftUI
 
 /// A half-circle gauge; the needle rises while that side is composing.
+/// `driven` then knocks it about that reading on the beat the card's border
+/// is playing (WireRhythm), so the pair reads as one instrument under load
+/// rather than as a moving outline around a value someone set by hand.
 struct WireGauge: View {
+    var level: Double
+    var driven = false
+
+    var body: some View {
+        WireSweptGauge(reading: level, driven: driven)
+            .animation(Self.sweep, value: level)
+    }
+
+    /// How the needle crosses to a new reading when the turn changes hands.
+    /// A spring rather than the eased curves the rest of the panel moves
+    /// on, because this is the one instrument that has already been given
+    /// weight: a needle that slid to its new angle at an even speed and
+    /// stopped dead there would hand that weight straight back. It rings at
+    /// about the rate a hit rings it (WireRhythm), since it is the same
+    /// needle, but damped far harder — a tap is small enough that a little
+    /// hunting reads as a live instrument, while a swing across half the
+    /// dial that hunted would read as one that cannot make up its mind.
+    ///
+    /// Nothing sweeps on the first draw, which is what `value:` buys: a
+    /// panel opening on a needle winding up to its reading would be the
+    /// instrument announcing itself, and every other part of this skin
+    /// stays still until it has something to say.
+    private static let sweep = Animation.spring(response: 0.34, dampingFraction: 0.72)
+}
+
+/// The reading, which is the part that sweeps. SwiftUI interpolates
+/// `animatableData` across a handoff, so the gauge is handed readings part
+/// way between the old and the new and simply draws them. The wobble is
+/// deliberately not part of that: it sits on top, taken fresh each frame,
+/// so a needle crossing to a new reading while being knocked about on the
+/// way does both at once instead of one smearing the other.
+private struct WireSweptGauge: View, Animatable {
+    var reading: Double
+    var driven: Bool
+
+    var animatableData: Double {
+        get { reading }
+        set { reading = newValue }
+    }
+
+    var body: some View {
+        if driven {
+            WireKnockedNeedle(reading: reading)
+        } else {
+            WireGaugeFace(level: reading)
+        }
+    }
+}
+
+/// The needle while the side is composing. Like the pulsing bulb and the
+/// speaker border, it owns its frame clock in a child that exists only
+/// while there is something to show, so nothing is animating on an idle
+/// panel — and it stamps its start in the same update that mounts the
+/// border, which is the whole of what keeps the two in phase.
+private struct WireKnockedNeedle: View {
+    var reading: Double
+
+    @State private var started = Date()
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            WireGaugeFace(level: reading + swing(at: timeline.date))
+        }
+    }
+
+    /// Where the needle is sitting relative to its reading: every hit still
+    /// sounding, summed. They stack the way the cone's do, so a needle
+    /// caught mid-swing by the next beat is carried further than either hit
+    /// would have taken it alone.
+    private func swing(at now: Date) -> Double {
+        let elapsed = now.timeIntervalSince(started)
+        var swing = 0.0
+        for beat in WireBeatTrack.beats {
+            guard let age = WireBeatTrack.age(of: beat, elapsed: elapsed) else { continue }
+            swing += beat.velocity * WireBeatTrack.knock(age)
+        }
+        return swing * Self.travel
+    }
+
+    /// What a full-velocity hit is worth as a share of the scale — about
+    /// sixteen degrees of the gauge's half circle. Far enough to read as
+    /// movement from as far back as the lamps do, near enough that the
+    /// needle still plainly reads its value while it wobbles.
+    private static let travel = 0.09
+}
+
+/// The drawn face, at whatever angle the needle is reading this frame.
+private struct WireGaugeFace: View {
     var level: Double
 
     var body: some View {
@@ -27,6 +118,9 @@ struct WireGauge: View {
                                          y: c.y + sin(a) * (r - Wire.s(2))))
                 ctx.stroke(tick, with: .color(Wire.faint.opacity(0.7)), lineWidth: Wire.s(1))
             }
+            // The clamp is the needle's end stops: the swing a driven gauge
+            // adds is a share of the scale on top of a reading, so this is
+            // what keeps it on the dial however the two come out.
             let a = Angle.degrees(180 + 180 * min(max(level, 0), 1)).radians
             var hand = Path()
             hand.move(to: c)
