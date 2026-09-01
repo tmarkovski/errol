@@ -3,7 +3,7 @@
 Status: design exploration, September 1, 2026. These files are reference
 material, not production UI and not part of the app build.
 
-This directory records two related proposals for reconciling Errol's
+This directory records three related proposals for reconciling Errol's
 conversation setup, prompt, run controls, steering, and session lifecycle.
 They were developed while the production wireframe UI was being restructured,
 so the proposals describe behavior and visual hierarchy without prescribing the
@@ -13,10 +13,11 @@ Open the standalone interactive studies in a browser:
 
 - [Option A — Modern composer](option-a-modern-composer.html)
 - [Option B — Modern instrument](option-b-modern-instrument.html)
+- [Option C — Quick conversation types](option-c-quick-conversation-types.html)
 
-Both studies include controls at the top for switching among the four principal
-states: before a run, running, steering/pausing, and complete. Their menus and
-primary actions are also interactive.
+All three studies include controls at the top for switching among the four
+principal states: before a run, running, steering/pausing, and complete. Their
+menus and primary actions are also interactive.
 
 ## Shared interaction model
 
@@ -172,15 +173,56 @@ its own lamp, label, or bezel. The final design should retain only information
 that helps answer: Are both sides ready? Who is working? Where is the handoff?
 What turn is this? Is the run paused or ending?
 
+## Option C — Quick conversation types
+
+Option C keeps Option A's calm participant area and composer but replaces the
+conversation-type dropdown with a one-click row of frequently used shapes.
+
+The default row contains **Free chat**, **Brainstorm**, **Debate**, and
+**More**. Free chat adds no preset structure. Brainstorm and Debate apply their
+instruction sets immediately. More opens the full list, including Code review,
+Adversary, Interview, Custom, and the route to edit saved conversation types.
+
+When a shape selected through More is active, its name replaces the word
+`More` in the row. This keeps the current selection visible without permanently
+allocating space to every possible shape.
+
+### States
+
+| State | Type selector | Composer |
+| --- | --- | --- |
+| Before run | The most common shapes are directly selectable; More reveals the remaining list. | The selected shape's instruction preview and the topic are visible. |
+| Running | The shape row and instruction detail collapse. | The field invites optional direction and Pause is the prominent action. |
+| Steer / pause | The selected shape remains session context but is not editable mid-run. | The composer becomes the same amber-accented steering field as Option A. |
+| Complete | The selector remains collapsed. | Completion summary offers New session and transcript access. |
+
+### Strengths
+
+- Reduces the most common shape selection to one click.
+- Makes Free chat a clear, first-class alternative to structured conversations.
+- Teaches the available conversation shapes without requiring menu discovery.
+- Scales to user-created shapes through More while keeping the composer calm.
+
+### Risk
+
+The quick row consumes more horizontal space and implies a product-level
+ranking of conversation shapes. The visible set and order therefore need a
+stable rule. On narrow layouts the row should wrap cleanly rather than shrink
+labels or become a horizontal scroller.
+
 ## Reconciliation direction
 
 The most promising unified direction is Option A's composer and control
-hierarchy attached to a simplified version of Option B's instrument head.
+hierarchy, Option C's quick type selector, and a simplified version of Option
+B's instrument head.
 
 - Preserve the warm neutral palette, restrained green/amber signals, gauges,
   route, and turn counter from Option B.
-- Preserve Option A's instruction preview, conversation-type menu, compact run
-  options, morphing primary action, session overflow, and completion flow.
+- Preserve Option A's instruction preview, compact run options, morphing
+  primary action, session overflow, and completion flow.
+- Use Option C's Free chat / Brainstorm / Debate / More row when the available
+  width can support it; the More menu owns the complete collection and template
+  management.
 - Keep participant identity and readiness in the instrument; avoid duplicating
   them as a second pair of status cards.
 - During a run, collapse the instruction preview but keep the composer itself
@@ -195,6 +237,10 @@ hierarchy attached to a simplified version of Option B's instrument head.
   template on first use.
 - Whether selecting the active conversation type opens an inline session edit
   before sending the user to Settings.
+- Whether the visible quick types are fixed product defaults, user-pinnable, or
+  determined by recent use; the proposal currently assumes fixed defaults.
+- How a shape selected from More stays represented when the row wraps at narrow
+  widths.
 - How small the instrument head can become during a run while keeping the turn
   counter and active-side signal useful.
 - Whether the first-speaker control remains in the composer or is selected by
