@@ -6,10 +6,10 @@
 // chrome, sizing, and state through every switch for no testing benefit.
 //
 // The window chrome follows the skin (MenuBarController.buildPanel):
-// classic gets the original titled utility panel; glass and wireframe get
-// a borderless transparent panel — glass so Liquid Glass can sample the
-// desktop behind it, wireframe so the paper instrument card it paints is
-// the panel's own edge.
+// classic gets the original titled utility panel; glass gets a borderless
+// transparent panel, so Liquid Glass can sample the desktop behind it;
+// wireframe gets a titled one that draws none of its chrome, so the paper
+// instrument card fills the window and the real close button sits on it.
 
 import SwiftUI
 
@@ -40,19 +40,21 @@ enum PanelLayout {
                                        : (fullPrompt ? 570 : 470))
             }
         case .wireframe:
-            // Derived from the card the skin draws (WireframeMetrics), so
-            // rescaling the instrument moves the window with it. The head
-            // unit grows a row while the steering editor is open; expanded,
-            // the fixed card lends the editor the log's room instead.
-            compact ? (steering ? WireframeMetrics.compactSteeringPanel
-                                : WireframeMetrics.compactPanel)
-                    : WireframeMetrics.expandedPanel
+            // Only the opening size. The wireframe card is content-sized
+            // and reports its real size as it lays out; the shell fits the
+            // window to that (MenuBarController.fitPanel), so no layout
+            // table exists for this skin.
+            WireframeMetrics.initialPanel
         }
     }
 }
 
 struct PanelRootView: View {
     let controller: RelayController
+    /// Wireframe only: the content-sized card reports its size here so the
+    /// shell can fit the window to it. The other skins size through
+    /// PanelLayout and never call it.
+    var onWireframeCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
         switch activePanelStyle {
@@ -61,7 +63,8 @@ struct PanelRootView: View {
         case .classic:
             ControlPanelView(controller: controller)
         case .wireframe:
-            WireframePanelView(controller: controller)
+            WireframePanelView(controller: controller,
+                               onCardResize: onWireframeCardResize)
         }
     }
 }

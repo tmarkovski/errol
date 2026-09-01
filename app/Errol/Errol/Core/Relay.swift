@@ -217,7 +217,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
             break
         }
         guard let reply = copyLastResponse(from: speaker) else {
-            log("Stopping: could not copy response from \(speaker.name).")
+            log("Stopping: could not copy response from \(speaker.name) after a retry.")
             break
         }
 

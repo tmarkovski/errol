@@ -116,6 +116,13 @@ struct GrowingTextEditor: NSViewRepresentable {
 /// Draws a hint in NSTextView's extra line fragment — the insertion line
 /// after the template body — without adding those characters to its storage.
 private final class TrailingPlaceholderTextView: NSTextView {
+    /// A real NSView inside the panel, so the hosting view's claim on the
+    /// first click (FirstMouseHostingView) does not cover it: AppKit asks the
+    /// view the click actually hit. Without this, a click into the prompt on
+    /// an unfocused console is spent making the panel key and the caret
+    /// lands on the second one.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     var trailingPlaceholder: String? {
         didSet {
             if trailingPlaceholder != oldValue { needsDisplay = true }

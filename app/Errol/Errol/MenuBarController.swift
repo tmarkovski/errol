@@ -25,6 +25,12 @@ final class KeyablePanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    /// Every close path — the title bar's close button, Cmd+W, a menu Close
+    /// — puts the console away rather than tearing it down. Errol is a
+    /// menu-bar app: the window going away is the app going quiet in the
+    /// status item, and the process only ends through Quit in that item's
+    /// menu.
+    override func performClose(_ sender: Any?) { orderOut(nil) }
     override func makeKeyAndOrderFront(_ sender: Any?) {
         super.makeKeyAndOrderFront(sender)
         onVisibilityChange?(true)
@@ -37,6 +43,16 @@ final class KeyablePanel: NSPanel {
         super.close()
         onVisibilityChange?(false)
     }
+}
+
+/// The panel floats over the chat apps without taking their focus, so most
+/// clicks land on a window that is not key — and AppKit spends the first
+/// click on a window like that activating it, never delivering it to the
+/// content. That is why the console had to be clicked once before it could
+/// be dragged or pressed. Claiming the click makes it behave like the
+/// floating palette it is: the first one acts, wherever it lands.
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Carries a main-thread callback into withObservationTracking's @Sendable
@@ -62,9 +78,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// greets a first launch, when there is nothing to avoid deactivating.
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
+    /// The debug log window, behind the status item's "Show Last Run Log".
+    private var logWindow: NSWindow?
     /// Auto-update. Created at launch so background checks start immediately;
     /// everything that could interrupt a run is gated inside it.
     private var updater: UpdaterController!
+    /// The wireframe panel's toolbar delegate. NSToolbar holds its delegate
+    /// weakly, so the shell keeps it alive.
+    private var wireChrome: WireChromeToolbar?
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
@@ -122,6 +143,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             // surface Sparkle's window later, at a moment nobody chose.
             checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
             menu.addItem(.separator())
+            // The debug pair. The console dropped its log well and Inspect
+            // button; the in-memory run log and the inspector live here.
+            menu.addItem(withTitle: "Show Last Run Log", action: #selector(showRunLog),
+                         keyEquivalent: "").target = self
+            let inspectItem = menu.addItem(
+                withTitle: "Inspect Apps", action: #selector(inspectApps), keyEquivalent: "")
+            inspectItem.target = self
+            // A run owns the apps' AX trees; inspecting mid-run would fight it.
+            inspectItem.isEnabled = !relay.isRunning
+            menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
             if let button = statusItem.button {
                 menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 6), in: button)
@@ -140,6 +171,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
+    /// The console being put away is not the app ending — AppKit's default
+    /// already agrees, but the close button depends on it, so it is stated.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
     /// Every termination path, not just the Quit item: logout, and Sparkle's
     /// own install-on-quit. Cancelling is idempotent, so the Quit item having
     /// already done it costs nothing.
@@ -150,12 +185,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Panel
 
-    /// Window chrome follows the compiled-in skin: classic keeps the original
-    /// titled utility panel; glass and wireframe get a borderless transparent
-    /// panel (glass so its Liquid Glass surfaces sample the desktop behind the
-    /// window, wireframe so its painted paper card is the panel's edge; Esc
-    /// still hides it, the header strip and bare paper drag it) whose frame
-    /// animates with the console/companion morph.
+    /// Window chrome follows the compiled-in skin.
+    ///
+    /// Classic keeps the original titled utility panel. Glass gets a
+    /// borderless transparent panel, so its Liquid Glass surfaces sample the
+    /// desktop behind the window. Wireframe is titled but draws none of its
+    /// chrome — transparent title bar, hidden title, content run up under it
+    /// — so the paper card fills the window and AppKit's close button lands
+    /// on the band across its top (Wire.chromeBand). That is the one way to
+    /// get the real window buttons with their own behavior (the hover
+    /// glyphs, a first click that lands on an unfocused window, Cmd+W)
+    /// without AppKit drawing a title bar over the skin: a borderless window
+    /// has no title bar to hang them on, and `standardWindowButton` answers
+    /// nil for one. The cost is that AppKit owns where they sit — top-left,
+    /// in the title bar's strip — which is why the card pads its top past
+    /// them, and owns the window's corner mask and shadow, which the card
+    /// now reads as its own edge instead of painting.
+    ///
+    /// Esc hides any of them; the header strip and bare paper drag the two
+    /// that have no title bar to drag by; the frame animates with the
+    /// console/companion morph.
     private func buildPanel() {
         let size = PanelLayout.size(style: activePanelStyle, compact: relay.compact,
                                     logOpen: relay.logOpen, steering: relay.isSteering,
@@ -165,7 +214,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
                                  styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
                                  backing: .buffered, defer: false)
-        case .glass, .wireframe:
+        case .glass:
             panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
                                  styleMask: [.borderless, .nonactivatingPanel],
                                  backing: .buffered, defer: false)
@@ -173,13 +222,44 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel.backgroundColor = .clear
             panel.hasShadow = false
             // Carries the glass skin, whose surfaces float over window
-            // background AppKit can see is unclaimed. The wireframe card
-            // covers its whole window, so it names its own drag regions
-            // (WireframePanelView.header) rather than trusting this.
+            // background AppKit can see is unclaimed.
             panel.isMovableByWindowBackground = true
             // Follow presentation changes with an animated frame change,
             // anchored top-center so the panel hangs from the status item.
             trackPanelLayout()
+        case .wireframe:
+            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
+                                 styleMask: [.titled, .closable, .fullSizeContentView,
+                                             .nonactivatingPanel],
+                                 backing: .buffered, defer: false)
+            panel.titlebarAppearsTransparent = true
+            panel.titleVisibility = .hidden
+            panel.titlebarSeparatorStyle = .none
+            // The toolbar does two jobs. Attached at all, it grows the
+            // title strip from the bare 28pt to the unified bar's 52pt and
+            // centers the close button in it with the roomier inset Safari
+            // and Mail have (Wire.chromeBand mirrors the height). And it
+            // carries the strip's contents — the state word and the gear —
+            // as real toolbar items, the one way controls up there receive
+            // clicks rather than losing them to the bar's drag
+            // (WireChromeToolbar).
+            wireChrome = WireChromeToolbar(controller: relay)
+            panel.toolbar = wireChrome!.makeToolbar()
+            panel.toolbarStyle = .unified
+            // Close is the only button offered: the card is a fixed size, so
+            // zoom has nothing to do, and a panel does not miniaturize.
+            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            panel.standardWindowButton(.zoomButton)?.isHidden = true
+            // The card paints the paper over the whole window; AppKit masks
+            // the corners and casts the shadow the skin used to draw itself.
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            // The card covers its whole window, so it names its own drag
+            // region (WireframePanelView); this catches whatever it
+            // leaves, the title bar's own strip aside.
+            panel.isMovableByWindowBackground = true
+            // No layout tracker: the card is content-sized and reports each
+            // laid-out size itself (fitPanel, wired below).
         }
         panel.title = "Errol"
         // Ordering and occlusion combine into one effective visibility: a
@@ -198,7 +278,23 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: PanelRootView(controller: relay))
+        panel.contentView = FirstMouseHostingView(rootView: PanelRootView(
+            controller: relay,
+            onWireframeCardResize: { [weak self] size in
+                // The report lands mid-layout; the hop keeps the window's
+                // frame change out of the pass that measured the card.
+                DispatchQueue.main.async { self?.fitPanel(to: size) }
+            }))
+    }
+
+    /// Wireframe only: follow the content-sized card. Each size the card
+    /// reports (PanelRootView.onWireframeCardResize) becomes the window's,
+    /// through the same anchored, animated frame change the glass skin's
+    /// layout tracker uses.
+    private func fitPanel(to size: CGSize) {
+        guard size != lastPanelSize else { return }
+        lastPanelSize = size
+        resizePanel(to: size)
     }
 
     private func pushPanelVisibility() {
@@ -324,6 +420,45 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             settingsWindow = window
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: Debug log window
+
+    /// The last run's in-memory log, live while a run is going — the well
+    /// the console used to carry, in a window of its own so it costs no
+    /// panel room. Chrome follows the settings card: non-activating,
+    /// bare-titled, floating a level above the console; resizable, because
+    /// inspect reports are long.
+    @objc private func showRunLog() {
+        if logWindow == nil {
+            let window = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
+                                      styleMask: [.titled, .closable, .resizable,
+                                                  .fullSizeContentView,
+                                                  .nonactivatingPanel],
+                                      backing: .buffered, defer: false)
+            window.title = "Errol Log"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.isFloatingPanel = true
+            window.hidesOnDeactivate = false
+            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            window.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1)
+            window.contentView = FirstMouseHostingView(
+                rootView: WireLogWindowView(controller: relay))
+            window.center()
+            logWindow = window
+        }
+        logWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Inspect from the menu: open the log window first, so the report —
+    /// and anything that stops it, a missing app or permission — lands
+    /// somewhere visible.
+    @objc private func inspectApps() {
+        showRunLog()
+        relay.runInspect()
     }
 
     // MARK: Permission explainer

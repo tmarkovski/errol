@@ -6,18 +6,15 @@
 
 import SwiftUI
 
-/// Inspect/Run/Stop/Compact/Steer/Pause. Updates while the prompt is
-/// typed — Run eligibility reads it — which is a small, deliberate
-/// invalidation.
+/// Run/Stop/Compact/Steer/Pause. Updates while the prompt is typed — Run
+/// eligibility reads it — which is a small, deliberate invalidation.
+/// (Inspect is a debug tool, not a run control; it lives in the status
+/// item's menu.)
 struct WireActionControls: View {
     let controller: RelayController
 
     var body: some View {
         HStack(spacing: Wire.s(8)) {
-            WireButton(label: "INSPECT", disabled: controller.isRunning) {
-                controller.runInspect()
-            }
-            .help("Dump both apps' windows, buttons, and selector matches into the log")
             Spacer()
             if controller.isRunning {
                 WireButton(label: "COMPACT", disabled: false) { controller.compact = true }

@@ -22,7 +22,42 @@ func expandLastMessageActions(in target: TargetApp) {
     log("\(target.name): no copy button mounted after expanding message actions")
 }
 
+/// The newest response's text, taken with the app's own per-message copy
+/// button.
+///
+/// The press is a plain AXPress, but the handler behind it writes the
+/// clipboard from the app's renderer, and Chromium refuses that write while
+/// the document is unfocused: the press still reports success and the
+/// clipboard never moves (observed live Aug 31 2026 — a run died mid-turn on
+/// "clipboard never changed after pressing copy" with Claude no longer
+/// focused). So the target is brought frontmost first, the way `send` does
+/// before typing, and a miss is retried once behind a LaunchServices
+/// activation — the one call that moves key status too, which is what the
+/// renderer actually reads.
 func copyLastResponse(from target: TargetApp) -> String? {
+    for attempt in 0..<2 {
+        if !makeFrontmost(target) {
+            // Unlike a keystroke, an AXPress lands on the element whatever is
+            // frontmost, so the press is still worth making — but say what
+            // focus looked like, since it is the first suspect for a press
+            // that reports success and copies nothing.
+            log("\(target.name): could not bring app to front before copying; pressing anyway")
+            log("\(target.name): \(focusReport(target))")
+        }
+        if let text = pressCopyButton(in: target) { return text }
+        if attempt == 0 {
+            log("\(target.name): retrying the copy after forcing activation")
+            activateViaLaunchServices(target)
+            usleep(400_000)
+        }
+    }
+    return nil
+}
+
+/// One press of the newest message's copy button, confirmed by the pasteboard
+/// moving. nil when no button could be found, the press failed, or it
+/// produced no clipboard write.
+func pressCopyButton(in target: TargetApp) -> String? {
     expandLastMessageActions(in: target)
     let buttons = copyButtons(in: target)
     guard let button = buttons.last else {

@@ -242,8 +242,9 @@ final class RelayController {
         scanner.setActive(panelVisible && !isRunning)
     }
 
-    /// The log well keeps a bounded tail — the transcript file holds the
-    /// whole run — and trims in chunks so removeFirst's element shuffle
+    /// The log is an in-memory tail read through the status item's debug
+    /// window (WireLogWindowView) — the transcript file holds the whole
+    /// run. Bounded, trimming in chunks so removeFirst's element shuffle
     /// stays off the per-line path.
     private static let logCap = 500
     private static let logTrimSlack = 100
@@ -287,6 +288,10 @@ final class RelayController {
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
         currentTurn = 0
+        // The buffer holds one run, so the debug window's "last run log"
+        // means what it says; lines logged between runs (an inspect report,
+        // a failed start) stay until the next run claims the buffer.
+        logLines.removeAll()
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
 
@@ -391,7 +396,9 @@ final class RelayController {
     }
 
     /// Dump both apps' windows, buttons, and selector matches into the log —
-    /// the way selector breakage gets diagnosed after an app update.
+    /// the way selector breakage gets diagnosed after an app update. A debug
+    /// tool, reached through the status item's menu and read in the log
+    /// window it opens.
     func runInspect() {
         guard !isRunning else { return }
         guard ensureTrusted(), let apps = resolveApps() else { return }
