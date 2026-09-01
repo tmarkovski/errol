@@ -9,10 +9,9 @@ import SwiftUI
         .background(Color(white: 0.75))
 }
 
-#Preview("Wireframe head unit (in run)") {
+#Preview("Wireframe console (in run)") {
     let controller = RelayController()
     controller.isRunning = true
-    controller.compact = true
     controller.currentTurn = 7
     controller.chatgptConversation = .chatting
     controller.claudeConversation = .waiting
@@ -23,13 +22,22 @@ import SwiftUI
 #Preview("Wireframe steer (held at handoff)") {
     let controller = RelayController()
     controller.isRunning = true
-    controller.compact = true
     controller.currentTurn = 4
     controller.isPaused = true
     controller.isHolding = true
-    controller.isSteering = true
+    controller.setSteeringText("Drop the notification idea; go deeper on the lamps.")
     controller.chatgptConversation = .replied
     controller.claudeConversation = .waiting
+    return WireframePanelView(controller: controller)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Wireframe run ended") {
+    let controller = RelayController()
+    controller.currentTurn = 6
+    controller.lastRunDuration = 272
+    controller.chatgptConversation = .ended
+    controller.claudeConversation = .ended
     return WireframePanelView(controller: controller)
         .background(Color(white: 0.75))
 }
@@ -44,7 +52,6 @@ private struct WireframeHandoffPreview: View {
     @State private var controller: RelayController = {
         let c = RelayController()
         c.isRunning = true
-        c.compact = true
         c.currentTurn = 1
         c.conversation = "Debate"
         c.topic = "Are code comments for the why or the what?"

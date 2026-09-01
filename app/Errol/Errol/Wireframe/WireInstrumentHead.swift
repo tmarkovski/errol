@@ -247,25 +247,43 @@ struct WireInstrumentHead: View {
                 .lineLimit(1)
                 .fixedSize()
             secondaryStatus
+            if controller.hasFinishedRun { newSessionButton }
         }
         .frame(width: Wire.s(150))
+    }
+
+    /// The two-step ending: END leaves the finished run on the instruments —
+    /// the turns, the sign-offs, the clock — because how a run ended is
+    /// worth a look; this is the step that wipes them for the next one. It
+    /// lives in the deck because the deck is what it resets.
+    private var newSessionButton: some View {
+        Button {
+            controller.resetSession()
+        } label: {
+            Text("[ NEW SESSION ]")
+                .font(Wire.mono(8, .bold))
+                .foregroundColor(Wire.ink)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .modifier(WireHandCursor(active: true))
+        .help("Clear the finished run — turns, cards, and clock back to start")
     }
 
     /// The line under the primary status: a single faint readout in one
     /// style, whichever state fills it in. In a run it
     /// reports a pause — the word alone tells PAUSING from PAUSED, and the
-    /// ghost stop draws that distinction on the route besides. Idle it
-    /// names the side the courier is aimed at, since an arrow's angle is
-    /// not something the panel should make anyone read. Blank otherwise,
-    /// so the row's height never moves.
+    /// ghost stop draws that distinction on the route besides. A finished
+    /// run puts its clock here — the one stat the odometer does not already
+    /// hold. Idle it names the side the courier is aimed at, since an
+    /// arrow's angle is not something the panel should make anyone read.
+    /// Blank otherwise, so the row's height never moves.
     ///
     /// Plain faint text, not a control: flipping the opener already lives
     /// on the participant cards and on the courier itself, and brackets
     /// are what this panel puts around a choice — a readout gets none.
     private var secondaryStatus: some View {
-        Text(controller.isRunning
-                ? (controller.isHolding ? "PAUSED" : "PAUSING")
-                : "\(openerName.uppercased()) OPENS")
+        Text(secondaryReadout)
             .font(Wire.mono(8, .bold))
             .tracking(0.5)
             .foregroundColor(Wire.faint)
@@ -275,6 +293,24 @@ struct WireInstrumentHead: View {
             .opacity(controller.isRunning && !controller.isPaused ? 0 : 1)
     }
 
+    private var secondaryReadout: String {
+        if controller.isRunning {
+            return controller.isHolding ? "PAUSED" : "PAUSING"
+        }
+        if controller.hasFinishedRun, let duration = controller.lastRunDuration {
+            return "RAN \(runClock(duration))"
+        }
+        return "\(openerName.uppercased()) OPENS"
+    }
+
+    private func runClock(_ duration: TimeInterval) -> String {
+        let total = Int(duration.rounded())
+        let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60)
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
+            : String(format: "%d:%02d", minutes, seconds)
+    }
+
     private var primaryStatus: String {
         if controller.isRunning {
             if controller.isHolding { return "Holding at handoff" }
@@ -282,7 +318,9 @@ struct WireInstrumentHead: View {
             if controller.claudeConversation == .chatting { return "Claude is composing" }
             return "Relaying"
         }
-        if bothEnded { return "Run complete" }
+        // Both sign-offs mean the conversation closed itself; anything else
+        // still on the odometer was ended from this side.
+        if controller.hasFinishedRun { return bothEnded ? "Run complete" : "Run ended" }
         if bothReady { return "Ready" }
         if [controller.chatgptStatus.state, controller.claudeStatus.state]
             .contains(.checking) { return "Scanning" }

@@ -17,13 +17,17 @@
 // deliberately unpainted, so nothing marks where the window's chrome ends
 // and the instrument begins (Wire.chromeBand is the room it gets).
 //
-// Idle, the full console shows the instrument head, the conversation
-// setup, and the run options; the run log stays in memory and reads
-// through the status item's debug window (WireLogWell). Starting a run
-// shrinks the panel to the head unit alone. The card is content-sized in
-// every state: it reports each laid-out size through onCardResize and the
-// shell fits the window to it (MenuBarController.fitPanel). EXPAND brings
-// the full console back mid-run with the setup rows disabled.
+// The console is two rows in every state: the instrument head, and the
+// composer under it — the one card that carries the shape, the prompt, the
+// run options, and the run controls, and that turns into the steering
+// field while a run is on (WireComposer). There is no compact mode: with
+// the setup folded into the composer, the full console is already the size
+// the head-unit panel used to be, so a run changes what the card holds
+// rather than which card is shown. The run log stays in memory and reads
+// through the status item's debug window (WireLogWell). The card is
+// content-sized in every state: it reports each laid-out size through
+// onCardResize and the shell fits the window to it
+// (MenuBarController.fitPanel).
 //
 // The skin is split into child views along update boundaries, not visual
 // ones: the controller is Observable, so each struct re-renders only for
@@ -33,24 +37,23 @@
 //
 // The skin lives in this folder, one file per part. WireStyle has the
 // palette and the window sizes; this file has the shell that stacks the
-// rows. The rows are WireInstrumentHead, WireConversationSetup,
-// WireRunControls, and WireSteeringEditor, with WireChrome
-// putting the state word and the gear in the window's own title strip. The instruments
-// those rows are built from — the courier, the gauge and odometer, the
-// lamps, the speaker border, the button — each have their own file, named
-// for the part, and so does the one thing that is not drawn at all: the
-// beat two of those instruments play to (WireRhythm). A part more than one
-// file builds on had to give up its private marker to move out here, and
-// the Wire prefix stands in for what that marker was doing; a part only
-// its own file builds on — the lamp face behind the signal lamps, the
+// rows. The rows are WireInstrumentHead and WireComposer, with WireChrome
+// putting the state word and the gear in the window's own title strip. The
+// instruments those rows are built from — the courier, the gauge and
+// odometer, the lamps, the speaker border — each have their own file,
+// named for the part, and so does the one thing that is not drawn at all:
+// the beat two of those instruments play to (WireRhythm). A part more than
+// one file builds on had to give up its private marker to move out here,
+// and the Wire prefix stands in for what that marker was doing; a part
+// only its own file builds on — the lamp face behind the signal lamps, the
 // needle and the face behind the gauge, the digit wheel behind the
 // odometer — still has it.
 
 import SwiftUI
 
-/// The shell: structure only. It reads the two properties that decide
-/// which children mount (compact, isSteering); everything else is read
-/// inside the child views, which is what keeps their invalidation apart.
+/// The shell: structure only. The same two children mount in every state —
+/// the properties that vary are read inside them, which is what keeps
+/// their invalidation apart.
 struct WireframePanelView: View {
     let controller: RelayController
     /// The content-sized card reports each laid-out size here so the shell
@@ -60,14 +63,7 @@ struct WireframePanelView: View {
     var body: some View {
         VStack(spacing: Wire.s(12)) {
             WireInstrumentHead(controller: controller)
-            if controller.compact {
-                WireCompactFooter(controller: controller)
-                if controller.isSteering { WireSteeringEditor(controller: controller) }
-            } else {
-                WireConversationSetup(controller: controller)
-                WireActionControls(controller: controller)
-                if controller.isSteering { WireSteeringEditor(controller: controller) }
-            }
+            WireComposer(controller: controller)
         }
         .padding(.horizontal, Wire.s(16))
         .padding(.bottom, Wire.s(16))

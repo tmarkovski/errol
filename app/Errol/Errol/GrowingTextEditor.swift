@@ -14,6 +14,13 @@ struct GrowingTextEditor: NSViewRepresentable {
     var placeholder: String?
     var minimumLines = 8
     var maximumLines = 13
+    /// When set, Return submits instead of breaking the line (Shift-Return
+    /// still breaks one) — the chat-composer contract, for the fields whose
+    /// text is a message to send rather than prose to shape.
+    var onSubmit: (() -> Void)?
+    /// When set, Esc reports out instead of invoking NSTextView's word
+    /// completion — the way a steer editor gets called off.
+    var onEscape: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -109,6 +116,26 @@ struct GrowingTextEditor: NSViewRepresentable {
             parent.text = textView.string
             scrollView?.invalidateIntrinsicContentSize()
             scrollView?.superview?.needsLayout = true
+        }
+
+        func textView(_ textView: NSTextView,
+                      doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)),
+               let onSubmit = parent.onSubmit,
+               NSApp.currentEvent?.modifierFlags.contains(.shift) != true {
+                onSubmit()
+                return true
+            }
+            // Esc reaches an NSTextView as complete: (word completion), or
+            // as cancelOperation: when a key-binding layer maps it first;
+            // either one is the escape the caller asked to hear about.
+            if commandSelector == #selector(NSResponder.cancelOperation(_:))
+                || commandSelector == #selector(NSStandardKeyBindingResponding.complete(_:)),
+               let onEscape = parent.onEscape {
+                onEscape()
+                return true
+            }
+            return false
         }
     }
 }

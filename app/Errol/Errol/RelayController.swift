@@ -46,11 +46,15 @@ final class RelayController {
     /// the agent that was composing is still finishing its reply, which is
     /// the gap the panel's route draws.
     var isHolding = false
-    /// Whether the steering editor is open. Steer asks for a pause the way
-    /// the Pause control does — room to write — and posting or canceling
-    /// the note releases that pause only if Steer was what asked for it.
-    var isSteering = false
-    /// The note being written in the steering editor.
+    /// Whether a steering note is being written. Driven by the composer's
+    /// text through setSteeringText: typing into the run's composer is what
+    /// begins a steer, and erasing the note (or Esc) is what calls it off.
+    /// Steer asks for a pause the way the Pause control does — room to
+    /// write — and posting or calling off the note releases that pause only
+    /// if Steer was what asked for it.
+    private(set) var isSteering = false
+    /// The steering note. The composer writes it through setSteeringText,
+    /// which is where the typing-begins-a-steer transition lives.
     var steeringText = ""
     /// Whether the current pause exists on Steer's account rather than a
     /// Pause press of the user's own; cleared whenever the user toggles
@@ -69,8 +73,14 @@ final class RelayController {
     var chatgptConversation = ConversationStatus.notStarted
     var claudeConversation = ConversationStatus.notStarted
     /// The running turn number (1-based) during a relay run; 0 outside one.
-    /// Feeds the wireframe skin's odometer.
+    /// Feeds the wireframe skin's odometer. It survives the run's end so the
+    /// finished state stays readable, until resetSession or the next start
+    /// clears it.
     var currentTurn = 0
+    /// How long the last run took, for the deck's post-run readout. Set when
+    /// a run finishes; cleared by resetSession and at the next start.
+    var lastRunDuration: TimeInterval?
+    @ObservationIgnored private var runStartedAt: Date?
     @ObservationIgnored private var nextLogID = 0
     /// Preserve in-progress full-prompt edits while someone compares shapes.
     /// A deliberate reset removes the draft for that shape.
@@ -288,6 +298,8 @@ final class RelayController {
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
         currentTurn = 0
+        lastRunDuration = nil
+        runStartedAt = Date()
         // The buffer holds one run, so the debug window's "last run log"
         // means what it says; lines logged between runs (an inspect report,
         // a failed start) stay until the next run claims the buffer.
@@ -309,9 +321,28 @@ final class RelayController {
         }
     }
 
+    /// Whether a finished run is still on the instruments: turns on the
+    /// odometer, no run to own them. The wireframe deck shows its NEW
+    /// SESSION control in this state, and resetSession is what leaves it.
+    var hasFinishedRun: Bool { !isRunning && currentTurn > 0 }
+
+    /// NEW SESSION: clear the finished run off the instruments — the turn
+    /// counter, the conversation cards, the duration readout. The prompt and
+    /// the run options stay as they are; they belong to the next run, not
+    /// the finished one.
+    func resetSession() {
+        guard hasFinishedRun else { return }
+        currentTurn = 0
+        lastRunDuration = nil
+        chatgptConversation = .notStarted
+        claudeConversation = .notStarted
+    }
+
     /// The run's `.finished` event: put the panel back to idle. Ordered
     /// after every line the run logged, because it rides the same stream.
     private func finishRun() {
+        lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
+        runStartedAt = nil
         isRunning = false
         isPaused = false
         isHolding = false
@@ -350,20 +381,28 @@ final class RelayController {
         }
     }
 
-    /// Steer: hold the run and write a note into the conversation. The note
-    /// rides the next handoff to whoever replies next, and is echoed to the
-    /// other side a turn later, so both learn of it and in what order.
-    func beginSteer() {
-        guard isRunning, !isSteering else { return }
-        isSteering = true
-        steeringText = ""
-        if isPaused {
-            append("Steer — the run is already pausing; the note rides the handoff when you resume.")
-        } else {
-            steerInitiatedPause = true
-            isPaused = true
-            relayControl.setPaused(true)
-            append("Steer — the run holds at the next handoff while you write.")
+    /// The composer's write path for the steering note. Steering has no
+    /// button: typing the first word of a note holds the run at the next
+    /// handoff — the note rides that handoff to whoever replies next, and is
+    /// echoed to the other side a turn later, so both learn of it and in
+    /// what order — and erasing the note whole calls the steer off again,
+    /// the same release Esc asks for by name (cancelSteer).
+    func setSteeringText(_ text: String) {
+        steeringText = text
+        guard isRunning else { return }
+        let hasNote = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if hasNote, !isSteering {
+            isSteering = true
+            if isPaused {
+                append("Steer — the run is already pausing; the note rides the handoff when you resume.")
+            } else {
+                steerInitiatedPause = true
+                isPaused = true
+                relayControl.setPaused(true)
+                append("Steer — the run holds at the next handoff while you write.")
+            }
+        } else if !hasNote, isSteering {
+            cancelSteer()
         }
     }
 

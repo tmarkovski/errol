@@ -80,7 +80,7 @@ struct WireStateWord: View {
             guard controller.isPaused else { return "IN RUN" }
             return controller.isHolding ? "PAUSED" : "PAUSING"
         }
-        if bothEnded { return "DONE" }
+        if controller.hasFinishedRun { return "DONE" }
         if bothReady { return "READY" }
         if [controller.chatgptStatus.state, controller.claudeStatus.state]
             .contains(.checking) { return "CHECKING" }
@@ -90,14 +90,10 @@ struct WireStateWord: View {
     private var bothReady: Bool {
         controller.chatgptStatus.state == .ready && controller.claudeStatus.state == .ready
     }
-
-    private var bothEnded: Bool {
-        controller.chatgptConversation == .ended && controller.claudeConversation == .ended
-    }
 }
 
 /// The way into the settings card, kept in the title strip so it is
-/// reachable in every console state, compact head unit included. The glyph
+/// reachable in every console state, mid-run included. The glyph
 /// stays small and unboxed — it is a utility, not one of the run controls,
 /// and drawing a rectangle around it would give it their weight.
 struct WireChromeGear: View {
