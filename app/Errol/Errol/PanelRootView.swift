@@ -8,18 +8,19 @@
 // The window chrome follows the skin (MenuBarController.buildPanel):
 // classic gets the original titled utility panel; glass gets a borderless
 // transparent panel, so Liquid Glass can sample the desktop behind it;
-// wireframe gets a titled one that draws none of its chrome, so the paper
-// instrument card fills the window and the real close button sits on it.
+// wireframe and perch get a titled one that draws none of its chrome, so
+// the skin's card fills the window and the real close button sits on it.
 
 import SwiftUI
 
 /// The compiled-in panel skin. Edit this line to swap UIs.
-let activePanelStyle = PanelStyle.wireframe
+let activePanelStyle = PanelStyle.perch
 
 enum PanelStyle {
     case glass
     case classic
     case wireframe
+    case perch
 }
 
 /// The one place panel frame sizes live. For the glass skin the AppKit
@@ -45,16 +46,19 @@ enum PanelLayout {
             // window to that (MenuBarController.fitPanel), so no layout
             // table exists for this skin.
             WireframeMetrics.initialPanel
+        case .perch:
+            // Content-sized the same way the wireframe is.
+            PerchMetrics.initialPanel
         }
     }
 }
 
 struct PanelRootView: View {
     let controller: RelayController
-    /// Wireframe only: the content-sized card reports its size here so the
-    /// shell can fit the window to it. The other skins size through
-    /// PanelLayout and never call it.
-    var onWireframeCardResize: ((CGSize) -> Void)? = nil
+    /// The content-sized skins (wireframe, perch) report each laid-out card
+    /// size here so the shell can fit the window to it. The other skins
+    /// size through PanelLayout and never call it.
+    var onCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
         switch activePanelStyle {
@@ -64,7 +68,10 @@ struct PanelRootView: View {
             ControlPanelView(controller: controller)
         case .wireframe:
             WireframePanelView(controller: controller,
-                               onCardResize: onWireframeCardResize)
+                               onCardResize: onCardResize)
+        case .perch:
+            PerchPanelView(controller: controller,
+                           onCardResize: onCardResize)
         }
     }
 }

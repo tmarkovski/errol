@@ -83,9 +83,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Auto-update. Created at launch so background checks start immediately;
     /// everything that could interrupt a run is gated inside it.
     private var updater: UpdaterController!
-    /// The wireframe panel's toolbar delegate. NSToolbar holds its delegate
-    /// weakly, so the shell keeps it alive.
-    private var wireChrome: WireChromeToolbar?
+    /// The panel's toolbar delegate (wireframe or perch chrome). NSToolbar
+    /// holds its delegate weakly, so the shell keeps it alive.
+    private var panelChrome: (any NSToolbarDelegate)?
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
@@ -189,7 +189,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     ///
     /// Classic keeps the original titled utility panel. Glass gets a
     /// borderless transparent panel, so its Liquid Glass surfaces sample the
-    /// desktop behind the window. Wireframe is titled but draws none of its
+    /// desktop behind the window. Wireframe (and perch, which mirrors its
+    /// chrome) is titled but draws none of its
     /// chrome — transparent title bar, hidden title, content run up under it
     /// — so the paper card fills the window and AppKit's close button lands
     /// on the band across its top (Wire.chromeBand). That is the one way to
@@ -243,8 +244,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             // as real toolbar items, the one way controls up there receive
             // clicks rather than losing them to the bar's drag
             // (WireChromeToolbar).
-            wireChrome = WireChromeToolbar(controller: relay)
-            panel.toolbar = wireChrome!.makeToolbar()
+            let chrome = WireChromeToolbar(controller: relay)
+            panelChrome = chrome
+            panel.toolbar = chrome.makeToolbar()
             panel.toolbarStyle = .unified
             // Close is the only button offered: the card is a fixed size, so
             // zoom has nothing to do, and a panel does not miniaturize.
@@ -260,6 +262,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             panel.isMovableByWindowBackground = true
             // No layout tracker: the card is content-sized and reports each
             // laid-out size itself (fitPanel, wired below).
+        case .perch:
+            // The wireframe's window chrome exactly (see that case for the
+            // reasoning); only the toolbar's contents differ — the state
+            // pill and the session overflow (PerchChrome).
+            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
+                                 styleMask: [.titled, .closable, .fullSizeContentView,
+                                             .nonactivatingPanel],
+                                 backing: .buffered, defer: false)
+            panel.titlebarAppearsTransparent = true
+            panel.titleVisibility = .hidden
+            panel.titlebarSeparatorStyle = .none
+            let chrome = PerchChromeToolbar(controller: relay)
+            panelChrome = chrome
+            panel.toolbar = chrome.makeToolbar()
+            panel.toolbarStyle = .unified
+            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            panel.standardWindowButton(.zoomButton)?.isHidden = true
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.isMovableByWindowBackground = true
         }
         panel.title = "Errol"
         // Ordering and occlusion combine into one effective visibility: a
@@ -280,15 +302,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = FirstMouseHostingView(rootView: PanelRootView(
             controller: relay,
-            onWireframeCardResize: { [weak self] size in
+            onCardResize: { [weak self] size in
                 // The report lands mid-layout; the hop keeps the window's
                 // frame change out of the pass that measured the card.
                 DispatchQueue.main.async { self?.fitPanel(to: size) }
             }))
     }
 
-    /// Wireframe only: follow the content-sized card. Each size the card
-    /// reports (PanelRootView.onWireframeCardResize) becomes the window's,
+    /// The content-sized skins (wireframe, perch): follow the card. Each
+    /// size it reports (PanelRootView.onCardResize) becomes the window's,
     /// through the same anchored, animated frame change the glass skin's
     /// layout tracker uses.
     private func fitPanel(to size: CGSize) {

@@ -20,7 +20,12 @@ struct LogLine: Identifiable {
 final class RelayController {
     /// The picker tag for free-form instructions; not a ConversationTemplate.
     static let customConversation = "Custom"
-    /// The selected template's name, or customConversation.
+    /// The picker tag for an open conversation with no preset structure: the
+    /// topic is the whole opening message. Not a ConversationTemplate — a
+    /// template with an empty body would still frame the topic as "below",
+    /// and Settings should not offer its body for editing.
+    static let freeConversation = "Free chat"
+    /// The selected template's name, customConversation, or freeConversation.
     var conversation = conversationTemplates[0].name
     /// Completes the selected template ("What to brainstorm about").
     var topic = ""
@@ -130,6 +135,7 @@ final class RelayController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] templates in
                 guard let self, conversation != Self.customConversation,
+                      conversation != Self.freeConversation,
                       !templates.contains(where: { $0.name == self.conversation })
                 else { return }
                 selectConversation(templates.first?.name ?? Self.customConversation)
@@ -140,15 +146,19 @@ final class RelayController {
         openSettingsHandler?()
     }
 
-    /// nil means the picker is on Custom.
+    /// nil means the picker is on Custom or Free chat.
     var selectedTemplate: ConversationTemplate? {
         conversationTemplates.first { $0.name == conversation }
     }
 
+    var isFreeChat: Bool { conversation == Self.freeConversation }
+
     /// Custom always needs the full editor. A template starts with its compact
     /// topic field and stays in the full editor once the user asks to edit it.
+    /// Free chat never opens it: the topic field already holds the whole
+    /// opening message, so there is no composed prompt to reveal.
     var showsFullInstructionsEditor: Bool {
-        selectedTemplate == nil || isEditingInstructions
+        (selectedTemplate == nil && !isFreeChat) || isEditingInstructions
     }
 
     /// A visual hint at the insertion point in the full editor. It is never
@@ -168,10 +178,11 @@ final class RelayController {
 
     /// The exact initial message the relay will hand to the first agent
     /// (before the framing preamble): the template composed with the topic,
-    /// or the full editor's text as written.
+    /// the bare topic for Free chat, or the full editor's text as written.
     var composedInstructions: String {
-        guard !showsFullInstructionsEditor,
-              let template = selectedTemplate else { return customInstructions }
+        guard !showsFullInstructionsEditor else { return customInstructions }
+        if isFreeChat { return topic }
+        guard let template = selectedTemplate else { return customInstructions }
         return template.composed(topic: topic)
     }
 
@@ -201,6 +212,7 @@ final class RelayController {
     /// shape so comparing options does not silently throw work away.
     func selectConversation(_ name: String) {
         guard name == Self.customConversation
+                || name == Self.freeConversation
                 || conversationTemplates.contains(where: { $0.name == name }),
               name != conversation else { return }
 
@@ -214,6 +226,10 @@ final class RelayController {
         if name == Self.customConversation {
             customInstructions = instructionDrafts[name] ?? ""
             isEditingInstructions = true
+        } else if name == Self.freeConversation {
+            // Free chat has no full-prompt form (the topic is the message),
+            // so it closes the editor rather than carrying it over.
+            isEditingInstructions = false
         } else if keepEditorOpen {
             let template = conversationTemplates.first { $0.name == name }!
             customInstructions = instructionDrafts[name]
@@ -272,9 +288,13 @@ final class RelayController {
         guard !isRunning else { return }
 
         guard instructionsReady else {
-            append(showsFullInstructionsEditor
-                ? "Write the instructions first — they become the opening message handed to the first agent."
-                : "Add a topic first — it completes the \(conversation) opening handed to the first agent.")
+            if showsFullInstructionsEditor {
+                append("Write the instructions first — they become the opening message handed to the first agent.")
+            } else if isFreeChat {
+                append("Add a topic first — it is the whole opening message handed to the first agent.")
+            } else {
+                append("Add a topic first — it completes the \(conversation) opening handed to the first agent.")
+            }
             return
         }
         guard ensureTrusted(), let apps = resolveApps() else { return }
