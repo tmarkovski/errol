@@ -1,7 +1,7 @@
-// What the skin puts in the window's own title strip: the state pill and
-// the session overflow menu, trailing. The pattern is WireChromeToolbar's —
-// real toolbar items, because the title bar claims the strip's clicks — and
-// only the contents differ. See PerchPanelView for the skin.
+// What the panel puts in the window's own title strip: the state pill and
+// the session overflow menu, trailing. They are real toolbar items because
+// the title bar claims the strip's clicks (MenuBarController.buildPanel has
+// the account). See PerchPanelView for the panel.
 
 import AppKit
 import SwiftUI

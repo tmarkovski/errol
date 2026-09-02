@@ -1,7 +1,7 @@
-// The Perch skin's constant tables: the palette and type helpers every part
+// The panel's constant tables: the palette and type helpers every part
 // draws from, and the one window size the panel still names. Changing how
 // large or how warm the panel reads is a change to this file alone. See
-// PerchPanelView for what the skin is.
+// PerchPanelView for what the panel is.
 
 import AppKit
 import SwiftUI
@@ -57,8 +57,8 @@ enum Perch {
 
     /// Every length and type size is a mockup measurement put through `s`,
     /// so this one number sets how large the panel reads. The converged
-    /// mockup drew at 1.0 for a 464-point card; 1.1 gives it the same
-    /// slight enlargement the wireframe skin took for laptop displays.
+    /// mockup drew at 1.0 for a 464-point card; 1.1 enlarges it slightly for
+    /// laptop displays.
     static let scale: CGFloat = 1.1
     static func s(_ points: CGFloat) -> CGFloat { points * scale }
     /// System type throughout — Perch speaks native macOS, not instrument
@@ -71,7 +71,14 @@ enum Perch {
         .system(size: s(size), weight: weight, design: .monospaced)
     }
 
-    /// The two corners the skin cuts: the panel's own edge, and the composer
+    // MARK: Motion
+
+    /// The fade every state-driven line of text takes when it changes — the
+    /// turn line, the perches' sublines, the context row and the hold
+    /// notice, the composer's hint — so nothing snaps.
+    static let fade = Animation.easeInOut(duration: 0.2)
+
+    /// The two corners the panel cuts: the panel's own edge, and the composer
     /// card set into it. The pills and chips are capsules and name no radius.
     static let shellCorner = s(18)
     static let boxCorner = s(16)
@@ -82,9 +89,11 @@ enum Perch {
     /// constant — the card is content-sized and the shell fits the window to
     /// what it reports (PerchPanelView, MenuBarController.fitPanel).
     static let cardWidth = s(464)
-    /// The title bar's strip, mirroring the unified-toolbar height the panel
-    /// wears (see Wire.chromeBand for the full account — the chrome pattern
-    /// is the wireframe's, only the contents differ).
+    /// The title bar's strip: the panel wears an attached unified toolbar,
+    /// which grows the strip to the height Safari and Mail have — 52pt, the
+    /// close button centered in it (MenuBarController.buildPanel) — so this
+    /// is that height. Without the toolbar the bare strip is 28pt, which is
+    /// what the settings and log windows clear.
     static let chromeBand: CGFloat = 52
     /// The card's top padding: the strip, plus breathing room before the
     /// avatars — the app icons' squircles read heavier than the initial
@@ -92,8 +101,11 @@ enum Perch {
     static let chromeInset = chromeBand + s(10)
 }
 
-/// The window frame the panel opens at before the card's first size report
-/// lands (see WireframeMetrics for the pattern).
+/// The one window frame the panel names: what it opens at before the card's
+/// first size report lands. Every real size comes from the card itself —
+/// content-sized in every state, the shell fitting the window to what it
+/// reports (MenuBarController.fitPanel) — so this is a first-frame stand-in,
+/// corrected the moment the card lays out.
 enum PerchMetrics {
     static let initialPanel = CGSize(width: Perch.cardWidth, height: Perch.s(320))
 }

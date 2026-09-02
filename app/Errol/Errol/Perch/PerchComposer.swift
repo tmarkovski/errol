@@ -7,7 +7,7 @@
 // anatomy across states — in a run the setup zone folds into a one-line
 // context row above the same hairline, and the editor becomes the steering
 // field (typing is what begins a steer, RelayController.setSteeringText).
-// See PerchPanelView for the skin.
+// See PerchPanelView for the panel.
 
 import SwiftUI
 
@@ -41,11 +41,16 @@ private struct PerchConfigZone: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Perch.s(8)) {
             if controller.isRunning {
-                if controller.isSteering {
-                    holdNotice
-                } else {
-                    contextLine
+                // Overlaid, not stacked, so the crossfade never shows both
+                // rows at once and the card holds its height through it.
+                ZStack(alignment: .leading) {
+                    if controller.isSteering {
+                        holdNotice.transition(.opacity)
+                    } else {
+                        contextLine.transition(.opacity)
+                    }
                 }
+                .animation(Perch.fade, value: controller.isSteering)
             } else {
                 pillRow
                 previewRow
@@ -79,11 +84,11 @@ private struct PerchConfigZone: View {
     private var pillRow: some View {
         HStack(spacing: Perch.s(6)) {
             pill(name: RelayController.freeConversation,
-                 icon: "circle.dashed",
+                 icon: PerchShapeIcons.freeIcon,
                  selected: controller.isFreeChat)
             ForEach(quickTemplates) { template in
                 pill(name: template.name,
-                     icon: WireShapeIcons.icon(for: template.name),
+                     icon: PerchShapeIcons.icon(for: template.name),
                      selected: controller.conversation == template.name)
             }
             morePill
@@ -131,20 +136,20 @@ private struct PerchConfigZone: View {
                     controller.selectConversation(template.name)
                 } label: {
                     Label(template.name,
-                          systemImage: WireShapeIcons.icon(for: template.name))
+                          systemImage: PerchShapeIcons.icon(for: template.name))
                 }
             }
             Button {
                 controller.selectConversation(RelayController.customConversation)
             } label: {
-                Label("Write from scratch", systemImage: WireShapeIcons.customIcon)
+                Label("Write from scratch", systemImage: PerchShapeIcons.customIcon)
             }
             Divider()
             Button("Manage shapes…") { controller.openSettings() }
         } label: {
             pillLabel(text: moreHoldsSelection ? controller.conversation : "More",
                       icon: moreHoldsSelection
-                          ? WireShapeIcons.icon(for: controller.conversation)
+                          ? PerchShapeIcons.icon(for: controller.conversation)
                           : "ellipsis",
                       selected: moreHoldsSelection)
         }
@@ -209,7 +214,7 @@ private struct PerchConfigZone: View {
                 Button {
                     controller.editInstructions()
                 } label: {
-                    Image(systemName: WireShapeIcons.customIcon)
+                    Image(systemName: PerchShapeIcons.customIcon)
                         .font(.system(size: Perch.s(10), weight: .medium))
                         .foregroundColor(Perch.muted)
                         .frame(width: Perch.s(20), height: Perch.s(20))
@@ -240,9 +245,7 @@ private struct PerchConfigZone: View {
     /// options, readable but no longer controls — a run owns them.
     private var contextLine: some View {
         HStack(spacing: Perch.s(6)) {
-            Image(systemName: controller.isFreeChat
-                  ? "circle.dashed"
-                  : WireShapeIcons.icon(for: controller.conversation))
+            Image(systemName: PerchShapeIcons.icon(for: controller.conversation))
                 .font(.system(size: Perch.s(10), weight: .medium))
             Text(controller.conversation)
                 .font(Perch.text(11, .medium))
@@ -261,20 +264,57 @@ private struct PerchConfigZone: View {
         return parts.joined(separator: " · ")
     }
 
-    /// While a steer is being written the zone carries the hold, in the
-    /// precise voice: what the run is doing about the note, not just that
-    /// it is paused.
+    /// The side whose reply the note will travel with: the one writing now,
+    /// or the one whose finished reply a pause is holding.
+    private var replier: String? {
+        switch (controller.chatgptConversation, controller.claudeConversation) {
+        case (.chatting, _), (.replied, _): return controller.chatgptStatus.appName
+        case (_, .chatting), (_, .replied): return controller.claudeStatus.appName
+        default: return nil
+        }
+    }
+
+    /// The side that reads the note first: the reply goes to the other
+    /// side, and the note goes with it.
+    private var reader: String? {
+        guard let replier else { return nil }
+        return replier == controller.chatgptStatus.appName
+            ? controller.claudeStatus.appName
+            : controller.chatgptStatus.appName
+    }
+
+    /// While a steer is being written the zone says, in plain words, who is
+    /// writing and where the note will go. It takes the context line's own
+    /// row — an amber dot where the shape's glyph sits, the text in the
+    /// quiet amber, no band — so the card keeps its height when the notice
+    /// replaces the context and nothing below it jumps.
     private var holdNotice: some View {
-        Text(controller.isHolding
-             ? "Paused at the handoff — the note rides the delivery when you resume."
-             : "Holding at the next handoff — the note rides it to whoever replies next.")
-            .font(Perch.text(11))
-            .foregroundColor(Perch.amberText)
-            .lineLimit(2)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Perch.s(9))
-            .background(RoundedRectangle(cornerRadius: Perch.bandCorner).fill(Perch.amberBack))
+        HStack(spacing: Perch.s(6)) {
+            Circle()
+                .fill(Perch.amber)
+                .frame(width: Perch.s(7), height: Perch.s(7))
+            Text(holdText)
+                .font(Perch.text(11))
+                .foregroundColor(Perch.amberText)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .contentTransition(.opacity)
+        }
+        .padding(.horizontal, Perch.s(2))
+        .animation(Perch.fade, value: holdText)
+    }
+
+    private var holdText: String {
+        if controller.isHolding {
+            if let replier, let reader {
+                return "Paused. Your note will go to \(reader) when you resume."
+            }
+            return "Paused. Your note will go out when you resume."
+        }
+        if let replier, let reader {
+            return "Pausing when \(replier) is done… Your note will go to \(reader) after."
+        }
+        return "Pausing after this reply… Your note will go out after."
     }
 }
 
@@ -294,7 +334,7 @@ private struct PerchComposerEditor: View {
                               minimumLines: 2, maximumLines: 8,
                               onSubmit: { controller.sendSteering() },
                               onEscape: { controller.cancelSteer() })
-                .help("Steer the conversation: typing pauses at the next handoff; Return sends the note, Esc clears it")
+                .help("Type a note to steer the conversation. We'll pause so you can finish it — Return sends the note, Esc clears it")
         } else if !controller.showsFullInstructionsEditor {
             GrowingTextEditor(text: $controller.topic,
                               font: .systemFont(ofSize: Perch.s(12.5)),
@@ -340,9 +380,11 @@ private struct PerchComposerToolbar: View {
             if controller.isRunning {
                 Text(controller.isSteering
                      ? "Esc clears the note"
-                     : "Typing pauses at the next handoff")
+                     : "Type a note and we'll pause so you can finish it")
                     .font(Perch.text(11))
                     .foregroundColor(Perch.placeholder)
+                    .contentTransition(.opacity)
+                    .animation(Perch.fade, value: controller.isSteering)
             } else {
                 optionsChip
             }
@@ -409,6 +451,7 @@ private struct PerchComposerToolbar: View {
         return Button(action: role.action) {
             Image(systemName: role.icon)
                 .font(.system(size: Perch.s(13), weight: .bold))
+                .contentTransition(.symbolEffect(.replace))
                 .foregroundColor(.white)
                 .frame(width: Perch.s(36), height: Perch.s(36))
                 .background(Circle().fill(Perch.amber))
@@ -439,7 +482,7 @@ private struct PerchComposerToolbar: View {
         }
         if controller.isSteering {
             return PrimaryRole(icon: "arrow.up",
-                               help: "Send the note; it reaches whoever replies next, and the other side a turn later",
+                               help: "Send your note with the next message",
                                disabled: false,
                                action: { controller.sendSteering() })
         }

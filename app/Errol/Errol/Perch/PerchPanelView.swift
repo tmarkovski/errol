@@ -1,19 +1,18 @@
-// The Perch skin (see PanelRootView for skin selection): the skin studies'
-// clean-modern direction carrying the converged composer. Native macOS
-// surfaces — system type, sentence case, soft warm neutrals — with one
+// Perch, the console: the converged composer (docs/design-proposals/
+// chat-composer/converged-composer.html) in a clean, native dress. Native
+// macOS surfaces — system type, sentence case, soft warm neutrals — with one
 // owl-amber accent shared by the primary button and the courier bead, and
 // the playfulness spent on motion: the bead hops the flight path on every
-// handoff. The two sides are perches — avatars with presence dots — and a
-// quiet turn line replaces the wireframe's instrument cluster.
+// handoff. The two sides are perches — the apps' own icons with presence
+// dots — and a quiet turn line says what the panel is doing.
 //
 // The console is two rows in every state: the head (PerchHead) and the
 // composer (PerchComposer), whose setup zone — quick shape pills and the
 // instruction preview above a hairline — folds into a context row while a
-// run is on. The window chrome follows the wireframe pattern exactly
-// (MenuBarController.buildPanel): a titled panel that draws none of its
-// chrome, the card content-sized and reported through onCardResize, and
-// the title strip carrying the state pill and the session overflow as real
-// toolbar items (PerchChrome).
+// run is on. The window is a titled panel that draws none of its chrome
+// (MenuBarController.buildPanel): the card is content-sized and reported
+// through onCardResize, and the title strip carries the state pill and the
+// session overflow as real toolbar items (PerchChrome).
 
 import SwiftUI
 
@@ -38,14 +37,19 @@ struct PerchPanelView: View {
         .frame(width: Perch.cardWidth)
         .background(
             RoundedRectangle(cornerRadius: Perch.shellCorner).fill(Perch.paper)
-                // Bare paper moves the window (see WireframePanelView for
-                // why the gesture is asked for outright).
+                // Bare paper — the card's padding and the gaps between rows
+                // — moves the window, asked for outright rather than through
+                // `isMovableByWindowBackground`, which only moves a window
+                // when AppKit judges that nothing in the content wanted the
+                // click, an inference that does not hold on every macOS
+                // release. Text selection in the editor is untouched: the
+                // gesture lives on the paper, not over it.
                 .gesture(WindowDragGesture())
         )
         .overlay(RoundedRectangle(cornerRadius: Perch.shellCorner)
             .stroke(Perch.panelEdge, lineWidth: 1))
-        // The wordmark, centered in the title strip like a window title —
-        // sentence case, because this skin is an app, not an instrument.
+        // The wordmark, centered in the title strip like a window title, in
+        // sentence case as a window title is.
         .overlay(alignment: .top) {
             Text("Errol")
                 .font(Perch.text(13, .semibold))
@@ -54,17 +58,15 @@ struct PerchPanelView: View {
                 .allowsHitTesting(false)
         }
         .environment(\.colorScheme, .light)
-        // Measured here — the card with its paddings, before the flexible
-        // outer frame stretches to whatever window AppKit currently has —
-        // so the size reported is the one the window should become.
+        // Measured here — the card with its paddings — so the size reported
+        // is the one the window should become. Fitting the card to the
+        // window it sits in, and running it up under the title bar, is the
+        // shell's business (MenuBarController.buildPanel), which is what
+        // lets a preview canvas show the card at its own size.
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in
             onCardResize?(size)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // Running under the title bar is the point (the band is where the
-        // close button stands), so the safe-area inset is declined.
-        .ignoresSafeArea()
     }
 }

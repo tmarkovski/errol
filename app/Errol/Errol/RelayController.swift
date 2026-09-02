@@ -3,7 +3,7 @@
 // thread only; runs and inspections live on worker threads so the panel's
 // event loop stays free. Observation tracks per property, so a view body
 // re-evaluates only for the properties it actually read — which is why the
-// skins are split into child views along update boundaries.
+// panel is split into child views along update boundaries.
 
 import AppKit
 import ApplicationServices
@@ -38,9 +38,9 @@ final class RelayController {
     private(set) var isEditingInstructions = false
     var limitTurns = config.limitTurns
     var turns = config.turns
-    /// Which side sends the opening message. Chosen before a run — the
-    /// wireframe skin's courier points at whoever is nominated — and copied
-    /// into config at Start, which is where the relay loop reads it.
+    /// Which side sends the opening message. Chosen before a run by clicking
+    /// a perch (the turn line names the opener), and copied into config at
+    /// Start, which is where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
     var tileWindows = false
     var isRunning = false
@@ -65,24 +65,16 @@ final class RelayController {
     /// Pause press of the user's own; cleared whenever the user toggles
     /// the pause by hand, which takes ownership of it.
     @ObservationIgnored private var steerInitiatedPause = false
-    /// Panel presentation state, glass skin only: a run shrinks the panel to
-    /// the companion pane; the user can expand back mid-run. The AppKit shell
-    /// watches this (with logOpen) to animate the glass panel's frame; the
-    /// classic skin ignores it.
-    var compact = false
-    /// Whether the glass skin's log drawer is open.
-    var logOpen = false
     var logLines: [LogLine] = []
     var chatgptStatus = SideStatus(appName: "ChatGPT")
     var claudeStatus = SideStatus(appName: "Claude")
     var chatgptConversation = ConversationStatus.notStarted
     var claudeConversation = ConversationStatus.notStarted
     /// The running turn number (1-based) during a relay run; 0 outside one.
-    /// Feeds the wireframe skin's odometer. It survives the run's end so the
-    /// finished state stays readable, until resetSession or the next start
-    /// clears it.
+    /// Feeds the head's turn line. It survives the run's end so the finished
+    /// state stays readable, until resetSession or the next start clears it.
     var currentTurn = 0
-    /// How long the last run took, for the deck's post-run readout. Set when
+    /// How long the last run took, for the turn line's post-run clock. Set when
     /// a run finishes; cleared by resetSession and at the next start.
     var lastRunDuration: TimeInterval?
     @ObservationIgnored private var runStartedAt: Date?
@@ -92,8 +84,8 @@ final class RelayController {
     @ObservationIgnored private var instructionDrafts: [String: String] = [:]
     @ObservationIgnored private let scanner = ReadinessScanner()
     @ObservationIgnored private var panelVisible = false
-    /// Set by the AppKit shell; the skins' gear button routes here to open
-    /// the settings window above the panel.
+    /// Set by the AppKit shell; the panel's Settings… item routes here to
+    /// open the settings window above the panel.
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
@@ -269,7 +261,7 @@ final class RelayController {
     }
 
     /// The log is an in-memory tail read through the status item's debug
-    /// window (WireLogWindowView) — the transcript file holds the whole
+    /// window (PerchLogWindowView) — the transcript file holds the whole
     /// run. Bounded, trimming in chunks so removeFirst's element shuffle
     /// stays off the per-line path.
     private static let logCap = 500
@@ -313,7 +305,6 @@ final class RelayController {
         steeringText = ""
         steerInitiatedPause = false
         relayControl.reset()
-        compact = true
         updateScanner()
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
@@ -341,15 +332,14 @@ final class RelayController {
         }
     }
 
-    /// Whether a finished run is still on the instruments: turns on the
-    /// odometer, no run to own them. The wireframe deck shows its NEW
-    /// SESSION control in this state, and resetSession is what leaves it.
+    /// Whether a finished run is still on the panel: a turn count, no run to
+    /// own it. The head shows New session in this state, and resetSession is
+    /// what leaves it.
     var hasFinishedRun: Bool { !isRunning && currentTurn > 0 }
 
-    /// NEW SESSION: clear the finished run off the instruments — the turn
-    /// counter, the conversation cards, the duration readout. The prompt and
-    /// the run options stay as they are; they belong to the next run, not
-    /// the finished one.
+    /// New session: clear the finished run off the panel — the turn count,
+    /// the perches' sign-offs, the run clock. The prompt and the run options
+    /// stay as they are; they belong to the next run, not the finished one.
     func resetSession() {
         guard hasFinishedRun else { return }
         currentTurn = 0
@@ -370,7 +360,6 @@ final class RelayController {
         steeringText = ""
         steerInitiatedPause = false
         relayControl.setPaused(false)
-        compact = false
         updateScanner()
     }
 
@@ -468,15 +457,6 @@ final class RelayController {
             if freshChatgpt || freshClaude { usleep(700_000) }
             let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
             DispatchQueue.main.async { self?.append(report) }
-        }
-    }
-
-    /// Put the chat windows back where they were before the last tiling.
-    func restoreWindows() {
-        guard !isRunning else { return }
-        guard ensureTrusted(), let apps = resolveApps() else { return }
-        runOnWorkerThread {
-            unarrange([apps.chatgpt, apps.claude])
         }
     }
 

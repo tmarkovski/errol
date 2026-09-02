@@ -282,7 +282,7 @@ let defaultConversationTemplates = [
 ]
 
 /// The picker's shapes: the shipped defaults with any Settings edits applied.
-/// Computed so every reader — the three skins' pickers, the controller's
+/// Computed so every reader — the composer's pills, the controller's
 /// compose path — sees an edit the moment it lands.
 var conversationTemplates: [ConversationTemplate] {
     SettingsStore.shared.templates

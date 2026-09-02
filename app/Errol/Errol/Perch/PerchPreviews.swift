@@ -1,10 +1,11 @@
-// Every canvas the skin is worked on in, kept out of the view files the
-// same way WireframePreviews is.
+// Every canvas the panel is worked on in, kept out of the view files so
+// each of those stays about its view.
 
 import SwiftUI
 
 #Preview("Perch console (idle)") {
     PerchPanelView(controller: RelayController())
+        .padding(24)
         .background(Color(white: 0.75))
 }
 
@@ -31,6 +32,7 @@ import SwiftUI
     controller.chatgptConversation = .waiting
     controller.claudeConversation = .chatting
     return PerchPanelView(controller: controller)
+        .padding(24)
         .background(Color(white: 0.75))
 }
 
@@ -42,6 +44,7 @@ import SwiftUI
     controller.claudeConversation = .chatting
     controller.setSteeringText("Push on the pricing question before you wrap up.")
     return PerchPanelView(controller: controller)
+        .padding(24)
         .background(Color(white: 0.75))
 }
 
@@ -52,6 +55,7 @@ import SwiftUI
     controller.chatgptConversation = .ended
     controller.claudeConversation = .ended
     return PerchPanelView(controller: controller)
+        .padding(24)
         .background(Color(white: 0.75))
 }
 
@@ -70,7 +74,8 @@ private struct PerchHandoffPreview: View {
 
     var body: some View {
         PerchPanelView(controller: controller)
-            .background(Color(white: 0.75))
+            .padding(24)
+        .background(Color(white: 0.75))
             .task {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(2.2))

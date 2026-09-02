@@ -1,6 +1,6 @@
 // The AppKit shell around the SwiftUI interface: the status item (an owl,
-// hidden until clicked) and the floating panel that hosts the compiled-in
-// skin (PanelRootView).
+// hidden until clicked) and the floating panel that hosts the console
+// (PerchPanelView).
 //
 // The shell stays AppKit on purpose. SwiftUI's MenuBarExtra window dismisses
 // itself whenever another app activates — which the relay does on every
@@ -68,8 +68,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: KeyablePanel!
     private let relay = RelayController()
-    /// What the layout tracker last applied, so re-runs that land on the
-    /// same size don't restart the frame animation.
+    /// What fitPanel last applied, so a card re-reporting the same size
+    /// doesn't restart the frame animation.
     private var lastPanelSize: CGSize?
     /// Settings rides the same non-activating panel machinery as the console
     /// and floats one level above it, so it opens over the panel without
@@ -83,9 +83,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Auto-update. Created at launch so background checks start immediately;
     /// everything that could interrupt a run is gated inside it.
     private var updater: UpdaterController!
-    /// The panel's toolbar delegate (wireframe or perch chrome). NSToolbar
-    /// holds its delegate weakly, so the shell keeps it alive.
-    private var panelChrome: (any NSToolbarDelegate)?
+    /// The panel's toolbar delegate (PerchChrome). NSToolbar holds its
+    /// delegate weakly, so the shell keeps it alive.
+    private var panelChrome: PerchChromeToolbar?
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
@@ -185,104 +185,53 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Panel
 
-    /// Window chrome follows the compiled-in skin.
+    /// The console's window is titled, but draws none of its chrome —
+    /// transparent title bar, hidden title, content run up under it — so the
+    /// paper card fills the window and AppKit's close button lands on the
+    /// strip across its top (Perch.chromeBand). That is the one way to get
+    /// the real window buttons with their own behavior (the hover glyphs, a
+    /// first click that lands on an unfocused window, Cmd+W) without AppKit
+    /// drawing a title bar over the card: a borderless window has no title
+    /// bar to hang them on, and `standardWindowButton` answers nil for one.
+    /// The cost is that AppKit owns where they sit — top-left, in the title
+    /// bar's strip — which is why the card pads its top past them, and owns
+    /// the window's corner mask and shadow, which the card reads as its own
+    /// edge instead of painting.
     ///
-    /// Classic keeps the original titled utility panel. Glass gets a
-    /// borderless transparent panel, so its Liquid Glass surfaces sample the
-    /// desktop behind the window. Wireframe (and perch, which mirrors its
-    /// chrome) is titled but draws none of its
-    /// chrome — transparent title bar, hidden title, content run up under it
-    /// — so the paper card fills the window and AppKit's close button lands
-    /// on the band across its top (Wire.chromeBand). That is the one way to
-    /// get the real window buttons with their own behavior (the hover
-    /// glyphs, a first click that lands on an unfocused window, Cmd+W)
-    /// without AppKit drawing a title bar over the skin: a borderless window
-    /// has no title bar to hang them on, and `standardWindowButton` answers
-    /// nil for one. The cost is that AppKit owns where they sit — top-left,
-    /// in the title bar's strip — which is why the card pads its top past
-    /// them, and owns the window's corner mask and shadow, which the card
-    /// now reads as its own edge instead of painting.
-    ///
-    /// Esc hides any of them; the header strip and bare paper drag the two
-    /// that have no title bar to drag by; the frame animates with the
-    /// console/companion morph.
+    /// Esc hides it; the bare paper drags it; the frame follows the card
+    /// (fitPanel).
     private func buildPanel() {
-        let size = PanelLayout.size(style: activePanelStyle, compact: relay.compact,
-                                    logOpen: relay.logOpen, steering: relay.isSteering,
-                                    fullPrompt: relay.showsFullInstructionsEditor)
-        switch activePanelStyle {
-        case .classic:
-            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
-                                 styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
-        case .glass:
-            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
-                                 styleMask: [.borderless, .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            panel.hasShadow = false
-            // Carries the glass skin, whose surfaces float over window
-            // background AppKit can see is unclaimed.
-            panel.isMovableByWindowBackground = true
-            // Follow presentation changes with an animated frame change,
-            // anchored top-center so the panel hangs from the status item.
-            trackPanelLayout()
-        case .wireframe:
-            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
-                                 styleMask: [.titled, .closable, .fullSizeContentView,
-                                             .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
-            panel.titlebarAppearsTransparent = true
-            panel.titleVisibility = .hidden
-            panel.titlebarSeparatorStyle = .none
-            // The toolbar does two jobs. Attached at all, it grows the
-            // title strip from the bare 28pt to the unified bar's 52pt and
-            // centers the close button in it with the roomier inset Safari
-            // and Mail have (Wire.chromeBand mirrors the height). And it
-            // carries the strip's contents — the state word and the gear —
-            // as real toolbar items, the one way controls up there receive
-            // clicks rather than losing them to the bar's drag
-            // (WireChromeToolbar).
-            let chrome = WireChromeToolbar(controller: relay)
-            panelChrome = chrome
-            panel.toolbar = chrome.makeToolbar()
-            panel.toolbarStyle = .unified
-            // Close is the only button offered: the card is a fixed size, so
-            // zoom has nothing to do, and a panel does not miniaturize.
-            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-            panel.standardWindowButton(.zoomButton)?.isHidden = true
-            // The card paints the paper over the whole window; AppKit masks
-            // the corners and casts the shadow the skin used to draw itself.
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            // The card covers its whole window, so it names its own drag
-            // region (WireframePanelView); this catches whatever it
-            // leaves, the title bar's own strip aside.
-            panel.isMovableByWindowBackground = true
-            // No layout tracker: the card is content-sized and reports each
-            // laid-out size itself (fitPanel, wired below).
-        case .perch:
-            // The wireframe's window chrome exactly (see that case for the
-            // reasoning); only the toolbar's contents differ — the state
-            // pill and the session overflow (PerchChrome).
-            panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
-                                 styleMask: [.titled, .closable, .fullSizeContentView,
-                                             .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
-            panel.titlebarAppearsTransparent = true
-            panel.titleVisibility = .hidden
-            panel.titlebarSeparatorStyle = .none
-            let chrome = PerchChromeToolbar(controller: relay)
-            panelChrome = chrome
-            panel.toolbar = chrome.makeToolbar()
-            panel.toolbarStyle = .unified
-            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-            panel.standardWindowButton(.zoomButton)?.isHidden = true
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            panel.isMovableByWindowBackground = true
-        }
+        panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: PerchMetrics.initialPanel),
+                             styleMask: [.titled, .closable, .fullSizeContentView,
+                                         .nonactivatingPanel],
+                             backing: .buffered, defer: false)
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.titlebarSeparatorStyle = .none
+        // The toolbar does two jobs. Attached at all, it grows the title
+        // strip from the bare 28pt to the unified bar's 52pt and centers the
+        // close button in it with the roomier inset Safari and Mail have
+        // (Perch.chromeBand mirrors the height). And it carries the strip's
+        // contents — the state pill and the session menu — as real toolbar
+        // items, the one way controls up there receive clicks rather than
+        // losing them to the bar's drag (PerchChromeToolbar).
+        let chrome = PerchChromeToolbar(controller: relay)
+        panelChrome = chrome
+        panel.toolbar = chrome.makeToolbar()
+        panel.toolbarStyle = .unified
+        // Close is the only button offered: the card is a fixed width and
+        // sizes its own height, so zoom has nothing to do, and a panel does
+        // not miniaturize.
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        // The card paints the paper over the whole window; AppKit masks the
+        // corners and casts the shadow from that shape.
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        // The card covers its whole window, so it names its own drag region
+        // (PerchPanelView); this catches whatever it leaves, the title bar's
+        // own strip aside.
+        panel.isMovableByWindowBackground = true
         panel.title = "Errol"
         // Ordering and occlusion combine into one effective visibility: a
         // panel parked behind other windows is still "visible" to AppKit's
@@ -300,19 +249,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = FirstMouseHostingView(rootView: PanelRootView(
+        panel.contentView = FirstMouseHostingView(rootView: PerchPanelView(
             controller: relay,
             onCardResize: { [weak self] size in
                 // The report lands mid-layout; the hop keeps the window's
                 // frame change out of the pass that measured the card.
                 DispatchQueue.main.async { self?.fitPanel(to: size) }
-            }))
+            })
+            // The card hangs from the top of whatever frame the window has
+            // at the moment — its opening size, or the last fit while a
+            // resize is still animating — and runs up under the title bar,
+            // whose strip is where the close button stands, so the
+            // safe-area inset is declined. Both are window concerns, kept
+            // here rather than in the view so it previews at its own size.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea())
     }
 
-    /// The content-sized skins (wireframe, perch): follow the card. Each
-    /// size it reports (PanelRootView.onCardResize) becomes the window's,
-    /// through the same anchored, animated frame change the glass skin's
-    /// layout tracker uses.
+    /// Follow the card: it is content-sized, and each size it reports
+    /// (PerchPanelView.onCardResize) becomes the window's, through an
+    /// anchored, animated frame change.
     private func fitPanel(to size: CGSize) {
         guard size != lastPanelSize else { return }
         lastPanelSize = size
@@ -343,20 +299,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // back: a staged install, or an update it found but never presented.
         if wasRunning, !running { updater?.relayDidFinish() }
         wasRunning = running
-    }
-
-    private func trackPanelLayout() {
-        let rearm = MainQueueHop { [weak self] in self?.trackPanelLayout() }
-        let size = withObservationTracking {
-            PanelLayout.size(style: activePanelStyle, compact: relay.compact,
-                             logOpen: relay.logOpen, steering: relay.isSteering,
-                             fullPrompt: relay.showsFullInstructionsEditor)
-        } onChange: {
-            rearm.run()
-        }
-        guard size != lastPanelSize else { return }
-        lastPanelSize = size
-        resizePanel(to: size)
     }
 
     private func resizePanel(to size: CGSize) {
@@ -416,8 +358,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Settings window
 
-    /// The settings card wears the wireframe skin, so its window chrome
-    /// follows the panel's: non-activating (typing works — KeyablePanel
+    /// The settings card wears the console's idiom, so its window chrome
+    /// follows the console's: non-activating (typing works — KeyablePanel
     /// forces key status), titled but bare so only the system close button
     /// shows over the card's paper, and a level above the floating console
     /// so it always opens on top of it.
@@ -468,7 +410,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
             window.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1)
             window.contentView = FirstMouseHostingView(
-                rootView: WireLogWindowView(controller: relay))
+                rootView: PerchLogWindowView(controller: relay))
             window.center()
             logWindow = window
         }

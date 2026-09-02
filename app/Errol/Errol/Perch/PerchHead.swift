@@ -1,13 +1,13 @@
 // The head: the two perches with their avatars (PerchAvatar — the apps'
 // own icons) and presence dots, the dotted flight path between them with
 // the courier bead riding it, and the turn line that says in one quiet
-// sentence what the panel is doing. See PerchPanelView for the skin.
+// sentence what the panel is doing. See PerchPanelView for the panel.
 
 import SwiftUI
 
-/// One view on purpose, like the wireframe's head: everything here depends
-/// on the same relay-state cluster, so splitting it further would add
-/// plumbing without separating meaningful updates.
+/// One view on purpose: everything here depends on the same relay-state
+/// cluster, so splitting it further would add plumbing without separating
+/// meaningful updates.
 struct PerchHead: View {
     let controller: RelayController
 
@@ -40,7 +40,8 @@ struct PerchHead: View {
 
     private func perch(_ speaker: Speaker, status: SideStatus,
                        conversation: ConversationStatus, feather: Color) -> some View {
-        VStack(spacing: Perch.s(7)) {
+        let line = subline(status: status, conversation: conversation)
+        return VStack(spacing: Perch.s(7)) {
             PerchAvatar(bundleID: bundleID(for: speaker),
                         initial: String(status.appName.prefix(1)), feather: feather,
                         presence: presenceColor(status: status, conversation: conversation))
@@ -48,11 +49,15 @@ struct PerchHead: View {
                 Text(status.appName)
                     .font(Perch.text(13, .semibold))
                     .foregroundColor(Perch.ink)
-                Text(subline(status: status, conversation: conversation))
+                Text(line)
                     .font(Perch.text(11))
                     .foregroundColor(Perch.muted)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    // "Replying…" shimmers: the one line that means busy.
+                    .perchShimmer(active: conversation == .chatting)
+                    .contentTransition(.opacity)
+                    .animation(Perch.fade, value: line)
             }
         }
         .frame(width: Perch.s(132))
@@ -82,7 +87,7 @@ struct PerchHead: View {
 
     /// Green when the side is relayable, amber while it is the one composing,
     /// red when it is not relayable, and the path's gray while the first
-    /// sweep is still out. One dot instead of the wireframe's two lamps: the
+    /// sweep is still out. One dot, not a pair of ready and live lamps: the
     /// turn line says the rest in words.
     private func presenceColor(status: SideStatus,
                                conversation: ConversationStatus) -> Color {
@@ -127,6 +132,8 @@ struct PerchHead: View {
             .font(Perch.text(11))
             .foregroundColor(Perch.muted)
             .lineLimit(1)
+            .contentTransition(.opacity)
+            .animation(Perch.fade, value: turnText)
     }
 
     private var turnText: String {
@@ -207,7 +214,7 @@ struct PerchHead: View {
 }
 
 /// The dotted arc between the perches, with the courier bead riding it. The
-/// bead's move is the skin's signature motion: it hops the arc on every
+/// bead's move is the panel's signature motion: it hops the arc on every
 /// handoff with a little spring, the one playful gesture in an otherwise
 /// native panel.
 struct PerchFlightPath: View {

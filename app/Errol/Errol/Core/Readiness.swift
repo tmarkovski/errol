@@ -29,7 +29,7 @@ enum ReadyState {
 }
 
 /// Equatable so the controller can drop no-change sweeps instead of
-/// republishing (and re-rendering the skins) every poll.
+/// republishing (and re-rendering the panel) every poll.
 struct SideStatus: Equatable {
     var appName: String
     var state = ReadyState.checking

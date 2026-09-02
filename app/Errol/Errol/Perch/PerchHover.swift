@@ -1,4 +1,4 @@
-// Hover feedback for the skin's controls. Everything clickable here is a
+// Hover feedback for the panel's controls. Everything clickable here is a
 // plain-styled button or a tap target drawing its own look, so nothing
 // answers the pointer unless asked to; this is the one idiom they share: a
 // tint washed over the control's own shape while the pointer rests on it —
@@ -51,7 +51,7 @@ struct PerchHoverInk: ViewModifier {
 }
 
 extension View {
-    /// The skin's hover wash over `shape`, the control's own outline. The
+    /// The panel's hover wash over `shape`, the control's own outline. The
     /// default is the ink tint that suits paper-colored controls; filled
     /// controls pass their own (white over ink, a deeper ink over amber).
     func perchHover<S: Shape>(_ shape: S, tint: Color = Perch.ink,
