@@ -4,6 +4,9 @@ name: Deploy Errol site
 # repository under the Worker's Build settings in the Cloudflare dashboard, or
 # both systems will deploy the same Worker on every push. Missing credentials
 # fail the run on purpose: a green check on main must mean the site shipped.
+#
+# Wrangler is called directly rather than through cloudflare/wrangler-action so
+# the deploy uses the exact version pinned in site/package-lock.json.
 
 on:
   push:
@@ -24,14 +27,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Wrangler reads these two directly; no action-specific inputs needed.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
     defaults:
       run:
         working-directory: site
     steps:
       - name: Require Cloudflare credentials
-        if: ${{ env.CF_API_TOKEN == '' || env.CF_ACCOUNT_ID == '' }}
+        if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' }}
         working-directory: .
         run: |
           echo "::error::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets. This workflow is the site's only deploy path, so it fails instead of skipping."
@@ -45,9 +50,4 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
-          workingDirectory: site
-          command: deploy
+        run: npx wrangler deploy
