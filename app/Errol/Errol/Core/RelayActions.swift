@@ -83,11 +83,40 @@ func pressCopyButton(in target: TargetApp) -> String? {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+/// What a cut message ends with, so the peer sees it was cut rather than a
+/// silent ellipsis.
+let relayTruncationMark = "\n\n[truncated by relay]"
+
 /// The per-message length cap, applied before pasting — the protection
 /// (with the turn cap) against two chatty models burning through usage.
+/// The plain cap keeps the beginning; a handoff carrying steering notes is
+/// assembled to fit under it first (HandoffPayload), so the notes travel
+/// whole and this never cuts one.
 func truncatedForRelay(_ text: String) -> String {
     guard text.count > config.maxChars else { return text }
-    return String(text.prefix(config.maxChars)) + "\n\n[truncated by relay]"
+    return String(text.prefix(config.maxChars)) + relayTruncationMark
+}
+
+/// How a send ended, as far as the relay could observe.
+enum SendOutcome: Equatable {
+    /// The paste was verified in the composer and a submission signal was
+    /// observed afterwards: the message is in the conversation.
+    case confirmed
+    /// A submission was attempted without a signal that confirms it — or
+    /// the paste itself never verified, in which case no later signal can
+    /// vouch for what was submitted.
+    case unconfirmed
+    /// The foreground was lost during confirmation, after a submission may
+    /// already have gone out. The relay stops rather than type into
+    /// whatever took focus.
+    case abandoned
+    /// The foreground could not be taken before typing; nothing was typed.
+    case refused
+
+    /// Whether the relay can go on to the next turn: a message that may
+    /// well have landed does not end the run, the two that lost the
+    /// machine do.
+    var continuesRun: Bool { self == .confirmed || self == .unconfirmed }
 }
 
 enum PasteReceipt: Equatable {
@@ -125,7 +154,11 @@ func waitForPasteReceipt(needle: String, input: AXUIElement?, selectors: AppSele
     } while true
 }
 
-func send(_ text: String, to target: TargetApp) -> Bool {
+/// Paste `text` into the target's composer and submit it. The outcome says
+/// how much of that was seen to happen; only `.confirmed` means both the
+/// paste and the submission were observed, which is what a steering note's
+/// receipt is allowed to rest on.
+func send(_ text: String, to target: TargetApp) -> SendOutcome {
     let payload = truncatedForRelay(text)
     if payload.count != text.count {
         log("\(target.name): payload truncated to \(config.maxChars) chars")
@@ -139,7 +172,7 @@ func send(_ text: String, to target: TargetApp) -> Bool {
     guard makeFrontmost(target) else {
         log("\(target.name): could not bring app to front; refusing to type into another app's window")
         log("\(target.name): \(focusReport(target))")
-        return false
+        return .refused
     }
 
     // Synthesized keystrokes follow the KEY window, which can lag behind the
@@ -148,6 +181,10 @@ func send(_ text: String, to target: TargetApp) -> Bool {
     // in the composer, not assumed: paste, check for the payload text or a new
     // pasted-text attachment chip, and on a miss force a LaunchServices
     // activation (the one call that moves key status too) and paste again.
+    // A paste that never verified caps the outcome at unconfirmed whatever
+    // the composer does afterwards: a send signal cannot vouch for a
+    // payload nobody saw land.
+    var pasteVerified = false
     let needle = String(payload.prefix(while: { $0 != "\n" }).prefix(32))
     pasteAttempts: for attempt in 0..<2 {
         let input = inputArea(in: target)
@@ -167,6 +204,7 @@ func send(_ text: String, to target: TargetApp) -> Bool {
             if receipt == .attachment {
                 log("\(target.name): paste landed as a text attachment")
             }
+            pasteVerified = true
             break pasteAttempts
         }
         if attempt == 0 {
@@ -195,27 +233,53 @@ func send(_ text: String, to target: TargetApp) -> Bool {
 
     // Confirm the send landed; if not, escalate through the known variants,
     // re-checking frontmost before each keystroke so an app that stole focus
-    // mid-send doesn't receive stray Returns.
-    if !confirmSend(in: target, from: beforeSend, buttonSignal: hadSendButton, within: 3) {
+    // mid-send doesn't receive stray Returns. A surface that offers no
+    // signal to watch is not escalated — another Return could only double a
+    // send nobody can see — and reports unconfirmed, not success.
+    var confirmation = confirmSend(in: target, from: beforeSend,
+                                   buttonSignal: hadSendButton, within: 3)
+    if confirmation == .pending {
         guard isFrontmost(target) else {
             log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
-            return false
+            return .abandoned
         }
         log("\(target.name): send unconfirmed, trying Return keystroke")
         keystroke(keyReturn)
-        if !confirmSend(in: target, from: beforeSend, buttonSignal: hadSendButton, within: 3) {
+        confirmation = confirmSend(in: target, from: beforeSend,
+                                   buttonSignal: hadSendButton, within: 3)
+        if confirmation == .pending {
             guard isFrontmost(target) else {
                 log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
-                return false
+                return .abandoned
             }
             log("\(target.name): send still unconfirmed, trying Cmd+Return")
             keystroke(keyReturn, flags: .maskCommand)
-            if !confirmSend(in: target, from: beforeSend, buttonSignal: hadSendButton, within: 3) {
+            confirmation = confirmSend(in: target, from: beforeSend,
+                                       buttonSignal: hadSendButton, within: 3)
+            if confirmation == .pending {
                 log("\(target.name): WARNING: could not confirm the message was sent")
             }
         }
+    } else if confirmation == .unobservable {
+        log("\(target.name): WARNING: nothing to confirm the send against on this surface — no readable composer and no send button")
     }
-    return true
+    guard confirmation == .confirmed else { return .unconfirmed }
+    guard pasteVerified else {
+        log("\(target.name): WARNING: the send was confirmed but the paste never was; treating it as unconfirmed")
+        return .unconfirmed
+    }
+    return .confirmed
+}
+
+/// What one confirmation window learned about the send.
+enum SendConfirmation: Equatable {
+    /// A signal said the message left the composer.
+    case confirmed
+    /// A signal exists to watch and has not fired yet — worth escalating.
+    case pending
+    /// Neither signal exists on this surface: no readable composer and no
+    /// send button. Nothing can be learned by waiting, or by pressing again.
+    case unobservable
 }
 
 /// The message really left the composer. Two independent signals, either
@@ -226,23 +290,24 @@ func send(_ text: String, to target: TargetApp) -> Bool {
 /// after a successful send on Claude Code, so it cannot be the only check.
 /// The button signal only counts when a send button existed at press time —
 /// otherwise its absence is the app's normal idle state, not a confirmation.
+/// With neither signal there is nothing to verify, and that is reported as
+/// such rather than as a success.
 func confirmSend(in target: TargetApp, from before: String?, buttonSignal: Bool,
-                 within seconds: TimeInterval) -> Bool {
-    // With no readable composer and no button to watch, there is nothing to verify.
-    guard before != nil || buttonSignal else { return true }
+                 within seconds: TimeInterval) -> SendConfirmation {
+    guard before != nil || buttonSignal else { return .unobservable }
     let deadline = Date().addingTimeInterval(seconds)
     while Date() < deadline {
-        if before != nil, composerValue(in: target) != before { return true }
+        if before != nil, composerValue(in: target) != before { return .confirmed }
         if buttonSignal {
             if let button = sendButton(in: target) {
-                if (axAttribute(button, kAXEnabledAttribute) as? Bool) == false { return true }
+                if (axAttribute(button, kAXEnabledAttribute) as? Bool) == false { return .confirmed }
             } else {
-                return true
+                return .confirmed
             }
         }
         usleep(200_000)
     }
-    return false
+    return .pending
 }
 
 /// The pre-send snapshot a response is detected against. Two independent

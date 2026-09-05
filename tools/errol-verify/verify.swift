@@ -296,9 +296,13 @@ struct Verify {
 
         let start = Date()
         var baseline = responseBaseline(in: target)
-        guard send(probe, to: target) else {
-            report("FAIL", "live-send", "send() returned false")
+        let outcome = send(probe, to: target)
+        guard outcome.continuesRun else {
+            report("FAIL", "live-send", "send() ended the attempt: \(outcome)")
             return
+        }
+        if outcome == .unconfirmed {
+            report("WARN", "live-send", "send() could not confirm the submission; continuing on the response")
         }
         baseline = absorbEchoIntoBaseline(in: target, preSend: baseline)
         report("PASS", "live-send", "sent; baseline \(baseline.affordances) affordance(s)"

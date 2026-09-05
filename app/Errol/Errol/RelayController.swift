@@ -16,6 +16,47 @@ struct LogLine: Identifiable {
     let text: String
 }
 
+/// A note the worker has committed to a handoff and is pasting now: out
+/// of the field, not yet with an outcome. The design is
+/// docs/design-proposals/steering/the-note-stays-put.md, as revised at its
+/// end: typing holds the run, Return queues, the head says where the note
+/// is.
+struct SteeringInFlight: Equatable {
+    var note: String
+    /// The recipient's app name.
+    var recipient: String
+    var turn: Int
+}
+
+/// The record of a note's journey, the head's line under the turn line
+/// once the note has left the field, kept until the next note or New
+/// session. Every field is what was observed, so "shared" is never assumed.
+struct SteeringReceipt: Equatable {
+    enum Outcome: Equatable {
+        /// Delivery confirmed: paste verified and a submission signal seen.
+        case sent
+        /// Submitted, no confirming signal.
+        case unconfirmed
+        /// Never reached the recipient, for the reason given.
+        case notSent(SteeringOutcome)
+        /// A draft the run ended on, never queued.
+        case neverQueued
+    }
+    enum Echo: Equatable {
+        case shared(turn: Int)
+        case unconfirmed
+        case notShared
+    }
+    var note: String
+    /// The recipient's app name; nil for a draft that never went anywhere.
+    var recipient: String?
+    var turn: Int?
+    var outcome: Outcome
+    /// The echo to the other side, once its handoff has happened or been
+    /// ruled out; nil while it is still ahead.
+    var echo: Echo?
+}
+
 @Observable
 final class RelayController {
     /// The picker tag for free-form instructions; not a ConversationTemplate.
@@ -41,27 +82,28 @@ final class RelayController {
     var firstSpeaker = Speaker.chatgpt
     var tileWindows = false
     var isRunning = false
-    /// Whether a pause has been *asked for* (see RelayControl). The run
-    /// keeps going until it reaches the next handoff.
+    /// Whether the human has *asked for* a pause with the Pause control (see
+    /// RelayControl). The run keeps going until it reaches the next handoff.
+    /// The other way a hold gets requested is a note being written;
+    /// `holdRequested` is the two together, and is what the chrome reads.
     var isPaused = false
     /// Whether the run has actually parked at that handoff. Between the two
     /// the agent that was composing is still finishing its reply, which is
     /// the gap the panel's route draws.
     var isHolding = false
-    /// Whether a steering note is being written. Driven by the composer's
-    /// text through setSteeringText: typing into the run's composer is what
-    /// begins a steer, and erasing the note (or Esc) is what calls it off.
-    /// Steer asks for a pause the way the Pause control does — room to
-    /// write — and posting or calling off the note releases that pause only
-    /// if Steer was what asked for it.
-    private(set) var isSteering = false
-    /// The steering note. The composer writes it through setSteeringText,
-    /// which is where the typing-begins-a-steer transition lives.
+    /// The steering field's text. The composer writes it through
+    /// setSteeringText, which is where typing takes effect on the run.
     var steeringText = ""
-    /// Whether the current pause exists on Steer's account rather than a
-    /// Pause press of the user's own; cleared whenever the user toggles
-    /// the pause by hand, which takes ownership of it.
-    @ObservationIgnored private var steerInitiatedPause = false
+    /// The field's text as it stood when Return queued it, while the note
+    /// is in the mailbox; nil otherwise. Text that differs from it is a
+    /// note being written, and a note being written holds the run.
+    private(set) var queuedSteering: String?
+    /// The note the worker has committed and is pasting, between the
+    /// committed event and the outcome.
+    private(set) var steeringInFlight: SteeringInFlight?
+    /// The last note's record, for the head. Cleared by resetSession and at
+    /// the next start.
+    private(set) var lastReceipt: SteeringReceipt?
     var logLines: [LogLine] = []
     var chatgptStatus = SideStatus(appName: "ChatGPT")
     var claudeStatus = SideStatus(appName: "Claude")
@@ -110,6 +152,10 @@ final class RelayController {
                 currentTurn = turn
             case .holding(let holding):
                 isHolding = holding
+            case .steeringCommitted(let note, let recipient, let turn):
+                steeringCommitted(note, to: recipient, turn: turn)
+            case .steering(let delivery):
+                steeringDelivered(delivery)
             case .finished:
                 finishRun()
             }
@@ -233,9 +279,8 @@ final class RelayController {
         isRunning = true
         isPaused = false
         isHolding = false
-        isSteering = false
-        steeringText = ""
-        steerInitiatedPause = false
+        resetSteering()
+        lastReceipt = nil
         relayControl.reset()
         updateScanner()
         chatgptConversation = .notStarted
@@ -270,108 +315,253 @@ final class RelayController {
     var hasFinishedRun: Bool { !isRunning && currentTurn > 0 }
 
     /// New session: clear the finished run off the panel — the turn count,
-    /// the perches' sign-offs, the run clock. The prompt and the run options
-    /// stay as they are; they belong to the next run, not the finished one.
+    /// the perches' sign-offs, the run clock, the last note's record. The
+    /// prompt and the run options stay as they are; they belong to the next
+    /// run, not the finished one.
     func resetSession() {
         guard hasFinishedRun else { return }
         currentTurn = 0
         lastRunDuration = nil
+        lastReceipt = nil
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
     }
 
     /// The run's `.finished` event: put the panel back to idle. Ordered
     /// after every line the run logged, because it rides the same stream.
+    /// Whatever the note was doing becomes its record for the head, since
+    /// the composer goes back to the topic and ending is exactly when
+    /// someone inspects what happened.
     private func finishRun() {
         lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
         runStartedAt = nil
         isRunning = false
         isPaused = false
         isHolding = false
-        isSteering = false
-        steeringText = ""
-        steerInitiatedPause = false
+        recordSteeringAtRunEnd()
+        resetSteering()
         relayControl.setPaused(false)
         updateScanner()
     }
 
     func stop() {
         guard isRunning else { return }
-        // Clear any pause so the loop wakes and reaches its cancel check;
-        // a half-written steering note has nothing left to steer.
+        // Clear every hold so the loop wakes and reaches its cancel check.
+        // The note stays where it is; the run's end records what became of it.
         isPaused = false
-        isSteering = false
-        steeringText = ""
-        steerInitiatedPause = false
         relayControl.setPaused(false)
         relayControl.cancel()
         append("Stop requested — ending the run at the next safe point...")
     }
 
+    // MARK: Pause
+
+    /// Whether a hold is asked for, by either route: the Pause control, or
+    /// a note being written. The pill and the turn line read this, since a
+    /// hold is a hold whoever asked.
+    var holdRequested: Bool { isPaused || steeringDirty }
+
     /// Pause holds the run at the next handoff boundary; the agent currently
     /// composing finishes its reply, which is captured but not delivered
-    /// until Resume.
+    /// until Resume. Resume lifts the pressed pause and nothing else: a note
+    /// still being written keeps its own hold until it is queued or cleared.
     func togglePause() {
         guard isRunning else { return }
         isPaused.toggle()
-        relayControl.setPaused(isPaused)
-        // A pause toggled by hand is the user's own, whichever way it went.
-        steerInitiatedPause = false
+        syncHold()
         if isPaused {
             append("Pause requested — the run holds at the next handoff.")
+        } else if steeringDirty {
+            append("Resumed — the note being written still holds the next handoff until you queue it or clear it.")
         }
     }
 
-    /// The composer's write path for the steering note. Steering has no
-    /// button: typing the first word of a note holds the run at the next
-    /// handoff — the note rides that handoff to whoever replies next, and is
-    /// echoed to the other side a turn later, so both learn of it and in
-    /// what order — and erasing the note whole calls the steer off again,
-    /// the same release Esc asks for by name (cancelSteer).
+    /// The engine's pause flag is the two holds together. Every change to
+    /// either goes through here, so the flag never lags the state the
+    /// chrome shows.
+    private func syncHold() {
+        relayControl.setPaused(isPaused || steeringDirty)
+    }
+
+    // MARK: Steering
+
+    /// Whether the field holds a note that is not queued: something written
+    /// since the last queue, or a first draft. It is the note's hold on the
+    /// run — writing one is asking the relay to wait at the next handoff —
+    /// and the state in which the primary circle is Queue.
+    var steeringDirty: Bool {
+        queuedSteering == nil
+            && !steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Whether a note is in the mailbox, waiting for its handoff.
+    var steeringQueued: Bool { queuedSteering != nil }
+
+    /// The side a queued note reaches first: whoever is about to reply,
+    /// which is the side not composing now — the reply being written goes
+    /// to them, and the note goes with it. nil in the moments nobody is
+    /// composing.
+    var nextRecipient: String? {
+        switch (chatgptConversation, claudeConversation) {
+        case (.chatting, _), (.replied, _): return claudeStatus.appName
+        case (_, .chatting), (_, .replied): return chatgptStatus.appName
+        default: return nil
+        }
+    }
+
+    /// The other side's name, for the receipt's echo clause.
+    func otherName(than appName: String) -> String {
+        appName == chatgptStatus.appName ? claudeStatus.appName : chatgptStatus.appName
+    }
+
+    private func appName(_ speaker: Speaker) -> String {
+        switch speaker {
+        case .chatgpt: chatgptStatus.appName
+        case .claude: claudeStatus.appName
+        }
+    }
+
+    /// The field's write path, and where typing acts on the run. Text that
+    /// is not queued holds the next handoff, so the note lands where the
+    /// human meant it to rather than one handoff late; the hold lifts when
+    /// Return queues it or Esc clears it. Typing into a queued note takes
+    /// it back off the mailbox and puts the hold on in one locked step
+    /// (RelayControl.claimSteering). If the worker committed it first, the
+    /// claim loses: that note is on its way, the committed event says so,
+    /// and what is in the field from here is a new note.
     func setSteeringText(_ text: String) {
-        steeringText = text
         guard isRunning else { return }
-        let hasNote = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if hasNote, !isSteering {
-            isSteering = true
-            if isPaused {
-                append("Steer — the run is already pausing; the note rides the handoff when you resume.")
+        if let queued = queuedSteering, text != queued {
+            queuedSteering = nil
+            if relayControl.claimSteering() != nil {
+                append("Note taken back to change it — the run holds at the next handoff until you queue it again or clear it.")
             } else {
-                steerInitiatedPause = true
-                isPaused = true
-                relayControl.setPaused(true)
-                append("Steer — the run holds at the next handoff while you write.")
+                append("The note had already gone out with the handoff; what you type now is a new note.")
             }
-        } else if !hasNote, isSteering {
-            cancelSteer()
+        }
+        steeringText = text
+        syncHold()
+    }
+
+    /// Return, or the Queue circle: commit the text to the next handoff.
+    /// The mailbox takes the trimmed note, the field keeps the text as
+    /// written under a wash, and the note's hold lifts — a pressed pause
+    /// stays, and the note goes out when the human resumes. Posting comes
+    /// before the hold lifts, so the handoff the flag releases is one that
+    /// finds the note.
+    func queueSteering() {
+        guard isRunning, steeringDirty else { return }
+        let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
+        relayControl.postSteering(note)
+        queuedSteering = steeringText
+        syncHold()
+        append(isPaused
+            ? "Note queued — it goes out with the handoff when you resume."
+            : "Note queued — it goes out with the next handoff.")
+    }
+
+    /// Esc: clear the field, take a queued note back, and lift the note's
+    /// hold. A pressed pause stays; Resume is what lifts that. Returns
+    /// whether there was anything to clear, so the composer can let Esc
+    /// mean "leave the field" when there was not.
+    @discardableResult
+    func clearSteering() -> Bool {
+        guard isRunning else { return false }
+        var cleared = false
+        if queuedSteering != nil {
+            queuedSteering = nil
+            cleared = true
+            if relayControl.takeSteering() != nil {
+                append("Note withdrawn.")
+            } else {
+                append("The note had already gone out with the handoff.")
+            }
+        }
+        if !steeringText.isEmpty {
+            steeringText = ""
+            cleared = true
+        }
+        syncHold()
+        return cleared
+    }
+
+    /// Everything about the note, at a run's start and end.
+    private func resetSteering() {
+        steeringText = ""
+        queuedSteering = nil
+        steeringInFlight = nil
+    }
+
+    /// The worker won the handoff: the note is the courier's, and the field
+    /// lets go of it — its text clears and the head takes over the story.
+    /// The field is left alone when it no longer shows that note: the human
+    /// typed in the instant before the commit and the claim lost, and what
+    /// they have now is a new note, holding the next handoff as any draft
+    /// does.
+    private func steeringCommitted(_ note: String, to recipient: Speaker, turn: Int) {
+        steeringInFlight = SteeringInFlight(note: note, recipient: appName(recipient), turn: turn)
+        if let queued = queuedSteering,
+           queued.trimmingCharacters(in: .whitespacesAndNewlines) == note {
+            queuedSteering = nil
+            steeringText = ""
+            syncHold()
         }
     }
 
-    func sendSteering() {
-        let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isRunning, isSteering, !note.isEmpty else { return }
-        relayControl.postSteering(note)
-        closeSteer()
-        append(isPaused
-            ? "Steering note posted — it rides the handoff when you resume."
-            : "Steering note posted — it rides the next handoff.")
+    /// One leg's outcome becomes the record. A note leg reported straight
+    /// off the mailbox — too long to travel whole, or the run ended with
+    /// it queued — never had a committed event, so the field lets go of it
+    /// here instead.
+    private func steeringDelivered(_ delivery: SteeringDelivery) {
+        let recipient = appName(delivery.recipient)
+        switch delivery.leg {
+        case .note:
+            let outcome: SteeringReceipt.Outcome
+            switch delivery.outcome {
+            case .delivered: outcome = .sent
+            case .unconfirmed: outcome = .unconfirmed
+            case .refused, .tooLong, .runEnded: outcome = .notSent(delivery.outcome)
+            }
+            lastReceipt = SteeringReceipt(note: delivery.note, recipient: recipient,
+                                          turn: delivery.turn, outcome: outcome)
+            steeringInFlight = nil
+            if let queued = queuedSteering,
+               queued.trimmingCharacters(in: .whitespacesAndNewlines) == delivery.note {
+                queuedSteering = nil
+                steeringText = ""
+                syncHold()
+            }
+        case .echo:
+            guard lastReceipt?.note == delivery.note else { return }
+            switch delivery.outcome {
+            case .delivered: lastReceipt?.echo = .shared(turn: delivery.turn)
+            case .unconfirmed: lastReceipt?.echo = .unconfirmed
+            case .refused, .tooLong, .runEnded: lastReceipt?.echo = .notShared
+            }
+        }
     }
 
-    func cancelSteer() {
-        guard isSteering else { return }
-        closeSteer()
-        append(isPaused ? "Steer called off — the run stays paused." : "Steer called off.")
-    }
-
-    /// Close the editor, and release the pause if Steer asked for it; a
-    /// pause the user requested themselves outlives the editor.
-    private func closeSteer() {
-        isSteering = false
-        steeringText = ""
-        if steerInitiatedPause {
-            steerInitiatedPause = false
-            isPaused = false
-            relayControl.setPaused(false)
+    /// What the run's end leaves of the note becomes its record: a note
+    /// being written was never queued; a queued note the worker never took
+    /// is reported by the worker itself before it finishes (a fallback here
+    /// covers the case where it could not); a note still in flight never
+    /// got its outcome, which is what unconfirmed means. Notes already
+    /// resolved keep the record they have, and an echo still ahead is ruled
+    /// out.
+    private func recordSteeringAtRunEnd() {
+        if let inFlight = steeringInFlight {
+            lastReceipt = SteeringReceipt(note: inFlight.note, recipient: inFlight.recipient,
+                                          turn: inFlight.turn, outcome: .unconfirmed)
+        } else if let queued = queuedSteering {
+            lastReceipt = SteeringReceipt(note: queued.trimmingCharacters(in: .whitespacesAndNewlines),
+                                          recipient: nil, turn: nil, outcome: .notSent(.runEnded))
+        } else if steeringDirty {
+            lastReceipt = SteeringReceipt(note: steeringText, recipient: nil, turn: nil,
+                                          outcome: .neverQueued)
+        }
+        if let receipt = lastReceipt, receipt.echo == nil,
+           receipt.outcome == .sent || receipt.outcome == .unconfirmed {
+            lastReceipt?.echo = .notShared
         }
     }
 

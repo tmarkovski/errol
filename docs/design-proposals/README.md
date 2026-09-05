@@ -9,3 +9,7 @@ part of the application build.
 - [Landing page for errol.chat](landing-page/README.md) — converged one-page concept: a
   live scripted relay as the hero, the conversation shapes, the naming session
   as proof, the wrong-window story, and a plain permission section.
+- [Steering mid-run](steering/the-note-stays-put.md) — the converged design for
+  steering notes and, at its end, the revision built after trying it (typing
+  holds the run, Return queues, the head says where the note is), with
+  [the problem framing](steering/the-note-in-flight.md) it answers.

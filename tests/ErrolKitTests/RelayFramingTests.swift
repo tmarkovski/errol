@@ -107,9 +107,11 @@ final class RelayFramingTests: XCTestCase {
         let note = framed.range(of: "Focus on the geology.")!
         XCTAssertTrue(reply.lowerBound < note.lowerBound,
                       "the note came after the reply, so it must read after it")
-        XCTAssertTrue(framed.contains("Claude has not seen it yet"))
+        XCTAssertTrue(framed.contains("Claude has not yet received this note"))
         XCTAssertTrue(framed.contains("alongside your reply"),
                       "the recipient must know the note travels on with its own reply")
+        XCTAssertFalse(framed.localizedCaseInsensitiveContains("paused"),
+                       "a note is queued while the run keeps going; the framing must not claim a pause")
     }
 
     func testEchoedNoteReadsBeforeTheReplyWrittenInItsLight() {
@@ -121,8 +123,10 @@ final class RelayFramingTests: XCTestCase {
         let reply = framed.range(of: "Fine: the geology.")!
         XCTAssertTrue(note.lowerBound < reply.lowerBound,
                       "the note preceded the reply, so it must read before it")
-        XCTAssertTrue(framed.contains("Claude read it before writing the reply below"),
-                      "the recipient must know the peer replied aware of the note")
+        XCTAssertTrue(framed.contains("included in the input sent to Claude before the reply below"),
+                      "the recipient must know the peer had the note before replying")
+        XCTAssertFalse(framed.localizedCaseInsensitiveContains("paused"),
+                       "the framing describes the order of delivery, not what the human was doing")
     }
 
     func testBackToBackNotesKeepTheirOrderAroundTheReply() {
@@ -161,5 +165,109 @@ final class RelayFramingTests: XCTestCase {
         control.postSteering("Leftover from a dead run.")
         control.reset()
         XCTAssertNil(control.takeSteering())
+    }
+
+    func testHandoffDecisionTakesTheNoteInTheSameStepAsTheFlags() {
+        // Hold, end, or go is one locked decision, and go takes the note in
+        // the same step — the gap between checking the pause and taking the
+        // note is where a claim could win the mailbox and lose the handoff.
+        let control = RelayControl()
+        control.postSteering("Focus on the geology.")
+        control.setPaused(true)
+        XCTAssertEqual(control.decideHandoff { _ in true }, .hold)
+        XCTAssertTrue(control.hasSteering, "a held handoff leaves the note where it is")
+        control.setPaused(false)
+        XCTAssertEqual(control.decideHandoff { _ in true },
+                       .commit(note: "Focus on the geology.", unfit: nil))
+        XCTAssertFalse(control.hasSteering, "committing takes the note")
+        XCTAssertEqual(control.decideHandoff { _ in true }, .commit(note: nil, unfit: nil))
+        control.postSteering("Too long.")
+        XCTAssertEqual(control.decideHandoff { _ in false },
+                       .commit(note: nil, unfit: "Too long."),
+                       "a note that cannot travel whole is taken off and reported, never trimmed")
+        XCTAssertFalse(control.hasSteering)
+        control.postSteering("Never rides.")
+        control.setPaused(true)
+        control.cancel()
+        XCTAssertEqual(control.decideHandoff { _ in true }, .cancel, "cancel wins over hold")
+        XCTAssertTrue(control.hasSteering, "a cancelled handoff takes nothing")
+    }
+
+    func testClaimSteeringWinsTheNoteAndTheHoldTogetherOrNeither() {
+        // Edit & pause: the panel takes the note back and asks for the hold
+        // in one step. A claim the worker beat finds nothing and must not
+        // hold the run for a note that is already on its way.
+        let control = RelayControl()
+        XCTAssertNil(control.claimSteering())
+        XCTAssertFalse(control.isPaused, "a lost claim must not hold the run")
+        control.postSteering("Focus on the geology.")
+        XCTAssertEqual(control.claimSteering(), "Focus on the geology.")
+        XCTAssertTrue(control.isPaused, "a won claim holds the next handoff in the same step")
+        XCTAssertEqual(control.decideHandoff { _ in true }, .hold)
+        control.reset()
+        control.postSteering("Now compare it to the Cuillin.")
+        XCTAssertEqual(control.decideHandoff { _ in true },
+                       .commit(note: "Now compare it to the Cuillin.", unfit: nil))
+        XCTAssertNil(control.claimSteering(), "the worker committed first")
+        XCTAssertFalse(control.isPaused)
+    }
+
+    func testHandoffPayloadKeepsSteeringSectionsWholeUnderTheCap() {
+        // The reply gives way under the cap, never the notes: a note cut
+        // short is a direction misread.
+        config.seed = "Plan a trip to Skye."
+        let note = String(repeating: "Focus on the geology. ", count: 20)
+        let echo = String(repeating: "Keep it to three days. ", count: 20)
+        let reply = String(repeating: "Basalt columns. ", count: 500)
+        let payload = HandoffPayload(from: "Claude", intro: false, echo: echo, note: note)
+        let cap = 2000
+        XCTAssertTrue(payload.carriesNotes(cap: cap))
+        let text = payload.text(reply: reply, cap: cap)
+        XCTAssertLessThanOrEqual(text.count, cap,
+                                 "the assembled message respects the cap, so send's own cap is a no-op on it")
+        XCTAssertTrue(text.contains(note), "the fresh note travels whole")
+        XCTAssertTrue(text.contains(echo), "the echoed note travels whole")
+        XCTAssertTrue(text.contains(relayTruncationMark), "the reply is what was cut, and says so")
+        XCTAssertTrue(text.contains("Basalt columns."), "some of the reply survives")
+        XCTAssertEqual(payload.text(reply: "Short.", cap: cap), payload.assemble(reply: "Short."),
+                       "untouched when it all fits")
+    }
+
+    func testHandoffPayloadRefusesANoteItCannotCarryWhole() {
+        let long = String(repeating: "x", count: 3000)
+        var payload = HandoffPayload(from: "Claude", intro: false, echo: nil, note: long)
+        XCTAssertFalse(payload.carriesNotes(cap: 2000),
+                       "a note longer than the cap has no handoff that carries it whole")
+        payload.intro = true
+        XCTAssertFalse(payload.carriesNotes(cap: 2000))
+        payload.note = nil
+        XCTAssertTrue(payload.carriesNotes(cap: 2000), "without the note the same handoff carries")
+    }
+
+    func testSteeringOutcomeFollowsTheSendOutcome() {
+        XCTAssertEqual(SteeringOutcome(.confirmed), .delivered)
+        XCTAssertEqual(SteeringOutcome(.unconfirmed), .unconfirmed)
+        XCTAssertEqual(SteeringOutcome(.abandoned), .unconfirmed,
+                       "a foreground lost after a possible submission is unconfirmed, not failed")
+        XCTAssertEqual(SteeringOutcome(.refused), .refused)
+        XCTAssertTrue(SendOutcome.unconfirmed.continuesRun)
+        XCTAssertFalse(SendOutcome.abandoned.continuesRun)
+        XCTAssertFalse(SendOutcome.refused.continuesRun)
+    }
+
+    func testSteeringTranscriptLinesNeverImplySuccessWithoutIt() {
+        let sent = steeringTranscriptLine(
+            SteeringDelivery(leg: .note, note: "Push on pricing.", recipient: .claude, turn: 5, outcome: .delivered),
+            recipientName: "Claude")
+        XCTAssertTrue(sent.contains("delivered to Claude with turn 5"))
+        let unconfirmed = steeringTranscriptLine(
+            SteeringDelivery(leg: .note, note: "Push on pricing.", recipient: .claude, turn: 5, outcome: .unconfirmed),
+            recipientName: "Claude")
+        XCTAssertTrue(unconfirmed.contains("unconfirmed"))
+        XCTAssertFalse(unconfirmed.contains("delivered"))
+        let notShared = steeringTranscriptLine(
+            SteeringDelivery(leg: .echo, note: "Push on pricing.", recipient: .chatgpt, turn: 6, outcome: .runEnded),
+            recipientName: "ChatGPT")
+        XCTAssertTrue(notShared.contains("not shared with ChatGPT"))
     }
 }

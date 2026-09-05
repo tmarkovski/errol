@@ -71,7 +71,7 @@ struct PerchStatePill: View {
 
     private var pillLook: (word: String, tint: Color, back: Color) {
         if controller.isRunning {
-            guard controller.isPaused else {
+            guard controller.holdRequested else {
                 return ("Running", Perch.amberText, Perch.amberBack)
             }
             return (controller.isHolding ? "Paused" : "Pausing",

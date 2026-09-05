@@ -23,8 +23,9 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// text is a message to send rather than prose to shape.
     var onSubmit: (() -> Void)?
     /// When set, Esc reports out instead of invoking NSTextView's word
-    /// completion — the way a steer editor gets called off.
-    var onEscape: (() -> Void)?
+    /// completion — the way a steer editor gets called off. The text view
+    /// comes along so the handler can also just leave focus.
+    var onEscape: ((NSTextView) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -137,7 +138,7 @@ struct GrowingTextEditor: NSViewRepresentable {
             if commandSelector == #selector(NSResponder.cancelOperation(_:))
                 || commandSelector == #selector(NSStandardKeyBindingResponding.complete(_:)),
                let onEscape = parent.onEscape {
-                onEscape()
+                onEscape(textView)
                 return true
             }
             return false
