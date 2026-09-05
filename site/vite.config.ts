@@ -14,6 +14,8 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
 const localBindingConfig = {
   main: 'vinext/server/fetch-handler',
+  // Match the bundled local Workers runtime; production uses wrangler.jsonc.
+  compatibility_date: '2026-05-22',
   compatibility_flags: ['nodejs_compat'],
   d1_databases: d1
     ? [
@@ -51,6 +53,8 @@ export default defineConfig(async () => {
     optimizeDeps: {
       include: [
         'lucide-react',
+        '@base-ui/react/field',
+        '@base-ui/react/slider',
         '@base-ui/react/tabs',
         'class-variance-authority',
         'clsx',

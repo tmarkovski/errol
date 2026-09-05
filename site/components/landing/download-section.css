@@ -1,0 +1,63 @@
+.closing {
+  text-align: center;
+  position: relative;
+  padding: 116px 0 90px;
+  isolation: isolate;
+}
+.closing-glow {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  width: min(850px, 120vw);
+  height: 600px;
+  top: -5px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, #a98d3b15, transparent 68%);
+}
+.closing-owl {
+  display: block;
+  width: 49px;
+  height: 49px;
+  margin: 0 auto 23px;
+  opacity: 0.8;
+}
+.closing .eyebrow {
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+.closing h2 {
+  font-size: clamp(76px, 8vw, 105px);
+  letter-spacing: -6px;
+  margin-top: 17px;
+  line-height: 1.1;
+}
+.closing > p:not(.eyebrow) {
+  color: #9fa293;
+  font-size: 16px;
+  margin: 16px 0 25px;
+}
+.closing .download-note {
+  display: block;
+  margin-top: 17px;
+}
+@media (max-width: 760px) {
+  .closing {
+    padding-top: 82px;
+    padding-bottom: 66px;
+  }
+  .closing h2 {
+    font-size: 80px;
+  }
+}
+@media (max-width: 560px) {
+  .closing .eyebrow {
+    letter-spacing: 0.5px;
+  }
+}
+@supports (animation-timeline: view()) {
+  .closing > :not(.closing-glow) {
+    animation: scroll-appear linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { siteConfig } from '@/lib/site-config';
 import './globals.css';
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Errol — Good ideas need company',
-  description: 'Let Codex and Claude think together. Errol carries conversations between your AI desktop apps on macOS. No API keys needed.',
+  title: siteConfig.title,
+  description: siteConfig.description,
   icons: { icon: '/favicon.svg' },
 };
 

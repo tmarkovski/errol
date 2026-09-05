@@ -1,0 +1,41 @@
+.site-footer {
+  border-top: 1px solid #ffffff12;
+  min-height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.site-footer .brand > span {
+  font-size: 24px;
+}
+.site-footer .brand .owl {
+  width: 30px;
+  height: 30px;
+}
+.site-footer p {
+  font-size: 12px;
+  color: #828676;
+  margin: 0;
+}
+.site-footer .text-link {
+  font-size: 14px;
+  color: #b2b4a6;
+}
+@media (max-width: 760px) {
+  .site-footer {
+    flex-wrap: wrap;
+    min-height: 115px;
+    padding-block: 24px;
+    row-gap: 18px;
+  }
+  .site-footer p {
+    order: 3;
+    width: 100%;
+    font-size: 12px;
+    text-align: center;
+  }
+  .site-footer .text-link {
+    font-size: 14px;
+  }
+}

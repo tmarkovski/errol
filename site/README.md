@@ -1,6 +1,26 @@
 # Errol landing page
 
-A standalone, original landing page for Errol. This project is independent of the existing `site/` directory.
+Errol's public landing page, built with React and Vinext.
+
+## Making changes
+
+`app/page.tsx` composes the page sections and connects the demo's playback state
+to the background motion. Each section has its own component and stylesheet in
+`components/landing/`:
+
+- `site-header.tsx` — navigation and the compact download link.
+- `hero-section.tsx` — headline, introduction, atmosphere, and the demo.
+- `how-it-works.tsx` — the three steps and practical notes.
+- `download-section.tsx` — the closing download section.
+- `site-footer.tsx` — the footer and repository link.
+- `brand.tsx`, `download-link.tsx`, and `shared.css` — reused brand and button treatments.
+
+Keep section copy and styling together when iterating. `app/globals.css` holds
+the shared palette, typography, layout helpers, and motion preferences.
+`lib/site-config.ts` is the single place for metadata, release links, and the
+minimum macOS version. `hooks/use-landing-motion.ts` owns the decorative pointer
+and scroll effects. The demo's scene, player, script, and styling remain isolated
+in `components/hero-demo/`.
 
 ## Development
 
@@ -15,7 +35,22 @@ npm run dev
 npm run build
 ```
 
-Static output is in `dist/client/`. The page uses React, Vinext, and the starter's accessible Base UI tabs. All motion is CSS or requestAnimationFrame; there is no animation-library dependency. It respects reduced-motion preferences and includes a pause control.
+Static output is in `dist/client/`. The page uses React, Vinext, and Base UI. All motion is CSS or requestAnimationFrame; there is no animation-library dependency. It respects reduced-motion preferences and includes a pause control.
+
+The hero contains the 49-second Errol demonstration in `components/hero-demo/`.
+It opens with a typed introduction, switches from Free chat to Debate, and types
+the topic into a simplified composer. The icon-only start button moves to the
+center while the surrounding content blurs, before the camera leaves Errol.
+The demo then shows automatic Copy/paste/Send handoffs and a steering
+note changing the next response. `timeline.js` holds the script and camera
+timing; the React component provides the scene and accessible playback controls.
+The demonstration starts when visible, pauses offscreen or in a background tab,
+and supports pause, replay, and seeking. Reduced motion starts on a completed
+response with playback paused. The camera pulls back as ChatGPT and Claude start
+their opening replies, so the full desktop is visible before each reply finishes.
+After the steering note, the camera holds the full desktop for the remaining exchange.
+Narrow containers use closer portrait framing for typing and the same desktop reveals.
+ChatGPT and Claude use their actual app icons from `public/app-icons/`.
 
 ## Deploy to Cloudflare
 
@@ -34,6 +69,6 @@ npm run deploy
 
 Cloudflare assigns a `workers.dev` address on the first deployment. A custom domain can be attached afterward in the Worker settings.
 
-The three conversation modes are illustrative examples. Download buttons point to `https://github.com/tmarkovski/errol/releases`; change `DOWNLOAD_URL` in `app/page.tsx` when a direct installer URL is available. The minimum macOS version matches the app's current Xcode deployment target (26.4).
+The demonstration uses simplified interfaces and illustrative dialogue. Download buttons point to `https://github.com/tmarkovski/errol/releases`; change `downloadUrl` in `lib/site-config.ts` when a direct installer URL is available. The minimum macOS version matches the app's current Xcode deployment target (26.4).
 
-The owl comes from the app's menu-bar asset. Product facts were checked against the root README and current Swift configuration. No files in `site/` or the previous landing-page proposals were read.
+The owl comes from the app's menu-bar asset. Product facts were checked against the root README and current Swift configuration.

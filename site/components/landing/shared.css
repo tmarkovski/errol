@@ -1,0 +1,81 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.brand > span {
+  font-size: 29px;
+  font-weight: 650;
+  letter-spacing: -1.6px;
+}
+.brand-dot {
+  color: var(--gold);
+}
+.owl {
+  object-fit: contain;
+  filter: invert(89%) sepia(16%) saturate(318%) hue-rotate(356deg)
+    brightness(106%) contrast(95%);
+}
+.brand .owl {
+  width: 37px;
+  height: 37px;
+}
+.download-button {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 0 23px;
+  color: #201a12;
+  background: var(--gold);
+  border: 1px solid #f5cb8d;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow:
+    0 0 0 4px #edba7206,
+    0 5px 18px #0002,
+    inset 0 1px #ffffff30;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.download-button:hover {
+  background: #f4ca8e;
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 30px #edba721a,
+    0 5px 18px #0002;
+}
+.button-arrow {
+  margin-left: 9px;
+  opacity: 0.7;
+}
+.download-small {
+  min-height: 38px;
+  padding-inline: 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #25241f;
+  border-color: #b6a28244;
+  color: #eee4d2;
+  box-shadow: inset 0 1px #ffffff07;
+}
+.download-small:hover {
+  color: #211b12;
+}
+@media (max-width: 760px) {
+  .brand > span {
+    font-size: 26px;
+  }
+  .download-button {
+    padding-inline: 17px;
+    font-size: 14px;
+  }
+  .download-small {
+    font-size: 14px;
+    padding-inline: 13px;
+  }
+}
