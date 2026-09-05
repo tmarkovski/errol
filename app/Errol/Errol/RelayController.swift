@@ -1,12 +1,13 @@
 // The app's model: form state, the log, and the start/stop wiring around
 // the relay engine. UI-facing state is Observable and mutated on the main
-// thread only; runs and inspections live on worker threads so the panel's
-// event loop stays free. Observation tracks per property, so a view body
+// thread only; everything that touches the apps — the permission, the
+// readiness sweeps, the run itself — is the engine's (RelayEngine), which
+// works on its own threads and reports back over its event stream, so the
+// panel's event loop stays free and a preview can substitute an engine
+// that touches nothing. Observation tracks per property, so a view body
 // re-evaluates only for the properties it actually read — which is why the
 // panel is split into child views along update boundaries.
 
-import AppKit
-import ApplicationServices
 import Combine
 import Foundation
 import Observation
@@ -118,18 +119,23 @@ final class RelayController {
     var lastRunDuration: TimeInterval?
     @ObservationIgnored private var runStartedAt: Date?
     @ObservationIgnored private var nextLogID = 0
-    @ObservationIgnored private let scanner = ReadinessScanner()
+    /// What drives the apps and reports back; LiveRelayEngine in the app.
+    @ObservationIgnored private let engine: RelayEngine
+    /// The engine's inward flags and mailbox, written here at the human's
+    /// actions and read by the run at its handoff boundaries.
+    private var control: RelayControl { engine.control }
     @ObservationIgnored private var panelVisible = false
     /// Set by the AppKit shell; the panel's Settings… item routes here to
     /// open the settings window above the panel.
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
-    init() {
+    init(engine: RelayEngine = LiveRelayEngine()) {
+        self.engine = engine
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only
         // changed statuses reach the observable properties.
-        scanner.onUpdate = { [weak self] chatgpt, claude in
+        engine.onReadiness = { [weak self] chatgpt, claude in
             DispatchQueue.main.async {
                 guard let self else { return }
                 if self.chatgptStatus != chatgpt { self.chatgptStatus = chatgpt }
@@ -140,7 +146,7 @@ final class RelayController {
         // Consuming it in one place keeps related updates — a turn, a hold,
         // the log line about them — from interleaving the way the separate
         // callbacks it replaced could.
-        relayEvents.onEvent { [weak self] event in
+        engine.events.onEvent { [weak self] event in
             guard let self else { return }
             switch event {
             case .log(let line):
@@ -235,7 +241,7 @@ final class RelayController {
     }
 
     private func updateScanner() {
-        scanner.setActive(panelVisible && !isRunning)
+        engine.setScanning(panelVisible && !isRunning)
     }
 
     /// The log is an in-memory tail read through the status item's debug
@@ -267,20 +273,18 @@ final class RelayController {
             }
             return
         }
-        guard ensureTrusted(), let apps = resolveApps() else { return }
+        guard engine.preflight() else { return }
 
         config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
         config.limitTurns = limitTurns
         turns = max(1, turns)
         config.turns = turns
         config.first = firstSpeaker
-        let tile = tileWindows
 
         isRunning = true
         isHolding = false
         resetSteering()
         lastReceipt = nil
-        relayControl.reset()
         updateScanner()
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
@@ -291,21 +295,7 @@ final class RelayController {
         // means what it says; lines logged between runs (an inspect report,
         // a failed start) stay until the next run claims the buffer.
         logLines.removeAll()
-        let origin = currentFrontmostApp()
-        log("Run starting. Transcript: \(config.transcriptPath)")
-
-        runOnWorkerThread {
-            // First contact only: the scanner has usually nudged both long
-            // ago, and then the trees are already populated and the settle
-            // wait would just delay the run.
-            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
-            let freshClaude = electronNudges.beginContact(apps.claude)
-            if freshChatgpt || freshClaude { usleep(700_000) }
-            if tile { arrangeSideBySide(left: apps.chatgpt, right: apps.claude) }
-            _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude)
-            refocus(to: origin)
-            relayEvents.post(.finished)
-        }
+        engine.startRun(tileWindows: tileWindows)
     }
 
     /// Whether a finished run is still on the panel: a turn count, no run to
@@ -338,7 +328,7 @@ final class RelayController {
         isHolding = false
         recordSteeringAtRunEnd()
         resetSteering()
-        relayControl.setPaused(false)
+        control.setPaused(false)
         updateScanner()
     }
 
@@ -346,8 +336,8 @@ final class RelayController {
         guard isRunning else { return }
         // Lift the hold so the loop wakes and reaches its cancel check. The
         // field stays as it is; the run's end records what became of the note.
-        relayControl.setPaused(false)
-        relayControl.cancel()
+        control.setPaused(false)
+        control.cancel()
         append("Stop requested — ending the run at the next safe point...")
     }
 
@@ -402,7 +392,7 @@ final class RelayController {
         guard isRunning, !isSteering else { return }
         if queuedSteering != nil {
             queuedSteering = nil
-            if relayControl.claimSteering() != nil {
+            if control.claimSteering() != nil {
                 append("Note taken back — the run holds at the next handoff while you change it.")
             } else {
                 steeringText = ""
@@ -411,7 +401,7 @@ final class RelayController {
         } else {
             append("Pausing to steer — the run holds at the next handoff while you write.")
         }
-        relayControl.setPaused(true)
+        control.setPaused(true)
         isSteering = true
     }
 
@@ -428,12 +418,12 @@ final class RelayController {
             queuedSteering = nil
             append("Continued without a note.")
         } else {
-            relayControl.postSteering(note)
+            control.postSteering(note)
             queuedSteering = steeringText
             append("Note queued — the run goes on, and the note rides the next handoff.")
         }
         isSteering = false
-        relayControl.setPaused(false)
+        control.setPaused(false)
     }
 
     /// Esc in the open field. The first press empties it; the second, on an
@@ -458,7 +448,7 @@ final class RelayController {
         if queuedSteering != nil {
             queuedSteering = nil
             steeringText = ""
-            if relayControl.takeSteering() != nil {
+            if control.takeSteering() != nil {
                 append("Note withdrawn.")
             } else {
                 append("The note had already gone out with the handoff.")
@@ -559,57 +549,13 @@ final class RelayController {
     /// Dump both apps' windows, buttons, and selector matches into the log —
     /// the way selector breakage gets diagnosed after an app update. A debug
     /// tool, reached through the status item's menu and read in the log
-    /// window it opens.
+    /// window it opens. The report arrives as a log line on the event stream.
     func runInspect() {
         guard !isRunning else { return }
-        guard ensureTrusted(), let apps = resolveApps() else { return }
-        append("Inspecting both apps...")
-        runOnWorkerThread { [weak self] in
-            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
-            let freshClaude = electronNudges.beginContact(apps.claude)
-            if freshChatgpt || freshClaude { usleep(700_000) }
-            let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
-            DispatchQueue.main.async { self?.append(report) }
-        }
+        engine.inspect()
     }
 
     func openTranscript() {
-        let url = URL(fileURLWithPath: config.transcriptPath)
-        if FileManager.default.fileExists(atPath: url.path) {
-            NSWorkspace.shared.open(url)
-        } else {
-            append("No transcript yet at \(config.transcriptPath).")
-        }
-    }
-
-    /// Prompting on demand (not at app launch) means the permission dialog
-    /// appears while the user is looking at the panel, not out of nowhere.
-    private func ensureTrusted() -> Bool {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        if AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) { return true }
-        append("Accessibility permission missing. Grant Errol in System Settings > Privacy & Security > Accessibility, then try again.")
-        return false
-    }
-
-    private func resolveApps() -> (chatgpt: TargetApp, claude: TargetApp)? {
-        guard let chatgpt = findApp(bundleID: config.chatgptBundleID, name: "Codex",
-                                    selectors: config.chatgptSelectors) else {
-            append("ERROR: Codex/ChatGPT (\(config.chatgptBundleID)) is not running. Launch it with a conversation open.")
-            return nil
-        }
-        guard let claude = findApp(bundleID: config.claudeBundleID, name: "Claude",
-                                   selectors: config.claudeSelectors) else {
-            append("ERROR: Claude Desktop (\(config.claudeBundleID)) is not running. Launch it with a conversation open.")
-            return nil
-        }
-        return (chatgpt, claude)
-    }
-
-    /// The deep AX tree walks need more stack than the default worker thread
-    /// provides.
-    private func runOnWorkerThread(_ work: @escaping () -> Void) {
-        let worker = Thread(block: work)
-        worker.stackSize = 4 << 20
-        worker.start()
+        engine.openTranscript()
     }
 }

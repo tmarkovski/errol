@@ -179,7 +179,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// own install-on-quit. Cancelling is idempotent, so the Quit item having
     /// already done it costs nothing.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if relay.isRunning { relayControl.cancel() }
+        relay.stop()
         return .terminateNow
     }
 
