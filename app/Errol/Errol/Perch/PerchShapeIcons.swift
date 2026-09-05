@@ -1,8 +1,8 @@
 // The shape glyphs: a fixed name→symbol map for the shipped conversation
 // shapes, a default for shapes made in Settings, the dashed circle for Free
-// chat, and the pencil that marks a from-scratch or edited prompt. Read by
-// the composer's pills and More menu, the mid-run context line, and the
-// settings card's shape rail.
+// chat, and the pencil that marks a prompt written from scratch. Read by
+// the composer's mid-run context line and the settings card's shape rail;
+// the shape tabs themselves are names alone.
 
 import Foundation
 

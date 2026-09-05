@@ -17,8 +17,9 @@ enum Perch {
     static let paper = Color(red: 252 / 255, green: 252 / 255, blue: 250 / 255)
     /// The composer card set into it.
     static let well = Color(red: 244 / 255, green: 243 / 255, blue: 239 / 255)
-    /// The instruction-preview band set into the well.
-    static let band = Color(red: 236 / 255, green: 234 / 255, blue: 226 / 255)
+    /// The shape tabs' track, set into the well a step darker than it, so
+    /// the paper thumb that slides along it reads as lifted without a shadow.
+    static let track = Color(red: 235 / 255, green: 234 / 255, blue: 228 / 255)
     static let panelEdge = Color(red: 229 / 255, green: 227 / 255, blue: 220 / 255)
     static let chipEdge = Color(red: 226 / 255, green: 224 / 255, blue: 216 / 255)
     /// The rule under the composer's setup zone.
@@ -29,13 +30,16 @@ enum Perch {
     static let secondary = Color(red: 75 / 255, green: 74 / 255, blue: 68 / 255)
     static let muted = Color(red: 138 / 255, green: 136 / 255, blue: 127 / 255)
     static let placeholder = Color(red: 160 / 255, green: 157 / 255, blue: 146 / 255)
-    static let bandText = Color(red: 117 / 255, green: 114 / 255, blue: 106 / 255)
+    /// The instruction preview's ink: the shape's text under the pills, a
+    /// step quieter than secondary so it reads as material, not a control.
+    static let previewInk = Color(red: 117 / 255, green: 114 / 255, blue: 106 / 255)
     /// The flight path's dotted arc.
     static let path = Color(red: 213 / 255, green: 210 / 255, blue: 200 / 255)
 
     /// The accent: the primary button, the courier bead, and nothing else.
     static let amber = Color(red: 217 / 255, green: 142 / 255, blue: 43 / 255)
-    /// The live-state pill and the steering band's quiet amber.
+    /// The live-state pill, the hold notice, and the on state of the
+    /// composer's option chips: the quiet amber.
     static let amberText = Color(red: 160 / 255, green: 109 / 255, blue: 20 / 255)
     static let amberBack = Color(red: 246 / 255, green: 239 / 255, blue: 221 / 255)
     static let green = Color(red: 47 / 255, green: 125 / 255, blue: 91 / 255)
@@ -52,6 +56,9 @@ enum Perch {
     /// What the growing editors need in AppKit terms.
     static let inkNS = NSColor(calibratedRed: 44 / 255, green: 43 / 255,
                                blue: 39 / 255, alpha: 1)
+    /// The turn count's ink, for the AppKit field inside its chip.
+    static let amberTextNS = NSColor(calibratedRed: 160 / 255, green: 109 / 255,
+                                     blue: 20 / 255, alpha: 1)
 
     // MARK: Type and measure
 
@@ -78,12 +85,25 @@ enum Perch {
     /// notice, the composer's hint — so nothing snaps.
     static let fade = Animation.easeInOut(duration: 0.2)
 
+    /// The spring behind every control that moves rather than fades: the
+    /// tab thumb sliding to the chosen shape, and an option chip growing
+    /// its label.
+    static let spring = Animation.spring(response: 0.32, dampingFraction: 0.82)
+
     /// The two corners the panel cuts: the panel's own edge, and the composer
-    /// card set into it. The pills and chips are capsules and name no radius.
+    /// card set into it. The tabs' track and thumb and the option chips are
+    /// capsules and name no radius.
     static let shellCorner = s(18)
-    static let boxCorner = s(16)
-    /// The preview band inside the composer, a step tighter than the card.
-    static let bandCorner = s(10)
+    /// The composer card: a tight inset, so the words sit close to the edge
+    /// the way they do in the chat apps' own composers, and a corner a step
+    /// rounder than the shell's — enough to rhyme with the primary circle
+    /// set into its foot without the card reading as a pill.
+    static let boxInset = s(8)
+    static let boxCorner = s(22)
+    static let primaryDiameter = s(36)
+    /// A step tighter than the card, for a well set inside a window: the
+    /// log window's text area.
+    static let insetCorner = s(10)
 
     /// The fixed card width, which is also the window's. Height is nobody's
     /// constant — the card is content-sized and the shell fits the window to
@@ -99,6 +119,33 @@ enum Perch {
     /// avatars — the app icons' squircles read heavier than the initial
     /// circles did and crowded the wordmark with only a hair of gap.
     static let chromeInset = chromeBand + s(10)
+
+    // MARK: The composer's measures
+
+    /// The gap between the composer's rows: tabs, preview, hairline, editor,
+    /// foot. Named because the preview zone's height is summed from it.
+    static let cardGap = s(8)
+
+    /// The instruction preview is held to two lines of its mono whatever the
+    /// shape says, so the zone it sits in has one height — and Free chat,
+    /// which has no instructions to preview, hands exactly that height to
+    /// the editor instead (PerchComposer). The card keeps its size across
+    /// every selection; only the words move. `previewSize` is the mockup
+    /// size the SwiftUI font is asked for by name; the NSFont here is the
+    /// same face at the same scaled size, measured the way the growing
+    /// editor measures its own lines. It is a reservation, not a limit: the
+    /// Text lays out its own two lines inside it, and a pixel of overrun
+    /// spills into the gap below rather than costing the second line.
+    static let previewSize: CGFloat = 10
+    static let previewLineSpacing = s(2)
+    static let previewHeight: CGFloat = {
+        let font = NSFont.monospacedSystemFont(ofSize: s(previewSize), weight: .regular)
+        let line = NSLayoutManager().defaultLineHeight(for: font)
+        return ceil(2 * line + previewLineSpacing) + 1
+    }()
+    /// What the preview adds to the card: itself, the hairline under it, and
+    /// the gap above each — the amount the editor takes back under Free chat.
+    static let previewZoneHeight = previewHeight + 2 * cardGap + 1
 }
 
 /// The one window frame the panel names: what it opens at before the card's

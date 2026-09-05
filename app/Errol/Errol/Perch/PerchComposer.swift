@@ -1,45 +1,47 @@
 // The composer: one card whose first two lines are the conversation's setup
-// — the quick shape pills and the selected shape's instructions — closed
-// off by a hairline, with the person's own words below the line and the
-// actions at the foot. The arrangement is the converged proposal
-// (docs/design-proposals/chat-composer/converged-composer.html): the pills
-// are input, so they live on the composing surface, and the card keeps its
-// anatomy across states — in a run the setup zone folds into a one-line
+// — the shape tabs and the selected shape's instructions — closed off by a
+// hairline, with the person's own words below the line and the actions at
+// the foot. The arrangement is the converged proposal
+// (docs/design-proposals/chat-composer/converged-composer.html): the shape
+// choice is input, so it lives on the composing surface, and the card keeps
+// its anatomy across states — in a run the setup zone folds into a one-line
 // context row above the same hairline, and the editor becomes the steering
 // field (typing is what begins a steer, RelayController.setSteeringText).
-// See PerchPanelView for the panel.
+// The foot follows the chat apps' own composers: the run options are bare
+// glyphs that grow a label when they are on, and one filled circle is the
+// primary action. See PerchPanelView for the panel.
 
 import SwiftUI
 
 /// The card: structure only. The zone, the editor, and the toolbar are
 /// their own observation scopes so a keystroke invalidates the text and the
-/// button that watches it, never the pills or the perches above.
+/// button that watches it, never the tabs or the perches above.
 struct PerchComposer: View {
     let controller: RelayController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(8)) {
+        VStack(alignment: .leading, spacing: Perch.cardGap) {
             PerchConfigZone(controller: controller)
             PerchComposerEditor(controller: controller)
             PerchComposerToolbar(controller: controller)
         }
-        .padding(Perch.s(13))
+        .padding(Perch.boxInset)
         .background(RoundedRectangle(cornerRadius: Perch.boxCorner).fill(Perch.well))
     }
 }
 
-/// The setup zone above the hairline: idle, the quick pills and the
-/// instruction preview; in a run, the one-line context row (or the amber
+/// The setup zone above the hairline: idle, the shape tabs and — for any
+/// shape but Free chat — the instruction preview; in a run, the one-line context row (or the amber
 /// hold notice while a steer is being written). The hairline itself is
 /// drawn here so the zone and its rule always move together.
 private struct PerchConfigZone: View {
     let controller: RelayController
-    /// Whether the preview band shows the whole instruction set rather than
-    /// its first two lines. Presentation state, so it lives with the view.
-    @State private var expanded = false
+    /// The tab thumb's coordinate space: every tab is a source in it, and
+    /// the thumb follows whichever one the selection names.
+    @Namespace private var tabSpace
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(8)) {
+        VStack(alignment: .leading, spacing: Perch.cardGap) {
             if controller.isRunning {
                 // Overlaid, not stacked, so the crossfade never shows both
                 // rows at once and the card holds its height through it.
@@ -51,17 +53,34 @@ private struct PerchConfigZone: View {
                     }
                 }
                 .animation(Perch.fade, value: controller.isSteering)
+                hairline
             } else {
-                pillRow
-                previewRow
+                shapeTabs
+                // Free chat has no instructions to preview, so it shows
+                // none — and no rule to close a zone that is only the tabs.
+                // Choosing a shape brings both in, settling down from the
+                // tabs, and the editor gives up exactly their height
+                // (PerchComposerEditor): the card holds its size, and only
+                // the words move down to make room.
+                if !controller.isFreeChat {
+                    previewRow
+                        .frame(height: Perch.previewHeight, alignment: .topLeading)
+                        .transition(.opacity.combined(with: .offset(y: -Perch.s(6))))
+                    hairline
+                        .transition(.opacity)
+                }
             }
-            Rectangle()
-                .fill(Perch.hairline)
-                .frame(height: 1)
         }
     }
 
-    // MARK: The quick pills
+    /// The rule that closes the zone.
+    private var hairline: some View {
+        Rectangle()
+            .fill(Perch.hairline)
+            .frame(height: 1)
+    }
+
+    // MARK: The shape tabs
 
     /// The quick set is fixed: Free chat, then the first two saved shapes —
     /// Brainstorm and Debate as shipped — with More owning the rest of the
@@ -81,25 +100,46 @@ private struct PerchConfigZone: View {
             && !quickTemplates.contains { $0.name == controller.conversation }
     }
 
-    private var pillRow: some View {
-        HStack(spacing: Perch.s(6)) {
-            pill(name: RelayController.freeConversation,
-                 icon: PerchShapeIcons.freeIcon,
-                 selected: controller.isFreeChat)
-            ForEach(quickTemplates) { template in
-                pill(name: template.name,
-                     icon: PerchShapeIcons.icon(for: template.name),
-                     selected: controller.conversation == template.name)
-            }
-            morePill
-        }
+    /// More's slot in the thumb's space — a constant, because its label
+    /// changes to name whatever shape it holds.
+    private static let moreTabID = "more"
+
+    /// Which tab the thumb sits under: a fixed shape's own name, or More's
+    /// slot when the shape lives behind it.
+    private var selectedTab: String {
+        moreHoldsSelection ? Self.moreTabID : controller.conversation
     }
 
-    private func pill(name: String, icon: String, selected: Bool) -> some View {
+    /// One track, the shapes as text in equal cells, and a single paper
+    /// thumb that springs to the chosen one, with the selection moving
+    /// rather than each cell lighting up on its own. The thumb is flat: the
+    /// system glass casts a shadow under the row, and a control this small
+    /// should sit in the card, not float over it. Names alone: the shapes
+    /// are words, and a glyph per word made the row read as a toolbar.
+    private var shapeTabs: some View {
+        HStack(spacing: 0) {
+            shapeTab(RelayController.freeConversation)
+            ForEach(quickTemplates) { template in
+                shapeTab(template.name)
+            }
+            moreTab
+        }
+        .padding(Perch.s(3))
+        .background {
+            // The thumb takes the selected tab's frame through the shared
+            // namespace, so a change of selection is a move, not a swap.
+            Capsule()
+                .fill(Perch.paper)
+                .matchedGeometryEffect(id: selectedTab, in: tabSpace, isSource: false)
+        }
+        .background(Capsule().fill(Perch.track))
+    }
+
+    private func shapeTab(_ name: String) -> some View {
         Button {
-            controller.selectConversation(name)
+            choose(name)
         } label: {
-            pillLabel(text: name, icon: icon, selected: selected)
+            tabLabel(name, id: name, selected: selectedTab == name)
         }
         .buttonStyle(.plain)
         .help(name == RelayController.freeConversation
@@ -107,136 +147,105 @@ private struct PerchConfigZone: View {
               : "Open with the \(name) instructions")
     }
 
-    private func pillLabel(text: String, icon: String, selected: Bool) -> some View {
-        HStack(spacing: Perch.s(5)) {
-            Image(systemName: icon)
-                .font(.system(size: Perch.s(10), weight: .medium))
+    /// A cell in the track: the name, ink when it is the selection and a
+    /// step quieter otherwise, darkening under the pointer. The cell is a
+    /// source for the thumb, so it is measured whole — padding included.
+    private func tabLabel(_ text: String, id: String, selected: Bool,
+                          menu: Bool = false) -> some View {
+        HStack(spacing: Perch.s(4)) {
             Text(text)
                 .font(Perch.text(12, .medium))
                 .lineLimit(1)
+                .truncationMode(.tail)
+            if menu {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: Perch.s(7), weight: .semibold))
+            }
         }
-        .foregroundColor(selected ? Perch.paper : Perch.secondary)
-        .padding(.horizontal, Perch.s(11))
-        .frame(height: Perch.s(25))
-        .background(Capsule().fill(selected ? Perch.ink : Perch.paper))
-        .overlay(Capsule().stroke(selected ? Perch.ink : Perch.chipEdge, lineWidth: 1))
-        .perchHover(Capsule(), tint: selected ? .white : Perch.ink,
-                    opacity: selected ? 0.14 : 0.06)
+        .padding(.horizontal, Perch.s(10))
+        .frame(maxWidth: .infinity)
+        .frame(height: Perch.s(24))
+        .perchHoverInk(idle: selected ? Perch.ink : Perch.secondary, active: Perch.ink)
         .contentShape(Capsule())
+        .matchedGeometryEffect(id: id, in: tabSpace)
+    }
+
+    /// Every selection springs, so the thumb travels and the More cell's
+    /// name changes under it in the same motion.
+    private func choose(_ name: String) {
+        withAnimation(Perch.spring) { controller.selectConversation(name) }
     }
 
     /// More owns everything the row does not: the remaining shapes, writing
     /// from scratch, and the way into Settings. A shape chosen here takes
-    /// over the pill's label, so the current selection is always visible
-    /// without the row allocating space to every possible shape.
-    private var morePill: some View {
+    /// over the cell's label and the thumb comes to rest under it, so the
+    /// current selection is always visible without the row allocating a
+    /// cell to every possible shape.
+    private var moreTab: some View {
         Menu {
             ForEach(overflowTemplates) { template in
-                Button {
-                    controller.selectConversation(template.name)
-                } label: {
-                    Label(template.name,
-                          systemImage: PerchShapeIcons.icon(for: template.name))
-                }
+                Button(template.name) { choose(template.name) }
             }
-            Button {
-                controller.selectConversation(RelayController.customConversation)
-            } label: {
-                Label("Write from scratch", systemImage: PerchShapeIcons.customIcon)
-            }
+            Button("Write from scratch") { choose(RelayController.customConversation) }
             Divider()
             Button("Manage shapes…") { controller.openSettings() }
         } label: {
-            pillLabel(text: moreHoldsSelection ? controller.conversation : "More",
-                      icon: moreHoldsSelection
-                          ? PerchShapeIcons.icon(for: controller.conversation)
-                          : "ellipsis",
-                      selected: moreHoldsSelection)
+            tabLabel(moreHoldsSelection ? controller.conversation : "More",
+                     id: Self.moreTabID, selected: moreHoldsSelection, menu: true)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .fixedSize()
+        .frame(maxWidth: .infinity)
         .help("The other shapes, a from-scratch prompt, and the shape editor")
     }
 
     // MARK: The instruction preview
 
-    /// Under the pills, what the selected shape will actually say: the
-    /// template's instructions in a quiet mono band, two lines until asked
-    /// for all of them, with a pencil for a session-only edit. While that
-    /// edit is open the band gives way to the way back out of it.
+    /// Under the tabs, what the selected shape will actually say: the
+    /// template's instructions as quiet mono text, held to two lines with
+    /// the rest behind an ellipsis and the whole text in the tooltip under
+    /// the pointer. Plain text on purpose — no band, no control around it —
+    /// so it reads as the system's part of the opening message, sent as
+    /// written rather than something to edit here: the saved shape is
+    /// edited in Settings, and a one-off prompt is written under Custom,
+    /// whose editor takes the band's place below.
     @ViewBuilder
     private var previewRow: some View {
-        if controller.isEditingInstructions, controller.selectedTemplate != nil {
-            HStack(spacing: Perch.s(8)) {
-                Text("Editing the full opening message below")
-                    .font(Perch.text(11))
-                    .foregroundColor(Perch.muted)
-                Spacer(minLength: Perch.s(6))
-                Button("Back to simple setup") {
-                    controller.resetInstructionsToTemplate()
-                }
-                .buttonStyle(.plain)
-                .font(Perch.text(11, .medium))
-                .perchHoverInk()
-                .help("Discard this session's edits and return to the \(controller.conversation) topic field")
-            }
-            .padding(.horizontal, Perch.s(2))
-        } else if controller.selectedTemplate == nil, !controller.isFreeChat {
+        if controller.selectedTemplate == nil, !controller.isFreeChat {
             Text("Writing the opening message from scratch")
                 .font(Perch.text(11))
                 .foregroundColor(Perch.muted)
                 .padding(.horizontal, Perch.s(2))
         } else {
-            previewBand
+            // The text sets its own height: a SwiftUI Text offered a height
+            // fits itself to it, and the slot below is measured with AppKit
+            // metrics that can land a hair under SwiftUI's own two lines —
+            // enough to drop the second line for an ellipsis. So the frame
+            // reserves the space and the words fill it on their own terms.
+            Text(previewText)
+                .font(Perch.mono(Perch.previewSize))
+                .foregroundColor(Perch.previewInk)
+                .lineSpacing(Perch.previewLineSpacing)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Perch.s(2))
+                .help(previewBody)
         }
     }
 
-    private var previewBand: some View {
-        HStack(alignment: .top, spacing: Perch.s(8)) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
-            } label: {
-                Text(previewText)
-                    .font(Perch.mono(10.5))
-                    .foregroundColor(Perch.bandText)
-                    .lineSpacing(Perch.s(2))
-                    .lineLimit(expanded ? nil : 2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(expanded ? "Collapse the instructions"
-                           : "Show the complete instructions")
-            if !controller.isFreeChat {
-                Button {
-                    controller.editInstructions()
-                } label: {
-                    Image(systemName: PerchShapeIcons.customIcon)
-                        .font(.system(size: Perch.s(10), weight: .medium))
-                        .foregroundColor(Perch.muted)
-                        .frame(width: Perch.s(20), height: Perch.s(20))
-                        .contentShape(Rectangle())
-                        .perchHover(RoundedRectangle(cornerRadius: Perch.s(5)))
-                }
-                .buttonStyle(.plain)
-                .help("Customize these instructions for this session only")
-            }
-        }
-        .padding(Perch.s(9))
-        .background(RoundedRectangle(cornerRadius: Perch.bandCorner).fill(Perch.band))
-        // The band is one clickable surface (click to expand), so the whole
-        // band answers the pointer; the pencil layers its own square on top.
-        .perchHover(RoundedRectangle(cornerRadius: Perch.bandCorner))
+    private var previewBody: String {
+        controller.selectedTemplate?.body ?? ""
     }
 
+    /// The body run together: the preview is a two-line peek at the words,
+    /// not at their layout, so a paragraph break must not spend a whole
+    /// line on nothing. The tooltip keeps the body as written.
     private var previewText: String {
-        if controller.isFreeChat {
-            return "Open conversation — no preset structure; the topic below is the whole opening message."
-        }
-        return controller.selectedTemplate?.body ?? ""
+        previewBody.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     // MARK: The zone mid-run
@@ -341,15 +350,21 @@ private struct PerchComposerEditor: View {
                               textColor: Perch.inkNS,
                               placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 3, maximumLines: 12,
+                              // Free chat shows no preview, so the editor
+                              // holds the preview zone's height itself and
+                              // the card is one size for every shape.
+                              extraMinimumHeight: controller.isFreeChat
+                                  ? Perch.previewZoneHeight : 0,
                               onSubmit: { controller.start() })
         } else {
             // Prose mode: Return breaks the line, as a prompt editor should;
-            // Run is the button's job here.
+            // Run is the button's job here. The same three lines as the
+            // topic field, so switching to Custom moves no edge of the card.
             GrowingTextEditor(text: $controller.customInstructions,
                               font: .systemFont(ofSize: Perch.s(12.5)),
                               textColor: Perch.inkNS,
                               placeholder: controller.promptEditorPlaceholder,
-                              minimumLines: 4, maximumLines: 13)
+                              minimumLines: 3, maximumLines: 13)
         }
     }
 
@@ -367,13 +382,18 @@ private struct PerchComposerEditor: View {
     }
 }
 
-/// The foot of the card: the options chip leading (a hint line mid-run),
-/// the one primary circle trailing. Ending a run lives in the title
+/// The foot of the card: the run options leading — the end condition and
+/// tiling, each its own control (a hint line takes their place mid-run) —
+/// and the one primary circle trailing. Ending a run lives in the title
 /// strip's overflow menu (PerchChrome), per the converged proposal — Pause
 /// is the safety action, so it keeps the only big button.
 private struct PerchComposerToolbar: View {
-    let controller: RelayController
-    @State private var optionsOpen = false
+    @Bindable var controller: RelayController
+    /// Bumped whenever the turn count should take the keyboard: when the
+    /// limit is switched on, and when its label is clicked.
+    @State private var turnsFocus = 0
+    /// The chips' height, and the square a bare glyph sits in.
+    private static let chipSize = Perch.s(32)
 
     var body: some View {
         HStack(spacing: Perch.s(8)) {
@@ -386,7 +406,10 @@ private struct PerchComposerToolbar: View {
                     .contentTransition(.opacity)
                     .animation(Perch.fade, value: controller.isSteering)
             } else {
-                optionsChip
+                HStack(spacing: Perch.s(6)) {
+                    turnLimitChip
+                    tileChip
+                }
             }
             Spacer(minLength: Perch.s(8))
             primaryButton
@@ -395,49 +418,114 @@ private struct PerchComposerToolbar: View {
 
     // MARK: Run options
 
-    /// The turn limit and tiling, behind one chip that always reads out its
-    /// setting — "Auto" is a state worth a word, not an empty chip.
-    private var optionsChip: some View {
+    /// Both options draw the way the chat apps' tool toggles do: nothing at
+    /// rest but the glyph, the wash under the pointer, and once on, the
+    /// quiet amber capsule grown around a label that reads the setting out.
+    /// Amber is the panel's word for "live", and an option that will shape
+    /// the run is live. The glyph keeps its place through the change — the
+    /// capsule grows past it, so the eye stays where it clicked. The chips
+    /// are a size under the primary circle, with air around the glyph, so
+    /// they read as buttons of the same family rather than as its footnotes.
+    private func chip<Content: View>(on: Bool,
+                                     @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 0, content: content)
+            .foregroundColor(on ? Perch.amberText : Perch.secondary)
+            .frame(height: Self.chipSize)
+            .background(Capsule().fill(Perch.amberBack).opacity(on ? 1 : 0))
+            .perchHover(Capsule(), tint: on ? Perch.amber : Perch.ink,
+                        opacity: on ? 0.08 : 0.06)
+    }
+
+    /// A chip's glyph. One whose symbol stays put bounces to mark the
+    /// press; one whose symbol changes with the state — `swaps` — replaces
+    /// itself instead, the system's own swap, rather than popping twice.
+    private func glyph(_ symbol: String, on: Bool, swaps: Bool = false) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: Perch.s(13), weight: .medium))
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, value: !swaps && on)
+            .frame(width: Self.chipSize, height: Self.chipSize)
+            .padding(.leading, on ? Perch.s(3) : 0)
+    }
+
+    /// The label a chip grows: out of the glyph's side, scaling up as the
+    /// capsule stretches to make room for it.
+    private var labelTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.5, anchor: .leading))
+    }
+
+    /// Tiling: one press, one word.
+    private var tileChip: some View {
         Button {
-            optionsOpen.toggle()
+            withAnimation(Perch.spring) { controller.tileWindows.toggle() }
         } label: {
-            HStack(spacing: Perch.s(5)) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: Perch.s(10), weight: .medium))
-                Text(optionsSummary)
-                    .font(Perch.text(12, .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: Perch.s(7), weight: .semibold))
-                    .foregroundColor(Perch.muted)
+            chip(on: controller.tileWindows) {
+                // A window as it is when off; the split when the run will
+                // arrange two. (Two windows one behind another is the copy
+                // glyph — it read as duplicate, not as untiled.)
+                glyph(controller.tileWindows ? "rectangle.split.2x1" : "macwindow",
+                      on: controller.tileWindows, swaps: true)
+                if controller.tileWindows {
+                    Text("Tile")
+                        .font(Perch.text(12, .medium))
+                        .fixedSize()
+                        .padding(.trailing, Perch.s(12))
+                        .transition(labelTransition)
+                }
             }
-            .foregroundColor(Perch.secondary)
-            .padding(.horizontal, Perch.s(11))
-            .frame(height: Perch.s(25))
-            .background(Capsule().fill(Perch.paper))
-            .overlay(Capsule().stroke(Perch.chipEdge, lineWidth: 1))
-            .perchHover(Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Run options: the turn limit and window tiling")
-        // Anchored to a fixed span at the chip's leading end rather than the
-        // chip's bounds: the label re-reads the setting as it changes
-        // ("Auto" to "10 turns"), so a bounds anchor would slide the open
-        // popover with every edit made inside it. The chip's leading edge
-        // never moves.
-        .popover(isPresented: $optionsOpen,
-                 attachmentAnchor: .rect(.rect(CGRect(x: 0, y: 0,
-                                                      width: Perch.s(44),
-                                                      height: Perch.s(25)))),
-                 arrowEdge: .bottom) {
-            PerchRunOptions(controller: controller)
+        .help(controller.tileWindows
+              ? "Tiling on: ChatGPT left, Claude right when the run starts. Click to leave the windows where they are."
+              : "Tile the chat windows — ChatGPT left, Claude right — when the run starts")
+    }
+
+    /// The end condition: the checkered flag is the switch, and the label it
+    /// grows is the value itself. Switching it on hands the keyboard to the
+    /// count with its digits selected, so the whole gesture is click, type a
+    /// number, Return — and the arrows or the scroll wheel nudge it without
+    /// a stepper in sight.
+    private var turnLimitChip: some View {
+        chip(on: controller.limitTurns) {
+            Button {
+                withAnimation(Perch.spring) { controller.limitTurns.toggle() }
+                if controller.limitTurns { turnsFocus += 1 }
+            } label: {
+                glyph("flag.checkered", on: controller.limitTurns)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(controller.limitTurns
+                  ? "Ending after the set number of turns. Click to end only when both agents sign off."
+                  : "End condition: stop after a set number of turns. Off, the run ends when both agents sign off (or on an empty reply, a timeout, or End session).")
+            if controller.limitTurns {
+                turnCount.transition(labelTransition)
+            }
         }
     }
 
-    private var optionsSummary: String {
-        var parts = [controller.limitTurns ? "\(controller.turns) turns" : "Auto"]
-        if controller.tileWindows { parts.append("Tile") }
-        return parts.joined(separator: " · ")
+    /// The count and its unit. The unit is a click into the number, so the
+    /// whole label edits: the number is the value, the glyph is the switch.
+    private var turnCount: some View {
+        HStack(spacing: Perch.s(3)) {
+            PerchTurnsField(value: $controller.turns,
+                            font: .monospacedDigitSystemFont(ofSize: Perch.s(12),
+                                                             weight: .medium),
+                            color: Perch.amberTextNS,
+                            focusRequest: turnsFocus)
+            Button {
+                turnsFocus += 1
+            } label: {
+                Text(controller.turns == 1 ? "turn" : "turns")
+                    .font(Perch.text(12, .medium))
+                    .fixedSize()
+                    .padding(.trailing, Perch.s(12))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .help("How many turns to allow. Type a number, or nudge it with ↑ ↓ or the scroll wheel.")
     }
 
     // MARK: The primary button
@@ -453,7 +541,7 @@ private struct PerchComposerToolbar: View {
                 .font(.system(size: Perch.s(13), weight: .bold))
                 .contentTransition(.symbolEffect(.replace))
                 .foregroundColor(.white)
-                .frame(width: Perch.s(36), height: Perch.s(36))
+                .frame(width: Perch.primaryDiameter, height: Perch.primaryDiameter)
                 .background(Circle().fill(Perch.amber))
                 .perchHover(Circle(), opacity: 0.1)
                 .opacity(role.disabled ? 0.4 : 1)
@@ -498,39 +586,5 @@ private struct PerchComposerToolbar: View {
                            help: "Hold the run at the next handoff",
                            disabled: false,
                            action: { controller.togglePause() })
-    }
-}
-
-/// The popover behind the options chip: native controls on the panel's own
-/// paper.
-private struct PerchRunOptions: View {
-    @Bindable var controller: RelayController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(10)) {
-            HStack(spacing: Perch.s(8)) {
-                Toggle("Limit turns", isOn: $controller.limitTurns)
-                    .toggleStyle(.checkbox)
-                    .help("Off: the run ends when both agents sign off (or on an empty reply, a timeout, or End session). On: also stop after this many responses.")
-                HStack(spacing: Perch.s(3)) {
-                    TextField("10", value: $controller.turns, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .multilineTextAlignment(.center)
-                        .frame(width: Perch.s(40))
-                    Stepper("", value: $controller.turns, in: 1...99)
-                        .labelsHidden()
-                        .controlSize(.small)
-                }
-                .disabled(!controller.limitTurns)
-                .opacity(controller.limitTurns ? 1 : 0.45)
-            }
-            Toggle("Tile the chat windows", isOn: $controller.tileWindows)
-                .toggleStyle(.checkbox)
-                .help("Arrange ChatGPT left, Claude right when the run starts")
-        }
-        .font(Perch.text(12))
-        .padding(Perch.s(14))
-        .background(Perch.paper)
-        .environment(\.colorScheme, .light)
     }
 }

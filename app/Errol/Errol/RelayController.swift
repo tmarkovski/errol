@@ -29,13 +29,10 @@ final class RelayController {
     var conversation = conversationTemplates[0].name
     /// Completes the selected template ("What to brainstorm about").
     var topic = ""
-    /// The full opening text while the editor is open. The picker continues
-    /// to name the selected template; Custom is reserved for a prompt written
-    /// from scratch.
+    /// The opening message written from scratch under Custom (More → Write
+    /// from scratch). A stored draft: it survives comparing other shapes, so
+    /// coming back to Custom finds the writing where it was left.
     var customInstructions = ""
-    /// Editing is presentation state, not a conversation choice. Keeping it
-    /// separate prevents Edit from silently changing the picker to Custom.
-    private(set) var isEditingInstructions = false
     var limitTurns = config.limitTurns
     var turns = config.turns
     /// Which side sends the opening message. Chosen before a run by clicking
@@ -79,9 +76,6 @@ final class RelayController {
     var lastRunDuration: TimeInterval?
     @ObservationIgnored private var runStartedAt: Date?
     @ObservationIgnored private var nextLogID = 0
-    /// Preserve in-progress full-prompt edits while someone compares shapes.
-    /// A deliberate reset removes the draft for that shape.
-    @ObservationIgnored private var instructionDrafts: [String: String] = [:]
     @ObservationIgnored private let scanner = ReadinessScanner()
     @ObservationIgnored private var panelVisible = false
     /// Set by the AppKit shell; the panel's Settings… item routes here to
@@ -145,108 +139,46 @@ final class RelayController {
 
     var isFreeChat: Bool { conversation == Self.freeConversation }
 
-    /// Custom always needs the full editor. A template starts with its compact
-    /// topic field and stays in the full editor once the user asks to edit it.
-    /// Free chat never opens it: the topic field already holds the whole
-    /// opening message, so there is no composed prompt to reveal.
+    /// Custom is the one shape with a full editor: its prompt is written from
+    /// scratch. A template shows its topic field under a read-only preview of
+    /// its body, and Free chat's topic field already holds the whole opening
+    /// message, so neither has a composed prompt to reveal.
     var showsFullInstructionsEditor: Bool {
-        (selectedTemplate == nil && !isFreeChat) || isEditingInstructions
+        selectedTemplate == nil && !isFreeChat
     }
 
     /// A visual hint at the insertion point in the full editor. It is never
     /// part of customInstructions, so an untouched placeholder cannot leak
     /// into the message sent to either agent.
     var promptEditorPlaceholder: String? {
-        if let template = selectedTemplate {
-            let topicIsEmpty = topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            let editorStillHasOnlyTheTemplate =
-                customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
-                == template.body.trimmingCharacters(in: .whitespacesAndNewlines)
-            return topicIsEmpty && editorStillHasOnlyTheTemplate
-                ? "(add your topic or material here)" : nil
-        }
-        return customInstructions.isEmpty ? "Write your complete opening prompt here…" : nil
+        customInstructions.isEmpty ? "Write your complete opening prompt here…" : nil
     }
 
     /// The exact initial message the relay will hand to the first agent
     /// (before the framing preamble): the template composed with the topic,
-    /// the bare topic for Free chat, or the full editor's text as written.
+    /// the bare topic for Free chat, or the from-scratch prompt as written.
     var composedInstructions: String {
-        guard !showsFullInstructionsEditor else { return customInstructions }
         if isFreeChat { return topic }
         guard let template = selectedTemplate else { return customInstructions }
         return template.composed(topic: topic)
     }
 
-    /// Whether Start has something to send: a topic in compact template mode,
-    /// or any text when the full prompt is being edited.
+    /// Whether Start has something to send: a topic for a template or Free
+    /// chat, any text for a prompt written from scratch.
     var instructionsReady: Bool {
-        guard showsFullInstructionsEditor else {
-            return !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-
-        let text = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return false }
-
-        // Opening a template before entering a topic should not make Run look
-        // ready merely because the template body itself is non-empty. Any
-        // actual edit makes the full prompt independently valid.
-        if let template = selectedTemplate,
-           topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           text == template.body.trimmingCharacters(in: .whitespacesAndNewlines) {
-            return false
-        }
-        return true
+        let text = showsFullInstructionsEditor ? customInstructions : topic
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Select a shape without changing whether the user is working in the
-    /// compact topic field or the full editor. Full-prompt drafts are kept per
-    /// shape so comparing options does not silently throw work away.
+    /// Select a shape. The from-scratch draft is left alone: it stays in
+    /// customInstructions across the switch, so comparing the shapes and
+    /// coming back to Custom does not throw the writing away.
     func selectConversation(_ name: String) {
         guard name == Self.customConversation
                 || name == Self.freeConversation
                 || conversationTemplates.contains(where: { $0.name == name }),
               name != conversation else { return }
-
-        if showsFullInstructionsEditor {
-            instructionDrafts[conversation] = customInstructions
-        }
-
-        let keepEditorOpen = showsFullInstructionsEditor
         conversation = name
-
-        if name == Self.customConversation {
-            customInstructions = instructionDrafts[name] ?? ""
-            isEditingInstructions = true
-        } else if name == Self.freeConversation {
-            // Free chat has no full-prompt form (the topic is the message),
-            // so it closes the editor rather than carrying it over.
-            isEditingInstructions = false
-        } else if keepEditorOpen {
-            let template = conversationTemplates.first { $0.name == name }!
-            customInstructions = instructionDrafts[name]
-                ?? template.composed(topic: topic)
-            isEditingInstructions = true
-        } else {
-            isEditingInstructions = false
-        }
-    }
-
-    /// Reveal the selected template's composed message for direct editing
-    /// without relabeling the selection as Custom.
-    func editInstructions() {
-        guard selectedTemplate != nil, !isEditingInstructions else { return }
-        customInstructions = composedInstructions
-        isEditingInstructions = true
-    }
-
-    /// Explicitly discard this shape's full-prompt edits and return to the
-    /// template's topic field. This is the only action that collapses it.
-    func resetInstructionsToTemplate() {
-        guard selectedTemplate != nil else { return }
-        instructionDrafts.removeValue(forKey: conversation)
-        customInstructions = ""
-        isEditingInstructions = false
     }
 
     /// The readiness strip only scans while someone can see it, and never

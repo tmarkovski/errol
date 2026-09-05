@@ -3,9 +3,9 @@
 // answers the pointer unless asked to; this is the one idiom they share: a
 // tint washed over the control's own shape while the pointer rests on it —
 // ink at a few percent on the paper-colored controls, white on the filled
-// ones — faded over a beat. Bare glyphs (the ··· menu, the pencil) get the
-// same wash, which shows as the soft square macOS draws behind a toolbar
-// button.
+// ones — faded over a beat. Bare glyphs (the ··· menu, the composer's option
+// chips at rest) get the same wash, which shows as the soft square macOS
+// draws behind a toolbar button, or a circle where the glyph sits in one.
 //
 // It works in the non-activating panel: SwiftUI's onHover installs an
 // activeAlways tracking area (probed on macOS 26), so the pointer is noticed

@@ -49,8 +49,8 @@ struct PerchLogWindowView: View {
                 .padding(Perch.s(10))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(RoundedRectangle(cornerRadius: Perch.bandCorner).fill(Perch.well))
-            .overlay(RoundedRectangle(cornerRadius: Perch.bandCorner)
+            .background(RoundedRectangle(cornerRadius: Perch.insetCorner).fill(Perch.well))
+            .overlay(RoundedRectangle(cornerRadius: Perch.insetCorner)
                 .stroke(Perch.chipEdge, lineWidth: 1))
             .onChange(of: controller.logLines.count) { _, _ in
                 if let last = controller.logLines.last {

@@ -14,6 +14,10 @@ struct GrowingTextEditor: NSViewRepresentable {
     var placeholder: String?
     var minimumLines = 8
     var maximumLines = 13
+    /// Height the editor holds beyond its minimum lines: what the composer
+    /// hands it when a row above is absent, so the card keeps one height
+    /// whether or not that row is showing (Perch.previewZoneHeight).
+    var extraMinimumHeight: CGFloat = 0
     /// When set, Return submits instead of breaking the line (Shift-Return
     /// still breaks one) — the chat-composer contract, for the fields whose
     /// text is a message to send rather than prose to shape.
@@ -78,7 +82,8 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         let width = proposal.width ?? scrollView.frame.width
         guard width > 0 else {
-            return CGSize(width: width, height: lineHeight * CGFloat(minimumLines))
+            return CGSize(width: width,
+                          height: lineHeight * CGFloat(minimumLines) + extraMinimumHeight)
         }
 
         textView.frame.size.width = width
@@ -88,8 +93,8 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         let insets = textView.textContainerInset.height * 2
         let contentHeight = ceil(layoutManager.usedRect(for: textContainer).height + insets)
-        let minimumHeight = lineHeight * CGFloat(minimumLines) + insets
-        let maximumHeight = lineHeight * CGFloat(maximumLines) + insets
+        let minimumHeight = lineHeight * CGFloat(minimumLines) + insets + extraMinimumHeight
+        let maximumHeight = max(lineHeight * CGFloat(maximumLines) + insets, minimumHeight)
         let height = min(max(contentHeight, minimumHeight), maximumHeight)
         return CGSize(width: width, height: height)
     }
