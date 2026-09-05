@@ -19,16 +19,18 @@ Static output is in `dist/client/`. The page uses React, Vinext, and the starter
 
 ## Deploy to Cloudflare
 
-The site is configured as a Cloudflare Worker with static assets. For a manual production deploy:
+The site is a Cloudflare Worker that serves the static output in `dist/client/`. The GitHub Actions workflow at `.github/workflows/site.yml` is the only deploy path: every push to `main` that touches `site/` builds the site and runs `wrangler deploy`. Do not also connect the repository under the Worker's Build settings in the Cloudflare dashboard, or both systems will deploy the same Worker on each push. If that dashboard integration is ever used instead, it needs a Build command of `npm run build`, because `wrangler deploy` on its own does not build and the assets directory will not exist.
+
+The workflow needs both of these repository secrets and fails if either is missing:
+
+- `CLOUDFLARE_API_TOKEN`: an API token created from the "Edit Cloudflare Workers" template
+- `CLOUDFLARE_ACCOUNT_ID`: the account ID shown on the Workers & Pages overview page
+
+For a one-off deploy from a machine that has run `wrangler login`:
 
 ```sh
 npm run deploy
 ```
-
-The repository workflow at `.github/workflows/site.yml` deploys changes to `site/` from `main`. Add these GitHub Actions repository secrets before enabling it:
-
-- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with Workers Scripts edit permission
-- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID that should own the Worker
 
 Cloudflare assigns a `workers.dev` address on the first deployment. A custom domain can be attached afterward in the Worker settings.
 

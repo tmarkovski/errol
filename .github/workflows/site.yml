@@ -1,5 +1,10 @@
 name: Deploy Errol site
 
+# This workflow is the only deploy path for the site. Do not also connect the
+# repository under the Worker's Build settings in the Cloudflare dashboard, or
+# both systems will deploy the same Worker on every push. Missing credentials
+# fail the run on purpose: a green check on main must mean the site shipped.
+
 on:
   push:
     branches: [main]
@@ -25,6 +30,12 @@ jobs:
       run:
         working-directory: site
     steps:
+      - name: Require Cloudflare credentials
+        if: ${{ env.CF_API_TOKEN == '' || env.CF_ACCOUNT_ID == '' }}
+        working-directory: .
+        run: |
+          echo "::error::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets. This workflow is the site's only deploy path, so it fails instead of skipping."
+          exit 1
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
@@ -34,13 +45,9 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Deploy to Cloudflare
-        if: ${{ env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ env.CF_API_TOKEN }}
           accountId: ${{ env.CF_ACCOUNT_ID }}
           workingDirectory: site
           command: deploy
-      - name: Explain skipped deployment
-        if: ${{ env.CF_API_TOKEN == '' || env.CF_ACCOUNT_ID == '' }}
-        run: echo "Build passed; add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to enable deployment."
