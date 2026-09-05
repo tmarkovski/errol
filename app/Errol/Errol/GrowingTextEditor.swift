@@ -18,6 +18,10 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// hands it when a row above is absent, so the card keeps one height
     /// whether or not that row is showing (Perch.previewZoneHeight).
     var extraMinimumHeight: CGFloat = 0
+    /// When set, the editor takes the keyboard as soon as it is in a window
+    /// — for a field that opens on a click elsewhere, so the next thing
+    /// typed lands in it.
+    var takesFocusOnAppear = false
     /// When set, Return submits instead of breaking the line (Shift-Return
     /// still breaks one) — the chat-composer contract, for the fields whose
     /// text is a message to send rather than prose to shape.
@@ -26,6 +30,16 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// completion — the way a steer editor gets called off. The text view
     /// comes along so the handler can also just leave focus.
     var onEscape: ((NSTextView) -> Void)?
+
+    /// The text's inset above and below, inside the editor.
+    static let insetHeight: CGFloat = 2
+
+    /// The height the editor settles at for `lines` of `font`, insets
+    /// included — for a view that stands in for the editor and must not
+    /// move the card when the two swap.
+    static func height(lines: Int, font: NSFont) -> CGFloat {
+        ceil(NSLayoutManager().defaultLineHeight(for: font)) * CGFloat(lines) + insetHeight * 2
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -47,7 +61,7 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
-        textView.textContainerInset = NSSize(width: 0, height: 2)
+        textView.textContainerInset = NSSize(width: 0, height: Self.insetHeight)
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
         textView.textContainer?.lineFragmentPadding = 0
@@ -58,6 +72,13 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         scrollView.documentView = textView
         context.coordinator.scrollView = scrollView
+        if takesFocusOnAppear {
+            // No window yet while the view is being made; by the next turn
+            // of the loop it is in one.
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+            }
+        }
         return scrollView
     }
 

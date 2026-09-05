@@ -28,8 +28,8 @@ struct PerchHead: View {
                 // The note's line: where it is during the run, what became
                 // of it after, kept until New session since ending is when
                 // someone inspects what happened. The slot is reserved for
-                // the whole run, so the composer does not move under the
-                // hand that starts typing a note.
+                // the whole run, so the composer does not move when the
+                // field opens.
                 PerchSteeringLine(controller: controller)
                     .frame(height: Perch.s(14))
             }
@@ -137,9 +137,8 @@ struct PerchHead: View {
     /// One sentence, centered: the turn count and what is happening to it.
     /// This is where the precise copy lives — "Will pause after Claude
     /// finishes" rather than a bare "Paused" — because the pause states are
-    /// exactly the ones a glance misreads. A hold reads the same whoever
-    /// asked for it, the Pause control or a note being written; the line
-    /// under this one says which.
+    /// exactly the ones a glance misreads. The hold is always Pause to
+    /// steer's; the line under this one says what the note is doing.
     private var turnLine: some View {
         Text(turnText)
             .font(Perch.text(11))

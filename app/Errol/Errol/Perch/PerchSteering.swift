@@ -1,21 +1,21 @@
 // The steering note's chrome outside the field: the line under the head's
 // turn line that says where the note is — being written, queued, sending —
 // and then what became of it, and the popover that shows a note whole. The
-// field itself (PerchComposer) shows only the text, under a wash while the
-// mailbox holds it, and the primary circle is Queue while there is text to
-// queue. The design is docs/design-proposals/steering/the-note-stays-put.md,
+// field itself (PerchComposer) is closed while the agents work, with Pause
+// to steer standing in it and a queued note blurred behind; the press opens
+// it. The design is docs/design-proposals/steering/the-note-stays-put.md,
 // as revised at its end. See PerchHead for the slot this fills.
 
 import SwiftUI
 
 /// The head's steering line. One line in a slot the head reserves for the
 /// whole run, so the composer never moves when a note starts; empty when
-/// there is nothing to say. A note in flight outranks a queued one, a queued
-/// one outranks one being written, and the last note's record shows when
-/// none of those is true — so Esc on a fresh note brings the record back.
-/// The line describes the note; whether the run is running, pausing, or held
-/// is the turn line's to say, right above, and the two never restate each
-/// other.
+/// there is nothing to say. A note in flight outranks the open field, the
+/// open field outranks a queued note (opening it takes the note back), and
+/// the last note's record shows when none of those is true — so closing the
+/// field without a note brings the record back. The line describes the
+/// note; whether the run is running, pausing, or held is the turn line's to
+/// say, right above, and the two never restate each other.
 struct PerchSteeringLine: View {
     let controller: RelayController
 
@@ -25,8 +25,8 @@ struct PerchSteeringLine: View {
 
     private var slot: Slot {
         if controller.steeringInFlight != nil { return .sending }
+        if controller.isSteering { return .writing }
         if controller.steeringQueued { return .queued }
-        if controller.steeringDirty { return .writing }
         if controller.lastReceipt != nil { return .record }
         return .empty
     }
@@ -39,7 +39,7 @@ struct PerchSteeringLine: View {
             case .queued:
                 live(queuedText)
             case .writing:
-                live("Note in progress · Return queues it · Esc clears it")
+                live(writingText)
             case .record:
                 if let receipt = controller.lastReceipt {
                     PerchReceiptLine(controller: controller, receipt: receipt)
@@ -65,8 +65,15 @@ struct PerchSteeringLine: View {
             .transition(.opacity)
     }
 
+    /// The field is open. With nothing in it yet, the line says what the
+    /// hold is for; with words, who they are for.
+    private var writingText: String {
+        guard controller.steeringHasText else { return "Steering · write a note, or continue" }
+        if let side = controller.nextRecipient { return "Writing a note for \(side)" }
+        return "Writing a note for the next handoff"
+    }
+
     private var queuedText: String {
-        if controller.isPaused { return "Note queued · sends when you resume" }
         if let side = controller.nextRecipient {
             return "Note queued · goes to \(side) with the next handoff"
         }
@@ -126,7 +133,7 @@ struct PerchReceiptLine: View {
         case .notSent:
             line = "Note not sent · never reached \(recipient)"
         case .neverQueued:
-            line = "Note in progress · the run ended before it was queued"
+            line = "Note in progress · the run ended before it was sent"
         }
         if let echo = receipt.echo, let recipientName = receipt.recipient,
            receipt.outcome == .sent || receipt.outcome == .unconfirmed {

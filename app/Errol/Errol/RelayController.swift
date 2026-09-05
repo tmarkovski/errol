@@ -19,8 +19,8 @@ struct LogLine: Identifiable {
 /// A note the worker has committed to a handoff and is pasting now: out
 /// of the field, not yet with an outcome. The design is
 /// docs/design-proposals/steering/the-note-stays-put.md, as revised at its
-/// end: typing holds the run, Return queues, the head says where the note
-/// is.
+/// end: Pause to steer opens the field and holds the run, Return sends the
+/// note and lets the run go, the head says where the note is.
 struct SteeringInFlight: Equatable {
     var note: String
     /// The recipient's app name.
@@ -82,21 +82,21 @@ final class RelayController {
     var firstSpeaker = Speaker.chatgpt
     var tileWindows = false
     var isRunning = false
-    /// Whether the human has *asked for* a pause with the Pause control (see
-    /// RelayControl). The run keeps going until it reaches the next handoff.
-    /// The other way a hold gets requested is a note being written;
-    /// `holdRequested` is the two together, and is what the chrome reads.
-    var isPaused = false
+    /// Whether the field is open: the human pressed Pause to steer, the
+    /// engine's pause flag is on (see RelayControl), and the run holds at
+    /// the next handoff until Return or the circle closes the field and lets
+    /// it go. The run keeps going until it reaches that handoff.
+    var isSteering = false
     /// Whether the run has actually parked at that handoff. Between the two
     /// the agent that was composing is still finishing its reply, which is
     /// the gap the panel's route draws.
     var isHolding = false
-    /// The steering field's text. The composer writes it through
-    /// setSteeringText, which is where typing takes effect on the run.
+    /// The field's text: what the human is writing while the field is open,
+    /// and the queued note as written — shown under a blur — while the
+    /// mailbox holds it. The composer writes it through setSteeringText.
     var steeringText = ""
-    /// The field's text as it stood when Return queued it, while the note
-    /// is in the mailbox; nil otherwise. Text that differs from it is a
-    /// note being written, and a note being written holds the run.
+    /// The field's text as it stood when it was sent, while the note is in
+    /// the mailbox; nil otherwise.
     private(set) var queuedSteering: String?
     /// The note the worker has committed and is pasting, between the
     /// committed event and the outcome.
@@ -277,7 +277,6 @@ final class RelayController {
         let tile = tileWindows
 
         isRunning = true
-        isPaused = false
         isHolding = false
         resetSteering()
         lastReceipt = nil
@@ -336,7 +335,6 @@ final class RelayController {
         lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
         runStartedAt = nil
         isRunning = false
-        isPaused = false
         isHolding = false
         recordSteeringAtRunEnd()
         resetSteering()
@@ -346,52 +344,24 @@ final class RelayController {
 
     func stop() {
         guard isRunning else { return }
-        // Clear every hold so the loop wakes and reaches its cancel check.
-        // The note stays where it is; the run's end records what became of it.
-        isPaused = false
+        // Lift the hold so the loop wakes and reaches its cancel check. The
+        // field stays as it is; the run's end records what became of the note.
         relayControl.setPaused(false)
         relayControl.cancel()
         append("Stop requested — ending the run at the next safe point...")
     }
 
-    // MARK: Pause
-
-    /// Whether a hold is asked for, by either route: the Pause control, or
-    /// a note being written. The pill and the turn line read this, since a
-    /// hold is a hold whoever asked.
-    var holdRequested: Bool { isPaused || steeringDirty }
-
-    /// Pause holds the run at the next handoff boundary; the agent currently
-    /// composing finishes its reply, which is captured but not delivered
-    /// until Resume. Resume lifts the pressed pause and nothing else: a note
-    /// still being written keeps its own hold until it is queued or cleared.
-    func togglePause() {
-        guard isRunning else { return }
-        isPaused.toggle()
-        syncHold()
-        if isPaused {
-            append("Pause requested — the run holds at the next handoff.")
-        } else if steeringDirty {
-            append("Resumed — the note being written still holds the next handoff until you queue it or clear it.")
-        }
-    }
-
-    /// The engine's pause flag is the two holds together. Every change to
-    /// either goes through here, so the flag never lags the state the
-    /// chrome shows.
-    private func syncHold() {
-        relayControl.setPaused(isPaused || steeringDirty)
-    }
-
     // MARK: Steering
 
-    /// Whether the field holds a note that is not queued: something written
-    /// since the last queue, or a first draft. It is the note's hold on the
-    /// run — writing one is asking the relay to wait at the next handoff —
-    /// and the state in which the primary circle is Queue.
-    var steeringDirty: Bool {
-        queuedSteering == nil
-            && !steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    /// Whether a hold is asked for. There is one way to ask: Pause to
+    /// steer, which opens the field. The pill and the turn line read this.
+    var holdRequested: Bool { isSteering }
+
+    /// Whether the field holds words. The circle reads it to be Send rather
+    /// than Continue, and the run's end records such words as a note never
+    /// sent.
+    var steeringHasText: Bool {
+        !steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Whether a note is in the mailbox, waiting for its handoff.
@@ -421,90 +391,112 @@ final class RelayController {
         }
     }
 
-    /// The field's write path, and where typing acts on the run. Text that
-    /// is not queued holds the next handoff, so the note lands where the
-    /// human meant it to rather than one handoff late; the hold lifts when
-    /// Return queues it or Esc clears it. Typing into a queued note takes
-    /// it back off the mailbox and puts the hold on in one locked step
-    /// (RelayControl.claimSteering). If the worker committed it first, the
+    /// Pause to steer: the run holds at the next handoff and the field
+    /// opens. A queued note comes back into the field to be changed — taken
+    /// off the mailbox and the hold put on in one locked step
+    /// (RelayControl.claimSteering), so the handoff it was queued for cannot
+    /// slip through between the two. If the worker committed it first the
     /// claim loses: that note is on its way, the committed event says so,
-    /// and what is in the field from here is a new note.
-    func setSteeringText(_ text: String) {
-        guard isRunning else { return }
-        if let queued = queuedSteering, text != queued {
+    /// and the field opens empty for a new one.
+    func beginSteering() {
+        guard isRunning, !isSteering else { return }
+        if queuedSteering != nil {
             queuedSteering = nil
             if relayControl.claimSteering() != nil {
-                append("Note taken back to change it — the run holds at the next handoff until you queue it again or clear it.")
+                append("Note taken back — the run holds at the next handoff while you change it.")
             } else {
-                append("The note had already gone out with the handoff; what you type now is a new note.")
+                steeringText = ""
+                append("The note had already gone out with the handoff; the field is open for a new one.")
             }
+        } else {
+            append("Pausing to steer — the run holds at the next handoff while you write.")
         }
-        steeringText = text
-        syncHold()
+        relayControl.setPaused(true)
+        isSteering = true
     }
 
-    /// Return, or the Queue circle: commit the text to the next handoff.
-    /// The mailbox takes the trimmed note, the field keeps the text as
-    /// written under a wash, and the note's hold lifts — a pressed pause
-    /// stays, and the note goes out when the human resumes. Posting comes
-    /// before the hold lifts, so the handoff the flag releases is one that
-    /// finds the note.
-    func queueSteering() {
-        guard isRunning, steeringDirty else { return }
+    /// Return, or the circle: the field closes and the run goes on. Words
+    /// in it are the note — the mailbox takes them trimmed, and the field
+    /// keeps them as written to show under the blur — and an empty field
+    /// just continues. Posting comes before the hold lifts, so the handoff the
+    /// flag releases is one that finds the note.
+    func sendSteering() {
+        guard isRunning, isSteering else { return }
         let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
-        relayControl.postSteering(note)
-        queuedSteering = steeringText
-        syncHold()
-        append(isPaused
-            ? "Note queued — it goes out with the handoff when you resume."
-            : "Note queued — it goes out with the next handoff.")
+        if note.isEmpty {
+            steeringText = ""
+            queuedSteering = nil
+            append("Continued without a note.")
+        } else {
+            relayControl.postSteering(note)
+            queuedSteering = steeringText
+            append("Note queued — the run goes on, and the note rides the next handoff.")
+        }
+        isSteering = false
+        relayControl.setPaused(false)
     }
 
-    /// Esc: clear the field, take a queued note back, and lift the note's
-    /// hold. A pressed pause stays; Resume is what lifts that. Returns
-    /// whether there was anything to clear, so the composer can let Esc
-    /// mean "leave the field" when there was not.
+    /// Esc in the open field. The first press empties it; the second, on an
+    /// empty field, closes it and continues — so Esc twice drops whatever
+    /// note was there, queued before or not.
+    func escapeSteering() {
+        guard isRunning, isSteering else { return }
+        if steeringText.isEmpty {
+            sendSteering()
+        } else {
+            steeringText = ""
+        }
+    }
+
+    /// The explicit way to drop a queued note without opening the field:
+    /// the mailbox gives it back and the field lets go of the text. On an
+    /// open field it just empties it. Returns whether there was anything
+    /// to drop.
     @discardableResult
     func clearSteering() -> Bool {
         guard isRunning else { return false }
-        var cleared = false
         if queuedSteering != nil {
             queuedSteering = nil
-            cleared = true
+            steeringText = ""
             if relayControl.takeSteering() != nil {
                 append("Note withdrawn.")
             } else {
                 append("The note had already gone out with the handoff.")
             }
+            return true
         }
         if !steeringText.isEmpty {
             steeringText = ""
-            cleared = true
+            return true
         }
-        syncHold()
-        return cleared
+        return false
+    }
+
+    /// The field's write path. Only an open field takes text.
+    func setSteeringText(_ text: String) {
+        guard isRunning, isSteering else { return }
+        steeringText = text
     }
 
     /// Everything about the note, at a run's start and end.
     private func resetSteering() {
+        isSteering = false
         steeringText = ""
         queuedSteering = nil
         steeringInFlight = nil
     }
 
     /// The worker won the handoff: the note is the courier's, and the field
-    /// lets go of it — its text clears and the head takes over the story.
-    /// The field is left alone when it no longer shows that note: the human
-    /// typed in the instant before the commit and the claim lost, and what
-    /// they have now is a new note, holding the next handoff as any draft
-    /// does.
+    /// lets go of it — the blurred text clears and the head takes over the
+    /// story. The field is left alone when it no longer shows that note:
+    /// Pause to edit lost its claim in the instant before the commit, and
+    /// the field is already open and empty for a new one.
     private func steeringCommitted(_ note: String, to recipient: Speaker, turn: Int) {
         steeringInFlight = SteeringInFlight(note: note, recipient: appName(recipient), turn: turn)
         if let queued = queuedSteering,
            queued.trimmingCharacters(in: .whitespacesAndNewlines) == note {
             queuedSteering = nil
             steeringText = ""
-            syncHold()
         }
     }
 
@@ -529,7 +521,6 @@ final class RelayController {
                queued.trimmingCharacters(in: .whitespacesAndNewlines) == delivery.note {
                 queuedSteering = nil
                 steeringText = ""
-                syncHold()
             }
         case .echo:
             guard lastReceipt?.note == delivery.note else { return }
@@ -541,8 +532,8 @@ final class RelayController {
         }
     }
 
-    /// What the run's end leaves of the note becomes its record: a note
-    /// being written was never queued; a queued note the worker never took
+    /// What the run's end leaves of the note becomes its record: words in
+    /// an open field were never sent; a queued note the worker never took
     /// is reported by the worker itself before it finishes (a fallback here
     /// covers the case where it could not); a note still in flight never
     /// got its outcome, which is what unconfirmed means. Notes already
@@ -555,7 +546,7 @@ final class RelayController {
         } else if let queued = queuedSteering {
             lastReceipt = SteeringReceipt(note: queued.trimmingCharacters(in: .whitespacesAndNewlines),
                                           recipient: nil, turn: nil, outcome: .notSent(.runEnded))
-        } else if steeringDirty {
+        } else if isSteering, steeringHasText {
             lastReceipt = SteeringReceipt(note: steeringText, recipient: nil, turn: nil,
                                           outcome: .neverQueued)
         }

@@ -10,6 +10,7 @@ part of the application build.
   live scripted relay as the hero, the conversation shapes, the naming session
   as proof, the wrong-window story, and a plain permission section.
 - [Steering mid-run](steering/the-note-stays-put.md) — the converged design for
-  steering notes and, at its end, the revision built after trying it (typing
-  holds the run, Return queues, the head says where the note is), with
-  [the problem framing](steering/the-note-in-flight.md) it answers.
+  steering notes and, at its end, the revisions built after trying it (the
+  field is closed while the agents work; Pause to steer opens it, Return sends
+  and closes it), with [the problem framing](steering/the-note-in-flight.md)
+  it answers.

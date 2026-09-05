@@ -42,19 +42,21 @@ import SwiftUI
     controller.currentTurn = 4
     controller.chatgptConversation = .waiting
     controller.claudeConversation = .chatting
+    controller.beginSteering()
     controller.setSteeringText("Push on the pricing question before you wrap up.")
-    controller.queueSteering()
+    controller.sendSteering()
     return PerchPanelView(controller: controller)
         .padding(24)
         .background(Color(white: 0.75))
 }
 
-#Preview("Perch steer (writing, holding)") {
+#Preview("Perch steer (field open, holding)") {
     let controller = RelayController()
     controller.isRunning = true
     controller.currentTurn = 4
     controller.chatgptConversation = .waiting
     controller.claudeConversation = .replied
+    controller.beginSteering()
     controller.setSteeringText("Push on the pricing question before you wrap up.")
     controller.isHolding = true
     return PerchPanelView(controller: controller)
