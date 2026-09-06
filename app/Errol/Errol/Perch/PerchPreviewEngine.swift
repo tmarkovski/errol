@@ -68,7 +68,14 @@ final class PerchPreviewEngine: RelayEngine {
 
     func preflight() -> Bool { true }
 
-    func startRun(tileWindows: Bool) {
+    /// No windows to move; the chip hears the answer it would in the app.
+    func setTiling(_ tiled: Bool) {
+        events.post(.log(tiled ? "Preview: the chat windows would tile now."
+                               : "Preview: the chat windows would go back now."))
+        events.post(.arranged(tiled: tiled))
+    }
+
+    func startRun() {
         control.reset()
         run?.cancel()
         let opening = self.opening ?? (1, false)

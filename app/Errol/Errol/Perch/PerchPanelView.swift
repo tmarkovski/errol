@@ -35,6 +35,11 @@ struct PerchPanelView: View {
         // The top clears the title band and the window strip behind it.
         .padding(.top, Perch.chromeInset)
         .frame(width: Perch.cardWidth)
+        // The card reports its content height to the window. Taking the
+        // window's proposed height here would feed an in-flight resize
+        // back into the next measurement, especially when a run replaces
+        // the prompt editor with the shorter steering controls.
+        .fixedSize(horizontal: false, vertical: true)
         .tint(Perch.accent)
         .background(
             RoundedRectangle(cornerRadius: Perch.shellCorner).fill(Perch.paper)

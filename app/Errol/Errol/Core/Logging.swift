@@ -29,6 +29,10 @@ enum RelayEvent {
     /// The run is over — however it ended — and its worker has stopped
     /// touching the apps.
     case finished
+    /// The Tile chip's answer: the chat windows stand tiled (true) or where
+    /// they were (false) — false also when a tiling was asked for and could
+    /// not be done, so the chip lets go.
+    case arranged(tiled: Bool)
 }
 
 /// One leg of a steering note's journey and how it ended. A note travels

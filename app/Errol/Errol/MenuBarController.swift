@@ -67,10 +67,11 @@ private struct MainQueueHop: @unchecked Sendable {
 final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: KeyablePanel!
-    private let relay = RelayController()
+    private let relay = RelayController(veils: SideVeils())
     /// What fitPanel last applied, so a card re-reporting the same size
     /// doesn't restart the frame animation.
     private var lastPanelSize: CGSize?
+    private var panelResizeTimer: Timer?
     /// Settings rides the same non-activating panel machinery as the console
     /// and floats one level above it, so it opens over the panel without
     /// stealing focus; only the system close button distinguishes its chrome.
@@ -266,7 +267,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = FirstMouseHostingView(rootView: PerchPanelView(
+        let host = FirstMouseHostingView(rootView: PerchPanelView(
             controller: relay,
             onCardResize: { [weak self] size in
                 // The report lands mid-layout; the hop keeps the window's
@@ -281,12 +282,28 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             // here rather than in the view so it previews at its own size.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea())
+        // fitPanel is the one thing that sizes this window. Left to its
+        // default, the hosting view also gives itself an intrinsic size —
+        // the card plus the title strip's safe-area inset (66pt with the
+        // unified bar) — and its compression resistance outranks the
+        // window's stay-put priority, so every fit was undone a beat
+        // later: the window sprang back to card-plus-strip, a transparent
+        // band under the paper, and AppKit's own constraint passes were
+        // resizing the window behind the shell's back. With no intrinsic
+        // size the frame is exactly what the card reported.
+        host.sizingOptions = []
+        panel.contentView = host
     }
 
     /// Follow the card: it is content-sized, and each size it reports
     /// (PerchPanelView.onCardResize) becomes the window's, through an
     /// anchored, animated frame change.
     private func fitPanel(to size: CGSize) {
+        guard size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0 else { return }
+        // NSWindow rounds its frame to points. Compare the dimensions it
+        // can actually apply so fractional layout noise cannot retarget it.
+        let size = CGSize(width: ceil(size.width), height: ceil(size.height))
         guard size != lastPanelSize else { return }
         lastPanelSize = size
         resizePanel(to: size)
@@ -320,6 +337,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func resizePanel(to size: CGSize) {
         guard let panel else { return }
+        panelResizeTimer?.invalidate()
+        panelResizeTimer = nil
         var frame = panel.frame
         let topY = frame.maxY
         let midX = frame.midX
@@ -330,19 +349,30 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                                  min(frame.origin.x, visible.maxX - size.width - 8))
         }
         guard panel.isVisible else {
-            panel.setFrame(frame, display: true)
+            panel.setFrame(frame, display: false)
             return
         }
-        // The animator proxy animates on the run loop, where the synchronous
-        // setFrame(_:display:animate:) would hold the main thread inside a
-        // nested animation loop for the whole 0.32s; a morph arriving
-        // mid-flight retargets the animation instead of queueing behind it.
-        // The duration paces the frame to the SwiftUI content animation.
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.32
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(frame, display: true)
+        // Apply frames on run-loop ticks. This keeps the resize out of
+        // SwiftUI's measuring pass and avoids AppKit's synchronous animated
+        // resize/display loop. A new target cancels the old timer and starts
+        // at the current frame, so rapid state changes do not queue resizes.
+        let start = panel.frame
+        let target = frame
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak panel] timer in
+            guard let panel else { timer.invalidate(); return }
+            let progress = min(1, (ProcessInfo.processInfo.systemUptime - startedAt) / 0.32)
+            let eased = progress * progress * (3 - 2 * progress)
+            let next = NSRect(
+                x: start.minX + (target.minX - start.minX) * eased,
+                y: start.minY + (target.minY - start.minY) * eased,
+                width: start.width + (target.width - start.width) * eased,
+                height: start.height + (target.height - start.height) * eased)
+            panel.setFrame(progress == 1 ? target : next, display: false)
+            if progress == 1 { timer.invalidate() }
         }
+        panelResizeTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func togglePanel() {

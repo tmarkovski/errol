@@ -90,38 +90,34 @@ struct GrowingTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? TrailingPlaceholderTextView else {
             return
         }
-        textView.font = font
-        textView.textColor = textColor
-        textView.insertionPointColor = textColor
+        if textView.font != font { textView.font = font }
+        if textView.textColor != textColor { textView.textColor = textColor }
+        if textView.insertionPointColor != textColor { textView.insertionPointColor = textColor }
         textView.placeholderColor = placeholderColor
         textView.trailingPlaceholder = placeholder
         if textView.string != text {
             textView.string = text
         }
-        scrollView.invalidateIntrinsicContentSize()
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
                       context: Context) -> CGSize? {
-        guard let textView = scrollView.documentView as? NSTextView,
-              let textContainer = textView.textContainer,
-              let layoutManager = textView.layoutManager else { return nil }
+        guard let textView = scrollView.documentView as? NSTextView else { return nil }
 
-        let width = proposal.width ?? scrollView.frame.width
-        guard width > 0 else {
-            return CGSize(width: width,
-                          height: lineHeight * CGFloat(minimumLines) + extraMinimumHeight)
-        }
-
-        textView.frame.size.width = width
-        textContainer.containerSize = NSSize(width: width,
-                                             height: .greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: textContainer)
-
+        let proposedWidth = proposal.width ?? scrollView.bounds.width
+        let width = proposedWidth.isFinite ? max(0, proposedWidth) : scrollView.bounds.width
         let insets = textView.textContainerInset.height * 2
-        let contentHeight = ceil(layoutManager.usedRect(for: textContainer).height + insets)
         let minimumHeight = lineHeight * CGFloat(minimumLines) + insets + extraMinimumHeight
         let maximumHeight = max(lineHeight * CGFloat(maximumLines) + insets, minimumHeight)
+        guard width > 0 else {
+            return CGSize(width: width, height: minimumHeight)
+        }
+
+        // SwiftUI probes several widths during a layout pass. Measuring
+        // must not resize the live NSTextView: that relays out its scroll
+        // view and invalidates the hosting view's constraints mid-pass.
+        let contentHeight = ceil(context.coordinator.measuredTextHeight(
+            textView.attributedString(), width: width) + insets)
         let height = min(max(contentHeight, minimumHeight), maximumHeight)
         return CGSize(width: width, height: height)
     }
@@ -133,9 +129,30 @@ struct GrowingTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: GrowingTextEditor
         weak var scrollView: NSScrollView?
+        private let measurementStorage = NSTextStorage()
+        private let measurementLayout = NSLayoutManager()
+        private let measurementContainer = NSTextContainer(
+            containerSize: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
 
         init(parent: GrowingTextEditor) {
             self.parent = parent
+            super.init()
+            measurementContainer.lineFragmentPadding = 0
+            measurementLayout.addTextContainer(measurementContainer)
+            measurementStorage.addLayoutManager(measurementLayout)
+        }
+
+        /// A separate TextKit stack measures the same attributed text,
+        /// without changing any view involved in AppKit's current layout.
+        func measuredTextHeight(_ text: NSAttributedString, width: CGFloat) -> CGFloat {
+            if !measurementStorage.isEqual(to: text) {
+                measurementStorage.setAttributedString(text)
+            }
+            if measurementContainer.containerSize.width != width {
+                measurementContainer.containerSize.width = width
+            }
+            measurementLayout.ensureLayout(for: measurementContainer)
+            return measurementLayout.usedRect(for: measurementContainer).height
         }
 
         func textDidChange(_ notification: Notification) {

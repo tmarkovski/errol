@@ -47,19 +47,25 @@ func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint,
     }
 }
 
-func currentFrame(_ window: AXUIElement) -> CGRect {
+/// A window's frame in AX coordinates, or nil when the element no longer
+/// answers — a closed window, or an app whose tree was rebuilt under it.
+func windowFrame(_ window: AXUIElement) -> CGRect? {
     var position = CGPoint.zero
     var size = CGSize.zero
-    if let value = axAttribute(window, kAXPositionAttribute) {
-        AXValueGetValue(value as! AXValue, .cgPoint, &position)
-    }
-    if let value = axAttribute(window, kAXSizeAttribute) {
-        AXValueGetValue(value as! AXValue, .cgSize, &size)
-    }
+    guard let positionValue = axAttribute(window, kAXPositionAttribute),
+          CFGetTypeID(positionValue) == AXValueGetTypeID(),
+          AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
+          let sizeValue = axAttribute(window, kAXSizeAttribute),
+          CFGetTypeID(sizeValue) == AXValueGetTypeID(),
+          AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
     return CGRect(origin: position, size: size)
 }
 
-/// Snapshot the pre-tiling frames so Restore Window Positions can put them back.
+func currentFrame(_ window: AXUIElement) -> CGRect {
+    windowFrame(window) ?? .zero
+}
+
+/// Snapshot the pre-tiling frames so the Tile chip's next press can put them back.
 func saveFrames(_ entries: [(TargetApp, AXUIElement)]) {
     let lines = entries.map { target, window -> String in
         let frame = currentFrame(window)
@@ -99,19 +105,19 @@ func unarrange(_ targets: [TargetApp]) {
     }
 }
 
-/// Tile the two chat windows into the halves of one screen.
-func arrangeSideBySide(left: TargetApp, right: TargetApp) {
+/// Tile the two chat windows into the halves of one screen: the Tile
+/// chip's press. Returns whether both windows were found and moved.
+func arrangeSideBySide(left: TargetApp, right: TargetApp) -> Bool {
     guard let leftWindow = chatWindow(in: left), let rightWindow = chatWindow(in: right) else {
         log("arrange: could not resolve a chat window in both apps")
-        return
+        return false
     }
-    // Never overwrite an existing snapshot: arranging twice must not replace
-    // the original frames with already-tiled ones.
-    if FileManager.default.fileExists(atPath: config.frameStatePath) {
-        log("arrange: keeping the existing frame snapshot for restore")
-    } else {
-        saveFrames([(left, leftWindow), (right, rightWindow)])
-    }
+    // The frames as they stand are what the chip's next press puts back.
+    // Every tiling takes the snapshot afresh: the chip is the one control,
+    // so a tiling follows a restore and never another tiling — and a
+    // snapshot left by a process that ended tiled is not trusted over the
+    // layout the chip was actually pressed on.
+    saveFrames([(left, leftWindow), (right, rightWindow)])
     // Tile on whichever screen currently hosts the left app's window.
     var screen = NSScreen.screens[0]
     if let value = axAttribute(leftWindow, kAXPositionAttribute) {
@@ -138,4 +144,5 @@ func arrangeSideBySide(left: TargetApp, right: TargetApp) {
         _ = makeFrontmost(target)
     }
     log("arranged on \(Int(area.width))x\(Int(area.height)): \(left.name) \(windowFrameDescription(leftWindow)), \(right.name) \(windowFrameDescription(rightWindow))")
+    return true
 }

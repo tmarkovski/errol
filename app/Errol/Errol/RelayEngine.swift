@@ -29,11 +29,17 @@ protocol RelayEngine: AnyObject {
     /// lines. May prompt (the Accessibility dialog), which is why it is
     /// asked at Start and not at launch.
     func preflight() -> Bool
+    /// Tile the chat windows now — ChatGPT left, Claude right — or put
+    /// them back where they were: the Tile chip's press, done at once
+    /// rather than at Start, so the layout is settled before the run and
+    /// the console can be set beside it. Answered with `.arranged` on the
+    /// event stream once the windows have moved.
+    func setTiling(_ tiled: Bool)
     /// Start the run, with the settings config holds (seed, turns, first
     /// speaker), on the engine's own worker. It ends with `.finished` on
     /// the event stream, after every line it logged. Called after a
     /// preflight that passed.
-    func startRun(tileWindows: Bool)
+    func startRun()
     /// The debug dump of both apps' windows, buttons, and selector matches
     /// into the log. Does its own preflight.
     func inspect()
@@ -65,7 +71,30 @@ final class LiveRelayEngine: RelayEngine {
         return apps != nil
     }
 
-    func startRun(tileWindows: Bool) {
+    func setTiling(_ tiled: Bool) {
+        guard ensureTrusted(), let apps = resolveApps() else {
+            events.post(.arranged(tiled: false))
+            return
+        }
+        runExclusively { [events, control] in
+            // A cancel left by the last run's End session would make the
+            // activation inside the tiling give up at once. No run is on
+            // the worker while this is — they share it — so clearing the
+            // flags here touches nothing in flight.
+            control.reset()
+            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
+            let freshClaude = electronNudges.beginContact(apps.claude)
+            if freshChatgpt || freshClaude { usleep(700_000) }
+            if tiled {
+                events.post(.arranged(tiled: arrangeSideBySide(left: apps.chatgpt, right: apps.claude)))
+            } else {
+                unarrange([apps.chatgpt, apps.claude])
+                events.post(.arranged(tiled: false))
+            }
+        }
+    }
+
+    func startRun() {
         guard let apps else {
             report("Start skipped: the apps were not resolved.")
             events.post(.finished)
@@ -76,14 +105,13 @@ final class LiveRelayEngine: RelayEngine {
         control.reset()
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
-        runOnWorkerThread { [events] in
+        runExclusively { [events] in
             // First contact only: the scanner has usually nudged both long
             // ago, and then the trees are already populated and the settle
             // wait would just delay the run.
             let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
             let freshClaude = electronNudges.beginContact(apps.claude)
             if freshChatgpt || freshClaude { usleep(700_000) }
-            if tileWindows { arrangeSideBySide(left: apps.chatgpt, right: apps.claude) }
             _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude)
             refocus(to: origin)
             events.post(.finished)
@@ -93,7 +121,7 @@ final class LiveRelayEngine: RelayEngine {
     func inspect() {
         guard ensureTrusted(), let apps = resolveApps() else { return }
         report("Inspecting both apps...")
-        runOnWorkerThread { [events] in
+        runExclusively { [events] in
             let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
             let freshClaude = electronNudges.beginContact(apps.claude)
             if freshChatgpt || freshClaude { usleep(700_000) }
@@ -140,11 +168,50 @@ final class LiveRelayEngine: RelayEngine {
         return (chatgpt, claude)
     }
 
-    /// The deep AX tree walks need more stack than the default worker thread
-    /// provides.
-    private func runOnWorkerThread(_ work: @escaping () -> Void) {
-        let worker = Thread(block: work)
-        worker.stackSize = 4 << 20
-        worker.start()
+    /// Everything that drives the apps goes through one worker, in the
+    /// order asked: a tiling pressed just before Start is finished before
+    /// the run touches a window, and a quick on–off on the chip cannot
+    /// tile and restore at once.
+    private let worker = EngineWorker()
+
+    private func runExclusively(_ work: @escaping () -> Void) {
+        worker.run(work)
+    }
+}
+
+/// One long-lived thread taking jobs in order. Not a dispatch queue: those
+/// give their workers a stack too small for the deep AX tree walks, and
+/// parking a dispatch worker on a semaphore while a bigger-stacked thread
+/// does the job is the priority inversion the thread checker flags. The
+/// thread parks on a condition between jobs, so an idle engine costs
+/// nothing.
+private final class EngineWorker {
+    private let condition = NSCondition()
+    private var jobs: [() -> Void] = []
+    private var started = false
+
+    func run(_ job: @escaping () -> Void) {
+        condition.lock()
+        jobs.append(job)
+        let first = !started
+        started = true
+        condition.signal()
+        condition.unlock()
+        guard first else { return }
+        let thread = Thread { [self] in loop() }
+        thread.name = "RelayEngine"
+        thread.stackSize = 4 << 20
+        thread.qualityOfService = .userInitiated
+        thread.start()
+    }
+
+    private func loop() {
+        while true {
+            condition.lock()
+            while jobs.isEmpty { condition.wait() }
+            let job = jobs.removeFirst()
+            condition.unlock()
+            job()
+        }
     }
 }

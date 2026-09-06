@@ -271,7 +271,7 @@ private struct PerchConfigZone: View {
 
     private var optionsSummary: String {
         var parts = [controller.limitTurns ? "\(controller.turns) turns" : "Auto"]
-        if controller.tileWindows { parts.append("Tile") }
+        if controller.windowsTiled { parts.append("Tiled") }
         return parts.joined(separator: " · ")
     }
 }
@@ -559,19 +559,23 @@ private struct PerchComposerToolbar: View {
         .opacity.combined(with: .scale(scale: 0.5, anchor: .leading))
     }
 
-    /// Tiling: one press, one word.
+    /// Tiling: one press, one word — and the windows move as it is
+    /// pressed, not at Start. Offered once both apps read Ready, since the
+    /// windows have to be there to tile (dimmed until then, the tooltip
+    /// saying so); on, it can always be pressed again to put them back.
     private var tileChip: some View {
-        Button {
-            withAnimation(Perch.spring) { controller.tileWindows.toggle() }
+        let offered = controller.windowsTiled || controller.canTile
+        return Button {
+            withAnimation(Perch.spring) { controller.toggleTiling() }
         } label: {
-            chip(on: controller.tileWindows) {
-                // A window as it is when off; the split when the run will
-                // arrange two. (Two windows one behind another is the copy
+            chip(on: controller.windowsTiled) {
+                // A window as it is when off; the split once two stand
+                // arranged. (Two windows one behind another is the copy
                 // glyph — it read as duplicate, not as untiled.)
-                glyph(controller.tileWindows ? "rectangle.split.2x1" : "macwindow",
-                      on: controller.tileWindows, swaps: true)
-                if controller.tileWindows {
-                    Text("Tile")
+                glyph(controller.windowsTiled ? "rectangle.split.2x1" : "macwindow",
+                      on: controller.windowsTiled, swaps: true)
+                if controller.windowsTiled {
+                    Text("Tiled")
                         .font(Perch.text(12, .medium))
                         .fixedSize()
                         .padding(.trailing, Perch.s(12))
@@ -581,9 +585,17 @@ private struct PerchComposerToolbar: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(controller.tileWindows
-              ? "Tiling on: ChatGPT left, Claude right when the run starts. Click to leave the windows where they are."
-              : "Tile the chat windows — ChatGPT left, Claude right — when the run starts")
+        .opacity(offered ? 1 : 0.4)
+        .help(tileHelp)
+    }
+
+    private var tileHelp: String {
+        if controller.windowsTiled {
+            return "Tiled: ChatGPT left, Claude right. Click to put the windows back where they were."
+        }
+        return controller.canTile
+            ? "Tile the chat windows now — ChatGPT left, Claude right"
+            : "Tile the chat windows — once both apps read Ready"
     }
 
     /// The end condition: the checkered flag is the switch, and the label it

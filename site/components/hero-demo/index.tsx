@@ -14,11 +14,51 @@ import {
 } from 'lucide-react';
 import { Field } from '@base-ui/react/field';
 import { Slider } from '@/components/ui/slider';
-import { DEMO_DURATION, INTRO_TEXT, mountErrolDemo } from './timeline';
+import { DEMO_DURATION, mountErrolDemo } from './timeline';
 import './hero-demo.css';
 
 function AppIcon({ app }: { app: 'chatgpt' | 'claude' }) {
   return <img className="ef-app-icon" src={`/app-icons/${app}.png`} alt="" />;
+}
+
+function Courier({ note = false }: { note?: boolean }) {
+  const gradientId = note
+    ? 'ef-note-courier-tail-gradient'
+    : 'ef-courier-tail-gradient';
+  return (
+    <>
+      <svg
+        className={
+          note ? 'ef-courier-tail ef-note-courier-tail' : 'ef-courier-tail'
+        }
+        viewBox="0 0 1200 750"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="var(--ef-accent)" stopOpacity="0" />
+            <stop
+              offset="0.45"
+              stopColor="var(--ef-accent)"
+              stopOpacity="0.35"
+            />
+            <stop offset="1" stopColor="var(--ef-accent)" stopOpacity="0.9" />
+          </linearGradient>
+        </defs>
+        <path className="ef-courier-tail-glow" fill={`url(#${gradientId})`} />
+        <path className="ef-courier-tail-core" fill={`url(#${gradientId})`} />
+      </svg>
+      <div
+        className={note ? 'ef-courier ef-note-courier' : 'ef-courier'}
+        aria-hidden="true"
+      >
+        <span className="ef-courier-pulse"></span>
+        <span className="ef-courier-mark">
+          <img src="/errol.svg" alt="" />
+        </span>
+      </div>
+    </>
+  );
 }
 
 // Keep the cinematic scene outside React's playback updates. The timeline owns
@@ -226,42 +266,12 @@ const Scene = memo(function Scene() {
               </div>
             </div>
           </div>
-          <svg
-            className="ef-courier-tail"
-            viewBox="0 0 1200 750"
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient
-                id="ef-courier-tail-gradient"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop offset="0" stopColor="var(--ef-accent)" stopOpacity="0" />
-                <stop
-                  offset="0.45"
-                  stopColor="var(--ef-accent)"
-                  stopOpacity="0.35"
-                />
-                <stop
-                  offset="1"
-                  stopColor="var(--ef-accent)"
-                  stopOpacity="0.9"
-                />
-              </linearGradient>
-            </defs>
-            <path className="ef-courier-tail-glow" />
-            <path className="ef-courier-tail-core" />
-          </svg>
+          <Courier />
+          <Courier note />
           <div className="ef-click"></div>
           <div className="ef-pointer">
             <MousePointer2 size={16} aria-hidden="true" />
             <span>You</span>
-          </div>
-          <div className="ef-courier" aria-hidden="true">
-            <span className="ef-courier-pulse"></span>
-            <span className="ef-courier-mark">
-              <img src="/errol.svg" alt="" />
-            </span>
           </div>
         </div>
         <div className="ef-ending">
@@ -277,8 +287,6 @@ const Scene = memo(function Scene() {
 type Playback = {
   time: number;
   playing: boolean;
-  caption: string;
-  chapter: string;
 };
 type DemoController = ReturnType<typeof mountErrolDemo>;
 
@@ -292,8 +300,6 @@ export function HeroDemo({
   const [playback, setPlayback] = useState<Playback>({
     time: 0,
     playing: true,
-    caption: INTRO_TEXT,
-    chapter: '01',
   });
 
   useEffect(() => {
@@ -318,10 +324,6 @@ export function HeroDemo({
       aria-describedby="errol-demo-description"
     >
       <Scene />
-      <div className="ef-caption" aria-live="polite">
-        <span>{playback.caption}</span>
-        <small>{playback.chapter} / 04</small>
-      </div>
       <div className="ef-controls" role="group" aria-label="Demo playback">
         <button
           className="ef-control"

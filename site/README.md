@@ -37,18 +37,28 @@ npm run build
 
 Static output is in `dist/client/`. The page uses React, Vinext, and Base UI. All motion is CSS or requestAnimationFrame; there is no animation-library dependency. It respects reduced-motion preferences and includes a pause control.
 
-The hero contains the 57-second Errol demonstration in `components/hero-demo/`.
+The hero contains the 45-second Errol demonstration in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
-the topic into a simplified composer. The start button keeps its size as it moves
-to the prompt area's center and morphs into Pause. The header and participants stay clear.
+the topic into a simplified composer. The camera pulls back near the end of typing.
+Pressing Play shows a click ring and sends the owl from the middle of the typed
+topic toward ChatGPT's prompt. After delivery, Errol fades out of its setup state and into its running
+state with Pause centered in the prompt area. The button does not move or morph.
 Pause stays visible during the relay. The returning pointer hovers while the
 control expands to “Pause to steer,” then clicks to open the note field.
 Errol's owl illustrates automated handoffs: it moves over the prompt, its border
 lights up, and the message sends. The owl pulses once over each finished reply
-as Copy highlights. A short, tapered amber trail follows the moving owl and
+as the response container gains an amber outline and Copy highlights. A short, tapered amber trail follows the moving owl and
 fades as it stops; reduced motion omits the trail. The mouse pointer only illustrates the person's setup and
-steering actions. ChatGPT opens, Claude responds, and ChatGPT answers again
-before the person intervenes. Their note travels with ChatGPT's reply to Claude;
+steering actions. ChatGPT opens, Claude responds, and ChatGPT begins answering
+again before the person intervenes. As “Those features matter” streams, the
+camera moves halfway toward Errol while keeping ChatGPT's response in view.
+The person opens the note field and sends their note while ChatGPT is still
+typing. The camera pulls back as the note finishes, keeping the submitted text
+visible with no owl yet. When ChatGPT finishes, two owls appear and copy the
+reply and user note simultaneously. Their separate amber trails converge inside Claude's prompt,
+where both texts appear together before one message sends. This handoff fits
+within a 45-second runtime. The final Claude and ChatGPT replies type in under
+two seconds each, bringing the ending forward by five seconds.
 Claude responds to the new direction, then Errol relays that answer to ChatGPT
 for the final turn. The uninterrupted first exchange makes it clear that steering
 is optional. `timeline.js` holds the script and camera
@@ -57,8 +67,8 @@ The demonstration starts when visible, pauses offscreen or in a background tab,
 and supports pause, replay, and seeking. Reduced motion starts on a completed
 response with playback paused. The camera pulls back as ChatGPT and Claude start
 their opening replies, so the full desktop is visible before each reply finishes.
-The return to ChatGPT stays in the full desktop view. After the steering note,
-the camera holds the full desktop for the remaining exchange.
+The steering view keeps Errol and ChatGPT visible together, including on phones.
+After the steering note, the camera returns to the full desktop for the remaining exchange.
 Narrow containers use closer portrait framing for typing and the same desktop reveals.
 ChatGPT and Claude use their actual app icons from `public/app-icons/`.
 

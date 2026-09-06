@@ -7,6 +7,10 @@
 // that touches nothing. Observation tracks per property, so a view body
 // re-evaluates only for the properties it actually read — which is why the
 // panel is split into child views along update boundaries.
+//
+// The veil over whichever chat window is waiting (SideVeils, an AppKit
+// object the shell hands in) is driven from here too, off the same
+// events, so what it shows and what the perches say cannot disagree.
 
 import Combine
 import Foundation
@@ -81,7 +85,14 @@ final class RelayController {
     /// a perch (the turn line names the opener), and copied into config at
     /// Start, which is where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
-    var tileWindows = false
+    /// Whether the chat windows stand tiled — ChatGPT left, Claude right —
+    /// by the Tile chip. A live arrangement, not a run option: the chip
+    /// tiles the windows the moment it is pressed and puts them back where
+    /// they were when pressed again, so the layout is settled and visible
+    /// before Start and the console can be set beside it. Flipped here at
+    /// the press, for the chip's sake; the engine's `.arranged` pulls it
+    /// back down when a tiling could not be done.
+    var windowsTiled = false
     var isRunning = false
     /// Whether the field is open: the human pressed Pause to steer, the
     /// engine's pause flag is on (see RelayControl), and the run holds at
@@ -121,6 +132,9 @@ final class RelayController {
     @ObservationIgnored private var nextLogID = 0
     /// What drives the apps and reports back; LiveRelayEngine in the app.
     @ObservationIgnored private let engine: RelayEngine
+    /// The veil over the waiting chat window; nil in previews, which have
+    /// no windows to veil.
+    @ObservationIgnored private let veils: SideVeils?
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
@@ -130,8 +144,9 @@ final class RelayController {
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
-    init(engine: RelayEngine = LiveRelayEngine()) {
+    init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil) {
         self.engine = engine
+        self.veils = veils
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only
         // changed statuses reach the observable properties.
@@ -154,6 +169,7 @@ final class RelayController {
             case .conversation(let chatgpt, let claude):
                 chatgptConversation = chatgpt
                 claudeConversation = claude
+                veils?.update(chatgpt: chatgpt, claude: claude)
             case .turn(let turn):
                 currentTurn = turn
             case .holding(let holding):
@@ -164,6 +180,11 @@ final class RelayController {
                 steeringDelivered(delivery)
             case .finished:
                 finishRun()
+            case .arranged(let tiled):
+                // The engine's word on where the windows stand. True only
+                // confirms a press already shown; false takes the chip down
+                // — a tiling that found no window, or a restore done.
+                if !tiled { windowsTiled = false }
             }
         }
         // A shape deleted or renamed in Settings can leave the picker
@@ -244,6 +265,29 @@ final class RelayController {
         engine.setScanning(panelVisible && !isRunning)
     }
 
+    // MARK: Tiling
+
+    /// Tiling needs both chat windows found: the strip's two Ready dots,
+    /// the same test the run preflight applies. Tiled windows can always
+    /// be put back, whatever the strip says by then.
+    var canTile: Bool {
+        chatgptStatus.state == .ready && claudeStatus.state == .ready
+    }
+
+    /// The Tile chip: tile the chat windows now, or put them back. Not a
+    /// run option — a run owns the windows, and the chip is not offered
+    /// during one.
+    func toggleTiling() {
+        guard !isRunning else { return }
+        if windowsTiled {
+            windowsTiled = false
+            engine.setTiling(false)
+        } else if canTile {
+            windowsTiled = true
+            engine.setTiling(true)
+        }
+    }
+
     /// The log is an in-memory tail read through the status item's debug
     /// window (PerchLogWindowView) — the transcript file holds the whole
     /// run. Bounded, trimming in chunks so removeFirst's element shuffle
@@ -295,7 +339,8 @@ final class RelayController {
         // means what it says; lines logged between runs (an inspect report,
         // a failed start) stay until the next run claims the buffer.
         logLines.removeAll()
-        engine.startRun(tileWindows: tileWindows)
+        engine.startRun()
+        veils?.begin(chatgptName: chatgptStatus.appName, claudeName: claudeStatus.appName)
     }
 
     /// Whether a finished run is still on the panel: a turn count, no run to
@@ -326,6 +371,7 @@ final class RelayController {
         runStartedAt = nil
         isRunning = false
         isHolding = false
+        veils?.end()
         recordSteeringAtRunEnd()
         resetSteering()
         control.setPaused(false)
