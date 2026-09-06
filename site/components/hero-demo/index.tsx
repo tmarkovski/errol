@@ -185,15 +185,9 @@ const Scene = memo(function Scene() {
                 </div>
                 <div className="ef-running" hidden>
                   <div className="ef-run-context">Debate</div>
-                  <div className="ef-rest-primary">
-                    <button className="ef-steer-button" type="button">
-                      <Pause size={16} aria-hidden="true" />
-                      Pause to steer
-                    </button>
-                  </div>
                   <div className="ef-steer-prompt" hidden></div>
                   <div className="ef-steer-hint">
-                    The conversation is running
+                    Return to send and continue
                   </div>
                   <button
                     className="ef-primary ef-note-send"
@@ -204,20 +198,70 @@ const Scene = memo(function Scene() {
                     <span>Send note</span>
                   </button>
                 </div>
+                <div className="ef-pause-status" hidden>
+                  <span className="ef-pause-context">Debate</span>
+                  <span className="ef-pause-hint">
+                    The conversation is running
+                  </span>
+                </div>
+                <button
+                  className="ef-play"
+                  type="button"
+                  aria-label="Start conversation"
+                >
+                  <span className="ef-pause-face">
+                    <span className="ef-play-symbol">
+                      <Play size={16} aria-hidden="true" />
+                    </span>
+                    <span className="ef-pause-symbol">
+                      <Pause size={20} aria-hidden="true" />
+                    </span>
+                    <span className="ef-pause-label">
+                      <span className="ef-pause-label-text">
+                        Pause to steer
+                      </span>
+                    </span>
+                  </span>
+                </button>
               </div>
             </div>
-            <button
-              className="ef-primary ef-play"
-              type="button"
-              aria-label="Start conversation"
-            >
-              <Play size={16} aria-hidden="true" />
-            </button>
           </div>
+          <svg
+            className="ef-courier-tail"
+            viewBox="0 0 1200 750"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient
+                id="ef-courier-tail-gradient"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="0" stopColor="var(--ef-accent)" stopOpacity="0" />
+                <stop
+                  offset="0.45"
+                  stopColor="var(--ef-accent)"
+                  stopOpacity="0.35"
+                />
+                <stop
+                  offset="1"
+                  stopColor="var(--ef-accent)"
+                  stopOpacity="0.9"
+                />
+              </linearGradient>
+            </defs>
+            <path className="ef-courier-tail-glow" />
+            <path className="ef-courier-tail-core" />
+          </svg>
           <div className="ef-click"></div>
           <div className="ef-pointer">
             <MousePointer2 size={16} aria-hidden="true" />
             <span>You</span>
+          </div>
+          <div className="ef-courier" aria-hidden="true">
+            <span className="ef-courier-pulse"></span>
+            <span className="ef-courier-mark">
+              <img src="/errol.svg" alt="" />
+            </span>
           </div>
         </div>
         <div className="ef-ending">

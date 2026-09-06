@@ -39,10 +39,15 @@ Static output is in `dist/client/`. The page uses React, Vinext, and Base UI. Al
 
 The hero contains the 49-second Errol demonstration in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
-the topic into a simplified composer. The icon-only start button moves to the
-center while the surrounding content blurs, before the camera leaves Errol.
-The demo then shows automatic Copy/paste/Send handoffs and a steering
-note changing the next response. `timeline.js` holds the script and camera
+the topic into a simplified composer. The start button keeps its size as it moves
+to the prompt area's center and morphs into Pause. The header and participants stay clear.
+Pause stays visible during the relay. The returning pointer hovers while the
+control expands to “Pause to steer,” then clicks to open the note field.
+Errol's owl illustrates automated handoffs: it moves over the prompt, its border
+lights up, and the message sends. The owl pulses once over each finished reply
+as Copy highlights. A short, tapered amber trail follows the moving owl and
+fades as it stops; reduced motion omits the trail. The mouse pointer only illustrates the person's setup and
+steering actions. A steering note changes the next response. `timeline.js` holds the script and camera
 timing; the React component provides the scene and accessible playback controls.
 The demonstration starts when visible, pauses offscreen or in a background tab,
 and supports pause, replay, and seeking. Reduced motion starts on a completed

@@ -2,6 +2,10 @@ const INTRO_DURATION = 4;
 const SETUP_EXTENSION = 3;
 const START_PRESS = 5.2;
 const START_RELEASE = 7.1;
+const STEER_HOVER = 19.15;
+const STEER_PRESS = 19.9;
+const STEER_OPEN = 20;
+const CLAUDE_REPLY_END = 18.05;
 export const DEMO_DURATION = INTRO_DURATION + SETUP_EXTENSION + 42;
 export const INTRO_TEXT = 'What if your AIs could talk to each other?';
 
@@ -71,8 +75,8 @@ export function mountErrolDemo(root, onChange) {
     [12.45, 903, 491, 1.72],
     [14.25, 903, 491, 1.72],
     [17.55, 600, 365, 1],
-    [18.45, 600, 365, 1],
-    [19.4, 600, 219, 1.92],
+    [18.85, 600, 365, 1],
+    [19.8, 600, 219, 1.92],
     [23.8, 600, 219, 1.92],
     // Once the note is sent, hold the desktop for the remaining exchange.
     [24.55, 600, 365, 1],
@@ -89,16 +93,29 @@ export function mountErrolDemo(root, onChange) {
     [0, 'Give them something to debate.', '01'],
     [4.1, 'Errol starts the conversation.', '01'],
     [6, 'ChatGPT makes the opening case.', '02'],
-    [10.45, 'Errol presses Copy on the finished reply.', '02'],
-    [11.65, 'Switch to Claude. Paste the reply. Send.', '02'],
+    [10.45, 'Errol picks up ChatGPT’s reply.', '02'],
+    [11.65, 'Errol carries the reply to Claude.', '02'],
     [13.75, 'Claude reads it and challenges the idea.', '02'],
-    [18.05, 'Pause to steer. Errol holds the next handoff.', '03'],
-    [20, 'Add the detail that changes the discussion.', '03'],
+    [18.05, 'Errol picks up Claude’s reply.', '02'],
+    [18.85, 'Hover over Pause to steer the conversation.', '03'],
+    [STEER_OPEN, 'Errol holds the next handoff.', '03'],
+    [20.2, 'Add the detail that changes the discussion.', '03'],
     [23.5, 'Your note travels with Claude’s reply.', '03'],
     [26.25, 'ChatGPT rethinks its recommendation.', '04'],
     [31.1, 'Errol carries the new answer back to Claude.', '04'],
     [34, 'The conversation continues in their own apps.', '04'],
     [39.3, 'You set the direction. Errol carries the conversation.', '04'],
+  ];
+  const relayCopies = [
+    { app: 'gpt', at: 10.7, until: 11.6 },
+    { app: 'claude', at: 18.25, until: 18.85 },
+    { app: 'gpt', at: 31.4, until: 32.3 },
+  ];
+  const relaySends = [
+    { app: 'gpt', arrive: 5.15, sent: 5.85 },
+    { app: 'claude', arrive: 12.45, sent: 13.55 },
+    { app: 'gpt', arrive: 24.9, sent: 26.15 },
+    { app: 'claude', arrive: 33, sent: 33.95 },
   ];
   // Every frame is a pure function of time, so scrubbing never skips a state.
   function camera() {
@@ -127,7 +144,7 @@ export function mountErrolDemo(root, onChange) {
   }
   function chat(
     prefix,
-    { sent, input, text, start, end, draft, copy, sendAt, withNote = false },
+    { sent, input, text, start, end, draft, withNote = false },
   ) {
     const p = '.ef-' + prefix;
     show(p + ' .ef-empty', !sent);
@@ -149,6 +166,9 @@ export function mountErrolDemo(root, onChange) {
       incoming.dataset.content = input;
     }
     set(p + ' .ef-response', part(text, start, end));
+    const copy = relayCopies.some(
+      (action) => action.app === prefix && between(action.at, action.until),
+    );
     show(p + ' .ef-copy', sent && t >= end);
     set(p + ' .ef-copy span', copy ? 'Copied' : 'Copy');
     $(p + ' .ef-copy').classList.toggle('ef-pressed', copy);
@@ -157,138 +177,210 @@ export function mountErrolDemo(root, onChange) {
       draft || 'Message ' + (prefix === 'gpt' ? 'ChatGPT' : 'Claude'),
     );
     $(p + ' .ef-chat-composer').classList.toggle('ef-filled', !!draft);
-    $(p + ' .ef-send').classList.toggle(
-      'ef-pressed',
-      sendAt !== undefined && between(sendAt, sendAt + 0.45),
+    $(p + ' .ef-chat-composer').classList.toggle(
+      'ef-relay-focus',
+      relaySends.some(
+        (action) =>
+          action.app === prefix &&
+          between(action.arrive - 0.1, action.sent + 0.3),
+      ),
     );
   }
+  function center(selector) {
+    // The resting prompt is 100px tall. Keep its center stable when the note
+    // editor opens, so the person's pointer does not jump on the click.
+    const pauseFace = selector === '.ef-pause-face';
+    let element = $(pauseFace ? '.ef-compose' : selector);
+    let x = element.offsetWidth / 2;
+    let y = pauseFace ? 50 : element.offsetHeight / 2;
+    while (element && element !== world) {
+      x += element.offsetLeft;
+      y += element.offsetTop;
+      element = element.offsetParent;
+    }
+    return [x, y];
+  }
   function point() {
-    // Gold marks Errol's automated actions; the neutral pointer is the person.
+    // Only the person's setup and steering actions use a mouse pointer.
     const opening = setupTime < START_RELEASE + 0.5;
     const pointerTime = opening ? setupTime : t;
     const moves = opening
       ? [
-          [0, 520, 260, false, 'You'],
-          [0.35, 520, 260, false, 'You'],
-          [1.05, 700, 260, false, 'You'],
-          [1.35, 700, 260, false, 'You'],
-          [1.6, 590, 275, false, 'You'],
-          [4.8, 590, 275, false, 'You'],
-          [START_PRESS, 749, 310, false, 'You'],
-          [START_RELEASE + 0.5, 749, 310, false, 'You'],
+          [0, '.ef-mode-free'],
+          [0.35, '.ef-mode-free'],
+          [1.05, '.ef-mode-debate'],
+          [1.35, '.ef-mode-debate'],
+          [1.6, '.ef-topic'],
+          [4.8, '.ef-topic'],
+          [START_PRESS, '.ef-play'],
+          [START_RELEASE + 0.5, '.ef-play'],
         ]
       : [
-          [4.6, 749, 310, true, 'Errol'],
-          [5.2, 355, 654, true, 'Errol · Paste'],
-          [5.65, 503, 654, true, 'Errol · Send'],
-          [6.2, 503, 654, true, 'Errol'],
-          [10.25, 503, 654, true, 'Errol'],
-          [10.65, 93, 543, true, 'Errol · Copy'],
-          [11.35, 93, 543, true, 'Errol · Copied'],
-          [12.45, 834, 654, true, 'Errol · Paste'],
-          [13.3, 1109, 654, true, 'Errol · Send'],
-          [13.9, 1109, 654, true, 'Errol'],
-          [17.9, 760, 461, false, 'You'],
-          [18.6, 600, 309, false, 'You'],
-          [19.35, 582, 297, false, 'You'],
-          [22.95, 582, 297, false, 'You'],
-          [23.5, 730, 335, false, 'You'],
-          [24.1, 730, 335, false, 'You'],
-          [25, 334, 649, true, 'Errol · Paste + note'],
-          [26, 503, 654, true, 'Errol · Send'],
-          [26.4, 503, 654, true, 'Errol'],
-          [31, 503, 654, true, 'Errol'],
-          [31.35, 94, 594, true, 'Errol · Copy'],
-          [32, 94, 594, true, 'Errol · Copied'],
-          [33, 851, 654, true, 'Errol · Paste'],
-          [33.75, 1109, 654, true, 'Errol · Send'],
-          [34.2, 1109, 654, true, 'Errol'],
-          [42, 1109, 654, true, 'Errol'],
+          [18.85, [760, 461]],
+          [STEER_HOVER, '.ef-pause-face'],
+          [STEER_PRESS, '.ef-pause-face'],
+          [STEER_OPEN, '.ef-pause-face'],
+          [20.3, '.ef-steer-prompt'],
+          [22.95, '.ef-steer-prompt'],
+          [23.5, '.ef-note-send'],
+          [24.1, '.ef-note-send'],
         ];
-    const anchors = opening
-      ? {
-          0: '.ef-mode-free',
-          0.35: '.ef-mode-free',
-          1.05: '.ef-mode-debate',
-          1.35: '.ef-mode-debate',
-          1.6: '.ef-topic',
-          4.8: '.ef-topic',
-          [START_PRESS]: '.ef-play',
-          [START_RELEASE + 0.5]: '.ef-play',
-        }
-      : {
-          5.2: '.ef-gpt .ef-draft',
-          5.65: '.ef-gpt .ef-send',
-          6.2: '.ef-gpt .ef-send',
-          10.25: '.ef-gpt .ef-send',
-          10.65: '.ef-gpt .ef-copy',
-          11.35: '.ef-gpt .ef-copy',
-          12.45: '.ef-claude .ef-draft',
-          13.3: '.ef-claude .ef-send',
-          13.9: '.ef-claude .ef-send',
-          18.6: '.ef-steer-button',
-          19.35: '.ef-steer-prompt',
-          22.95: '.ef-steer-prompt',
-          23.5: '.ef-note-send',
-          24.1: '.ef-note-send',
-          25: '.ef-gpt .ef-draft',
-          26: '.ef-gpt .ef-send',
-          26.4: '.ef-gpt .ef-send',
-          31: '.ef-gpt .ef-send',
-          31.35: '.ef-gpt .ef-copy',
-          32: '.ef-gpt .ef-copy',
-          33: '.ef-claude .ef-draft',
-          33.75: '.ef-claude .ef-send',
-          34.2: '.ef-claude .ef-send',
-        };
-    for (const m of moves) {
-      const selector = anchors[m[0]];
-      if (!selector) continue;
-      let e = $(selector);
-      if (!e.offsetWidth) continue;
-      let x = e.offsetWidth / 2,
-        y = e.offsetHeight / 2;
-      while (e && e !== world) {
-        x += e.offsetLeft;
-        y += e.offsetTop;
-        e = e.offsetParent;
-      }
-      m[1] = x;
-      m[2] = y;
-    }
-    let i = 0;
-    while (i < moves.length - 2 && moves[i + 1][0] <= pointerTime) i++;
-    const a = moves[i],
-      b = moves[i + 1],
-      p = smooth((pointerTime - a[0]) / (b[0] - a[0]));
-    let x = a[1] + (b[1] - a[1]) * p,
-      y = a[2] + (b[2] - a[2]) * p;
-    const pointer = $('.ef-pointer');
-    pointer.style.transform = `translate(${x}px,${y}px)`;
-    pointer.classList.toggle('ef-auto', a[3]);
-    set('.ef-pointer span', a[4]);
+    const [x, y] = follow(moves, pointerTime);
     const pointerOn = opening
       ? (setupTime >= 0 && setupTime < 1.7) ||
         (setupTime >= 4.8 && setupTime < START_PRESS + 0.2)
-      : (t < 6.25 ||
-          between(10.15, 13.95) ||
-          between(17.85, 26.5) ||
-          between(30.9, 34.3)) &&
-        !between(19.45, 22.95);
+      : between(18.85, 23.7) && !between(20.4, 22.95);
+    const pointer = $('.ef-pointer');
+    pointer.style.transform = `translate(${x}px,${y}px)`;
     pointer.style.opacity = pointerOn ? '1' : '0';
-    const clicks = opening
-      ? [1.05, START_PRESS]
-      : [5.65, 10.7, 13.3, 18.6, 23.5, 26, 31.4, 33.75];
+    const clicks = opening ? [1.05, START_PRESS] : [STEER_PRESS, 23.5];
     const click = clicks.find(
       (at) => pointerTime >= at && pointerTime < at + 0.5,
     );
     const ring = $('.ef-click');
     const c = click === undefined ? 1 : clamp((pointerTime - click) / 0.5);
-    ring.style.opacity = click === undefined ? '0' : String(1 - c);
+    ring.style.opacity =
+      click === undefined || !pointerOn ? '0' : String(1 - c);
     ring.style.transform = `translate(${x - 15}px,${y - 15}px) scale(${0.5 + c * 1.5})`;
   }
+  function follow(path, time) {
+    let i = 0;
+    while (i < path.length - 2 && path[i + 1][0] <= time) i++;
+    const a = path[i],
+      b = path[i + 1];
+    const start = typeof a[1] === 'string' ? center(a[1]) : a[1];
+    const end = typeof b[1] === 'string' ? center(b[1]) : b[1];
+    const p = reduced.matches
+      ? Number(time >= b[0])
+      : smooth((time - a[0]) / (b[0] - a[0]));
+    return [
+      start[0] + (end[0] - start[0]) * p,
+      start[1] + (end[1] - start[1]) * p,
+    ];
+  }
+  const courierPaths = [
+    [
+      [4.6, '.ef-pause-face'],
+      [5.15, '.ef-gpt .ef-chat-composer'],
+      [6.2, '.ef-gpt .ef-chat-composer'],
+    ],
+    [
+      [10.25, '.ef-gpt .ef-chat-composer'],
+      [10.65, '.ef-gpt .ef-response'],
+      [11.35, '.ef-gpt .ef-response'],
+      [12.45, '.ef-claude .ef-chat-composer'],
+      [13.9, '.ef-claude .ef-chat-composer'],
+    ],
+    [
+      [17.65, '.ef-claude .ef-chat-composer'],
+      [18.15, '.ef-claude .ef-response'],
+      [18.75, '.ef-claude .ef-response'],
+    ],
+    [
+      [24.1, '.ef-pause-face'],
+      [24.9, '.ef-gpt .ef-chat-composer'],
+      [26.5, '.ef-gpt .ef-chat-composer'],
+    ],
+    [
+      [30.95, '.ef-gpt .ef-chat-composer'],
+      [31.35, '.ef-gpt .ef-response'],
+      [32, '.ef-gpt .ef-response'],
+      [33, '.ef-claude .ef-chat-composer'],
+      [34.3, '.ef-claude .ef-chat-composer'],
+    ],
+  ];
+  function courierTail(path, fade) {
+    const tail = $('.ef-courier-tail');
+    const glow = $('.ef-courier-tail-glow');
+    const core = $('.ef-courier-tail-core');
+    tail.style.opacity = '0';
+    glow.setAttribute('d', '');
+    core.setAttribute('d', '');
+    if (!path || reduced.matches) return;
+
+    // Sample the clock, not previous frames: seeking and replaying produce the
+    // same short wake, which catches up naturally when the owl stops moving.
+    const points = [];
+    let length = 0;
+    for (let i = 0; i <= 24; i++) {
+      const at = Math.max(path[0][0], t - (i / 24) * 0.38);
+      const point = follow(path, at);
+      if (points.length) {
+        const previous = points.at(-1);
+        const distance = Math.hypot(
+          point[0] - previous[0],
+          point[1] - previous[1],
+        );
+        if (distance < 0.5) continue;
+        if (length + distance > 170) break;
+        length += distance;
+      }
+      points.push(point);
+      if (at === path[0][0]) break;
+    }
+    if (points.length < 3 || length < 16) return;
+    points.reverse();
+    const left = [],
+      right = [];
+    points.forEach(([x, y], i) => {
+      const before = points[Math.max(0, i - 1)];
+      const after = points[Math.min(points.length - 1, i + 1)];
+      const dx = after[0] - before[0],
+        dy = after[1] - before[1];
+      const distance = Math.hypot(dx, dy) || 1;
+      const radius = 6 * Math.pow(i / (points.length - 1), 1.3);
+      left.push([x - (dy / distance) * radius, y + (dx / distance) * radius]);
+      right.push([x + (dy / distance) * radius, y - (dx / distance) * radius]);
+    });
+    const outline = [...left, ...right.reverse()];
+    const d =
+      outline
+        .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`)
+        .join(' ') + ' Z';
+    glow.setAttribute('d', d);
+    core.setAttribute('d', d);
+    const gradient = $('#ef-courier-tail-gradient');
+    gradient.setAttribute('x1', String(points[0][0]));
+    gradient.setAttribute('y1', String(points[0][1]));
+    gradient.setAttribute('x2', String(points.at(-1)[0]));
+    gradient.setAttribute('y2', String(points.at(-1)[1]));
+    tail.style.opacity = String(fade * smooth(length / 55));
+  }
+  function courier() {
+    const path = courierPaths.find((path) =>
+      between(path[0][0], path.at(-1)[0]),
+    );
+    const logo = $('.ef-courier');
+    const pulse = $('.ef-courier-pulse');
+    const mark = $('.ef-courier-mark');
+    logo.style.opacity = '0';
+    logo.style.transform = 'translate(0px,0px)';
+    pulse.style.opacity = '0';
+    pulse.style.transform = 'scale(1)';
+    mark.style.transform = 'scale(1)';
+    if (!path) {
+      courierTail(null, 0);
+      return;
+    }
+    const [x, y] = follow(path, t);
+    const fade = reduced.matches
+      ? 1
+      : smooth((t - path[0][0]) / 0.16) * smooth((path.at(-1)[0] - t) / 0.25);
+    logo.style.opacity = String(fade);
+    logo.style.transform = `translate(${x - 21}px,${y - 21}px)`;
+    courierTail(path, fade);
+    const copy = relayCopies.find((action) =>
+      between(action.at, action.at + 0.45),
+    );
+    if (copy && !reduced.matches) {
+      const p = clamp((t - copy.at) / 0.45);
+      mark.style.transform = `scale(${1 - 0.16 * Math.sin(p * Math.PI)})`;
+      pulse.style.opacity = String(0.7 * (1 - p));
+      pulse.style.transform = `scale(${0.8 + p * 1.05})`;
+    }
+  }
   function render() {
-    // Extend setup and hold the camera through the start-button emphasis, then
+    // Hold the camera while Start moves to the prompt's center and becomes Pause, then
     // resume the existing relay choreography without changing its pacing.
     setupTime = elapsed - INTRO_DURATION;
     t =
@@ -306,16 +398,17 @@ export function mountErrolDemo(root, onChange) {
         ? '1'
         : '0';
     world.style.opacity = String(reveal);
-    const running = t >= 4.3,
-      steering = between(18.65, 23.7),
+    const running = setupTime >= START_PRESS,
+      steering = between(STEER_OPEN, 23.7),
       gpt2 = t >= 26.15,
       claude2 = t >= 33.95;
     root.classList.toggle('ef-is-running', running);
     root.classList.toggle('ef-is-steering', steering);
     camera();
-    show('.ef-setup', !running);
-    show('.ef-running', running);
-    show('.ef-play', !running);
+    show('.ef-setup', setupTime < 6.1);
+    show('.ef-running', steering);
+    show('.ef-play', !steering);
+    show('.ef-pause-status', running && !steering);
     $('.ef-mode-free').classList.toggle('ef-selected', setupTime < 1.05);
     $('.ef-mode-debate').classList.toggle('ef-selected', setupTime >= 1.05);
     $('.ef-topic').dataset.placeholder =
@@ -323,33 +416,58 @@ export function mountErrolDemo(root, onChange) {
         ? 'What would you like to talk about?'
         : 'What would you like them to debate?';
     set('.ef-topic', part(topic, 1.7, 4.5, setupTime));
-    const lift = reduced.matches
+    const move = reduced.matches
       ? Number(setupTime >= START_PRESS)
-      : smooth((setupTime - START_PRESS) / 0.7);
-    const settle = smooth((setupTime - 6.6) / 0.5);
-    const emphasis = lift * (1 - settle);
+      : smooth((setupTime - START_PRESS) / 0.9);
+    const morph = reduced.matches
+      ? Number(setupTime >= START_PRESS)
+      : smooth((setupTime - 5.55) / 0.55);
+    const layout = reduced.matches
+      ? Number(running)
+      : smooth((setupTime - 6.35) / 0.65);
+    const hover = between(STEER_HOVER, STEER_OPEN)
+      ? reduced.matches
+        ? 1
+        : smooth((t - STEER_HOVER) / 0.55)
+      : 0;
+    root.style.setProperty('--ef-run-layout', String(layout));
     const play = $('.ef-play');
-    const errol = $('.ef-errol');
-    const dx = errol.clientWidth / 2 - play.offsetLeft - play.offsetWidth / 2;
-    const dy = errol.clientHeight / 2 - play.offsetTop - play.offsetHeight / 2;
-    play.style.transform = `translate(${dx * lift}px, ${dy * lift}px) scale(${1 + lift * 0.65})`;
-    play.style.opacity = String(1 - settle);
-    $('.ef-errol-body').style.filter = reduced.matches
+    const compose = $('.ef-compose');
+    const labelWidth = ($('.ef-pause-label-text').scrollWidth + 12) * hover;
+    play.style.setProperty('--ef-steer-label-width', `${labelWidth}px`);
+    // Preserve the 32px circle during the move. Only the later hover adds width.
+    play.style.width = `${32 + labelWidth}px`;
+    play.style.height = '32px';
+    play.style.right = `${10 + ((compose.clientWidth - 32) / 2 - 10) * move - labelWidth / 2}px`;
+    play.style.bottom = `${10 + ((compose.clientHeight - 32) / 2 - 10) * move}px`;
+    play.setAttribute(
+      'aria-label',
+      running ? 'Pause to steer' : 'Start conversation',
+    );
+    $('.ef-play-symbol').style.opacity = String(1 - morph);
+    $('.ef-play-symbol').style.transform = reduced.matches
       ? 'none'
-      : `blur(${3.5 * emphasis}px)`;
-    $('.ef-errol-body').style.opacity = String(1 - 0.38 * emphasis);
-    show('.ef-rest-primary', !steering);
+      : `rotate(${-45 * morph}deg) scale(${1 - 0.4 * morph})`;
+    $('.ef-pause-symbol').style.opacity = String(morph);
+    $('.ef-pause-symbol').style.transform = reduced.matches
+      ? 'none'
+      : `scale(${0.6 + 0.4 * morph})`;
+    $('.ef-pause-label').style.opacity = String(hover);
+    $('.ef-pause-face').classList.toggle(
+      'ef-pause-pressed',
+      between(STEER_PRESS, STEER_OPEN),
+    );
+    $('.ef-setup').style.filter = reduced.matches
+      ? 'none'
+      : `blur(${3 * move}px)`;
+    $('.ef-setup').style.opacity = String(1 - move);
     show('.ef-steer-prompt', steering);
     show('.ef-note-send', steering);
     set(
       '.ef-steer-prompt',
-      part(note, 19.6, 22.25) || 'Write a note for the next handoff…',
+      part(note, 20.3, 22.95) || 'Write a note for the next handoff…',
     );
-    set(
-      '.ef-steer-hint',
-      steering ? 'Return to send and continue' : 'The conversation is running',
-    );
-    const holding = between(19, 23.7);
+    const holding = between(STEER_OPEN, 23.7);
     set('.ef-status', holding ? 'Paused' : running ? 'Running' : 'Ready');
     set(
       '.ef-turn',
@@ -357,21 +475,23 @@ export function mountErrolDemo(root, onChange) {
         ? 'Turn 0 · ChatGPT opens'
         : holding
           ? 'Turn 2 · Paused at the handoff'
-          : between(18.65, 19)
+          : between(STEER_PRESS, STEER_OPEN)
             ? 'Turn 2 · Pausing at the next handoff'
             : t < 10.4
               ? 'Turn 1 · ChatGPT is replying'
               : t < 13.7
                 ? 'Turn 1 · Relaying to Claude'
-                : t < 18.9
+                : t < CLAUDE_REPLY_END
                   ? 'Turn 2 · Claude is replying'
-                  : t < 26.3
-                    ? 'Turn 2 · Relaying to ChatGPT'
-                    : t < 31.2
-                      ? 'Turn 3 · ChatGPT is replying'
-                      : t < 34
-                        ? 'Turn 3 · Relaying to Claude'
-                        : 'Turn 4 · Claude is replying',
+                  : t < STEER_PRESS
+                    ? 'Turn 2 · Claude’s reply is ready'
+                    : t < 26.3
+                      ? 'Turn 2 · Relaying to ChatGPT'
+                      : t < 31.2
+                        ? 'Turn 3 · ChatGPT is replying'
+                        : t < 34
+                          ? 'Turn 3 · Relaying to Claude'
+                          : 'Turn 4 · Claude is replying',
     );
     set(
       '.ef-note-status',
@@ -399,9 +519,9 @@ export function mountErrolDemo(root, onChange) {
       '.ef-claude-status',
       !running
         ? 'Ready'
-        : between(13.6, 18.6) || t >= 34
+        : between(13.6, CLAUDE_REPLY_END) || t >= 34
           ? 'Replying…'
-          : t > 18.6
+          : t >= CLAUDE_REPLY_END
             ? 'Reply ready'
             : 'Waiting',
     );
@@ -426,8 +546,6 @@ export function mountErrolDemo(root, onChange) {
       start: gpt2 ? 26.45 : 6.3,
       end: gpt2 ? 31 : 10.25,
       draft: gDraft,
-      copy: between(10.65, 11.6) || between(31.35, 32.3),
-      sendAt: gpt2 ? 26 : 5.65,
       withNote: gpt2,
     });
     chat('claude', {
@@ -435,20 +553,19 @@ export function mountErrolDemo(root, onChange) {
       input: claude2 ? revised : first,
       text: claude2 ? agreement : second,
       start: claude2 ? 34.25 : 13.95,
-      end: claude2 ? 38.2 : 18.65,
+      end: claude2 ? 38.2 : CLAUDE_REPLY_END,
       draft: cDraft,
-      copy: between(18.95, 19.4),
-      sendAt: claude2 ? 33.75 : 13.3,
     });
     set(
       '.ef-front-app',
-      !running || steering
+      !running || between(18.85, 24.1)
         ? 'Errol'
-        : between(11.8, 18.7) || t >= 32.4
+        : between(11.8, 18.85) || t >= 32.4
           ? 'Claude'
           : 'ChatGPT',
     );
     point();
+    courier();
     $('.ef-ending').style.opacity = String(smooth((t - 39.65) / 0.65));
     let index = 0;
     const activeBeats = setupTime < START_RELEASE ? openingBeats : beats;

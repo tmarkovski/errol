@@ -31,11 +31,11 @@ note, so steering has a consequence the viewer can recognize.
 | --- | --- | --- |
 | 0–4 s | Type “What if your AIs could talk to each other?” on a quiet title screen. Fade directly into a close-up of Errol. | Introduce the premise before the interface. |
 | 4–9 s | Free chat is selected first. The person's pointer visibly selects Debate, then types “Should we launch on the web or build a native Mac app?” | Establish what the person provides. |
-| 9–11 s | Press the round start icon. It moves into the center of Errol and grows, while the surrounding content blurs. Hold briefly, then restore the content and release the camera. | Give the start action a clear, separate moment. |
-| 11–17 s | Pull out, then focus on ChatGPT. Errol pastes the opening topic and presses Send. Let the first words appear, then ease back over 3.3 seconds; reach the full desktop while its answer is still streaming. | Keep attention on the reply as the desktop gradually comes into view. |
-| 17–21 s | In the full desktop view, the gold pointer labeled Errol presses Copy. Move into Claude. The reply appears in its composer; Errol presses Send. | Make the relay mechanism explicit. |
-| 21–26 s | Claude begins replying. Let the first words appear, then use the same gentle 3.3-second pullback while its response continues. Move toward Errol and press Pause to steer. The current reply finishes, is copied, and the handoff waits. | Show a second perspective and how a person intervenes. |
-| 26–31 s | Close-up on Errol. Type “Assume our users work offline every day.” Send the note. | Show steering as a small addition to the ongoing discussion. |
+| 9–11 s | Press the round start icon. The button keeps its size and moves to the center of the prompt area as the topic fades, then morphs into Pause. Keep the header and participants clear. Hold briefly before releasing the camera. | Make the start action clear and establish the persistent pause control. |
+| 11–17 s | Pull out, then focus on ChatGPT. Errol's owl moves over the prompt; its border lights up, the topic appears, and the message sends. Let the first words appear, then ease back over 3.3 seconds while its answer is still streaming. | Keep attention on the reply as the desktop gradually comes into view. |
+| 17–21 s | In the full desktop view, the owl pulses once over the middle of ChatGPT's reply and Copy highlights. The owl moves into Claude's composer; its border lights up, the reply appears, and the message sends. | Make the relay visible through the owl and the message surfaces. |
+| 21–26 s | Claude begins replying. Use the same gentle 3.3-second pullback while its response continues. The owl pulses over the finished reply and Copy highlights before the camera leaves the desktop. Pause remains visible in Errol. | Show both directions of the relay before the person intervenes. |
+| 26–31 s | Return the person's pointer to Errol as the camera moves in. Hover to expand Pause into “Pause to steer,” then click to open the note field and hold the next handoff. Type “Assume our users work offline every day.” Send the note; the pause control returns. | Show steering as a small addition to the ongoing discussion. |
 | 31–38 s | Pull back from Errol and hold the full desktop. Claude's reply and the person's note arrive together in ChatGPT. ChatGPT changes its recommendation to native because offline work is central. | Make the effect of steering visible. |
 | 38–46 s | Keep the full desktop in view as Errol copies the revised reply and delivers it to Claude. Claude proposes a small first release focused on offline work. | Establish that the relay continues after the intervention. |
 | 46–49 s | Fade from the desktop to the Errol mark and “Let your AIs talk.” | Leave the product's purpose clear. |
@@ -50,11 +50,15 @@ names identify ChatGPT and Claude within the simplified interfaces. Errol's setu
 keeps the conversation-shape selector, topic, and start icon; it omits tile/turn
 options, the secondary instructions, and the separator.
 
-Use a neutral pointer for the person's actions and an amber pointer labeled
-Errol for automated actions. The amber pointer is an editorial visualization
-of button presses, not a claim that the actual relay moves the mouse cursor.
-Highlight the pressed Copy and Send controls. Paste each reply as a block;
-stream only assistant replies and the person's typing.
+Use a neutral pointer for the person's setup and steering actions. Use the
+Errol owl in an amber circle for automated handoffs, with no pointer or action
+label attached. A short, softly glowing amber tail follows its recent path,
+tapers away behind it, and fades when it stops. Reduced motion omits the tail.
+It arrives over a composer and lights its border as the message
+appears and sends. For copying, it pulses once over the center of the reply and
+the Copy control highlights. The owl never targets Copy or Send buttons. This
+is an illustration of Errol's work, not a literal mouse recording. Paste each
+reply as a block; stream only assistant replies and the person's typing.
 
 Keep windows in consistent positions. Pull back during app changes so the
 viewer can orient themselves. Fade the background Errol panel during tight
