@@ -1,7 +1,7 @@
 // Perch, the console: the converged composer (docs/design-proposals/
 // chat-composer/converged-composer.html) in a clean, native dress. Native
 // macOS surfaces — system type, sentence case, soft warm neutrals — with one
-// owl-amber accent shared by the primary button and the courier bead, and
+// theme accent shared by the primary button and the courier bead, and
 // the playfulness spent on motion: the bead hops the flight path on every
 // handoff. The two sides are perches — the apps' own icons with presence
 // dots — and a quiet turn line says what the panel is doing.
@@ -35,6 +35,7 @@ struct PerchPanelView: View {
         // The top clears the title band and the window strip behind it.
         .padding(.top, Perch.chromeInset)
         .frame(width: Perch.cardWidth)
+        .tint(Perch.accent)
         .background(
             RoundedRectangle(cornerRadius: Perch.shellCorner).fill(Perch.paper)
                 // Bare paper — the card's padding and the gaps between rows
@@ -57,7 +58,6 @@ struct PerchPanelView: View {
                 .frame(height: Perch.chromeBand)
                 .allowsHitTesting(false)
         }
-        .environment(\.colorScheme, .light)
         // Measured here — the card with its paddings — so the size reported
         // is the one the window should become. Fitting the card to the
         // window it sits in, and running it up under the title bar, is the

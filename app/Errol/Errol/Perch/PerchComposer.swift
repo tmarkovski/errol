@@ -304,6 +304,7 @@ private struct PerchComposerEditor: View {
             GrowingTextEditor(text: $controller.topic,
                               font: .systemFont(ofSize: Perch.s(12.5)),
                               textColor: Perch.inkNS,
+                              placeholderColor: Perch.placeholderNS,
                               placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 3, maximumLines: 12,
                               // Free chat shows no preview, so the editor
@@ -319,6 +320,7 @@ private struct PerchComposerEditor: View {
             GrowingTextEditor(text: $controller.customInstructions,
                               font: .systemFont(ofSize: Perch.s(12.5)),
                               textColor: Perch.inkNS,
+                              placeholderColor: Perch.placeholderNS,
                               placeholder: controller.promptEditorPlaceholder,
                               minimumLines: 3, maximumLines: 13)
         }
@@ -340,8 +342,9 @@ private struct PerchComposerEditor: View {
         GrowingTextEditor(text: steeringBinding,
                           font: Self.steeringFont,
                           textColor: Perch.inkNS,
+                          placeholderColor: Perch.placeholderNS,
                           placeholder: controller.steeringText.isEmpty
-                              ? "Add a direction for the next handoff…" : nil,
+                              ? "A note for the next handoff…" : nil,
                           minimumLines: 2, maximumLines: 8,
                           extraMinimumHeight: Self.steeringMinimumHeight
                               - GrowingTextEditor.height(lines: 2, font: Self.steeringFont),
@@ -414,7 +417,7 @@ private struct PerchComposerEditor: View {
 /// that leaves in place (Continue's, as words arrive in the field) scales
 /// out of the glyph's side the way the option chips' labels do. Clipped to
 /// itself so the word does not spill while the capsule closes to a circle.
-/// The amber is the panel's one accent, and this is where it lives.
+/// The theme's accent stays with the primary action.
 private struct PerchPrimaryFace: View {
     let icon: String
     var word: String? = nil
@@ -437,8 +440,8 @@ private struct PerchPrimaryFace: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.5, anchor: .leading)))
             }
         }
-        .foregroundColor(.white)
-        .background(Capsule().fill(Perch.amber))
+        .foregroundColor(Perch.onAccent)
+        .background(Capsule().fill(Perch.accent))
         .perchHover(Capsule(), opacity: 0.1)
         .clipShape(Capsule())
         .opacity(dimmed ? 0.4 : 1)
@@ -522,8 +525,8 @@ private struct PerchComposerToolbar: View {
 
     /// Both options draw the way the chat apps' tool toggles do: nothing at
     /// rest but the glyph, the wash under the pointer, and once on, the
-    /// quiet amber capsule grown around a label that reads the setting out.
-    /// Amber is the panel's word for "live", and an option that will shape
+    /// quiet accent capsule grown around a label that reads the setting out.
+    /// The accent is the panel's word for "live", and an option that will shape
     /// the run is live. The glyph keeps its place through the change — the
     /// capsule grows past it, so the eye stays where it clicked. The chips
     /// are a size under the primary circle, with air around the glyph, so
@@ -531,10 +534,10 @@ private struct PerchComposerToolbar: View {
     private func chip<Content: View>(on: Bool,
                                      @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 0, content: content)
-            .foregroundColor(on ? Perch.amberText : Perch.secondary)
+            .foregroundColor(on ? Perch.accentText : Perch.secondary)
             .frame(height: Self.chipSize)
-            .background(Capsule().fill(Perch.amberBack).opacity(on ? 1 : 0))
-            .perchHover(Capsule(), tint: on ? Perch.amber : Perch.ink,
+            .background(Capsule().fill(Perch.accentBack).opacity(on ? 1 : 0))
+            .perchHover(Capsule(), tint: on ? Perch.accent : Perch.ink,
                         opacity: on ? 0.08 : 0.06)
     }
 
@@ -614,7 +617,7 @@ private struct PerchComposerToolbar: View {
             PerchTurnsField(value: $controller.turns,
                             font: .monospacedDigitSystemFont(ofSize: Perch.s(12),
                                                              weight: .medium),
-                            color: Perch.amberTextNS,
+                            color: Perch.accentTextNS,
                             focusRequest: turnsFocus)
             Button {
                 turnsFocus += 1

@@ -25,7 +25,6 @@ struct PerchLogWindowView: View {
         .frame(minWidth: Perch.s(380), maxWidth: .infinity,
                minHeight: Perch.s(220), maxHeight: .infinity)
         .background(Perch.paper)
-        .environment(\.colorScheme, .light)
     }
 
     /// The scrolling tail of the log, following the newest line.

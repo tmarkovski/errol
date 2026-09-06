@@ -1,14 +1,14 @@
 // The settings card: the console's own idiom — paper, system type, soft
 // wells, capsule buttons — inside a real titled window that keeps the
 // system close button and floats one level above the console
-// (MenuBarController owns the window). For now it manages one thing: the
-// conversation shapes behind the composer's pills — add, rename, rewrite,
-// delete.
+// (MenuBarController owns the window). Appearance preferences sit above the
+// conversation shapes behind the composer's pills.
 
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var store = SettingsStore.shared
+    @Bindable private var appearance = AppearanceStore.shared
     @State private var selected: String
     /// The name field commits on Enter or focus loss rather than per
     /// keystroke: names are the shapes' identity (the pill selection and
@@ -28,15 +28,20 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Perch.s(14)) {
-            rail
-            editor
+        VStack(alignment: .leading, spacing: Perch.s(14)) {
+            appearanceControls
+            Rectangle().fill(Perch.hairline).frame(height: 1)
+            HStack(alignment: .top, spacing: Perch.s(14)) {
+                rail
+                editor
+            }
         }
         .padding(.horizontal, Perch.s(18))
         .padding(.bottom, Perch.s(18))
         .padding(.top, titleStrip + Perch.s(8))
-        .frame(width: Perch.s(480), height: Perch.s(400))
+        .frame(width: Perch.s(480), height: Perch.s(470))
         .background(Perch.paper)
+        .tint(Perch.accent)
         // The wordmark centered in the title strip, as on the console; the
         // traffic lights sit at its left over the transparent title bar.
         .overlay(alignment: .top) {
@@ -46,13 +51,45 @@ struct SettingsView: View {
                 .frame(height: titleStrip)
                 .allowsHitTesting(false)
         }
-        .environment(\.colorScheme, .light)
         .onAppear {
             if store.template(named: selected) == nil {
                 selected = store.templates.first?.name ?? ""
                 nameDraft = selected
             }
         }
+    }
+
+    // MARK: Appearance
+
+    private var appearanceControls: some View {
+        HStack(alignment: .top, spacing: Perch.s(14)) {
+            VStack(alignment: .leading, spacing: Perch.s(6)) {
+                sectionLabel("Theme")
+                Picker("Theme", selection: $appearance.theme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.title).tag(theme)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityLabel("Theme")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: Perch.s(6)) {
+                sectionLabel("Appearance")
+                Picker("Appearance", selection: $appearance.appearance) {
+                    ForEach(AppAppearance.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityLabel("Appearance")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .pickerStyle(.menu)
+        .font(Perch.text(12))
+        .foregroundColor(Perch.ink)
     }
 
     // MARK: Shape rail

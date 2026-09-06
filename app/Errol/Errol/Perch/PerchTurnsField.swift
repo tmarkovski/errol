@@ -55,6 +55,10 @@ struct PerchTurnsField: NSViewRepresentable {
         if !context.coordinator.editing, field.stringValue != String(value) {
             field.stringValue = String(value)
         }
+        if let editor = field.currentEditor() as? NSTextView {
+            editor.textColor = color
+            editor.insertionPointColor = color
+        }
         if context.coordinator.focusRequest != focusRequest {
             context.coordinator.focusRequest = focusRequest
             // The chip may be mid-insertion when the request lands, so the

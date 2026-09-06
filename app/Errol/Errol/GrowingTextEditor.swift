@@ -11,6 +11,7 @@ struct GrowingTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont
     var textColor: NSColor = .labelColor
+    var placeholderColor: NSColor = .placeholderTextColor
     var placeholder: String?
     var minimumLines = 8
     var maximumLines = 13
@@ -67,6 +68,8 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.textContainer?.lineFragmentPadding = 0
         textView.font = font
         textView.textColor = textColor
+        textView.insertionPointColor = textColor
+        textView.placeholderColor = placeholderColor
         textView.string = text
         textView.trailingPlaceholder = placeholder
 
@@ -89,6 +92,8 @@ struct GrowingTextEditor: NSViewRepresentable {
         }
         textView.font = font
         textView.textColor = textColor
+        textView.insertionPointColor = textColor
+        textView.placeholderColor = placeholderColor
         textView.trailingPlaceholder = placeholder
         if textView.string != text {
             textView.string = text
@@ -170,6 +175,9 @@ struct GrowingTextEditor: NSViewRepresentable {
 /// Draws a hint in NSTextView's extra line fragment — the insertion line
 /// after the template body — without adding those characters to its storage.
 private final class TrailingPlaceholderTextView: NSTextView {
+    var placeholderColor: NSColor = .placeholderTextColor {
+        didSet { needsDisplay = true }
+    }
     /// A real NSView inside the panel, so the hosting view's claim on the
     /// first click (FirstMouseHostingView) does not cover it: AppKit asks the
     /// view the click actually hit. Without this, a click into the prompt on
@@ -195,7 +203,7 @@ private final class TrailingPlaceholderTextView: NSTextView {
             string: trailingPlaceholder,
             attributes: [
                 .font: font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize),
-                .foregroundColor: NSColor.placeholderTextColor,
+                .foregroundColor: placeholderColor,
             ]
         ).draw(at: origin)
     }

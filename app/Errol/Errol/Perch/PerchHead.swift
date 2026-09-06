@@ -96,13 +96,13 @@ struct PerchHead: View {
         }
     }
 
-    /// Green when the side is relayable, amber while it is the one composing,
+    /// Green when the side is relayable, accented while it is composing,
     /// red when it is not relayable, and the path's gray while the first
     /// sweep is still out. One dot, not a pair of ready and live lamps: the
     /// turn line says the rest in words.
     private func presenceColor(status: SideStatus,
                                conversation: ConversationStatus) -> Color {
-        if conversation == .chatting { return Perch.amber }
+        if conversation == .chatting { return Perch.accent }
         if controller.isRunning { return Perch.presence }
         switch status.state {
         case .ready: return Perch.presence
@@ -243,7 +243,7 @@ struct PerchFlightPath: View {
                                                lineCap: .round,
                                                dash: [1, Perch.s(6)]))
                 Circle()
-                    .fill(Perch.amber)
+                    .fill(Perch.accent)
                     .frame(width: Perch.s(10), height: Perch.s(10))
                     .position(point(at: fraction, width: width))
                     .animation(.spring(duration: 0.55, bounce: 0.35), value: fraction)

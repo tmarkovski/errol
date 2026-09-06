@@ -1,64 +1,44 @@
-// The panel's constant tables: the palette and type helpers every part
-// draws from, and the one window size the panel still names. Changing how
-// large or how warm the panel reads is a change to this file alone. See
-// PerchPanelView for what the panel is.
+// Shared type, geometry, and semantic color access. Theme definitions live
+// in PerchPalette; AppearanceStore persists the selection.
 
 import AppKit
 import SwiftUI
 
-/// Soft native-macOS surfaces with one warm owl-amber accent. The grays are
-/// warm — every neutral leans toward the amber rather than sitting at a pure
-/// white point — and the two participants each get a feather color of their
-/// own for the avatar, the one place the panel spends hue on identity.
+/// Shared geometry and semantic colors. Reading the observable theme here
+/// makes existing SwiftUI readers update in place when the selection changes.
 enum Perch {
     // MARK: Palette
 
-    /// The panel's own surface.
-    static let paper = Color(red: 252 / 255, green: 252 / 255, blue: 250 / 255)
-    /// The composer card set into it.
-    static let well = Color(red: 244 / 255, green: 243 / 255, blue: 239 / 255)
-    /// The shape tabs' track, set into the well a step darker than it, so
-    /// the paper thumb that slides along it reads as lifted without a shadow.
-    static let track = Color(red: 235 / 255, green: 234 / 255, blue: 228 / 255)
-    static let panelEdge = Color(red: 229 / 255, green: 227 / 255, blue: 220 / 255)
-    static let chipEdge = Color(red: 226 / 255, green: 224 / 255, blue: 216 / 255)
-    /// The rule under the composer's setup zone.
-    static let hairline = Color(red: 230 / 255, green: 228 / 255, blue: 220 / 255)
-    /// Primary text and the filled state of a selected pill.
-    static let ink = Color(red: 44 / 255, green: 43 / 255, blue: 39 / 255)
-    /// Chip labels and other secondary text.
-    static let secondary = Color(red: 75 / 255, green: 74 / 255, blue: 68 / 255)
-    static let muted = Color(red: 138 / 255, green: 136 / 255, blue: 127 / 255)
-    static let placeholder = Color(red: 160 / 255, green: 157 / 255, blue: 146 / 255)
-    /// The instruction preview's ink: the shape's text under the pills, a
-    /// step quieter than secondary so it reads as material, not a control.
-    static let previewInk = Color(red: 117 / 255, green: 114 / 255, blue: 106 / 255)
-    /// The flight path's dotted arc.
-    static let path = Color(red: 213 / 255, green: 210 / 255, blue: 200 / 255)
+    private static var palette: PerchPalette { AppearanceStore.shared.theme.palette }
 
-    /// The accent: the primary button, the courier bead, and nothing else.
-    static let amber = Color(red: 217 / 255, green: 142 / 255, blue: 43 / 255)
-    /// The live-state pill, the hold notice, and the on state of the
-    /// composer's option chips: the quiet amber.
-    static let amberText = Color(red: 160 / 255, green: 109 / 255, blue: 20 / 255)
-    static let amberBack = Color(red: 246 / 255, green: 239 / 255, blue: 221 / 255)
-    static let green = Color(red: 47 / 255, green: 125 / 255, blue: 91 / 255)
-    static let greenBack = Color(red: 233 / 255, green: 242 / 255, blue: 236 / 255)
-    static let red = Color(red: 164 / 255, green: 67 / 255, blue: 60 / 255)
-    static let redBack = Color(red: 246 / 255, green: 227 / 255, blue: 224 / 255)
-    /// The presence dot on a ready avatar.
-    static let presence = Color(red: 67 / 255, green: 163 / 255, blue: 115 / 255)
+    static var paper: Color { Color(nsColor: palette.paper) }
+    static var well: Color { Color(nsColor: palette.well) }
+    static var track: Color { Color(nsColor: palette.track) }
+    static var panelEdge: Color { Color(nsColor: palette.panelEdge) }
+    static var chipEdge: Color { Color(nsColor: palette.chipEdge) }
+    static var hairline: Color { Color(nsColor: palette.hairline) }
+    static var ink: Color { Color(nsColor: palette.ink) }
+    static var secondary: Color { Color(nsColor: palette.secondary) }
+    static var muted: Color { Color(nsColor: palette.muted) }
+    static var placeholder: Color { Color(nsColor: palette.placeholder) }
+    static var previewInk: Color { Color(nsColor: palette.previewInk) }
+    static var path: Color { Color(nsColor: palette.path) }
+    static var accent: Color { Color(nsColor: palette.accent) }
+    static var accentText: Color { Color(nsColor: palette.accentText) }
+    static var accentBack: Color { Color(nsColor: palette.accentBack) }
+    static var onAccent: Color { Color(nsColor: palette.onAccent) }
+    static var green: Color { Color(nsColor: palette.green) }
+    static var greenBack: Color { Color(nsColor: palette.greenBack) }
+    static var red: Color { Color(nsColor: palette.red) }
+    static var redBack: Color { Color(nsColor: palette.redBack) }
+    static var presence: Color { Color(nsColor: palette.presence) }
+    static var chatgptFeather: Color { Color(nsColor: palette.chatgptFeather) }
+    static var claudeFeather: Color { Color(nsColor: palette.claudeFeather) }
 
-    /// The participants' feather colors, behind the avatar initials.
-    static let chatgptFeather = Color(red: 93 / 255, green: 122 / 255, blue: 140 / 255)
-    static let claudeFeather = Color(red: 201 / 255, green: 126 / 255, blue: 74 / 255)
-
-    /// What the growing editors need in AppKit terms.
-    static let inkNS = NSColor(calibratedRed: 44 / 255, green: 43 / 255,
-                               blue: 39 / 255, alpha: 1)
-    /// The turn count's ink, for the AppKit field inside its chip.
-    static let amberTextNS = NSColor(calibratedRed: 160 / 255, green: 109 / 255,
-                                     blue: 20 / 255, alpha: 1)
+    static var paperNS: NSColor { palette.paper }
+    static var inkNS: NSColor { palette.ink }
+    static var accentTextNS: NSColor { palette.accentText }
+    static var placeholderNS: NSColor { palette.placeholder }
 
     // MARK: Type and measure
 

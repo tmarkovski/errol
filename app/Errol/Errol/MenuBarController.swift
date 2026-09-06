@@ -94,6 +94,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // LSUIElement in the Info.plist already hides the Dock icon; this
         // keeps the behavior if the binary is ever run outside the bundle.
         NSApp.setActivationPolicy(.accessory)
+        trackAppearance()
         updater = UpdaterController { [weak self] in self?.relay.isRunning ?? false }
         buildStatusItem()
         buildPanel()
@@ -106,6 +107,22 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         if !AXIsProcessTrusted() {
             showPermissionOnboarding()
         }
+    }
+
+    // MARK: Appearance
+
+    /// Native chrome and editors inherit the app appearance. SwiftUI colors
+    /// observe the theme independently, keeping view identity and drafts intact.
+    private func trackAppearance() {
+        let rearm = MainQueueHop { [weak self] in self?.trackAppearance() }
+        let selection = withObservationTracking {
+            (AppearanceStore.shared.theme, AppearanceStore.shared.appearance)
+        } onChange: {
+            rearm.run()
+        }
+        NSApp.appearance = selection.1.nativeAppearance
+        settingsWindow?.backgroundColor = selection.0.palette.paper
+        logWindow?.backgroundColor = selection.0.palette.paper
     }
 
     // MARK: Status item
@@ -378,7 +395,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             window.isFloatingPanel = true
             window.hidesOnDeactivate = false
             window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1)
+            window.backgroundColor = Perch.paperNS
             window.contentViewController = NSHostingController(rootView: SettingsView())
             window.center()
             settingsWindow = window
@@ -408,7 +425,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             window.isFloatingPanel = true
             window.hidesOnDeactivate = false
             window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1)
+            window.backgroundColor = Perch.paperNS
             window.contentView = FirstMouseHostingView(
                 rootView: PerchLogWindowView(controller: relay))
             window.center()

@@ -57,7 +57,7 @@ struct PerchSteeringLine: View {
     private func live(_ text: String) -> some View {
         Text(text)
             .font(Perch.text(11))
-            .foregroundColor(Perch.amberText)
+            .foregroundColor(Perch.accentText)
             .lineLimit(1)
             .truncationMode(.tail)
             .contentTransition(.opacity)
@@ -170,6 +170,5 @@ struct PerchNotePopover: View {
         .frame(width: Perch.s(320))
         .frame(maxHeight: Perch.s(280))
         .background(Perch.paper)
-        .environment(\.colorScheme, .light)
     }
 }

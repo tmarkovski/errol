@@ -48,7 +48,7 @@ final class PerchChromeToolbar: NSObject, NSToolbarDelegate {
 }
 
 /// What the panel is doing, as a tinted pill: green when both sides are
-/// relayable, amber while a run owns them, quiet otherwise. An indicator,
+/// relayable, accented while a run owns them, quiet otherwise. An indicator,
 /// not a control — hit testing is off so a click on it drags the window.
 struct PerchStatePill: View {
     let controller: RelayController
@@ -72,10 +72,10 @@ struct PerchStatePill: View {
     private var pillLook: (word: String, tint: Color, back: Color) {
         if controller.isRunning {
             guard controller.holdRequested else {
-                return ("Running", Perch.amberText, Perch.amberBack)
+                return ("Running", Perch.accentText, Perch.accentBack)
             }
             return (controller.isHolding ? "Paused" : "Pausing",
-                    Perch.amberText, Perch.amberBack)
+                    Perch.accentText, Perch.accentBack)
         }
         if controller.hasFinishedRun {
             return ("Done", Perch.green, Perch.greenBack)
