@@ -320,7 +320,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
                 log("Run stopped by user.")
                 appendTranscript("_Run stopped by user._\n\n")
             } else {
-                log("Stopping: no response from \(speaker.name).")
+                log("Stopping: no response activity detected from \(speaker.name).")
+                appendTranscript("_Run stopped: no response activity detected from \(speaker.name) for \(Int(config.timeout))s._\n\n")
             }
             break
         }

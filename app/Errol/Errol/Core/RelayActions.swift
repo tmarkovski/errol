@@ -358,6 +358,38 @@ func responseArrived(_ now: ResponseSighting, since baseline: ResponseBaseline,
     return sawStreaming
 }
 
+/// Response polling state, with monotonic timestamps supplied by the
+/// caller. The timeout bounds inactivity, not total generation time.
+struct ResponseWaitState {
+    enum Result: Equatable { case waiting, complete, timedOut }
+
+    private let timeout: TimeInterval
+    private var lastActivity: TimeInterval
+    private var stableTicks = 0
+    private(set) var sawStreaming = false
+
+    init(timeout: TimeInterval, startedAt: TimeInterval) {
+        self.timeout = timeout
+        lastActivity = startedAt
+    }
+
+    mutating func observe(_ sighting: ResponseSighting, since baseline: ResponseBaseline,
+                          selectors: AppSelectors, at now: TimeInterval) -> Result {
+        if sighting.streaming {
+            sawStreaming = true
+            lastActivity = now
+        }
+        if responseArrived(sighting, since: baseline, sawStreaming: sawStreaming,
+                           selectors: selectors) {
+            stableTicks += 1
+            // Give a reply first seen at the deadline its confirming poll.
+            return stableTicks >= 2 ? .complete : .waiting
+        }
+        stableTicks = 0
+        return now - lastActivity >= timeout ? .timedOut : .waiting
+    }
+}
+
 /// Where the just-pasted user message's own affordance registers in the
 /// count (Claude), a raw "count went up" check would fire on that echo, so
 /// wait for it to render and fold it into the baseline; only affordances
@@ -390,32 +422,31 @@ func absorbEchoIntoBaseline(in target: TargetApp, preSend: ResponseBaseline) -> 
 func waitForResponse(in target: TargetApp, baseline: ResponseBaseline) -> Bool {
     log("\(target.name): waiting for response (baseline \(baseline.affordances) message affordances"
         + (baseline.lastOrdinal.map { ", message \($0)" } ?? "") + ")...")
-    let deadline = Date().addingTimeInterval(config.timeout)
-    var stableTicks = 0
-    var sawStreaming = false
-    while Date() < deadline {
+    let timeout = config.timeout
+    let startedAt = ProcessInfo.processInfo.systemUptime
+    var wait = ResponseWaitState(timeout: timeout, startedAt: startedAt)
+    while true {
         if relayControl.isCancelled { return false }
         let sighting = ResponseSighting(affordances: messageAffordances(in: target).count,
                                         lastOrdinal: lastMessageOrdinal(in: target),
                                         streaming: hasStopButton(in: target))
-        if sighting.streaming { sawStreaming = true }
-        if responseArrived(sighting, since: baseline, sawStreaming: sawStreaming,
-                           selectors: target.selectors) {
-            stableTicks += 1
-            if stableTicks >= 2 {
-                log("\(target.name): response complete (\(sighting.affordances) message affordances"
-                    + (sighting.lastOrdinal.map { ", message \($0)" } ?? "") + ")")
-                return true
-            }
-        } else {
-            stableTicks = 0
+        let now = ProcessInfo.processInfo.systemUptime
+        switch wait.observe(sighting, since: baseline, selectors: target.selectors, at: now) {
+        case .complete:
+            log("\(target.name): response complete (\(sighting.affordances) message affordances"
+                + (sighting.lastOrdinal.map { ", message \($0)" } ?? "") + ")")
+            return true
+        case .timedOut:
+            log("\(target.name): timed out after \(Int(timeout))s without detected response activity"
+                + " (\(Int(now - startedAt))s total wait,"
+                + " affordances \(sighting.affordances)/\(baseline.affordances),"
+                + " message \(sighting.lastOrdinal.map(String.init) ?? "-")"
+                + "/\(baseline.lastOrdinal.map(String.init) ?? "-"),"
+                + " streaming seen: \(wait.sawStreaming), streaming now: \(sighting.streaming))")
+            return false
+        case .waiting:
+            break
         }
         usleep(1_200_000)
     }
-    log("\(target.name): timed out after \(Int(config.timeout))s"
-        + " (affordances \(messageAffordances(in: target).count)/\(baseline.affordances),"
-        + " message \(lastMessageOrdinal(in: target).map(String.init) ?? "-")"
-        + "/\(baseline.lastOrdinal.map(String.init) ?? "-"),"
-        + " streaming seen: \(sawStreaming))")
-    return false
 }

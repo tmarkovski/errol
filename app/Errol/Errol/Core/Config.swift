@@ -132,6 +132,9 @@ struct Config {
     /// here at Start; tools and tests that drive runRelay directly get the
     /// shipped default.
     var relayRulesTemplate = RelayRules.defaultTemplate
+    /// Maximum wait without detected response activity. A visible Stop
+    /// control means the app is still working and renews this interval;
+    /// thinking and tool use can take longer than five minutes overall.
     var timeout: TimeInterval = 300
     var maxChars = 12000
     /// Run artifacts live in Documents: the app is launched from Finder with
