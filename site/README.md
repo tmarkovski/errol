@@ -37,7 +37,7 @@ npm run build
 
 Static output is in `dist/client/`. The page uses React, Vinext, and Base UI. All motion is CSS or requestAnimationFrame; there is no animation-library dependency. It respects reduced-motion preferences and includes a pause control.
 
-The hero contains the 49-second Errol demonstration in `components/hero-demo/`.
+The hero contains the 57-second Errol demonstration in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
 the topic into a simplified composer. The start button keeps its size as it moves
 to the prompt area's center and morphs into Pause. The header and participants stay clear.
@@ -47,13 +47,18 @@ Errol's owl illustrates automated handoffs: it moves over the prompt, its border
 lights up, and the message sends. The owl pulses once over each finished reply
 as Copy highlights. A short, tapered amber trail follows the moving owl and
 fades as it stops; reduced motion omits the trail. The mouse pointer only illustrates the person's setup and
-steering actions. A steering note changes the next response. `timeline.js` holds the script and camera
+steering actions. ChatGPT opens, Claude responds, and ChatGPT answers again
+before the person intervenes. Their note travels with ChatGPT's reply to Claude;
+Claude responds to the new direction, then Errol relays that answer to ChatGPT
+for the final turn. The uninterrupted first exchange makes it clear that steering
+is optional. `timeline.js` holds the script and camera
 timing; the React component provides the scene and accessible playback controls.
 The demonstration starts when visible, pauses offscreen or in a background tab,
 and supports pause, replay, and seeking. Reduced motion starts on a completed
 response with playback paused. The camera pulls back as ChatGPT and Claude start
 their opening replies, so the full desktop is visible before each reply finishes.
-After the steering note, the camera holds the full desktop for the remaining exchange.
+The return to ChatGPT stays in the full desktop view. After the steering note,
+the camera holds the full desktop for the remaining exchange.
 Narrow containers use closer portrait framing for typing and the same desktop reveals.
 ChatGPT and Claude use their actual app icons from `public/app-icons/`.
 

@@ -10,7 +10,7 @@ Keep the windows, text, pointer, and camera editable independently. This makes
 it possible to change the topic or timing without recording the applications
 again, and to direct a separate portrait composition for phones.
 
-The landing-page animation runs for 49 seconds and includes pause, replay, and scrubbing.
+The landing-page animation runs for 57 seconds and includes pause, replay, and scrubbing.
 It uses an HTML/CSS scene with one animation clock. It follows the viewer's
 appearance, pauses when offscreen, and starts paused when reduced motion is
 enabled. For the landing page, the production recommendation is a silent MP4
@@ -21,8 +21,9 @@ been exported in this design pass.
 ## What a viewer should understand
 
 Errol operates the AI apps already open on the Mac. The person starts a
-conversation, Errol copies each reply into the other app, and the person can
-pause at a handoff to add a note. The next reply should visibly respond to that
+conversation, and Errol copies replies back and forth automatically. Show three
+assistant turns before the person chooses to pause at a handoff and add a note.
+The next reply should visibly respond to that
 note, so steering has a consequence the viewer can recognize.
 
 ## Sequence
@@ -34,11 +35,12 @@ note, so steering has a consequence the viewer can recognize.
 | 9–11 s | Press the round start icon. The button keeps its size and moves to the center of the prompt area as the topic fades, then morphs into Pause. Keep the header and participants clear. Hold briefly before releasing the camera. | Make the start action clear and establish the persistent pause control. |
 | 11–17 s | Pull out, then focus on ChatGPT. Errol's owl moves over the prompt; its border lights up, the topic appears, and the message sends. Let the first words appear, then ease back over 3.3 seconds while its answer is still streaming. | Keep attention on the reply as the desktop gradually comes into view. |
 | 17–21 s | In the full desktop view, the owl pulses once over the middle of ChatGPT's reply and Copy highlights. The owl moves into Claude's composer; its border lights up, the reply appears, and the message sends. | Make the relay visible through the owl and the message surfaces. |
-| 21–26 s | Claude begins replying. Use the same gentle 3.3-second pullback while its response continues. The owl pulses over the finished reply and Copy highlights before the camera leaves the desktop. Pause remains visible in Errol. | Show both directions of the relay before the person intervenes. |
-| 26–31 s | Return the person's pointer to Errol as the camera moves in. Hover to expand Pause into “Pause to steer,” then click to open the note field and hold the next handoff. Type “Assume our users work offline every day.” Send the note; the pause control returns. | Show steering as a small addition to the ongoing discussion. |
-| 31–38 s | Pull back from Errol and hold the full desktop. Claude's reply and the person's note arrive together in ChatGPT. ChatGPT changes its recommendation to native because offline work is central. | Make the effect of steering visible. |
-| 38–46 s | Keep the full desktop in view as Errol copies the revised reply and delivers it to Claude. Claude proposes a small first release focused on offline work. | Establish that the relay continues after the intervention. |
-| 46–49 s | Fade from the desktop to the Errol mark and “Let your AIs talk.” | Leave the product's purpose clear. |
+| 21–26 s | Claude begins replying. Use the same gentle 3.3-second pullback while its response continues. The owl pulses over the finished reply and Copy highlights. Pause remains visible in Errol. | Prepare the automatic return handoff. |
+| 26–34 s | Hold the full desktop as the owl carries Claude's reply back to ChatGPT. ChatGPT responds that the web still makes sense unless users need local access every day. The owl picks up this answer. The person's pointer stays absent. | Show a complete back-and-forth exchange without requiring the person to respond at each turn. |
+| 34–39 s | Return the person's pointer to Errol as the camera moves in. Hover to expand Pause into “Pause to steer,” then click to open the note field and hold the next handoff. Type “Assume our users work offline every day.” Send the note; the pause control returns. | Show steering as an optional addition to the ongoing discussion. |
+| 39–46 s | Pull back from Errol and hold the full desktop. ChatGPT's reply and the person's note arrive together in Claude. Claude recommends native because daily offline work is central. | Make the effect of steering visible in the next reply. |
+| 46–54 s | Keep the full desktop in view as Errol copies Claude's answer and delivers it to ChatGPT. ChatGPT agrees to start with one reliable offline Mac workflow and add web sharing later. | Show the conversation continuing automatically after the intervention. |
+| 54–57 s | Fade from the desktop to the Errol mark and “Let your AIs talk.” | Leave the product's purpose clear. |
 
 ## Visual direction
 

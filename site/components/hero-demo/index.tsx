@@ -368,8 +368,9 @@ export function HeroDemo({
       </p>
       <noscript>
         <p>
-          Errol copies replies between ChatGPT and Claude. Start with a topic,
-          then pause to add a steering note whenever you want.
+          Errol automatically carries replies back and forth between ChatGPT and
+          Claude. Start with a topic and let them continue. You can pause to add
+          a steering note whenever you want.
         </p>
       </noscript>
     </div>

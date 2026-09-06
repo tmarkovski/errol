@@ -2,11 +2,17 @@ const INTRO_DURATION = 4;
 const SETUP_EXTENSION = 3;
 const START_PRESS = 5.2;
 const START_RELEASE = 7.1;
-const STEER_HOVER = 19.15;
-const STEER_PRESS = 19.9;
-const STEER_OPEN = 20;
+const STEER_APPROACH = 26.85;
+const STEER_HOVER = 27.15;
+const STEER_PRESS = 27.9;
+const STEER_OPEN = 28;
+const NOTE_START = 28.3;
+const NOTE_END = 30.95;
+const NOTE_SEND = 31.5;
+const STEER_CLOSE = 31.7;
 const CLAUDE_REPLY_END = 18.05;
-export const DEMO_DURATION = INTRO_DURATION + SETUP_EXTENSION + 42;
+const REDUCED_SNAPSHOT = INTRO_DURATION + SETUP_EXTENSION + 46.25;
+export const DEMO_DURATION = INTRO_DURATION + SETUP_EXTENSION + 50;
 export const INTRO_TEXT = 'What if your AIs could talk to each other?';
 
 /**
@@ -25,12 +31,65 @@ export function mountErrolDemo(root, onChange) {
     'I’d start on the web. Launch sooner, reach more people, and learn what they need before committing to a platform.';
   const second =
     'Native could be the reason people choose it. If the work needs local files and fast shortcuts, the web may compromise the experience.';
+  const counterpoint =
+    'Those features matter, but a web launch would test demand faster. I’d still start there unless people need local access every day.';
   const note = 'Assume our users work offline every day.';
   const revised =
-    'That changes my recommendation. Start native: local files and reliable offline work are core to the product. Add the web later for sharing.';
+    'If our users work offline every day, native is the clear starting point. Build a focused Mac app around local files and reliable offline access.';
   const agreement =
-    'Agreed. Make the first release excellent offline. Keep the scope small: one Mac app, one workflow, then validate demand.';
-  let elapsed = reduced.matches ? INTRO_DURATION + SETUP_EXTENSION + 31 : 0,
+    'Agreed. Start with one reliable offline workflow on the Mac. Validate demand, then add the web for sharing.';
+  // One sequence drives deliveries, messages, and status labels. Only turn four
+  // carries the person's note; the first three turns run without intervention.
+  const turns = [
+    {
+      app: 'gpt',
+      arrive: 5.15,
+      sent: 5.85,
+      start: 6.3,
+      end: 10.25,
+      input: topic,
+      text: first,
+    },
+    {
+      app: 'claude',
+      arrive: 12.45,
+      sent: 13.55,
+      start: 13.95,
+      end: CLAUDE_REPLY_END,
+      input: first,
+      text: second,
+    },
+    {
+      app: 'gpt',
+      arrive: 19.75,
+      sent: 20.65,
+      start: 20.95,
+      end: 25.15,
+      input: second,
+      text: counterpoint,
+    },
+    {
+      app: 'claude',
+      arrive: 32.9,
+      sent: 34.15,
+      start: 34.45,
+      end: 39,
+      input: counterpoint,
+      text: revised,
+      withNote: true,
+    },
+    {
+      app: 'gpt',
+      arrive: 41,
+      sent: 41.95,
+      start: 42.25,
+      end: 46.2,
+      input: revised,
+      text: agreement,
+    },
+  ];
+  const appName = (app) => (app === 'gpt' ? 'ChatGPT' : 'Claude');
+  let elapsed = reduced.matches ? REDUCED_SNAPSHOT : 0,
     setupTime = 0,
     t = 0,
     playing = !reduced.matches,
@@ -75,12 +134,13 @@ export function mountErrolDemo(root, onChange) {
     [12.45, 903, 491, 1.72],
     [14.25, 903, 491, 1.72],
     [17.55, 600, 365, 1],
-    [18.85, 600, 365, 1],
-    [19.8, 600, 219, 1.92],
-    [23.8, 600, 219, 1.92],
+    // Hold the desktop through Claude's return handoff and ChatGPT's next turn.
+    [STEER_APPROACH, 600, 365, 1],
+    [27.8, 600, 219, 1.92],
+    [31.8, 600, 219, 1.92],
     // Once the note is sent, hold the desktop for the remaining exchange.
-    [24.55, 600, 365, 1],
-    [42, 600, 365, 1],
+    [32.55, 600, 365, 1],
+    [50, 600, 365, 1],
   ];
   const openingBeats = [
     [-INTRO_DURATION, INTRO_TEXT, '01'],
@@ -97,25 +157,23 @@ export function mountErrolDemo(root, onChange) {
     [11.65, 'Errol carries the reply to Claude.', '02'],
     [13.75, 'Claude reads it and challenges the idea.', '02'],
     [18.05, 'Errol picks up Claude’s reply.', '02'],
-    [18.85, 'Hover over Pause to steer the conversation.', '03'],
+    [18.85, 'Errol carries Claude’s reply back to ChatGPT.', '02'],
+    [20.85, 'They keep the discussion going automatically.', '02'],
+    [25.3, 'Errol picks up ChatGPT’s next reply.', '02'],
+    [STEER_APPROACH, 'Step in whenever you want to steer.', '03'],
     [STEER_OPEN, 'Errol holds the next handoff.', '03'],
-    [20.2, 'Add the detail that changes the discussion.', '03'],
-    [23.5, 'Your note travels with Claude’s reply.', '03'],
-    [26.25, 'ChatGPT rethinks its recommendation.', '04'],
-    [31.1, 'Errol carries the new answer back to Claude.', '04'],
-    [34, 'The conversation continues in their own apps.', '04'],
-    [39.3, 'You set the direction. Errol carries the conversation.', '04'],
+    [28.2, 'Add the detail that changes the discussion.', '03'],
+    [NOTE_SEND, 'Your note travels with ChatGPT’s reply to Claude.', '03'],
+    [34.25, 'Claude responds to your new direction.', '04'],
+    [39.1, 'Errol carries Claude’s answer back to ChatGPT.', '04'],
+    [42, 'The conversation continues in their own apps.', '04'],
+    [47.3, 'You set the direction. Errol carries the conversation.', '04'],
   ];
   const relayCopies = [
     { app: 'gpt', at: 10.7, until: 11.6 },
-    { app: 'claude', at: 18.25, until: 18.85 },
-    { app: 'gpt', at: 31.4, until: 32.3 },
-  ];
-  const relaySends = [
-    { app: 'gpt', arrive: 5.15, sent: 5.85 },
-    { app: 'claude', arrive: 12.45, sent: 13.55 },
-    { app: 'gpt', arrive: 24.9, sent: 26.15 },
-    { app: 'claude', arrive: 33, sent: 33.95 },
+    { app: 'claude', at: 18.25, until: 19 },
+    { app: 'gpt', at: 25.4, until: 26.3 },
+    { app: 'claude', at: 39.4, until: 40.3 },
   ];
   // Every frame is a pure function of time, so scrubbing never skips a state.
   function camera() {
@@ -179,7 +237,7 @@ export function mountErrolDemo(root, onChange) {
     $(p + ' .ef-chat-composer').classList.toggle('ef-filled', !!draft);
     $(p + ' .ef-chat-composer').classList.toggle(
       'ef-relay-focus',
-      relaySends.some(
+      turns.some(
         (action) =>
           action.app === prefix &&
           between(action.arrive - 0.1, action.sent + 0.3),
@@ -216,24 +274,24 @@ export function mountErrolDemo(root, onChange) {
           [START_RELEASE + 0.5, '.ef-play'],
         ]
       : [
-          [18.85, [760, 461]],
+          [STEER_APPROACH, [760, 461]],
           [STEER_HOVER, '.ef-pause-face'],
           [STEER_PRESS, '.ef-pause-face'],
           [STEER_OPEN, '.ef-pause-face'],
-          [20.3, '.ef-steer-prompt'],
-          [22.95, '.ef-steer-prompt'],
-          [23.5, '.ef-note-send'],
-          [24.1, '.ef-note-send'],
+          [NOTE_START, '.ef-steer-prompt'],
+          [NOTE_END, '.ef-steer-prompt'],
+          [NOTE_SEND, '.ef-note-send'],
+          [32.1, '.ef-note-send'],
         ];
     const [x, y] = follow(moves, pointerTime);
     const pointerOn = opening
       ? (setupTime >= 0 && setupTime < 1.7) ||
         (setupTime >= 4.8 && setupTime < START_PRESS + 0.2)
-      : between(18.85, 23.7) && !between(20.4, 22.95);
+      : between(STEER_APPROACH, STEER_CLOSE) && !between(28.4, NOTE_END);
     const pointer = $('.ef-pointer');
     pointer.style.transform = `translate(${x}px,${y}px)`;
     pointer.style.opacity = pointerOn ? '1' : '0';
-    const clicks = opening ? [1.05, START_PRESS] : [STEER_PRESS, 23.5];
+    const clicks = opening ? [1.05, START_PRESS] : [STEER_PRESS, NOTE_SEND];
     const click = clicks.find(
       (at) => pointerTime >= at && pointerTime < at + 0.5,
     );
@@ -275,18 +333,25 @@ export function mountErrolDemo(root, onChange) {
       [17.65, '.ef-claude .ef-chat-composer'],
       [18.15, '.ef-claude .ef-response'],
       [18.75, '.ef-claude .ef-response'],
+      [19.75, '.ef-gpt .ef-chat-composer'],
+      [21, '.ef-gpt .ef-chat-composer'],
     ],
     [
-      [24.1, '.ef-pause-face'],
-      [24.9, '.ef-gpt .ef-chat-composer'],
-      [26.5, '.ef-gpt .ef-chat-composer'],
+      [24.95, '.ef-gpt .ef-chat-composer'],
+      [25.35, '.ef-gpt .ef-response'],
+      [26.3, '.ef-gpt .ef-response'],
     ],
     [
-      [30.95, '.ef-gpt .ef-chat-composer'],
-      [31.35, '.ef-gpt .ef-response'],
-      [32, '.ef-gpt .ef-response'],
-      [33, '.ef-claude .ef-chat-composer'],
-      [34.3, '.ef-claude .ef-chat-composer'],
+      [32.1, '.ef-pause-face'],
+      [32.9, '.ef-claude .ef-chat-composer'],
+      [34.5, '.ef-claude .ef-chat-composer'],
+    ],
+    [
+      [38.95, '.ef-claude .ef-chat-composer'],
+      [39.35, '.ef-claude .ef-response'],
+      [40, '.ef-claude .ef-response'],
+      [41, '.ef-gpt .ef-chat-composer'],
+      [42.3, '.ef-gpt .ef-chat-composer'],
     ],
   ];
   function courierTail(path, fade) {
@@ -399,9 +464,7 @@ export function mountErrolDemo(root, onChange) {
         : '0';
     world.style.opacity = String(reveal);
     const running = setupTime >= START_PRESS,
-      steering = between(STEER_OPEN, 23.7),
-      gpt2 = t >= 26.15,
-      claude2 = t >= 33.95;
+      steering = between(STEER_OPEN, STEER_CLOSE);
     root.classList.toggle('ef-is-running', running);
     root.classList.toggle('ef-is-steering', steering);
     camera();
@@ -465,108 +528,82 @@ export function mountErrolDemo(root, onChange) {
     show('.ef-note-send', steering);
     set(
       '.ef-steer-prompt',
-      part(note, 20.3, 22.95) || 'Write a note for the next handoff…',
+      part(note, NOTE_START, NOTE_END) || 'Write a note for the next handoff…',
     );
-    const holding = between(STEER_OPEN, 23.7);
+    const holding = steering;
     set('.ef-status', holding ? 'Paused' : running ? 'Running' : 'Ready');
+    const turnIndex = Math.max(
+      0,
+      turns.findLastIndex((turn) => t >= turn.sent),
+    );
+    const activeTurn = turns[turnIndex];
+    const nextTurn = turns[turnIndex + 1];
+    const turnNumber = turnIndex + 1;
     set(
       '.ef-turn',
       !running
         ? 'Turn 0 · ChatGPT opens'
         : holding
-          ? 'Turn 2 · Paused at the handoff'
+          ? 'Turn 3 · Paused at the handoff'
           : between(STEER_PRESS, STEER_OPEN)
-            ? 'Turn 2 · Pausing at the next handoff'
-            : t < 10.4
-              ? 'Turn 1 · ChatGPT is replying'
-              : t < 13.7
-                ? 'Turn 1 · Relaying to Claude'
-                : t < CLAUDE_REPLY_END
-                  ? 'Turn 2 · Claude is replying'
-                  : t < STEER_PRESS
-                    ? 'Turn 2 · Claude’s reply is ready'
-                    : t < 26.3
-                      ? 'Turn 2 · Relaying to ChatGPT'
-                      : t < 31.2
-                        ? 'Turn 3 · ChatGPT is replying'
-                        : t < 34
-                          ? 'Turn 3 · Relaying to Claude'
-                          : 'Turn 4 · Claude is replying',
+            ? 'Turn 3 · Pausing at the next handoff'
+            : t < activeTurn.end
+              ? `Turn ${turnNumber} · ${appName(activeTurn.app)} is replying`
+              : nextTurn && t >= nextTurn.arrive
+                ? `Turn ${turnNumber} · Relaying to ${appName(nextTurn.app)}`
+                : `Turn ${turnNumber} · ${appName(activeTurn.app)}’s reply is ready`,
     );
     set(
       '.ef-note-status',
       steering
-        ? 'Writing a note for ChatGPT'
-        : between(23.7, 25)
+        ? 'Writing a note for Claude'
+        : between(STEER_CLOSE, 32.9)
           ? 'Note queued · goes with the next handoff'
-          : between(25, 26.2)
-            ? 'Sending note to ChatGPT…'
-            : t >= 26.2
-              ? 'Note sent to ChatGPT with turn 2'
+          : between(32.9, 34.15)
+            ? 'Sending note to Claude…'
+            : t >= 34.15
+              ? 'Note sent to Claude with turn 3'
               : '',
     );
-    set(
-      '.ef-gpt-status',
-      !running
-        ? 'Ready'
-        : between(5.8, 10.3) || between(26.3, 31.05)
-          ? 'Replying…'
-          : t > 5.8
-            ? 'Reply ready'
-            : 'Waiting',
-    );
-    set(
-      '.ef-claude-status',
-      !running
-        ? 'Ready'
-        : between(13.6, CLAUDE_REPLY_END) || t >= 34
-          ? 'Replying…'
-          : t >= CLAUDE_REPLY_END
-            ? 'Reply ready'
-            : 'Waiting',
-    );
+    for (const app of ['gpt', 'claude']) {
+      const appTurns = turns.filter((turn) => turn.app === app);
+      const current =
+        appTurns.findLast((turn) => t >= turn.sent) || appTurns[0];
+      const draft = appTurns.find((turn) => between(turn.arrive, turn.sent));
+      set(
+        `.ef-${app}-status`,
+        !running
+          ? 'Ready'
+          : t < current.sent
+            ? 'Waiting'
+            : t < current.end
+              ? 'Replying…'
+              : 'Reply ready',
+      );
+      chat(app, {
+        ...current,
+        sent: t >= current.sent,
+        draft: draft
+          ? draft.input + (draft.withNote ? '\n\nYour note: ' + note : '')
+          : '',
+      });
+    }
+    const receivingTurn = turns.findLast((turn) => t >= turn.arrive);
     const bead =
-      t < 4.3 || holding ? 0.5 : t < 11.7 || between(25, 32.2) ? 0.08 : 0.92;
+      t < 4.3 || holding ? 0.5 : receivingTurn?.app === 'claude' ? 0.92 : 0.08;
     $('.ef-bead').style.transform =
       `translate(${(bead - 0.5) * 143}px,${Math.pow((bead - 0.5) * 2, 2) * 12}px)`;
-    const gDraft = between(5.15, 5.85)
-      ? topic
-      : between(24.9, 26.15)
-        ? second + '\n\nYour note: ' + note
-        : '';
-    const cDraft = between(12.45, 13.55)
-      ? first
-      : between(33, 33.95)
-        ? revised
-        : '';
-    chat('gpt', {
-      sent: t >= 5.85,
-      input: gpt2 ? second : topic,
-      text: gpt2 ? revised : first,
-      start: gpt2 ? 26.45 : 6.3,
-      end: gpt2 ? 31 : 10.25,
-      draft: gDraft,
-      withNote: gpt2,
-    });
-    chat('claude', {
-      sent: t >= 13.55,
-      input: claude2 ? revised : first,
-      text: claude2 ? agreement : second,
-      start: claude2 ? 34.25 : 13.95,
-      end: claude2 ? 38.2 : CLAUDE_REPLY_END,
-      draft: cDraft,
-    });
     set(
       '.ef-front-app',
-      !running || between(18.85, 24.1)
+      !running || between(STEER_APPROACH, 32.1)
         ? 'Errol'
-        : between(11.8, 18.85) || t >= 32.4
+        : between(11.8, 19.15) || between(32.4, 40.4)
           ? 'Claude'
           : 'ChatGPT',
     );
     point();
     courier();
-    $('.ef-ending').style.opacity = String(smooth((t - 39.65) / 0.65));
+    $('.ef-ending').style.opacity = String(smooth((t - 47.65) / 0.65));
     let index = 0;
     const activeBeats = setupTime < START_RELEASE ? openingBeats : beats;
     const beatTime = setupTime < START_RELEASE ? setupTime : t;
@@ -644,7 +681,7 @@ export function mountErrolDemo(root, onChange) {
   function onReducedMotion() {
     if (reduced.matches) {
       playing = false;
-      elapsed = INTRO_DURATION + SETUP_EXTENSION + 31;
+      elapsed = REDUCED_SNAPSHOT;
       render();
     }
   }
