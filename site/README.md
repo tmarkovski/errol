@@ -10,6 +10,7 @@ to the background motion. Each section has its own component and stylesheet in
 
 - `site-header.tsx` — navigation and the compact download link.
 - `hero-section.tsx` — headline, introduction, atmosphere, and the demo.
+- `demo-comparison.tsx` — the saved comparison of the short film and full walkthrough (currently hidden).
 - `how-it-works.tsx` — the three steps and practical notes.
 - `download-section.tsx` — the closing download section.
 - `site-footer.tsx` — the footer and repository link.
@@ -20,7 +21,8 @@ the shared palette, typography, layout helpers, and motion preferences.
 `lib/site-config.ts` is the single place for metadata, release links, and the
 minimum macOS version. `hooks/use-landing-motion.ts` owns the decorative pointer
 and scroll effects. The demo's scene, player, script, and styling remain isolated
-in `components/hero-demo/`.
+in `components/hero-demo/`. The short video player lives in
+`components/short-demo/`.
 
 ## Development
 
@@ -35,9 +37,25 @@ npm run dev
 npm run build
 ```
 
-Static output is in `dist/client/`. The page uses React, Vinext, and Base UI. All motion is CSS or requestAnimationFrame; there is no animation-library dependency. It respects reduced-motion preferences and includes a pause control.
+Static output is in `dist/client/`. The page uses React, Vinext, and Base UI.
+The interactive walkthrough uses CSS and requestAnimationFrame; the short film
+uses a standard HTML video player. There is no animation-library dependency.
+Both respect reduced-motion preferences and include playback controls.
 
-The hero contains the 45-second Errol demonstration in `components/hero-demo/`.
+The landing page currently shows only the original 45-second walkthrough.
+The 10.5-second film and comparison layout are retained for further work but
+are not mounted on the page. To bring the comparison back, replace `HeroDemo`
+with `DemoComparison` in `components/landing/hero-section.tsx`. The saved layout
+places the films side by side on wide screens and stacks them on smaller screens.
+The short film shows a prompt entering ChatGPT, a reply moving to Claude, and
+two dots carrying Claude's reply and a steering note into ChatGPT together.
+Each arrival dissolves into a golden prompt outline. It plays once when visible,
+pauses offscreen or in a background tab, and provides native playback controls.
+Reduced motion shows its poster until the visitor chooses Play.
+The MP4 and poster are in `public/demos/`; the standalone macOS renderer and
+regeneration instructions are in `scripts/short-demo/`.
+
+The full walkthrough remains in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
 the topic into a simplified composer. The camera pulls back near the end of typing.
 Pressing Play shows a click ring and sends the owl from the middle of the typed

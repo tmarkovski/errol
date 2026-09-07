@@ -134,6 +134,8 @@ final class RelayController {
     /// The veil over the waiting chat window; nil in previews, which have
     /// no windows to veil.
     @ObservationIgnored private let veils: SideVeils?
+    @ObservationIgnored private let transferOverlay: TransferOverlay?
+    @ObservationIgnored let promptTransferSource = PromptTransferSource()
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
@@ -143,9 +145,12 @@ final class RelayController {
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
-    init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil) {
+    init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil,
+         transferOverlay: TransferOverlay? = nil) {
         self.engine = engine
         self.veils = veils
+        self.transferOverlay = transferOverlay
+        transferOverlay?.promptSource = promptTransferSource
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only
         // changed statuses reach the observable properties.
@@ -163,6 +168,8 @@ final class RelayController {
         engine.events.onEvent { [weak self] event in
             guard let self else { return }
             switch event {
+            case .transfer(let feedback):
+                if isRunning, !control.isCancelled { transferOverlay?.handle(feedback) }
             case .log(let line):
                 append(line)
             case .conversation(let chatgpt, let claude):
@@ -330,6 +337,7 @@ final class RelayController {
         config.first = firstSpeaker
 
         isRunning = true
+        transferOverlay?.stop()
         isHolding = false
         resetSteering()
         lastReceipt = nil
@@ -377,6 +385,7 @@ final class RelayController {
         isRunning = false
         isHolding = false
         veils?.end()
+        transferOverlay?.stop()
         recordSteeringAtRunEnd()
         resetSteering()
         updateScanner()
@@ -388,6 +397,7 @@ final class RelayController {
         // a focus operation between the two calls.
         isSteeringPending = false
         control.cancel()
+        transferOverlay?.stop()
         append("Stop requested — ending the run at the next safe point...")
     }
 

@@ -34,7 +34,8 @@ func expandLastMessageActions(in target: TargetApp) {
 /// before typing, and a miss is retried once behind a LaunchServices
 /// activation — the one call that moves key status too, which is what the
 /// renderer actually reads.
-func copyLastResponse(from target: TargetApp) -> String? {
+func copyLastResponse(from target: TargetApp,
+                      onCopy: ((TransferAnchor?) -> Void)? = nil) -> String? {
     for attempt in 0..<2 {
         if !makeFrontmost(target) {
             // Unlike a keystroke, an AXPress lands on the element whatever is
@@ -44,7 +45,7 @@ func copyLastResponse(from target: TargetApp) -> String? {
             log("\(target.name): could not bring app to front before copying; pressing anyway")
             log("\(target.name): \(focusReport(target))")
         }
-        if let text = pressCopyButton(in: target) { return text }
+        if let text = pressCopyButton(in: target, onCopy: onCopy) { return text }
         if attempt == 0 {
             log("\(target.name): retrying the copy after forcing activation")
             activateViaLaunchServices(target)
@@ -57,7 +58,8 @@ func copyLastResponse(from target: TargetApp) -> String? {
 /// One press of the newest message's copy button, confirmed by the pasteboard
 /// moving. nil when no button could be found, the press failed, or it
 /// produced no clipboard write.
-func pressCopyButton(in target: TargetApp) -> String? {
+func pressCopyButton(in target: TargetApp,
+                     onCopy: ((TransferAnchor?) -> Void)? = nil) -> String? {
     expandLastMessageActions(in: target)
     let buttons = copyButtons(in: target)
     guard let button = buttons.last else {
@@ -65,6 +67,9 @@ func pressCopyButton(in target: TargetApp) -> String? {
         return nil
     }
     let pasteboard = NSPasteboard.general
+    // Copy controls can unmount as soon as focus moves to the recipient.
+    // Remember their position while the actual button is still present.
+    let origin = onCopy == nil ? nil : transferAnchor(for: button, in: target)
     let before = pasteboard.changeCount
     let err = AXUIElementPerformAction(button, kAXPressAction as CFString)
     if err != .success {
@@ -79,8 +84,10 @@ func pressCopyButton(in target: TargetApp) -> String? {
         }
         usleep(50_000)
     }
-    return pasteboard.string(forType: .string)?
+    let text = pasteboard.string(forType: .string)?
         .trimmingCharacters(in: .whitespacesAndNewlines)
+    if text != nil { onCopy?(origin) }
+    return text
 }
 
 /// What a cut message ends with, so the peer sees it was cut rather than a
@@ -158,7 +165,9 @@ func waitForPasteReceipt(needle: String, input: AXUIElement?, selectors: AppSele
 /// how much of that was seen to happen; only `.confirmed` means both the
 /// paste and the submission were observed, which is what a steering note's
 /// receipt is allowed to rest on.
-func send(_ text: String, to target: TargetApp) -> SendOutcome {
+func send(_ text: String, to target: TargetApp,
+          sources: [TransferSource] = [],
+          showTransfer: Bool = false) -> SendOutcome {
     let payload = truncatedForRelay(text)
     if payload.count != text.count {
         log("\(target.name): payload truncated to \(config.maxChars) chars")
@@ -185,9 +194,22 @@ func send(_ text: String, to target: TargetApp) -> SendOutcome {
     // the composer does afterwards: a send signal cannot vouch for a
     // payload nobody saw land.
     var pasteVerified = false
+    var pastedTransfer: (id: UUID, input: AXUIElement)?
+    defer {
+        // Submission can collapse a prompt that grew during paste. Update
+        // its outline without replaying the arrival or implying send success.
+        if let transfer = pastedTransfer {
+            if let latest = transferAnchor(for: transfer.input, in: target) {
+                relayEvents.post(.transfer(.pasted(id: transfer.id, destination: latest)))
+            } else {
+                relayEvents.post(.transfer(.cancelled(id: transfer.id)))
+            }
+        }
+    }
     let needle = String(payload.prefix(while: { $0 != "\n" }).prefix(32))
     pasteAttempts: for attempt in 0..<2 {
         let input = inputArea(in: target)
+        let transferID = UUID()
         let attachmentsBefore = input.map {
             pastedTextAttachmentCount(around: $0, selectors: target.selectors)
         } ?? 0
@@ -197,6 +219,26 @@ func send(_ text: String, to target: TargetApp) -> SendOutcome {
         } else {
             log("\(target.name): could not locate input area, pasting into current focus")
         }
+        let destination = showTransfer ? transferAnchor(for: input, in: target) : nil
+        if let destination {
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            relayEvents.post(.transfer(.began(id: transferID, sources: sources,
+                                              destination: destination, startedAt: startedAt)))
+            // Give the live app's dot one short beat to reach the prompt.
+            // No renderer callback gates delivery. CLI runs, missing destination
+            // geometry, and Reduce Motion skip this beat entirely.
+            if !sources.isEmpty, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                let deadline = startedAt + TransferTiming.flightDuration
+                while ProcessInfo.processInfo.systemUptime < deadline, !relayControl.isCancelled {
+                    Thread.sleep(forTimeInterval: 0.01)
+                }
+            }
+            // The human may have switched apps or stopped during the flight.
+            guard !relayControl.isCancelled, isFrontmost(target) else {
+                relayEvents.post(.transfer(.cancelled(id: transferID)))
+                return attempt == 0 ? .refused : .abandoned
+            }
+        }
         keystroke(keyV, flags: .maskCommand)
         if let receipt = waitForPasteReceipt(needle: needle, input: input,
                                              selectors: target.selectors,
@@ -205,8 +247,19 @@ func send(_ text: String, to target: TargetApp) -> SendOutcome {
                 log("\(target.name): paste landed as a text attachment")
             }
             pasteVerified = true
+            // The input may have grown during paste. Refresh before the send
+            // clears it; a missing frame must not produce a misplaced glow.
+            if destination != nil {
+                if let input, let landed = transferAnchor(for: input, in: target) {
+                    pastedTransfer = (transferID, input)
+                    relayEvents.post(.transfer(.pasted(id: transferID, destination: landed)))
+                } else {
+                    relayEvents.post(.transfer(.cancelled(id: transferID)))
+                }
+            }
             break pasteAttempts
         }
+        if destination != nil { relayEvents.post(.transfer(.cancelled(id: transferID))) }
         if attempt == 0 {
             log("\(target.name): paste did not land in the composer; forcing activation and retrying")
             activateViaLaunchServices(target)

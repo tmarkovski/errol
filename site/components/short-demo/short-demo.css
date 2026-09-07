@@ -1,0 +1,44 @@
+.short-demo-frame {
+  padding: 9px;
+  overflow: hidden;
+  border-radius: 25px;
+  background: #111310;
+  box-shadow:
+    0 22px 60px #0007,
+    inset 0 1px 0 #ffffff40;
+}
+.short-demo video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border-radius: 17px;
+  background: #121417;
+  color-scheme: dark;
+}
+.short-demo video:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+}
+.short-demo-description,
+.short-demo-error {
+  display: block;
+  margin: 14px 0 0;
+  color: #aaa99f;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.short-demo-error a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 580px) {
+  .short-demo-frame {
+    padding: 6px;
+    border-radius: 20px;
+  }
+  .short-demo video {
+    border-radius: 14px;
+  }
+}

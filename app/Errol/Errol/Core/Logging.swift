@@ -8,6 +8,7 @@ let iso = ISO8601DateFormatter()
 /// Everything the engine reports outward, in the order it happened.
 enum RelayEvent {
     case log(String)
+    case transfer(TransferFeedback)
     /// Both sides' conversation state (ChatGPT first), whenever either
     /// changes.
     case conversation(chatgpt: ConversationStatus, claude: ConversationStatus)

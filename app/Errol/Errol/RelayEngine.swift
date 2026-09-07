@@ -112,7 +112,7 @@ final class LiveRelayEngine: RelayEngine {
             let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
             let freshClaude = electronNudges.beginContact(apps.claude)
             if freshChatgpt || freshClaude { usleep(700_000) }
-            _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude) { continuing in
+            _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude, showTransfers: true) { continuing in
                 completeFocusOperation(control: control, events: events, continuingRun: continuing)
             }
             // Decide before finished clears the editor state. Never save a

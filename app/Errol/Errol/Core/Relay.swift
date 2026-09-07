@@ -129,6 +129,14 @@ struct HandoffPayload {
     /// The note taken at this handoff, read after the reply.
     var note: String?
 
+    /// A fresh human note joins the reply in this handoff. An echo is
+    /// already carried by the preceding actor, so it adds no second dot.
+    func transferSources(reply: TransferAnchor?) -> [TransferSource] {
+        var sources = reply.map { [TransferSource.captured($0)] } ?? []
+        if note != nil { sources.append(.userPrompt) }
+        return sources
+    }
+
     /// The whole thing around `reply`, cap or no cap.
     func assemble(reply: String) -> String {
         if intro {
@@ -233,6 +241,7 @@ enum ConversationStatus: String {
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
 func runRelay(chatgpt: TargetApp, claude: TargetApp,
+              showTransfers: Bool = false,
               operationCompleted: (Bool) -> Void = {
                   _ = relayControl.endOperation(continuingRun: $0)
               }) -> Bool {
@@ -329,7 +338,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         return false
     }
     var baseline = responseBaseline(in: speaker)
-    let openingOutcome = send(opener, to: speaker)
+    let openingOutcome = send(opener, to: speaker, sources: [.userPrompt], showTransfer: showTransfers)
     if openingOutcome.continuesRun {
         setConversation(speaker, .chatting)
         setConversation(listener, .waiting)
@@ -368,7 +377,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             log("Run stopped by user.")
             break
         }
-        guard let reply = copyLastResponse(from: speaker) else {
+        var copiedAnchor: TransferAnchor?
+        guard let reply = copyLastResponse(from: speaker,
+                                           onCopy: showTransfers ? { copiedAnchor = $0 } : nil) else {
             log("Stopping: could not copy response from \(speaker.name) after a retry.")
             break
         }
@@ -467,7 +478,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         }
 
         baseline = responseBaseline(in: listener)
-        let outcome = send(payload.text(reply: reply, cap: config.maxChars), to: listener)
+        let outcome = send(payload.text(reply: reply, cap: config.maxChars), to: listener,
+                           sources: payload.transferSources(reply: copiedAnchor), showTransfer: showTransfers)
         if let note {
             reportSteering(.note, note, to: listener, turn: turn, outcome: SteeringOutcome(outcome))
         }

@@ -37,7 +37,17 @@ struct PerchComposer: View {
         GlassEffectContainer {
             VStack(alignment: .leading, spacing: Perch.cardGap) {
                 PerchConfigZone(controller: controller)
-                PerchComposerEditor(controller: controller, primarySpace: primarySpace)
+                // Keep the probe outside the editor's conditional view identity.
+                // Otherwise the topic-to-steering transition detaches its AppKit
+                // view, leaving the opening handoff without a launch point.
+                ZStack {
+                    PerchComposerEditor(controller: controller, primarySpace: primarySpace)
+                }
+                .background {
+                    PromptTransferProbe(source: controller.promptTransferSource)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
             }
         }
