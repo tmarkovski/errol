@@ -138,7 +138,7 @@ final class PasteReceiptTests: XCTestCase {
     func testChatGPTLongPasteAttachmentSelector() {
         XCTAssertEqual(chatgpt.pastedTextAttachmentRemoveLabel,
                        "Remove pasted text attachment")
-        XCTAssertNil(config.claudeSelectors.pastedTextAttachmentRemoveLabel)
+        XCTAssertEqual(chatgpt.pastedTextAttachmentAncestorLevels, 1)
 
         let composer = FixtureElement(role: "AXGroup", children: [
             FixtureElement(role: "AXButton",
@@ -147,8 +147,83 @@ final class PasteReceiptTests: XCTestCase {
                            value: .string("\nDo anything")),
         ])
         XCTAssertEqual(pastedTextAttachmentCount(under: composer, selectors: chatgpt), 1)
+        XCTAssertEqual(attachmentCount(in: composer, selectors: chatgpt), 1)
         XCTAssertEqual(pastedTextAttachmentCount(under: composer,
                                                  selectors: config.claudeSelectors), 0)
+    }
+
+    /// Replays the live parent walk, rather than handing the counter an
+    /// already-selected container (which missed Claude's nesting regression).
+    private func attachmentCount(in root: FixtureElement, selectors: AppSelectors) -> Int {
+        func parent(of node: FixtureElement, under ancestor: FixtureElement) -> FixtureElement? {
+            if ancestor.children.contains(node) { return ancestor }
+            return ancestor.children.lazy.compactMap { parent(of: node, under: $0) }.first
+        }
+        guard let input = composerElement(under: root) else { return 0 }
+        return pastedTextAttachmentCount(around: input, selectors: selectors) {
+            parent(of: $0, under: root)
+        }
+    }
+
+    /// Shape observed in Claude Desktop on Sep 7 2026. Payload previews are
+    /// anonymized; labels, empty AXValue, and nesting match the open draft.
+    private func claudeWindow(lineCounts: [Int]) -> FixtureElement {
+        let attachments = lineCounts.map { lines in
+            FixtureElement(role: "AXGroup", children: [
+                FixtureElement(role: "AXButton", axDescription: "Pasted text, pasted, \(lines) lines",
+                               children: [FixtureElement(role: "AXStaticText", value: .string("PASTED"))]),
+                FixtureElement(role: "AXButton", axDescription: "Remove Pasted text, pasted, \(lines) lines"),
+            ])
+        }
+        let input = FixtureElement(role: "AXTextArea", axDescription: "Write your prompt to Claude",
+                                   value: .string(""))
+        let composer = FixtureElement(role: "AXGroup", children: attachments + [
+            FixtureElement(role: "AXGroup", children: [
+                FixtureElement(role: "AXGroup", children: [input]),
+                FixtureElement(role: "AXPopUpButton", axDescription: "Add files, connectors, and more"),
+                FixtureElement(role: "AXButton", axDescription: "Send message"),
+            ]),
+        ])
+        return FixtureElement(role: "AXWindow", children: [
+            FixtureElement(role: "AXGroup", axDescription: "Chat messages", children: [
+                FixtureElement(role: "AXButton", axDescription: "Pasted text, pasted, 149 lines"),
+                FixtureElement(role: "AXButton", axDescription: "Pasted text, pasted, 149 lines"),
+                // Even a matching control elsewhere must not count.
+                FixtureElement(role: "AXButton", axDescription: "Remove Pasted text, pasted, 149 lines"),
+            ]),
+            composer,
+        ])
+    }
+
+    func testClaudeLongPasteConfirmsWithEmptyTextAreaAndNestedAttachment() {
+        let selectors = config.claudeSelectors
+        let before = attachmentCount(in: claudeWindow(lineCounts: []), selectors: selectors)
+        let after = attachmentCount(in: claudeWindow(lineCounts: [95]), selectors: selectors)
+        XCTAssertEqual(before, 0)
+        XCTAssertEqual(after, 1, "count the remove control once, not the preview as well")
+        XCTAssertEqual(observedPasteReceipt(needle: "The first words", composerValue: "",
+                                             attachmentsBefore: before, attachmentsNow: after), .attachment)
+    }
+
+    func testClaudeCountsVariableLineLabelsAndRequiresANewAttachment() {
+        let selectors = config.claudeSelectors
+        let before = attachmentCount(in: claudeWindow(lineCounts: [95]), selectors: selectors)
+        XCTAssertNil(observedPasteReceipt(needle: "The first words", composerValue: "",
+                                          attachmentsBefore: before, attachmentsNow: before))
+        let after = attachmentCount(in: claudeWindow(lineCounts: [95, 149]), selectors: selectors)
+        XCTAssertEqual(after, 2)
+        XCTAssertEqual(observedPasteReceipt(needle: "The first words", composerValue: "",
+                                             attachmentsBefore: before, attachmentsNow: after), .attachment)
+    }
+
+    func testClaudeDoesNotEscapeToWindowWhenComposerAncestorsAreMissing() {
+        let window = FixtureElement(role: "AXWindow", children: [
+            FixtureElement(role: "AXButton", axDescription: "Remove Pasted text, pasted, 95 lines"),
+            FixtureElement(role: "AXGroup", children: [
+                FixtureElement(role: "AXTextArea", value: .string("")),
+            ]),
+        ])
+        XCTAssertEqual(attachmentCount(in: window, selectors: config.claudeSelectors), 0)
     }
 
     func testOrdinaryTextConfirmsPaste() {

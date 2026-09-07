@@ -43,6 +43,46 @@ func transferAnchor(for element: AXUIElement?, in target: TargetApp) -> Transfer
     return TransferAnchor(frame: frame, window: window, pid: target.app.processIdentifier)
 }
 
+/// A copied reply still gets a flight when its copy control has scrolled out
+/// of view or exposes no geometry. Only the source may use this approximation;
+/// the destination continues to identify the actual receiving prompt.
+func replyTransferAnchor(copyFrame: CGRect?, window: CGRect, pid: pid_t,
+                         screens: [CGRect]? = nil) -> TransferAnchor? {
+    // Validate before taking intersections or computing a fallback center.
+    guard TransferAnchor(frame: window, window: window, pid: pid) != nil else { return nil }
+    if let copyFrame,
+       let exact = TransferAnchor(frame: copyFrame, window: window, pid: pid),
+       screens?.contains(where: { $0.contains(copyFrame) }) ?? true {
+        return exact
+    }
+    // Avoid launching outside a display when the window straddles a screen
+    // edge or a gap between monitors. Prefer its largest visible portion.
+    let visible = screens.map { frames in
+        frames.map { window.intersection($0) }
+            .filter { !$0.isNull && !$0.isEmpty }
+            .max { $0.width * $0.height < $1.width * $1.height }
+    } ?? window
+    guard let visible else { return nil }
+    let width = min(18, visible.width)
+    let height = min(18, visible.height)
+    let source = CGRect(x: visible.midX - width / 2, y: visible.midY - height / 2,
+                        width: width, height: height)
+    return TransferAnchor(frame: source, window: window, pid: pid)
+}
+
+/// Capture the window while the source app is active; the copy button itself
+/// can be off screen and may unmount when focus moves to the recipient.
+func replyTransferAnchor(for element: AXUIElement?, in target: TargetApp) -> TransferAnchor? {
+    let elementWindow = element.flatMap { axAttribute($0, kAXWindowAttribute) }
+        .flatMap { value -> AXUIElement? in
+            CFGetTypeID(value) == AXUIElementGetTypeID() ? (value as! AXUIElement) : nil
+        }
+    guard let windowElement = elementWindow ?? chatWindow(in: target),
+          let window = windowFrame(windowElement) else { return nil }
+    return replyTransferAnchor(copyFrame: element.flatMap(windowFrame), window: window,
+                               pid: target.app.processIdentifier)
+}
+
 enum TransferSource: Equatable {
     case captured(TransferAnchor)
     /// Resolve the prompt on the main thread at launch, after its editor

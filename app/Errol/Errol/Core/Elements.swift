@@ -167,7 +167,7 @@ func sendButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) ->
 }
 
 /// Count the long-paste attachment chips under one composer container. The
-/// caller deliberately supplies the composer's immediate parent rather than
+/// caller deliberately supplies the app's composer container rather than
 /// the whole window: sent messages retain the same pasted-text controls in the
 /// conversation history and must not confirm a new paste.
 func pastedTextAttachmentCount<Node: ElementNode>(under root: Node,
@@ -179,6 +179,23 @@ func pastedTextAttachmentCount<Node: ElementNode>(under root: Node,
             && element.label.localizedCaseInsensitiveContains(removeLabel)
     }, into: &results)
     return results.count
+}
+
+/// Resolve the app-specific composer scope using the same parent walk for
+/// live AX elements and fixtures. Do not search above that container: old
+/// messages and unrelated attachment controls cannot verify this paste.
+func pastedTextAttachmentCount<Node: ElementNode>(around input: Node,
+                                                   selectors: AppSelectors,
+                                                   parent: (Node) -> Node?) -> Int {
+    guard selectors.pastedTextAttachmentRemoveLabel != nil,
+          selectors.pastedTextAttachmentAncestorLevels > 0 else { return 0 }
+    var container = input
+    for _ in 0..<selectors.pastedTextAttachmentAncestorLevels {
+        guard let ancestor = parent(container), ancestor.role == kAXGroupRole as String
+        else { return 0 }
+        container = ancestor
+    }
+    return pastedTextAttachmentCount(under: container, selectors: selectors)
 }
 
 /// The last text input in the window — composers sit at the bottom. The live
@@ -235,14 +252,14 @@ func sendButton(in target: TargetApp) -> AXUIElement? {
     return sendButton(under: LiveElement(ax: root), selectors: target.selectors)?.ax
 }
 
-/// The live attachment-chip count beside this exact input. In the current
-/// ChatGPT tree the input and every "Remove pasted text attachment" button are
-/// siblings under one AXGroup, while historical attachments live elsewhere.
+/// ChatGPT's remove buttons are siblings of the input; Claude nests its
+/// input two groups deeper than its attachment row.
 func pastedTextAttachmentCount(around input: AXUIElement,
                                selectors: AppSelectors) -> Int {
-    guard let parent = axAttribute(input, kAXParentAttribute) else { return 0 }
-    return pastedTextAttachmentCount(under: LiveElement(ax: parent as! AXUIElement),
-                                     selectors: selectors)
+    pastedTextAttachmentCount(around: LiveElement(ax: input), selectors: selectors) { node in
+        guard let parent = axAttribute(node.ax, kAXParentAttribute) else { return nil }
+        return LiveElement(ax: parent as! AXUIElement)
+    }
 }
 
 func inputArea(in target: TargetApp) -> AXUIElement? {

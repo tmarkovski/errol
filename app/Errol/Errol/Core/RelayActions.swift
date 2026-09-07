@@ -69,7 +69,7 @@ func pressCopyButton(in target: TargetApp,
     let pasteboard = NSPasteboard.general
     // Copy controls can unmount as soon as focus moves to the recipient.
     // Remember their position while the actual button is still present.
-    let origin = onCopy == nil ? nil : transferAnchor(for: button, in: target)
+    let origin = onCopy == nil ? nil : replyTransferAnchor(for: button, in: target)
     let before = pasteboard.changeCount
     let err = AXUIElementPerformAction(button, kAXPressAction as CFString)
     if err != .success {
@@ -132,8 +132,8 @@ enum PasteReceipt: Equatable {
 }
 
 /// A paste is visible either as ordinary composer text or as a newly mounted
-/// pasted-text attachment. ChatGPT removes long paste contents from AXValue
-/// when it builds the attachment chip, so checking text alone causes the
+/// pasted-text attachment. Claude and ChatGPT remove long paste contents from
+/// AXValue when they build the attachment chip, so checking text alone causes the
 /// recovery path to paste the same payload a second time.
 func observedPasteReceipt(needle: String, composerValue: String?,
                           attachmentsBefore: Int, attachmentsNow: Int) -> PasteReceipt? {

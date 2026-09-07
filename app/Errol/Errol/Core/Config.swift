@@ -39,6 +39,9 @@ struct AppSelectors {
     /// turns into a text attachment instead of leaving in the text area. nil
     /// where the app does not expose this behavior over AX.
     var pastedTextAttachmentRemoveLabel: String?
+    /// Number of parents from the text area to the attachment container.
+    /// Keep this scoped to the composer, excluding conversation history.
+    var pastedTextAttachmentAncestorLevels = 1
     /// A window containing a button or text field with any of these labels is
     /// not a chat window (e.g. Claude Code session windows inside Claude Desktop).
     var windowExcludeLabels: [String] = []
@@ -176,6 +179,11 @@ struct Config {
         // (observed live, Aug 2026); the chat surface has no such trap but
         // the exclude is harmless there.
         sendExcludeKeywords: ["feedback"],
+        // Chat long pastes leave AXValue empty and mount a preview plus
+        // "Remove Pasted text, pasted, N lines" three parents above the input
+        // (verified live Sep 7 2026). Match the stable prefix, not the count.
+        pastedTextAttachmentRemoveLabel: "Remove Pasted text,",
+        pastedTextAttachmentAncestorLevels: 3,
         // The backstop under the world switcher below, for builds that have
         // no switcher (the older multi-window layout) or that move it. Of
         // these, only "Rewind to here" is present in current Claude Code

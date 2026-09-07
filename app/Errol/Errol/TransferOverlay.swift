@@ -24,10 +24,14 @@ final class TransferOverlay {
             stop()
             let windows = visibleWindows()
             guard isVisible(destination, in: windows) else { return }
+            let screens = NSScreen.screens.map { axRect($0.frame) }
             let origins = sources.compactMap { source -> TransferAnchor? in
                 let anchor: TransferAnchor?
                 switch source {
-                case .captured(let captured): anchor = captured
+                case .captured(let captured):
+                    anchor = replyTransferAnchor(copyFrame: captured.frame,
+                                                 window: captured.window, pid: captured.pid,
+                                                 screens: screens)
                 case .userPrompt: anchor = promptSource?.anchor()
                 }
                 return anchor.flatMap { isVisible($0, in: windows) ? $0 : nil }

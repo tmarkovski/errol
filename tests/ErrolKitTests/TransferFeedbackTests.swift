@@ -96,4 +96,58 @@ final class TransferFeedbackTests: XCTestCase {
             XCTAssertNil(TransferAnchor(frame: frame, window: window, pid: 1))
         }
     }
+
+    func testVisibleCopyButtonKeepsItsExactSource() {
+        XCTAssertEqual(replyTransferAnchor(copyFrame: replyAnchor.frame,
+                                            window: replyAnchor.window, pid: replyAnchor.pid,
+                                            screens: [CGRect(x: 0, y: 0, width: 1440, height: 1000)]),
+                       replyAnchor)
+    }
+
+    func testMissingOrScrolledCopyGeometryLaunchesFromWindowCenter() throws {
+        let window = replyAnchor.window
+        for copyFrame in [nil, CGRect.zero,
+                          CGRect(x: 150, y: 1100, width: 30, height: 20),
+                          CGRect(x: 150, y: 890, width: 30, height: 20),
+                          CGRect(x: CGFloat.infinity, y: 200, width: 30, height: 20)] {
+            let source = try XCTUnwrap(replyTransferAnchor(copyFrame: copyFrame, window: window, pid: 1))
+            XCTAssertEqual(source.frame.midX, window.midX)
+            XCTAssertEqual(source.frame.midY, window.midY)
+            XCTAssertTrue(window.contains(source.frame))
+            let payload = HandoffPayload(from: "Claude", intro: false, echo: nil, note: nil)
+            XCTAssertEqual(payload.transferSources(reply: source), [.captured(source)],
+                           "Missing button geometry must still produce the reply's flight")
+        }
+    }
+
+    func testOffDisplayCopyFallsBackToVisibleWindowPortion() throws {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 1000)
+        let window = CGRect(x: -700, y: 100, width: 1000, height: 800)
+        let copyFrame = CGRect(x: -600, y: 200, width: 30, height: 20)
+        // The copy button is inside its window but outside the display.
+        let source = try XCTUnwrap(replyTransferAnchor(copyFrame: copyFrame, window: window,
+                                                        pid: 1, screens: [screen]))
+        XCTAssertEqual(source.frame.midX, 150)
+        XCTAssertEqual(source.frame.midY, 500)
+        XCTAssertTrue(screen.contains(source.frame))
+        XCTAssertEqual(source.window, window, "Keep the real window identity for visibility checks")
+    }
+
+    func testFallbackHandlesNegativeDisplaysAndMonitorGaps() throws {
+        let left = CGRect(x: -1000, y: -200, width: 800, height: 1000)
+        let right = CGRect(x: 0, y: 0, width: 1440, height: 1000)
+        let window = CGRect(x: -400, y: 100, width: 500, height: 500)
+        let source = try XCTUnwrap(replyTransferAnchor(copyFrame: nil, window: window,
+                                                        pid: 1, screens: [left, right]))
+        XCTAssertEqual(source.frame.midX, -300, "Choose the largest visible portion, not the monitor gap")
+        XCTAssertEqual(source.frame.midY, 350)
+        XCTAssertTrue(left.contains(source.frame))
+    }
+
+    func testMissingVisibleWindowDoesNotInventAnAnimationSource() {
+        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: .zero, pid: 1))
+        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: replyAnchor.window, pid: 1, screens: []))
+        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: replyAnchor.window, pid: 1,
+                                         screens: [CGRect(x: 2000, y: 0, width: 1440, height: 1000)]))
+    }
 }
