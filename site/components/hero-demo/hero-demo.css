@@ -5,6 +5,9 @@
   --ef-muted: light-dark(#666c65, #b5b9af);
   --ef-line: light-dark(#dedfd8, #484b43);
   --ef-accent: light-dark(#d99b45, #eabb74);
+  /* The app's transfer overlay uses one gold in every appearance. */
+  --ef-gold: #ffc433;
+  --ef-gold-dot: #ffe685;
   --ef-on-accent: #2c2213;
   --ef-green: light-dark(#347953, #82b397);
   --ef-blue: light-dark(#486575, #9bb7c6);
@@ -347,9 +350,15 @@
   white-space: pre-line;
   color: var(--ef-muted);
 }
-#errol-hero-film .ef-chat-composer.ef-relay-focus {
-  border-color: var(--ef-accent);
-  box-shadow: 0 0 0 3px light-dark(#d99b4525, #eabb7425);
+#errol-hero-film .ef-chat-composer::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--ef-gold);
+  border-radius: 20px;
+  box-shadow: 0 0 8px #ffc433cc;
+  opacity: var(--ef-glow, 0);
+  pointer-events: none;
 }
 #errol-hero-film .ef-chat-composer.ef-filled .ef-draft {
   color: var(--ef-ink);
@@ -711,45 +720,37 @@
   opacity: 0;
   pointer-events: none;
 }
-#errol-hero-film .ef-courier-tail-glow {
-  filter: blur(4px);
-  opacity: 0.7;
+#errol-hero-film .ef-courier-tail path {
+  fill: var(--ef-gold);
 }
-#errol-hero-film .ef-courier-tail-core {
+#errol-hero-film .ef-courier-tail-glow {
+  filter: blur(3.5px);
   opacity: 0.65;
 }
 #errol-hero-film .ef-courier {
   position: absolute;
   left: 0;
   top: 0;
-  width: 42px;
-  height: 42px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ef-gold-dot);
+  box-shadow: 0 0 9px 1px var(--ef-gold);
   z-index: 12;
   opacity: 0;
   pointer-events: none;
 }
-#errol-hero-film .ef-courier-mark {
+#errol-hero-film .ef-bloom {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  left: 0;
+  top: 0;
+  width: 11px;
+  height: 11px;
+  border: 1.6px solid var(--ef-gold);
   border-radius: 50%;
-  background: var(--ef-accent);
-  box-shadow:
-    0 3px 12px #0003,
-    0 0 0 1px #ffffff30;
-}
-#errol-hero-film .ef-courier-mark img {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-}
-#errol-hero-film .ef-courier-pulse {
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--ef-accent);
-  border-radius: 50%;
+  z-index: 12;
   opacity: 0;
+  pointer-events: none;
 }
 #errol-hero-film .ef-click {
   position: absolute;

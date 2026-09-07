@@ -10,7 +10,7 @@ Keep the windows, text, pointer, and camera editable independently. This makes
 it possible to change the topic or timing without recording the applications
 again, and to direct a separate portrait composition for phones.
 
-The landing-page animation runs for 45 seconds and includes pause, replay, and scrubbing.
+The landing-page animation runs for 34 seconds and includes pause, replay, and scrubbing.
 It uses an HTML/CSS scene with one animation clock. It follows the viewer's
 appearance, pauses when offscreen, and starts paused when reduced motion is
 enabled. For the landing page, the production recommendation is a silent MP4
@@ -32,15 +32,14 @@ note, so steering has a consequence the viewer can recognize.
 | Time | Picture and action | Purpose |
 | --- | --- | --- |
 | 0–4 s | Type “What if your AIs could talk to each other?” on a quiet title screen. Fade directly into a close-up of Errol. | Introduce the premise before the interface. |
-| 4–9 s | Free chat is selected first. The person's pointer visibly selects Debate, then types “Should we launch on the web or build a native Mac app?” Pull back near the end of typing. | Establish what the person provides and reveal the desktop before starting. |
-| 9–15 s | Press Play with a click ring and send the owl from the middle of the typed topic toward ChatGPT's prompt. Its border lights up, the topic appears, and the message sends. After delivery, fade Errol's setup out and its running state in, with Pause centered; no button movement or morph. Focus on ChatGPT, then ease back over 3.3 seconds as its answer streams. | Make the first handoff immediate and keep attention on the reply. |
-| 15–19 s | In the full desktop view, the owl pulses once over the middle of ChatGPT's reply; the response gains an amber outline and Copy highlights. The owl moves into Claude's composer; its border lights up, the reply appears, and the message sends. | Make the relay visible through the owl and the message surfaces. |
-| 19–24 s | Claude begins replying. Use the same gentle 3.3-second pullback while its response continues. The owl pulses over the finished reply, outlining its container as Copy highlights. Pause remains visible in Errol. | Prepare the automatic return handoff. |
-| 24–26 s | Hold the full desktop as the owl carries Claude's reply back to ChatGPT. ChatGPT starts “Those features matter…” automatically. | Show the conversation returning to ChatGPT without requiring the person to act. |
-| 26–31 s | Move halfway toward Errol as ChatGPT continues typing. Keep the reply and Errol visible together. The pointer hovers to expand Pause into “Pause to steer,” then opens the blank note field. Type “Assume our users work offline every day” and send it while ChatGPT is still writing. | Show steering during an ongoing reply, with both actions visible at once. |
-| 31–36 s | Pull back as the note finishes, keeping its text visible with no owl yet. When ChatGPT finishes, two owls appear over the reply and user note together. Both sources gain amber outlines, and ChatGPT's Copy control highlights. The owls follow separate amber trails that converge inside Claude's prompt. The reply and note appear together and send as one message. Claude quickly types its recommendation for native because daily offline work is central. | Make both sources of the next message visible, then show the effect of steering. |
-| 36–42 s | Keep the full desktop in view as Errol copies Claude's answer and delivers it to ChatGPT. ChatGPT quickly types its agreement to start with one reliable offline Mac workflow and add web sharing later. | Show the conversation continuing automatically after the intervention. |
-| 42–45 s | Fade from the desktop to the Errol mark and “Let your AIs talk.” | Leave the product's purpose clear. |
+| 4–8 s | Free chat is selected first. The person's pointer visibly selects Debate, then types “Should we launch on the web or build a native Mac app?” Pull back near the end of typing. | Establish what the person provides and reveal the desktop before starting. |
+| 8–12 s | Press Play with a click ring. Once ChatGPT is in front, a golden dot leaves the typed topic and arcs to ChatGPT's prompt in about half a second, dissolving into a bloom as the topic appears and the prompt's outline lights; then the message sends. After delivery, fade Errol's setup out and its running state in, with Pause centered; no button movement or morph. Focus on ChatGPT, then ease back over about 1.5 seconds as its answer streams. | Make the first handoff immediate and keep attention on the reply. |
+| 12–16 s | In the full desktop view, ChatGPT's response gains an amber outline as Copy highlights. Once Claude is in front, the dot leaves the Copy control and arcs into Claude's composer; the outline lights, the reply appears, and the message sends. | Make the relay visible through the dot and the message surfaces. |
+| 16–20 s | Claude begins replying. Use the same gentle pullback while its response continues. The finished reply's container gains its outline as Copy highlights. Pause remains visible in Errol. | Prepare the automatic return handoff. |
+| 20–22 s | Hold the full desktop as the dot carries Claude's reply back to ChatGPT. ChatGPT starts “Those features matter…” automatically. | Show the conversation returning to ChatGPT without requiring the person to act. |
+| 22–26 s | Move halfway toward Errol as ChatGPT continues typing. Keep the reply and Errol visible together. The pointer hovers to expand Pause into “Pause to steer,” then opens the blank note field. Type “Assume our users work offline every day” and send it while ChatGPT is still writing. | Show steering during an ongoing reply, with both actions visible at once. |
+| 26–31 s | Pull back as the note finishes, keeping its text visible with no dot yet. When ChatGPT finishes, both sources gain amber outlines and ChatGPT's Copy control highlights. Two dots leave the Copy control and the note together and follow separate arcs that converge inside Claude's prompt, where one bloom marks the arrival. The reply and note appear together and send as one message. Claude quickly types its recommendation for native because daily offline work is central. | Make both sources of the next message visible, then show the effect of steering. |
+| 31–34 s | Fade from the desktop to the Errol mark and “Let your AIs talk.” | Leave the product's purpose clear, ending on the steered reply. |
 
 ## Visual direction
 
@@ -52,23 +51,26 @@ names identify ChatGPT and Claude within the simplified interfaces. Errol's setu
 keeps the conversation-shape selector, topic, and start icon; it omits tile/turn
 options, the secondary instructions, and the separator.
 
-Use a neutral pointer for the person's setup and steering actions. Use the
-Errol owl in an amber circle for automated handoffs, with no pointer or action
-label attached. A short, softly glowing amber tail follows its recent path,
-tapers away behind it, and fades when it stops. Reduced motion omits the tail.
-It arrives over a composer and lights its border as the message
-appears and sends. For copying, it pulses once over the center of the reply and
-the response container gains an amber outline in sync with the Copy highlight.
-Both highlights clear when the handoff moves on. The owl never targets Copy or Send buttons. This
-is an illustration of Errol's work, not a literal mouse recording. Paste each
+Use a neutral pointer for the person's setup and steering actions. For automated
+handoffs, draw the same transfer dot the app's overlay draws: a small golden dot
+that leaves the finished reply's Copy control (or Errol's prompt) once the
+receiving app is in front, follows an upward quadratic arc to the composer in
+0.55 seconds, and dissolves into a bloom on arrival while the composer's outline
+rises and fades. A short, softly glowing wake follows its recent path, tapers
+away behind it, and catches up with the dot when it stops. Reduced motion omits
+the dot and wake and shows only the outline. For copying, the response container
+gains an amber outline in sync with the Copy highlight, and the highlight clears
+when the handoff moves on. This is an illustration of Errol's work, not a
+literal mouse recording. Paste each
 reply as a block; stream only assistant replies and the person's typing.
 
-For the steering handoff, wait until ChatGPT finishes before showing either owl.
-Both owls copy their respective texts simultaneously, then leave together.
-Keep the note owl's trail separate from the owl carrying ChatGPT's reply until
-they meet in Claude's composer. Briefly merge the two marks there, then submit
-the reply and note together. The final Claude and ChatGPT replies each type in under two seconds, bringing
-the runtime to 45 seconds.
+For the steering handoff, wait until ChatGPT finishes before showing either dot.
+Both leave together, the note on a shallower arc, and their wakes stay separate
+until they meet in Claude's composer, where one bloom marks the arrival before
+the reply and note submit together. The person types at about 32 characters per
+second and the assistants stream at about 50; ChatGPT's second reply is the
+exception, streaming until the note is sent. Claude's steered reply types in
+under two seconds and closes the demo, bringing the runtime to 34 seconds.
 
 Keep windows in consistent positions. Pull back during app changes so the
 viewer can orient themselves. Fade the background Errol panel during tight

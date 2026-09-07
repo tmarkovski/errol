@@ -42,7 +42,7 @@ The interactive walkthrough uses CSS and requestAnimationFrame; the short film
 uses a standard HTML video player. There is no animation-library dependency.
 Both respect reduced-motion preferences and include playback controls.
 
-The landing page currently shows only the original 45-second walkthrough.
+The landing page currently shows only the original 34-second walkthrough.
 The 10.5-second film and comparison layout are retained for further work but
 are not mounted on the page. To bring the comparison back, replace `HeroDemo`
 with `DemoComparison` in `components/landing/hero-section.tsx`. The saved layout
@@ -58,28 +58,31 @@ regeneration instructions are in `scripts/short-demo/`.
 The full walkthrough remains in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
 the topic into a simplified composer. The camera pulls back near the end of typing.
-Pressing Play shows a click ring and sends the owl from the middle of the typed
-topic toward ChatGPT's prompt. After delivery, Errol fades out of its setup state and into its running
+Pressing Play shows a click ring, and the transfer dot leaves the typed topic
+for ChatGPT's prompt once that window is in front. After delivery, Errol fades out of its setup state and into its running
 state with Pause centered in the prompt area. The button does not move or morph.
 Pause stays visible during the relay. The returning pointer hovers while the
 control expands to “Pause to steer,” then clicks to open the note field.
-Errol's owl illustrates automated handoffs: it moves over the prompt, its border
-lights up, and the message sends. The owl pulses once over each finished reply
-as the response container gains an amber outline and Copy highlights. A short, tapered amber trail follows the moving owl and
-fades as it stops; reduced motion omits the trail. The mouse pointer only illustrates the person's setup and
-steering actions. ChatGPT opens, Claude responds, and ChatGPT begins answering
+The relay's transfer dot illustrates automated handoffs the way the app's own
+overlay draws them: a small golden dot leaves the finished reply's Copy control
+(or Errol's prompt) once the receiving app is in front, arcs to its composer in
+about half a second, and dissolves into a bloom as the pasted text lights the
+composer's outline. A short, tapered wake follows the dot and catches up with it
+as it stops; reduced motion omits the dot and shows only the outline. Each
+finished reply's container gains an amber outline as Copy highlights. The mouse
+pointer only illustrates the person's setup and steering actions. ChatGPT opens, Claude responds, and ChatGPT begins answering
 again before the person intervenes. As “Those features matter” streams, the
 camera moves halfway toward Errol while keeping ChatGPT's response in view.
 The person opens the note field and sends their note while ChatGPT is still
 typing. The camera pulls back as the note finishes, keeping the submitted text
-visible with no owl yet. When ChatGPT finishes, two owls appear and copy the
-reply and user note simultaneously. Their separate amber trails converge inside Claude's prompt,
-where both texts appear together before one message sends. This handoff fits
-within a 45-second runtime. The final Claude and ChatGPT replies type in under
-two seconds each, bringing the ending forward by five seconds.
-Claude responds to the new direction, then Errol relays that answer to ChatGPT
-for the final turn. The uninterrupted first exchange makes it clear that steering
-is optional. `timeline.js` holds the script and camera
+visible with no dot yet. When ChatGPT finishes, its reply and the note are copied
+together, and two dots leave the Copy control and the note field at the same
+moment. Their separate wakes converge inside Claude's prompt, where both texts
+appear together before one message sends. This handoff fits within a 34-second
+runtime. The person types at about 32 characters per second and the assistants
+stream at about 50, except that ChatGPT's second reply keeps streaming until the
+note is sent. Claude's steered reply types in under two seconds and closes the
+demo. The uninterrupted first exchange makes it clear that steering is optional. `timeline.js` holds the script and camera
 timing; the React component provides the scene and accessible playback controls.
 The demonstration starts when visible, pauses offscreen or in a background tab,
 and supports pause, replay, and seeking. Reduced motion starts on a completed

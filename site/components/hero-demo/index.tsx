@@ -21,10 +21,10 @@ function AppIcon({ app }: { app: 'chatgpt' | 'claude' }) {
   return <img className="ef-app-icon" src={`/app-icons/${app}.png`} alt="" />;
 }
 
+// The relay's transfer dot, drawn the way the app's TransferOverlay draws it:
+// a small golden dot with a short tapered wake. Two lanes let a steering note
+// travel beside the reply it accompanies.
 function Courier({ note = false }: { note?: boolean }) {
-  const gradientId = note
-    ? 'ef-note-courier-tail-gradient'
-    : 'ef-courier-tail-gradient';
   return (
     <>
       <svg
@@ -34,29 +34,13 @@ function Courier({ note = false }: { note?: boolean }) {
         viewBox="0 0 1200 750"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="var(--ef-accent)" stopOpacity="0" />
-            <stop
-              offset="0.45"
-              stopColor="var(--ef-accent)"
-              stopOpacity="0.35"
-            />
-            <stop offset="1" stopColor="var(--ef-accent)" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-        <path className="ef-courier-tail-glow" fill={`url(#${gradientId})`} />
-        <path className="ef-courier-tail-core" fill={`url(#${gradientId})`} />
+        <path className="ef-courier-tail-glow" />
+        <path className="ef-courier-tail-core" />
       </svg>
       <div
         className={note ? 'ef-courier ef-note-courier' : 'ef-courier'}
         aria-hidden="true"
-      >
-        <span className="ef-courier-pulse"></span>
-        <span className="ef-courier-mark">
-          <img src="/errol.svg" alt="" />
-        </span>
-      </div>
+      ></div>
     </>
   );
 }
@@ -268,6 +252,7 @@ const Scene = memo(function Scene() {
           </div>
           <Courier />
           <Courier note />
+          <div className="ef-bloom" aria-hidden="true"></div>
           <div className="ef-click"></div>
           <div className="ef-pointer">
             <MousePointer2 size={16} aria-hidden="true" />
