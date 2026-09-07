@@ -173,43 +173,48 @@ final class RelayFramingTests: XCTestCase {
         // note is where a claim could win the mailbox and lose the handoff.
         let control = RelayControl()
         control.postSteering("Focus on the geology.")
-        control.setPaused(true)
+        XCTAssertEqual(control.requestHold(), .now)
         XCTAssertEqual(control.decideHandoff { _ in true }, .hold)
         XCTAssertTrue(control.hasSteering, "a held handoff leaves the note where it is")
-        control.setPaused(false)
+        control.finishSteering(note: "Focus on the geology.")
         XCTAssertEqual(control.decideHandoff { _ in true },
                        .commit(note: "Focus on the geology.", unfit: nil))
         XCTAssertFalse(control.hasSteering, "committing takes the note")
+        XCTAssertFalse(control.endOperation(continuingRun: true))
         XCTAssertEqual(control.decideHandoff { _ in true }, .commit(note: nil, unfit: nil))
+        XCTAssertFalse(control.endOperation(continuingRun: true))
         control.postSteering("Too long.")
         XCTAssertEqual(control.decideHandoff { _ in false },
                        .commit(note: nil, unfit: "Too long."),
                        "a note that cannot travel whole is taken off and reported, never trimmed")
         XCTAssertFalse(control.hasSteering)
+        XCTAssertFalse(control.endOperation(continuingRun: true))
         control.postSteering("Never rides.")
-        control.setPaused(true)
+        XCTAssertEqual(control.requestHold(), .now)
         control.cancel()
         XCTAssertEqual(control.decideHandoff { _ in true }, .cancel, "cancel wins over hold")
         XCTAssertTrue(control.hasSteering, "a cancelled handoff takes nothing")
     }
 
-    func testClaimSteeringWinsTheNoteAndTheHoldTogetherOrNeither() {
+    func testClaimSteeringWinsTheNoteAndHoldOrWaitsForCommittedDelivery() {
         // Edit & pause: the panel takes the note back and asks for the hold
-        // in one step. A claim the worker beat finds nothing and must not
-        // hold the run for a note that is already on its way.
+        // in one step. A claim the worker beat opens empty after delivery.
         let control = RelayControl()
-        XCTAssertNil(control.claimSteering())
-        XCTAssertFalse(control.isPaused, "a lost claim must not hold the run")
         control.postSteering("Focus on the geology.")
-        XCTAssertEqual(control.claimSteering(), "Focus on the geology.")
+        let claim = control.claimSteering()
+        XCTAssertEqual(claim.note, "Focus on the geology.")
+        XCTAssertEqual(claim.grant, .now)
         XCTAssertTrue(control.isPaused, "a won claim holds the next handoff in the same step")
         XCTAssertEqual(control.decideHandoff { _ in true }, .hold)
         control.reset()
         control.postSteering("Now compare it to the Cuillin.")
         XCTAssertEqual(control.decideHandoff { _ in true },
                        .commit(note: "Now compare it to the Cuillin.", unfit: nil))
-        XCTAssertNil(control.claimSteering(), "the worker committed first")
-        XCTAssertFalse(control.isPaused)
+        let lost = control.claimSteering()
+        XCTAssertNil(lost.note, "the worker committed first")
+        XCTAssertEqual(lost.grant, .afterOperation)
+        XCTAssertTrue(control.isPaused)
+        XCTAssertTrue(control.endOperation(continuingRun: true))
     }
 
     func testHandoffPayloadKeepsSteeringSectionsWholeUnderTheCap() {

@@ -62,7 +62,7 @@ private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine
 }
 
 #Preview("Perch steer (field open, holding)") {
-    // Claude's reply is already in hand, so the pause holds at once.
+    // Claude's reply is ready to capture, so the pause holds at once.
     let controller = previewController(PerchPreviewEngine(turn: 4, atHandoff: true))
     controller.start()
     controller.beginSteering()
@@ -81,6 +81,24 @@ private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine
     controller.lastRunDuration = 272
     controller.chatgptConversation = .ended
     controller.claudeConversation = .ended
+    return PerchPanelView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Perch steer (pausing during copy)") {
+    let controller = previewController(PerchPreviewEngine(turn: 4, openingOperation: .capture))
+    controller.start()
+    controller.beginSteering()
+    return PerchPanelView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Perch steer (pausing during send)") {
+    let controller = previewController(PerchPreviewEngine(turn: 4, openingOperation: .delivery))
+    controller.start()
+    controller.beginSteering()
     return PerchPanelView(controller: controller)
         .padding(24)
         .background(Color(white: 0.75))

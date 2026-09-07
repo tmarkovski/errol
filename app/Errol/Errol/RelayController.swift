@@ -94,14 +94,13 @@ final class RelayController {
     /// back down when a tiling could not be done.
     var windowsTiled = false
     var isRunning = false
-    /// Whether the field is open: the human pressed Pause to steer, the
-    /// engine's pause flag is on (see RelayControl), and the run holds at
-    /// the next handoff until Return or the circle closes the field and lets
-    /// it go. The run keeps going until it reaches that handoff.
+    /// The field opens only after focus ownership is granted. Both relay
+    /// operations wait until Return or Continue closes the editor.
     var isSteering = false
-    /// Whether the run has actually parked at that handoff. Between the two
-    /// the agent that was composing is still finishing its reply, which is
-    /// the gap the panel's route draws.
+    private(set) var isSteeringPending = false
+    @ObservationIgnored let steeringEditor = TextEditorSession()
+    /// Whether the worker has parked at a capture or delivery gate. A hold
+    /// requested during an operation stays pending until that operation ends.
     var isHolding = false
     /// The field's text: what the human is writing while the field is open,
     /// and the queued note as written — shown under a blur — while the
@@ -174,6 +173,11 @@ final class RelayController {
                 currentTurn = turn
             case .holding(let holding):
                 isHolding = holding
+            case .steeringGranted:
+                guard isRunning, isSteeringPending, control.canOpenSteering else { return }
+                isSteeringPending = false
+                steeringEditor.begin(text: steeringText)
+                isSteering = true
             case .steeringCommitted(let note, let recipient, let turn):
                 steeringCommitted(note, to: recipient, turn: turn)
             case .steering(let delivery):
@@ -367,6 +371,7 @@ final class RelayController {
     /// the composer goes back to the topic and ending is exactly when
     /// someone inspects what happened.
     private func finishRun() {
+        if isSteering, let text = steeringEditor.end() { steeringText = text }
         lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
         runStartedAt = nil
         isRunning = false
@@ -374,15 +379,14 @@ final class RelayController {
         veils?.end()
         recordSteeringAtRunEnd()
         resetSteering()
-        control.setPaused(false)
         updateScanner()
     }
 
     func stop() {
         guard isRunning else { return }
-        // Lift the hold so the loop wakes and reaches its cancel check. The
-        // field stays as it is; the run's end records what became of the note.
-        control.setPaused(false)
+        // Cancellation wins at both gates. Clearing pause first would admit
+        // a focus operation between the two calls.
+        isSteeringPending = false
         control.cancel()
         append("Stop requested — ending the run at the next safe point...")
     }
@@ -391,7 +395,7 @@ final class RelayController {
 
     /// Whether a hold is asked for. There is one way to ask: Pause to
     /// steer, which opens the field. The pill and the turn line read this.
-    var holdRequested: Bool { isSteering }
+    var holdRequested: Bool { isSteering || isSteeringPending }
 
     /// Whether the field holds words. The circle reads it to be Send rather
     /// than Continue, and the run's end records such words as a note never
@@ -427,28 +431,37 @@ final class RelayController {
         }
     }
 
-    /// Pause to steer: the run holds at the next handoff and the field
-    /// opens. A queued note comes back into the field to be changed — taken
+    /// Pause to steer requests focus ownership; the field waits for any
+    /// active operation to finish. A queued note comes back to be changed — taken
     /// off the mailbox and the hold put on in one locked step
     /// (RelayControl.claimSteering), so the handoff it was queued for cannot
     /// slip through between the two. If the worker committed it first the
     /// claim loses: that note is on its way, the committed event says so,
     /// and the field opens empty for a new one.
     func beginSteering() {
-        guard isRunning, !isSteering else { return }
+        guard isRunning, !holdRequested else { return }
+        let grant: HoldGrant
         if queuedSteering != nil {
+            let claim = control.claimSteering()
+            guard claim.grant != .cancelled else { return }
+            grant = claim.grant
             queuedSteering = nil
-            if control.claimSteering() != nil {
+            if claim.note != nil {
                 append("Note taken back — the run holds at the next handoff while you change it.")
             } else {
                 steeringText = ""
-                append("The note had already gone out with the handoff; the field is open for a new one.")
+                append("The handoff already owns that note; opening a new one.")
             }
         } else {
+            grant = control.requestHold()
+            guard grant != .cancelled else { return }
             append("Pausing to steer — the run holds at the next handoff while you write.")
         }
-        control.setPaused(true)
-        isSteering = true
+        isSteeringPending = grant == .afterOperation
+        if grant == .now {
+            steeringEditor.begin(text: steeringText)
+            isSteering = true
+        }
     }
 
     /// Return, or the circle: the field closes and the run goes on. Words
@@ -457,19 +470,21 @@ final class RelayController {
     /// just continues. Posting comes before the hold lifts, so the handoff the
     /// flag releases is one that finds the note.
     func sendSteering() {
-        guard isRunning, isSteering else { return }
+        guard isRunning, isSteering, !control.isCancelled else { return }
+        // The outgoing SwiftUI view can survive its fade. Stop its NSTextView
+        // synchronously, including any marked text, before opening either gate.
+        if let text = steeringEditor.end() { steeringText = text }
         let note = steeringText.trimmingCharacters(in: .whitespacesAndNewlines)
         if note.isEmpty {
             steeringText = ""
             queuedSteering = nil
             append("Continued without a note.")
         } else {
-            control.postSteering(note)
             queuedSteering = steeringText
             append("Note queued — the run goes on, and the note rides the next handoff.")
         }
         isSteering = false
-        control.setPaused(false)
+        control.finishSteering(note: note.isEmpty ? nil : note)
     }
 
     /// Esc in the open field. The first press empties it; the second, on an
@@ -480,6 +495,7 @@ final class RelayController {
         if steeringText.isEmpty {
             sendSteering()
         } else {
+            steeringEditor.clear()
             steeringText = ""
         }
     }
@@ -502,6 +518,7 @@ final class RelayController {
             return true
         }
         if !steeringText.isEmpty {
+            steeringEditor.clear()
             steeringText = ""
             return true
         }
@@ -516,7 +533,9 @@ final class RelayController {
 
     /// Everything about the note, at a run's start and end.
     private func resetSteering() {
+        steeringEditor.end()
         isSteering = false
+        isSteeringPending = false
         steeringText = ""
         queuedSteering = nil
         steeringInFlight = nil
@@ -582,7 +601,7 @@ final class RelayController {
         } else if let queued = queuedSteering {
             lastReceipt = SteeringReceipt(note: queued.trimmingCharacters(in: .whitespacesAndNewlines),
                                           recipient: nil, turn: nil, outcome: .notSent(.runEnded))
-        } else if isSteering, steeringHasText {
+        } else if steeringHasText {
             lastReceipt = SteeringReceipt(note: steeringText, recipient: nil, turn: nil,
                                           outcome: .neverQueued)
         }

@@ -38,26 +38,31 @@ final class PerchPreviewEngine: RelayEngine {
     /// open mid-run. Runs started by hand after it start from the top.
     private var opening: (turn: Int, atHandoff: Bool)?
     private var run: Task<Void, Never>?
+    private var openingOperation: FocusOperation?
 
     /// - Parameters:
     ///   - replyTime: How long each reply takes to write.
     ///   - turn: The turn the first run opens on. Who is writing it follows
     ///     from the first speaker, as in a run: odd turns are the opener's.
-    ///   - atHandoff: Whether that turn's reply is already captured and the
-    ///     run is at the handoff boundary, so a pause asked for before the
+    ///   - atHandoff: Whether that turn's reply is already ready and the
+    ///     run is at the capture boundary, so a pause asked for before the
     ///     canvas draws holds at once.
     ///   - signOffAt: The turn from which the agents sign off — the side
     ///     writing it ends the conversation, and the other closes out on
     ///     the next — the way a conversation ends on its own. nil means
     ///     the run goes on until the turn cap or Stop.
+    ///   - openingOperation: Start inside capture or delivery so a pause made
+    ///     immediately after Start exercises the pending editor state.
     ///   - readiness: What the perches show for the two apps.
     init(pace replyTime: Duration = .seconds(4),
          turn: Int = 1, atHandoff: Bool = false, signOffAt: Int? = nil,
+         openingOperation: FocusOperation? = nil,
          readiness: (chatgpt: SideStatus, claude: SideStatus) = PerchPreviewEngine.bothReady) {
         self.replyTime = replyTime
         self.signOffAt = signOffAt
         self.readiness = readiness
         opening = (max(1, turn), atHandoff)
+        self.openingOperation = openingOperation
     }
 
     deinit {
@@ -80,13 +85,17 @@ final class PerchPreviewEngine: RelayEngine {
         run?.cancel()
         let opening = self.opening ?? (1, false)
         self.opening = nil
+        let operation = openingOperation
+        openingOperation = nil
+        if let operation { _ = control.beginOperation(operation) }
         events.post(.log("Preview run: nothing is sent to either app."))
         let play = PreviewRun(events: events, control: control, replyTime: replyTime,
                               names: (readiness.chatgpt.appName, readiness.claude.appName),
                               first: config.first,
                               turnCap: config.limitTurns ? config.turns : nil,
                               signOffAt: signOffAt,
-                              startTurn: opening.turn, atHandoff: opening.atHandoff)
+                              startTurn: opening.turn, atHandoff: opening.atHandoff,
+                              openingOperation: operation)
         run = Task { await play.play() }
     }
 
@@ -116,13 +125,16 @@ private final class PreviewRun {
     private let signOffAt: Int?
     private let startTurn: Int
     private let atHandoff: Bool
+    private var openingOperation: FocusOperation?
+    private var operationActive: Bool
 
     private var chatgpt = ConversationStatus.notStarted
     private var claude = ConversationStatus.notStarted
 
     nonisolated init(events: RelayEventBus, control: RelayControl, replyTime: Duration,
                      names: (chatgpt: String, claude: String), first: Speaker, turnCap: Int?,
-                     signOffAt: Int?, startTurn: Int, atHandoff: Bool) {
+                     signOffAt: Int?, startTurn: Int, atHandoff: Bool,
+                     openingOperation: FocusOperation?) {
         self.events = events
         self.control = control
         self.replyTime = replyTime
@@ -132,9 +144,15 @@ private final class PreviewRun {
         self.signOffAt = signOffAt
         self.startTurn = startTurn
         self.atHandoff = atHandoff
+        self.openingOperation = openingOperation
+        operationActive = openingOperation != nil
     }
 
     func play() async {
+        defer {
+            if operationActive { endOperation(continuing: false) }
+            control.finishRun()
+        }
         var speaker = startTurn % 2 == 1 ? first : other(than: first)
         var listener = other(than: speaker)
         set(speaker, .chatting)
@@ -150,12 +168,33 @@ private final class PreviewRun {
         while true {
             turn += 1
             events.post(.turn(turn))
-            if replyInHand {
+            let reserved = openingOperation
+            openingOperation = nil
+            if replyInHand || reserved != nil {
                 replyInHand = false
             } else if !(await writeReply()) {
                 if Task.isCancelled { return }
                 log("Run stopped by user.")
                 break
+            }
+
+            set(speaker, .replied)
+            if reserved != .delivery {
+                var capture = reserved == .capture ? OperationDecision.proceed : control.beginOperation(.capture)
+                if capture == .hold {
+                    log("Paused — \(name(speaker))'s reply is ready; waiting to copy it.")
+                    events.post(.holding(true))
+                    repeat {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        if Task.isCancelled { return }
+                        capture = control.beginOperation(.capture)
+                    } while capture == .hold
+                    events.post(.holding(false))
+                }
+                guard capture == .proceed else { break }
+                operationActive = true
+                try? await Task.sleep(for: .milliseconds(700))
+                if Task.isCancelled { return }
             }
 
             let signedOff = signOffAt.map { turn >= $0 } ?? false
@@ -174,9 +213,12 @@ private final class PreviewRun {
                 log("Turn cap reached.")
                 break
             }
+            if reserved != .delivery { endOperation(continuing: true) }
 
             // The handoff boundary: hold, end, or go, as the control says.
-            var decision = control.decideHandoff { _ in true }
+            var decision = reserved == .delivery
+                ? HandoffDecision.commit(note: nil, unfit: nil)
+                : control.decideHandoff { _ in true }
             if decision == .hold {
                 log("Paused — holding \(name(speaker))'s reply before it reaches \(name(listener)).")
                 if !signedOff { set(speaker, .replied) }
@@ -193,6 +235,7 @@ private final class PreviewRun {
                 log("Run stopped by user.")
                 break
             }
+            operationActive = true
 
             if let note {
                 log("Relaying the human's steering note with this handoff.")
@@ -212,8 +255,13 @@ private final class PreviewRun {
 
             if !signedOff { set(speaker, .waiting) }
             set(listener, .chatting)
+            endOperation(continuing: !control.isCancelled)
+            if control.isCancelled { break }
             swap(&speaker, &listener)
         }
+
+        if operationActive { endOperation(continuing: false) }
+        control.finishRun()
 
         // What the run left undelivered, said outright, as the engine does.
         if let left = control.takeSteering() {
@@ -226,6 +274,11 @@ private final class PreviewRun {
         if claude != .ended { set(.claude, .notStarted) }
         log("Done.")
         events.post(.finished)
+    }
+
+    private func endOperation(continuing: Bool) {
+        completeFocusOperation(control: control, events: events, continuingRun: continuing)
+        operationActive = false
     }
 
     /// The reply being written: replyTime on the clock, in slices, so Stop

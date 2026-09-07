@@ -14,3 +14,6 @@ part of the application build.
   field is closed while the agents work; Pause to steer opens it, Return sends
   and closes it), with [the problem framing](steering/the-note-in-flight.md)
   it answers.
+- [Focus coordination while steering](steering/focus-coordination.md) — two
+  operation gates under the relay's existing control lock, so copying and
+  delivery wait until the steering editor releases focus.

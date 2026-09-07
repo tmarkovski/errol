@@ -7,6 +7,52 @@
 import AppKit
 import SwiftUI
 
+/// An explicit input lifetime, independent of SwiftUI's animated removal of
+/// the editor. Ending it disables the actual text view before focus is released.
+final class TextEditorSession {
+    private weak var textView: NSTextView?
+    private(set) var acceptsInput = false
+
+    func begin(text: String) {
+        acceptsInput = true
+        // SwiftUI may reuse the native editor when an animated close is
+        // followed quickly by reopening. Restore that editor in place.
+        textView?.string = text
+        textView?.isEditable = true
+        textView?.isSelectable = true
+    }
+
+    func clear() {
+        guard acceptsInput else { return }
+        textView?.unmarkText()
+        textView?.string = ""
+    }
+
+    func attach(_ view: NSTextView) {
+        if let previous = textView, previous !== view {
+            previous.isEditable = false
+            previous.isSelectable = false
+        }
+        textView = view
+        view.isEditable = acceptsInput
+        view.isSelectable = acceptsInput
+    }
+
+    @discardableResult
+    func end() -> String? {
+        acceptsInput = false
+        guard let textView else { return nil }
+        textView.unmarkText()
+        let text = textView.string
+        textView.isEditable = false
+        textView.isSelectable = false
+        if textView.window?.firstResponder === textView {
+            textView.window?.makeFirstResponder(nil)
+        }
+        return text
+    }
+}
+
 struct GrowingTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont
@@ -31,6 +77,7 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// completion — the way a steer editor gets called off. The text view
     /// comes along so the handler can also just leave focus.
     var onEscape: ((NSTextView) -> Void)?
+    var session: TextEditorSession?
 
     /// The text's inset above and below, inside the editor.
     static let insetHeight: CGFloat = 2
@@ -75,10 +122,12 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         scrollView.documentView = textView
         context.coordinator.scrollView = scrollView
+        session?.attach(textView)
         if takesFocusOnAppear {
             // No window yet while the view is being made; by the next turn
             // of the loop it is in one.
             DispatchQueue.main.async {
+                guard textView.isEditable, session?.acceptsInput != false else { return }
                 textView.window?.makeFirstResponder(textView)
             }
         }
@@ -169,6 +218,8 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         func textView(_ textView: NSTextView,
                       doCommandBy commandSelector: Selector) -> Bool {
+            // Return/Escape belong to the input method while it is composing.
+            guard !textView.hasMarkedText() else { return false }
             if commandSelector == #selector(NSResponder.insertNewline(_:)),
                let onSubmit = parent.onSubmit,
                NSApp.currentEvent?.modifierFlags.contains(.shift) != true {

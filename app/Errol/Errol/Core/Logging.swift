@@ -16,8 +16,10 @@ enum RelayEvent {
     /// The run parking at a handoff to wait for Resume, and letting go.
     /// Asking for a pause and the run acting on it are different moments —
     /// the request lands mid-reply and takes effect only once that reply
-    /// is captured — and nothing else the app can see tells them apart.
+    /// is ready to capture — and nothing else the app can see tells them apart.
     case holding(Bool)
+    /// The focus operation has finished and a pending steering editor may open.
+    case steeringGranted
     /// The worker took the human's note off the mailbox for the handoff it
     /// is about to make. From here the note is the courier's — the panel
     /// can no longer take it back — and the paste is about to begin. The
@@ -77,7 +79,8 @@ enum SteeringOutcome: Equatable {
 /// main thread in posting order, so state derived from the stream cannot
 /// interleave — the reason this is one stream rather than the four
 /// separate callbacks it replaced.
-final class RelayEventBus {
+// The handler is protected by the lock and invoked only on the main queue.
+final class RelayEventBus: @unchecked Sendable {
     private let lock = NSLock()
     private var handler: ((RelayEvent) -> Void)?
 
@@ -125,24 +128,98 @@ enum HandoffDecision: Equatable {
     case commit(note: String?, unfit: String?)
 }
 
+enum HoldGrant: Equatable { case now, afterOperation, cancelled }
+enum OperationDecision: Equatable { case proceed, hold, cancel }
+enum FocusOperation: Equatable { case capture, delivery }
+
 /// The app's inward channel to a run in flight: the cancel and pause flags
 /// the relay's wait loops poll — so a run can end or hold without killing
 /// the process — and the steering-note mailbox. Set from the main thread,
 /// read on the relay worker; one lock covers the lot.
-final class RelayControl {
+// Every stored value is protected by lock, including operation ownership.
+final class RelayControl: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
     private var paused = false
     private var note: String?
+    private var operation: FocusOperation?
+    private var pendingEditor = false
+    private var finished = false
 
     var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
-    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        pendingEditor = false
+        lock.unlock()
+    }
 
-    /// While set, the run parks at the next handoff boundary — after a
-    /// reply has been captured, before it is delivered — so neither app is
-    /// touched while held.
+    /// Both capture and delivery wait while the steering editor owns focus.
     var isPaused: Bool { lock.lock(); defer { lock.unlock() }; return paused }
-    func setPaused(_ value: Bool) { lock.lock(); paused = value; lock.unlock() }
+
+    var hasFocusOperation: Bool { lock.lock(); defer { lock.unlock() }; return operation != nil }
+    var canOpenSteering: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return paused && operation == nil && !cancelled && !finished
+    }
+
+    func requestHold() -> HoldGrant {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestHoldLocked()
+    }
+
+    private func requestHoldLocked() -> HoldGrant {
+        guard !cancelled, !finished else { return .cancelled }
+        paused = true
+        pendingEditor = operation != nil
+        return pendingEditor ? .afterOperation : .now
+    }
+
+    /// Used for capture and the opener. Neither consumes the note mailbox.
+    func beginOperation(_ kind: FocusOperation) -> OperationDecision {
+        lock.lock()
+        defer { lock.unlock() }
+        if cancelled || finished { return .cancel }
+        if paused || operation != nil { return .hold }
+        operation = kind
+        return .proceed
+    }
+
+    /// The app calls this inside its synchronous main-queue completion fence.
+    /// Keep the hold set when granting, so the next operation cannot race the
+    /// controller's receipt of steeringGranted.
+    func endOperation(continuingRun: Bool) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(operation != nil, "No focus operation to end")
+        operation = nil
+        if !continuingRun { finished = true }
+        let grant = pendingEditor && !cancelled && !finished
+        pendingEditor = false
+        return grant
+    }
+
+    /// Seal terminal paths before the finished event reaches the controller.
+    /// Preserve the hold for the end-of-run focus restoration decision.
+    func finishRun() {
+        lock.lock()
+        defer { lock.unlock() }
+        precondition(operation == nil, "Finish the focus operation first")
+        finished = true
+        pendingEditor = false
+    }
+
+    /// The editor must stop accepting input before the controller calls this.
+    func finishSteering(note text: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !cancelled, !finished else { return }
+        note = text
+        paused = false
+        pendingEditor = false
+    }
 
     /// The steering mailbox: one slot. The panel posts the human's note
     /// here and the worker takes it at the next handoff boundary — the note
@@ -165,18 +242,16 @@ final class RelayControl {
     /// Whether a note is waiting for its handoff.
     var hasSteering: Bool { lock.lock(); defer { lock.unlock() }; return note != nil }
 
-    /// Typing into a queued note takes it back and requests the hold in
-    /// one locked step, so the handoff it was queued for cannot slip
-    /// through between the two. Returns the note when the claim won. When
-    /// the worker has already committed it, returns nil and leaves the
-    /// pause flag alone — the note is the courier's now.
-    func claimSteering() -> String? {
+    /// Claim the note and ask for editor ownership together. A lost claim
+    /// still holds the next operation, opening a new, empty note after send.
+    func claimSteering() -> (note: String?, grant: HoldGrant) {
         lock.lock()
         defer { lock.unlock() }
-        guard let claimed = note else { return nil }
+        let grant = requestHoldLocked()
+        guard grant != .cancelled else { return (nil, grant) }
+        let claimed = note
         note = nil
-        paused = true
-        return claimed
+        return (claimed, grant)
     }
 
     /// The worker's one decision at a handoff boundary. It reads the cancel
@@ -191,8 +266,9 @@ final class RelayControl {
     func decideHandoff(carries: (String) -> Bool) -> HandoffDecision {
         lock.lock()
         defer { lock.unlock() }
-        if cancelled { return .cancel }
-        if paused { return .hold }
+        if cancelled || finished { return .cancel }
+        if paused || operation != nil { return .hold }
+        operation = .delivery
         guard let pending = note else { return .commit(note: nil, unfit: nil) }
         note = nil
         return carries(pending)
@@ -207,11 +283,28 @@ final class RelayControl {
         cancelled = false
         paused = false
         note = nil
+        operation = nil
+        pendingEditor = false
+        finished = false
         lock.unlock()
     }
 }
 
 let relayControl = RelayControl()
+
+/// Drain the operation's queued main-thread focus work before releasing its
+/// ownership. The live worker waits here; the main thread must never join it.
+/// Main-thread preview/test callers can complete directly.
+func completeFocusOperation(control: RelayControl, events: RelayEventBus,
+                            continuingRun: Bool) {
+    let complete = {
+        if control.endOperation(continuingRun: continuingRun) {
+            events.post(.steeringGranted)
+        }
+    }
+    if Thread.isMainThread { complete() }
+    else { DispatchQueue.main.sync(execute: complete) }
+}
 
 func appendTranscript(_ text: String) {
     let url = URL(fileURLWithPath: config.transcriptPath)

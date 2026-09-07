@@ -105,15 +105,22 @@ final class LiveRelayEngine: RelayEngine {
         control.reset()
         let origin = currentFrontmostApp()
         log("Run starting. Transcript: \(config.transcriptPath)")
-        runExclusively { [events] in
+        runExclusively { [events, control] in
             // First contact only: the scanner has usually nudged both long
             // ago, and then the trees are already populated and the settle
             // wait would just delay the run.
             let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
             let freshClaude = electronNudges.beginContact(apps.claude)
             if freshChatgpt || freshClaude { usleep(700_000) }
-            _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude)
-            refocus(to: origin)
+            _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude) { continuing in
+                completeFocusOperation(control: control, events: events, continuingRun: continuing)
+            }
+            // Decide before finished clears the editor state. Never save a
+            // restoration to run after the human has finished writing.
+            let mayRestore = DispatchQueue.main.sync {
+                NSApp.keyWindow == nil && !control.isPaused
+            }
+            if mayRestore { refocus(to: origin) }
             events.post(.finished)
         }
     }

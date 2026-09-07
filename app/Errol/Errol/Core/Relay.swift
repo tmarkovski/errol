@@ -221,10 +221,10 @@ enum Speaker: String {
 enum ConversationStatus: String {
     case notStarted = "Not started"
     case chatting = "Chatting\u{2026}"
-    /// Finished writing, with the reply captured but not yet delivered. In an
-    /// uninterrupted run a side is never seen in this state — the handoff
-    /// follows immediately — but a pause parks the run here, and a side shown
-    /// as still composing through a hold is simply wrong.
+    /// Finished writing, with the reply detected but not yet delivered. Capture
+    /// may still be waiting for the steering editor to release focus. A normal
+    /// handoff leaves this state after capture and delivery; a hold can park
+    /// here without implying the agent is still composing.
     case replied = "Reply ready"
     case waiting = "Waiting"
     case ended = "Conversation ended"
@@ -232,7 +232,37 @@ enum ConversationStatus: String {
 
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
-func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
+func runRelay(chatgpt: TargetApp, claude: TargetApp,
+              operationCompleted: (Bool) -> Void = {
+                  _ = relayControl.endOperation(continuingRun: $0)
+              }) -> Bool {
+    // The app supplies a main-queue completion fence; command-line callers
+    // have no steering editor and can release ownership directly.
+    var operationActive = false
+    func endOperation(continuingRun: Bool) {
+        operationCompleted(continuingRun)
+        operationActive = false
+    }
+    defer {
+        if operationActive { endOperation(continuingRun: false) }
+        relayControl.finishRun()
+    }
+
+    func beginOperation(_ kind: FocusOperation, waiting: String) -> Bool {
+        var decision = relayControl.beginOperation(kind)
+        if decision == .hold {
+            log(waiting)
+            relayEvents.post(.holding(true))
+            repeat {
+                usleep(200_000)
+                decision = relayControl.beginOperation(kind)
+            } while decision == .hold
+            relayEvents.post(.holding(false))
+        }
+        guard decision == .proceed else { return false }
+        operationActive = true
+        return true
+    }
     // nil = no cap: the run ends on the conversation's own close (mutual
     // sign-off, empty reply, timeout, or Stop).
     let turnCap = config.limitTurns ? config.turns : nil
@@ -295,11 +325,18 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
     appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
 
     log("Seeding \(speaker.name)...")
+    guard beginOperation(.delivery, waiting: "Paused — waiting before the opening message.") else {
+        return false
+    }
     var baseline = responseBaseline(in: speaker)
-    guard send(opener, to: speaker).continuesRun else { return false }
+    let openingOutcome = send(opener, to: speaker)
+    if openingOutcome.continuesRun {
+        setConversation(speaker, .chatting)
+        setConversation(listener, .waiting)
+    }
+    endOperation(continuingRun: openingOutcome.continuesRun)
+    guard openingOutcome.continuesRun else { return false }
     baseline = absorbEchoIntoBaseline(in: speaker, preSend: baseline)
-    setConversation(speaker, .chatting)
-    setConversation(listener, .waiting)
 
     // A sign-off is relayed like any reply so the peer sees it; the run ends
     // when two consecutive replies carry the stop sequence.
@@ -323,6 +360,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
                 log("Stopping: no response activity detected from \(speaker.name).")
                 appendTranscript("_Run stopped: no response activity detected from \(speaker.name) for \(Int(config.timeout))s._\n\n")
             }
+            break
+        }
+        setConversation(speaker, .replied)
+        guard beginOperation(.capture,
+                             waiting: "Paused — \(speaker.name)'s reply is ready; waiting to copy it.") else {
+            log("Run stopped by user.")
             break
         }
         guard let reply = copyLastResponse(from: speaker) else {
@@ -357,6 +400,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
             log("Turn cap reached.")
             break
         }
+        endOperation(continuingRun: true)
 
         // The handoff's text: the listener's first message carries the rules
         // and full context; every later relay is the other agent's reply,
@@ -386,7 +430,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         }
         var decision = decide()
         if decision == .hold {
-            log("Paused — holding \(speaker.name)'s reply before it reaches \(listener.name).")
+            log("Paused — holding \(speaker.name)'s captured reply before it reaches \(listener.name).")
             // The reply is in hand, so whoever wrote it has stopped. A
             // sign-off already put them in a state worth keeping.
             if !signedOff { setConversation(speaker, .replied) }
@@ -404,6 +448,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
             appendTranscript("_Run stopped by user._\n\n")
             break
         }
+        operationActive = true
 
         if let unfit {
             log("The human's steering note is too long to travel whole with this handoff; not sending it.")
@@ -436,12 +481,19 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp) -> Bool {
         } else {
             steeringEcho = nil
         }
+        if outcome.continuesRun {
+            if !signedOff { setConversation(speaker, .waiting) }
+            setConversation(listener, .chatting)
+        }
+        endOperation(continuingRun: outcome.continuesRun)
         guard outcome.continuesRun else { break }
         baseline = absorbEchoIntoBaseline(in: listener, preSend: baseline)
-        if !signedOff { setConversation(speaker, .waiting) }
-        setConversation(listener, .chatting)
         swap(&speaker, &listener)
     }
+
+    // Close terminal capture paths before any editor grant can be delivered.
+    if operationActive { endOperation(continuingRun: false) }
+    relayControl.finishRun()
 
     // What the run left undelivered: a note still queued never rode a
     // handoff, and an echo still pending never reached the side whose reply

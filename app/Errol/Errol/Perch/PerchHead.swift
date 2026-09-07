@@ -151,6 +151,7 @@ struct PerchHead: View {
     private var turnText: String {
         if controller.isRunning {
             let turn = "Turn \(controller.currentTurn)"
+            if controller.isSteeringPending { return "\(turn) · Finishing the handoff" }
             if controller.isHolding { return "\(turn) · Paused at the handoff" }
             if controller.holdRequested {
                 if let side = chattingName { return "\(turn) · Will pause after \(side) finishes" }

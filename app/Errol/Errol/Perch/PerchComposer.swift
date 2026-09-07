@@ -30,12 +30,19 @@ struct PerchComposer: View {
     @Namespace private var primarySpace
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.cardGap) {
-            PerchConfigZone(controller: controller)
-            PerchComposerEditor(controller: controller, primarySpace: primarySpace)
-            PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
+        // The primary circle is Liquid Glass (PerchPrimaryFace), and glass
+        // morphs between two placements only inside one container — so the
+        // card is that container, with the editor's slot and the foot's
+        // corner both in it.
+        GlassEffectContainer {
+            VStack(alignment: .leading, spacing: Perch.cardGap) {
+                PerchConfigZone(controller: controller)
+                PerchComposerEditor(controller: controller, primarySpace: primarySpace)
+                PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
+            }
         }
         .padding(Perch.boxInset)
+        .animation(Perch.spring, value: controller.isSteering)
         .background(RoundedRectangle(cornerRadius: Perch.boxCorner).fill(Perch.well))
     }
 }
@@ -350,7 +357,8 @@ private struct PerchComposerEditor: View {
                               - GrowingTextEditor.height(lines: 2, font: Self.steeringFont),
                           takesFocusOnAppear: true,
                           onSubmit: { withAnimation(Perch.spring) { controller.sendSteering() } },
-                          onEscape: { _ in withAnimation(Perch.spring) { controller.escapeSteering() } })
+                          onEscape: { _ in withAnimation(Perch.spring) { controller.escapeSteering() } },
+                          session: controller.steeringEditor)
             .help(controller.steeringHasText
                   ? "Return sends the note with the next handoff and lets the run go on; Esc clears it."
                   : "The run holds at the next handoff while the field is open. Write a note and press Return, or Esc to continue without one.")
@@ -384,14 +392,18 @@ private struct PerchComposerEditor: View {
     private var pauseToSteer: some View {
         Button(action: begin) {
             PerchPrimaryFace(icon: "pause.fill",
-                             word: controller.steeringQueued ? "Pause to edit" : "Pause to steer",
+                             word: controller.isSteeringPending ? "Pausing…"
+                                : controller.steeringQueued ? "Pause to edit" : "Pause to steer",
                              space: primarySpace)
         }
         .buttonStyle(.plain)
+        .disabled(controller.isSteeringPending)
+        .opacity(controller.isSteeringPending ? 0.55 : 1)
         .help(controller.steeringQueued
               ? "Hold the run at the next handoff and bring the queued note back into the field"
               : "Hold the run at the next handoff and open the field for a note")
-        .accessibilityLabel(controller.steeringQueued ? "Pause to edit the note" : "Pause to steer")
+        .accessibilityLabel(controller.isSteeringPending ? "Pausing"
+                            : controller.steeringQueued ? "Pause to edit the note" : "Pause to steer")
     }
 
     /// The press springs the circle to the corner, so the state change is
@@ -417,7 +429,8 @@ private struct PerchComposerEditor: View {
 /// that leaves in place (Continue's, as words arrive in the field) scales
 /// out of the glyph's side the way the option chips' labels do. Clipped to
 /// itself so the word does not spill while the capsule closes to a circle.
-/// The theme's accent stays with the primary action.
+/// The theme's accent stays with the primary action, as the tint of its
+/// Liquid Glass: the capsule is glass over the card, not a filled shape.
 private struct PerchPrimaryFace: View {
     let icon: String
     var word: String? = nil
@@ -441,11 +454,17 @@ private struct PerchPrimaryFace: View {
             }
         }
         .foregroundColor(Perch.onAccent)
-        .background(Capsule().fill(Perch.accent))
-        .perchHover(Capsule(), opacity: 0.1)
+        // Liquid Glass in the theme's accent, interactive so the system
+        // answers the pointer and the press itself; the panel's own hover
+        // wash is left off, or the two would stack.
+        .glassEffect(.regular.tint(Perch.accent).interactive(), in: Capsule())
         .clipShape(Capsule())
         .opacity(dimmed ? 0.4 : 1)
         .contentShape(Capsule())
+        // The glass morphs between the field and the corner under the same
+        // id the geometry matches on, so the material travels with the
+        // capsule instead of fading out and in.
+        .glassEffectID(Self.id, in: space)
         .matchedGeometryEffect(id: Self.id, in: space)
     }
 }
