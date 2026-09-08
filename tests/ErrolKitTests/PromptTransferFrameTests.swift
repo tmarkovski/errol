@@ -68,7 +68,67 @@ final class PromptTransferFrameTests: XCTestCase {
         }
     }
 
-    func testOffWindowTextWithoutScrollEvidenceCannotProduceALandingPoint() {
+    func testCapturedChatGPTScrollingPromptStopsAtItsImmediateGroup() throws {
+        // User capture, 2026-09-07: no AXScrollArea; the text document extends
+        // above and below the composer, whose action buttons are direct children.
+        let capturedWindow = CGRect(x: 0, y: 34, width: 855, height: 1017)
+        let capturedShell = CGRect(x: 60, y: 727, width: 736, height: 308)
+        let input = Node(role: "AXTextArea", label: "Do anything",
+                         bounds: CGRect(x: 72, y: 289, width: 712, height: 762))
+        let composer = Node(bounds: capturedShell, children: [
+            input,
+            Node(role: "AXButton", label: "Add files and more",
+                 bounds: CGRect(x: 68, y: 999, width: 28, height: 28)),
+            Node(role: "AXPopUpButton", label: "Change permissions",
+                 bounds: CGRect(x: 101, y: 999, width: 127, height: 28)),
+            Node(role: "AXPopUpButton", label: "GPT-5.6 Sol Medium",
+                 bounds: CGRect(x: 560, y: 999, width: 164, height: 28)),
+            Node(role: "AXButton", label: "Dictate",
+                 bounds: CGRect(x: 724, y: 999, width: 28, height: 28)),
+            Node(role: "AXButton", label: "Send",
+                 bounds: CGRect(x: 760, y: 999, width: 28, height: 28))
+        ])
+        let parent2 = Node(bounds: capturedShell, children: [composer])
+        let parent3 = Node(bounds: capturedShell, children: [parent2])
+        let parent4 = Node(bounds: CGRect(x: 44, y: 727, width: 768, height: 308), children: [parent3])
+        let parent5 = Node(bounds: CGRect(x: 1, y: 727, width: 854, height: 324), children: [parent4])
+        let pane = Node(bounds: CGRect(x: 1, y: 81, width: 854, height: 970), children: [parent5])
+        try withExtendedLifetime(pane) {
+            // First frame is captured. Also cover a longer document scrolled
+            // off-window, and the original document scrolled back to its top.
+            for (top, height) in [(289.0, 762.0), (-200.0, 1500.0), (739.0, 762.0)] {
+                input.bounds = CGRect(x: 72, y: top, width: 712, height: height)
+                let geometry = try XCTUnwrap(promptTransferGeometry(
+                    around: input, window: capturedWindow, selectors: Config().chatgptSelectors,
+                    parent: { $0.parent }, frame: { $0.bounds }))
+                XCTAssertEqual(geometry.shell, capturedShell)
+                // The landing area ends above the toolbar, not at the bottom
+                // of the long text document or the surrounding conversation.
+                let visibleTop = max(top, capturedShell.minY)
+                XCTAssertEqual(geometry.editor,
+                               CGRect(x: 72, y: visibleTop, width: 712, height: 999 - visibleTop))
+            }
+        }
+    }
+
+    func testUnframedOrHiddenControlsCannotJustifyClippingAnOverflowingGroup() {
+        let narrowShell = CGRect(x: 138, y: 680, width: 674, height: 100)
+        for buttonFrame in [nil, CGRect(x: 160, y: 750, width: 0, height: 28),
+                            CGRect(x: 160, y: 790, width: 28, height: 28)] as [CGRect?] {
+            let input = Node(role: "AXTextArea", bounds: CGRect(x: 150, y: -200, width: 650, height: 940))
+            let composer = Node(bounds: narrowShell, children: [
+                input, Node(role: "AXPopUpButton", label: "main"),
+                Node(role: "AXButton", label: "Add files and more", bounds: buttonFrame),
+                Node(role: "AXButton", label: "Send", bounds: buttonFrame)
+            ])
+            withExtendedLifetime(composer) {
+                XCTAssertNil(promptTransferGeometry(around: input, window: window,
+                    selectors: Config().chatgptSelectors, parent: { $0.parent }, frame: { $0.bounds }))
+            }
+        }
+    }
+
+    func testOffWindowTextWithoutViewportEvidenceCannotProduceALandingPoint() {
         let input = Node(role: "AXTextArea", bounds: CGRect(x: 150, y: -200, width: 650, height: 940))
         let composer = Node(bounds: shell, children: [input, Node(role: "AXButton", label: "Send")])
         withExtendedLifetime(composer) {

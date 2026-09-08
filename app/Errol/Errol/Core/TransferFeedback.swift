@@ -39,7 +39,7 @@ struct TransferAnchor: Equatable {
     }
 }
 
-/// The visible text viewport and the surrounding composer border.
+/// A bounded editor landing area and the surrounding composer border.
 struct PromptTransferGeometry {
     let editor: CGRect
     let shell: CGRect?
@@ -69,15 +69,20 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
             if role == "AXScrollArea" { break }
             continue
         }
+        if role == "AXGroup", !bounds.contains(editor),
+           let clipped = toolbarClippedPromptEditor(editor, in: ancestor, bounds: bounds,
+                                                   selectors: selectors, frame: frame) {
+            return PromptTransferGeometry(editor: clipped, shell: bounds)
+        }
         if role == "AXScrollArea" {
             // A multiline AX text area can describe its full document, extending
-            // beyond both the composer and the window when scrolled. Only a
-            // known scroll viewport may clip that geometry into a landing area.
+            // beyond both the composer and the window when scrolled. The scroll
+            // area's explicit viewport supplies clipping evidence here.
             editor = editor.intersection(bounds)
             guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
         }
-        // Intermediate groups can also clip the document. Continue until a
-        // scroll viewport supplies evidence for the visible editor bounds.
+        // An unrecognized group is not sufficient clipping evidence. Continue
+        // looking for a scroll viewport or a group with its own visible toolbar.
         guard bounds.contains(editor) else { continue }
         guard editor.minX - bounds.minX <= 80,
               bounds.maxX - editor.maxX <= 120,
@@ -95,10 +100,40 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
     return PromptTransferGeometry(editor: editor, shell: nil)
 }
 
-private func hasPromptControl<Node: ElementNode>(under node: Node, selectors: AppSelectors,
-                                                 depth: Int, budget: inout Int) -> Bool {
-    guard depth <= 6, budget > 0 else { return false }
-    budget -= 1
+/// ChatGPT's scrolling prompt can expose only an AXGroup around the full text
+/// document (captured 2026-09-07). Its direct action buttons identify the shell
+/// and keep the landing area above the toolbar. Do not borrow nested conversation
+/// controls, unframed buttons, or arbitrary popups as evidence for clipping.
+private func toolbarClippedPromptEditor<Node: ElementNode>(
+    _ editor: CGRect, in node: Node, bounds: CGRect, selectors: AppSelectors,
+    frame: (Node) -> CGRect?
+) -> CGRect? {
+    // The captured composer has 12-point side insets. Allow modest padding,
+    // but not the wider conversation wrappers surrounding the composer.
+    guard editor.height > bounds.height,
+          editor.minX >= bounds.minX, editor.maxX <= bounds.maxX,
+          editor.minX - bounds.minX <= 24, bounds.maxX - editor.maxX <= 24 else { return nil }
+    let controls = node.children.compactMap { child -> CGRect? in
+        guard child.role == "AXButton", isPromptControl(child, selectors: selectors),
+              let rect = frame(child),
+              TransferAnchor(frame: rect, window: bounds, pid: 0) != nil,
+              rect.height <= 48, bounds.maxY - rect.maxY <= 24 else { return nil }
+        return rect
+    }
+    for control in controls {
+        let row = controls.filter {
+            abs($0.minY - control.minY) <= 4 && abs($0.maxY - control.maxY) <= 4
+        }
+        guard row.count >= 2, let top = row.map(\.minY).min() else { continue }
+        let viewport = CGRect(x: bounds.minX, y: bounds.minY,
+                              width: bounds.width, height: top - bounds.minY)
+        let visible = editor.intersection(viewport)
+        if TransferAnchor(frame: visible, window: bounds, pid: 0) != nil { return visible }
+    }
+    return nil
+}
+
+private func isPromptControl<Node: ElementNode>(_ node: Node, selectors: AppSelectors) -> Bool {
     let role = node.role
     // Model/tool popups remain mounted when Send disappears in an empty
     // ChatGPT prompt. Claude Code keeps its disabled Send control mounted.
@@ -111,6 +146,15 @@ private func hasPromptControl<Node: ElementNode>(under node: Node, selectors: Ap
                 .contains(where: { label.contains($0) })
             || label == "add" { return true }
     }
+    return false
+}
+
+private func hasPromptControl<Node: ElementNode>(under node: Node, selectors: AppSelectors,
+                                                 depth: Int, budget: inout Int) -> Bool {
+    guard depth <= 6, budget > 0 else { return false }
+    budget -= 1
+    if isPromptControl(node, selectors: selectors) { return true }
+    let role = node.role
     // The text area's contents cannot provide evidence for a toolbar.
     if role == "AXTextArea" || role == "AXTextField" { return false }
     for child in node.children {
