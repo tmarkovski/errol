@@ -4,6 +4,10 @@ import { useCallback, useState } from 'react';
 import { SiteHeader } from '@/components/landing/site-header';
 import { HeroSection } from '@/components/landing/hero-section';
 import { HowItWorks } from '@/components/landing/how-it-works';
+import { ConversationShapes } from '@/components/landing/conversation-shapes';
+import { WhyTheApps } from '@/components/landing/why-the-apps';
+import { InControl } from '@/components/landing/in-control';
+import { Faq } from '@/components/landing/faq';
 import { DownloadSection } from '@/components/landing/download-section';
 import { SiteFooter } from '@/components/landing/site-footer';
 import { useLandingMotion } from '@/hooks/use-landing-motion';
@@ -25,6 +29,10 @@ export default function Home() {
       <main id="main">
         <HeroSection onPlayingChange={onPlayingChange} />
         <HowItWorks />
+        <ConversationShapes />
+        <WhyTheApps />
+        <InControl />
+        <Faq />
         <DownloadSection />
       </main>
       <SiteFooter />

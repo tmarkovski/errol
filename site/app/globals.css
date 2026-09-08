@@ -191,3 +191,49 @@ h2 {
     transition: none !important;
   }
 }
+
+/* Section rhythm and copy alignment shared by the sections after the demo. */
+.eyebrow {
+  text-transform: uppercase;
+}
+.band {
+  position: relative;
+  margin-top: 104px;
+  padding-top: 80px;
+  border-top: 1px solid #ffffff14;
+}
+.band-heading {
+  max-width: 640px;
+}
+.band-heading .eyebrow {
+  justify-content: flex-start;
+  color: #a59a83;
+  letter-spacing: 1.2px;
+  margin-bottom: 20px;
+}
+.band-heading > p:not(.eyebrow) {
+  margin: 18px 0 0;
+  max-width: 520px;
+  color: #9b9e90;
+  font-size: 16px;
+  line-height: 1.8;
+}
+@media (max-width: 760px) {
+  .band {
+    margin-top: 68px;
+    padding-top: 52px;
+  }
+}
+/* Scroll-in for the new sections; the older ones keep their own selectors above. */
+@supports (animation-timeline: view()) {
+  .rise {
+    animation: scroll-appear linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 80%;
+  }
+}
+.landing[data-motion-paused='true'] .rise {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+}

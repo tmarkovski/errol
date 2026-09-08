@@ -11,13 +11,19 @@ to the background motion. Each section has its own component and stylesheet in
 - `site-header.tsx` — navigation and the compact download link.
 - `hero-section.tsx` — headline, introduction, atmosphere, and the demo.
 - `demo-comparison.tsx` — the saved comparison of the short film and full walkthrough (currently hidden).
-- `how-it-works.tsx` — the three steps and practical notes.
+- `how-it-works.tsx` — the three steps.
+- `conversation-shapes.tsx` — the Free chat, Brainstorm, and Debate cards with an example prompt each.
+- `why-the-apps.tsx` — why Errol drives the desktop apps instead of the API, plus the Accessibility note.
+- `in-control.tsx` — pause to steer, end whenever, keep the transcript.
+- `faq.tsx` — the four questions people ask before downloading.
 - `download-section.tsx` — the closing download section.
 - `site-footer.tsx` — the footer and repository link.
 - `brand.tsx`, `download-link.tsx`, and `shared.css` — reused brand and button treatments.
 
 Keep section copy and styling together when iterating. `app/globals.css` holds
-the shared palette, typography, layout helpers, and motion preferences.
+the shared palette, typography, layout helpers, the `.band` section rhythm and
+`.band-heading` copy block the sections after the demo share, the `.rise`
+scroll-in animation, and motion preferences.
 `lib/site-config.ts` is the single place for metadata, release links, and the
 minimum macOS version. `hooks/use-landing-motion.ts` owns the decorative pointer
 and scroll effects. The demo's scene, player, script, and styling remain isolated

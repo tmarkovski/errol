@@ -1,4 +1,3 @@
-import { Check, Sparkles } from 'lucide-react';
 import './how-it-works.css';
 export function HowItWorks() {
   return (
@@ -8,65 +7,47 @@ export function HowItWorks() {
       aria-labelledby="how-title"
     >
       <div className="section-heading">
-        <p className="eyebrow">YOUR IDEAS, WITH A LITTLE BACK-AND-FORTH</p>
+        <p className="eyebrow">How it works</p>
         <h2 id="how-title">
-          You set the direction.
+          You set the topic.
           <br />
-          <span>Errol takes it from there.</span>
+          <span>Errol does the relaying.</span>
         </h2>
         <p>
-          Brainstorm an idea. Challenge an assumption. Get a second pair of eyes
-          on your code. All without being the copy-and-paste person in the
-          middle.
+          It works the way a person would: copy the reply from one window, paste
+          it into the other, press Send. Errol does that on every turn and never
+          gets bored.
         </p>
       </div>
-      <div className="steps">
-        <article className="step">
+      <ol className="steps">
+        <li className="step">
           <span className="step-number">
             01 <span />
           </span>
-          <h3>Bring your two minds.</h3>
+          <h3>Open both apps.</h3>
           <p>
-            Open ChatGPT or Codex alongside Claude on your Mac. Their tools,
-            memory, and context come along.
+            ChatGPT or Codex next to Claude, each with a conversation window
+            open.
           </p>
-        </article>
-        <article className="step">
+        </li>
+        <li className="step">
           <span className="step-number">
             02 <span />
           </span>
-          <h3>Give them something good.</h3>
-          <p>
-            Choose a conversation style and write a brief. A question is all it
-            takes.
-          </p>
-        </article>
-        <article className="step">
+          <h3>Write the brief.</h3>
+          <p>Pick a shape, type a sentence, press Run. A question is enough.</p>
+        </li>
+        <li className="step">
           <span className="step-number">
             03 <span />
           </span>
-          <h3>Let the conversation fly.</h3>
+          <h3>Let them talk.</h3>
           <p>
-            Errol relays each reply. Pause to steer the discussion, or end it
-            and keep the transcript.
+            Errol copies each reply into the other app and presses Send, until
+            both sides sign off.
           </p>
-        </article>
-      </div>
-      <div className="practical-note">
-        <span>
-          <Sparkles size={15} /> Lives in your menu bar
-        </span>
-        <span>
-          <Check size={15} /> Uses your existing AI apps
-        </span>
-        <span>
-          <Check size={15} /> Saves a readable transcript
-        </span>
-      </div>
-      <p className="permission-note">
-        Errol uses macOS Accessibility to copy and send messages. Give it the
-        desktop while a conversation is running.
-      </p>
+        </li>
+      </ol>
     </section>
   );
 }

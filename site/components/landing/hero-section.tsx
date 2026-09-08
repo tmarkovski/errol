@@ -12,34 +12,31 @@ export function HeroSection({
     <section className="hero" aria-labelledby="hero-title">
       <div className="atmosphere" aria-hidden="true">
         <div className="ambient-glow" />
-        <div className="orbit orbit-one" />
-        <div className="orbit orbit-two" />
-        <div className="orbit orbit-three" />
-        <div className="star star-one" />
-        <div className="star star-two" />
-        <div className="star star-three" />
+        <div className="orbit" />
       </div>
       <div className="hero-copy shell">
-        <p className="eyebrow">
-          <span className="status-dot" /> A LITTLE MAC APP FOR BIG CONVERSATIONS
+        <p className="hero-pill">
+          <span className="status-dot" /> Open source
+          <span className="pill-sep">·</span> Lives in your menu bar
         </p>
         <h1 id="hero-title">
-          Good ideas
-          <br />
-          need <em>company.</em>
+          Let ChatGPT and Claude <br />
+          talk it out.
         </h1>
         <p className="hero-description">
-          Let ChatGPT and Claude think together. Errol carries the conversation
-          between the desktop apps you already use.
+          Errol carries messages between the ChatGPT and Claude apps already on
+          your Mac. Give it a topic, watch them work through it, and step in
+          whenever you like.
         </p>
         <div className="hero-actions">
           <DownloadLink />
           <a href="#conversation" className="text-link">
-            See it in motion <ArrowDown size={16} />
+            Watch a conversation <ArrowDown size={16} />
           </a>
         </div>
         <p className="download-note">
-          macOS {siteConfig.minimumMacOS}+ <span>·</span> No API keys needed
+          macOS {siteConfig.minimumMacOS} or later <span>·</span> Free and open
+          source <span>·</span> No API keys, no account
         </p>
       </div>
       <div id="conversation" className="conversation shell">

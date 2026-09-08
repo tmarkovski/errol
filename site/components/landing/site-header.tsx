@@ -11,6 +11,9 @@ export function SiteHeader() {
         <a className="nav-link" href="#how-it-works">
           How it works
         </a>
+        <a className="nav-link" href="#faq">
+          FAQ
+        </a>
         <a
           className="nav-link github-link"
           href={siteConfig.repositoryUrl}

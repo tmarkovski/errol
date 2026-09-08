@@ -1,0 +1,23 @@
+.why-section .card-grid {
+  margin-top: 40px;
+}
+.why-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 620px;
+  margin: 28px 0 0;
+  color: #8c8f84;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.why-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #b6a27b;
+}
+@media (max-width: 760px) {
+  .why-section .card-grid {
+    margin-top: 30px;
+  }
+}
