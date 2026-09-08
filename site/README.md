@@ -23,7 +23,8 @@ to the background motion. Each section has its own component and stylesheet in
 
 Every section carries the `slide` class from `app/globals.css`: one viewport
 high with its content centered, and the page snaps to slide starts (mandatory on
-desktop, proximity on phones so sections taller than the screen stay reachable).
+every viewport, phones included; a slide taller than the screen stays reachable
+because every scroll position it covers counts as a snap position).
 The header is fixed, so each slide's top padding is `--header-h`. The closing
 section and the footer share one slide.
 

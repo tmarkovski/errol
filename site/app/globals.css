@@ -230,7 +230,9 @@ h2 {
   transform: none;
 }
 
-/* Every section is one viewport-high slide, and the page snaps to slide starts. */
+/* Every section is one viewport-high slide, and the page snaps to slide starts on every
+   viewport. Snapping stays mandatory on phones too: a slide taller than the screen is still
+   fully reachable, because any scroll position it covers counts as a snap position. */
 .slide {
   box-sizing: border-box;
   min-height: 100vh;
@@ -256,8 +258,5 @@ h2 {
 @media (max-width: 760px) {
   :root {
     --header-h: 72px;
-  }
-  html {
-    scroll-snap-type: y proximity;
   }
 }
