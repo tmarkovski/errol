@@ -23,7 +23,7 @@ export function Faq() {
   return (
     <section
       id="faq"
-      className="faq-section band shell"
+      className="faq-section band slide shell"
       aria-labelledby="faq-title"
     >
       <div className="band-heading rise">

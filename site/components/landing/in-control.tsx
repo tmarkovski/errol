@@ -22,7 +22,7 @@ const controls = [
 export function InControl() {
   return (
     <section
-      className="control-section band shell"
+      className="control-section band slide shell"
       aria-labelledby="control-title"
     >
       <h2 id="control-title" className="rise">

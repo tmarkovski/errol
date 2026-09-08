@@ -9,7 +9,8 @@ to the background motion. Each section has its own component and stylesheet in
 `components/landing/`:
 
 - `site-header.tsx` — navigation and the compact download link.
-- `hero-section.tsx` — headline, introduction, atmosphere, and the demo.
+- `hero-section.tsx` — headline, introduction, and atmosphere.
+- `demo-section.tsx` — the walkthrough demo, sized to fit one viewport.
 - `demo-comparison.tsx` — the saved comparison of the short film and full walkthrough (currently hidden).
 - `how-it-works.tsx` — the three steps.
 - `conversation-shapes.tsx` — the Free chat, Brainstorm, and Debate cards with an example prompt each.
@@ -19,6 +20,12 @@ to the background motion. Each section has its own component and stylesheet in
 - `download-section.tsx` — the closing download section.
 - `site-footer.tsx` — the footer and repository link.
 - `brand.tsx`, `download-link.tsx`, and `shared.css` — reused brand and button treatments.
+
+Every section carries the `slide` class from `app/globals.css`: one viewport
+high with its content centered, and the page snaps to slide starts (mandatory on
+desktop, proximity on phones so sections taller than the screen stay reachable).
+The header is fixed, so each slide's top padding is `--header-h`. The closing
+section and the footer share one slide.
 
 Keep section copy and styling together when iterating. `app/globals.css` holds
 the shared palette, typography, layout helpers, the `.band` section rhythm and
@@ -51,7 +58,7 @@ Both respect reduced-motion preferences and include playback controls.
 The landing page currently shows only the original 34-second walkthrough.
 The 10.5-second film and comparison layout are retained for further work but
 are not mounted on the page. To bring the comparison back, replace `HeroDemo`
-with `DemoComparison` in `components/landing/hero-section.tsx`. The saved layout
+with `DemoComparison` in `components/landing/demo-section.tsx`. The saved layout
 places the films side by side on wide screens and stacks them on smaller screens.
 The short film shows a prompt entering ChatGPT, a reply moving to Claude, and
 two dots carrying Claude's reply and a steering note into ChatGPT together.

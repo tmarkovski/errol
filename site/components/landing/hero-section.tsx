@@ -1,15 +1,10 @@
 import { ArrowDown } from 'lucide-react';
-import { HeroDemo } from '@/components/hero-demo';
 import { siteConfig } from '@/lib/site-config';
 import { DownloadLink } from './download-link';
 import './hero-section.css';
-export function HeroSection({
-  onPlayingChange,
-}: {
-  onPlayingChange: (playing: boolean) => void;
-}) {
+export function HeroSection() {
   return (
-    <section className="hero" aria-labelledby="hero-title">
+    <section className="hero slide" aria-labelledby="hero-title">
       <div className="atmosphere" aria-hidden="true">
         <div className="ambient-glow" />
         <div className="orbit" />
@@ -38,9 +33,6 @@ export function HeroSection({
           macOS {siteConfig.minimumMacOS} or later <span>·</span> Free and open
           source <span>·</span> No API keys, no account
         </p>
-      </div>
-      <div id="conversation" className="conversation shell">
-        <HeroDemo onPlayingChange={onPlayingChange} />
       </div>
     </section>
   );

@@ -19,13 +19,14 @@
   --muted-foreground: #a5a59b;
   --border: #ffffff18;
   --gold: #edba72;
+  --header-h: 88px;
 }
 * {
   box-sizing: border-box;
 }
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 36px;
+  scroll-snap-type: y mandatory;
 }
 body {
   margin: 0;
@@ -198,9 +199,6 @@ h2 {
 }
 .band {
   position: relative;
-  margin-top: 104px;
-  padding-top: 80px;
-  border-top: 1px solid #ffffff14;
 }
 .band-heading {
   max-width: 640px;
@@ -218,12 +216,6 @@ h2 {
   font-size: 16px;
   line-height: 1.8;
 }
-@media (max-width: 760px) {
-  .band {
-    margin-top: 68px;
-    padding-top: 52px;
-  }
-}
 /* Scroll-in for the new sections; the older ones keep their own selectors above. */
 @supports (animation-timeline: view()) {
   .rise {
@@ -236,4 +228,36 @@ h2 {
   animation: none !important;
   opacity: 1;
   transform: none;
+}
+
+/* Every section is one viewport-high slide, and the page snaps to slide starts. */
+.slide {
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: var(--header-h);
+  padding-bottom: 32px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.closing-slide {
+  padding-bottom: 0;
+}
+.closing-slide > .closing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+@media (max-width: 760px) {
+  :root {
+    --header-h: 72px;
+  }
+  html {
+    scroll-snap-type: y proximity;
+  }
 }

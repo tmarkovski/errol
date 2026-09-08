@@ -1,6 +1,5 @@
 .hero {
   position: relative;
-  padding-top: 34px;
 }
 .hero-copy {
   text-align: center;
@@ -51,7 +50,7 @@ h1 {
 }
 .atmosphere {
   position: absolute;
-  inset: -104px 0 -70px;
+  inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -62,15 +61,15 @@ h1 {
   opacity: 0.12;
   background-image: radial-gradient(#c6b390 0.6px, transparent 0.6px);
   background-size: 6px 6px;
-  mask-image: radial-gradient(ellipse at 50% 70%, #000, transparent 70%);
+  mask-image: radial-gradient(ellipse at 50% 60%, #000, transparent 70%);
 }
 .ambient-glow {
   position: absolute;
   width: 1150px;
   height: 950px;
-  top: 225px;
+  top: 50%;
   left: 50%;
-  margin-left: -575px;
+  margin: -455px 0 0 -575px;
   background: radial-gradient(
     ellipse at 50% 58%,
     #a27c3023 0%,
@@ -82,30 +81,13 @@ h1 {
   position: absolute;
   width: 1560px;
   height: 590px;
+  top: 50%;
   left: 50%;
-  top: 372px;
-  margin-left: -780px;
+  margin: -215px 0 0 -780px;
   border-radius: 50%;
   border: 1px solid #d9b16b12;
 }
-.conversation {
-  position: relative;
-  z-index: 2;
-  margin-top: 46px;
-  scroll-margin-top: 32px;
-}
-@media (min-width: 1600px) {
-  .hero {
-    padding-top: 56px;
-  }
-  .conversation {
-    margin-top: 64px;
-  }
-}
 @media (max-width: 760px) {
-  .hero {
-    padding-top: 30px;
-  }
   h1 {
     font-size: clamp(44px, 9.6vw, 72px);
     margin: 22px 0;
@@ -117,14 +99,8 @@ h1 {
   .hero-actions {
     gap: 20px;
   }
-  .conversation {
-    margin-top: 44px;
-  }
 }
 @media (max-width: 560px) {
-  .hero {
-    padding-top: 22px;
-  }
   .hero-pill {
     letter-spacing: 0.8px;
     padding-inline: 11px 12px;
@@ -147,9 +123,6 @@ h1 {
   }
   .hero-actions .download-button {
     min-width: 219px;
-  }
-  .conversation {
-    margin-top: 36px;
   }
 }
 .ambient-glow {

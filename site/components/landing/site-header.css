@@ -11,12 +11,33 @@
   top: 14px;
 }
 .site-header {
-  height: 104px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  height: var(--header-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
-  z-index: 5;
+}
+/* Full-bleed fade so the bar stays legible over whatever slide is under it. */
+.site-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: -28px;
+  left: 50%;
+  width: 100vw;
+  translate: -50% 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    #111210 0%,
+    #111210e6 55%,
+    #11121000 100%
+  );
 }
 nav {
   display: flex;
@@ -35,9 +56,6 @@ nav {
   color: var(--gold);
 }
 @media (max-width: 760px) {
-  .site-header {
-    height: 82px;
-  }
   nav {
     gap: 21px;
   }

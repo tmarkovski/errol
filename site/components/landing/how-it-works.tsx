@@ -3,7 +3,7 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="how-section shell"
+      className="how-section slide shell"
       aria-labelledby="how-title"
     >
       <div className="section-heading">

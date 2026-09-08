@@ -1,7 +1,4 @@
 .how-section {
-  margin-top: 112px;
-  padding-top: 71px;
-  border-top: 1px solid #ffffff14;
   position: relative;
 }
 .section-heading {
@@ -71,10 +68,6 @@
   }
 }
 @media (max-width: 760px) {
-  .how-section {
-    margin-top: 72px;
-    padding-top: 48px;
-  }
   .section-heading {
     display: block;
   }

@@ -23,7 +23,7 @@ export function WhyTheApps() {
   return (
     <section
       id="why-the-apps"
-      className="why-section band shell"
+      className="why-section band slide shell"
       aria-labelledby="why-title"
     >
       <div className="band-heading rise">

@@ -27,7 +27,7 @@ export function ConversationShapes() {
   return (
     <section
       id="shapes"
-      className="shapes-section band shell"
+      className="shapes-section band slide shell"
       aria-labelledby="shapes-title"
     >
       <div className="band-heading rise">

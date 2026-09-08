@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { SiteHeader } from '@/components/landing/site-header';
 import { HeroSection } from '@/components/landing/hero-section';
+import { DemoSection } from '@/components/landing/demo-section';
 import { HowItWorks } from '@/components/landing/how-it-works';
 import { ConversationShapes } from '@/components/landing/conversation-shapes';
 import { WhyTheApps } from '@/components/landing/why-the-apps';
@@ -27,15 +28,18 @@ export default function Home() {
       </a>
       <SiteHeader />
       <main id="main">
-        <HeroSection onPlayingChange={onPlayingChange} />
+        <HeroSection />
+        <DemoSection onPlayingChange={onPlayingChange} />
         <HowItWorks />
         <ConversationShapes />
         <WhyTheApps />
         <InControl />
         <Faq />
-        <DownloadSection />
       </main>
-      <SiteFooter />
+      <div className="slide closing-slide">
+        <DownloadSection />
+        <SiteFooter />
+      </div>
     </div>
   );
 }

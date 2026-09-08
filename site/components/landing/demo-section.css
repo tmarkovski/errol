@@ -1,0 +1,14 @@
+.demo-section {
+  align-items: center;
+}
+/* The film is 16:10; leave room under it for the playback controls and caption. */
+.demo-frame {
+  width: min(100%, calc((100svh - var(--header-h) - 230px) * 1.6));
+  min-width: min(100%, 640px);
+}
+@media (max-width: 760px) {
+  .demo-frame {
+    width: 100%;
+    min-width: 0;
+  }
+}

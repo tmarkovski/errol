@@ -1,7 +1,7 @@
 .closing {
   text-align: center;
   position: relative;
-  padding: 116px 0 90px;
+  padding: 0;
   isolation: isolate;
 }
 .closing-glow {
@@ -10,8 +10,8 @@
   left: 50%;
   width: min(850px, 120vw);
   height: 600px;
-  top: -5px;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   background: radial-gradient(ellipse at center, #a98d3b15, transparent 68%);
 }
 .closing-owl {
@@ -41,10 +41,6 @@
   margin-top: 17px;
 }
 @media (max-width: 760px) {
-  .closing {
-    padding-top: 82px;
-    padding-bottom: 66px;
-  }
   .closing h2 {
     font-size: 80px;
   }
