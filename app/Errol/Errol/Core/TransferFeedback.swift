@@ -6,19 +6,26 @@ import Foundation
 /// use AX's top-left origin; the overlay converts them on the main thread.
 struct TransferAnchor: Equatable {
     let frame: CGRect
+    /// The receiving composer shell, separate from the text field where
+    /// the dot lands. Sources and unrecognized prompt layouts have no shell.
+    let promptFrame: CGRect?
     let window: CGRect
     let pid: pid_t
     /// Native Errol panels can resize as their editor closes. Their window
     /// identity remains valid after launch even when that layout changes.
     let windowID: CGWindowID?
 
-    init?(frame: CGRect, window: CGRect, pid: pid_t, windowID: CGWindowID? = nil) {
+    init?(frame: CGRect, window: CGRect, pid: pid_t, windowID: CGWindowID? = nil,
+          promptFrame: CGRect? = nil) {
         func usable(_ rect: CGRect) -> Bool {
             [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite)
                 && rect.width > 0 && rect.height > 0
         }
         guard usable(frame), usable(window), window.contains(frame) else { return nil }
         self.frame = frame
+        self.promptFrame = promptFrame.flatMap {
+            usable($0) && window.contains($0) && $0.contains(frame) ? $0 : nil
+        }
         self.window = window
         self.pid = pid
         self.windowID = windowID
@@ -32,15 +39,103 @@ struct TransferAnchor: Equatable {
     }
 }
 
+/// The visible text viewport and the surrounding composer border.
+struct PromptTransferGeometry {
+    let editor: CGRect
+    let shell: CGRect?
+}
+
+/// Find the nearest shell enclosing the editor AND its controls. A fixed
+/// parent count does not work across Chat, Work, and Claude Code: some put
+/// scrolling/attachment wrappers between the text area and the prompt shell.
+/// Geometry limits keep this walk out of the conversation pane. Missing
+/// evidence suppresses the outline; it never changes the paste target.
+func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRect,
+                                              selectors: AppSelectors,
+                                              parent: (Node) -> Node?,
+                                              frame: (Node) -> CGRect?) -> PromptTransferGeometry? {
+    guard var editor = frame(input),
+          TransferAnchor(frame: editor, window: editor, pid: 0) != nil else { return nil }
+    var node = input
+    for _ in 0..<8 {
+        guard let ancestor = parent(node),
+              let role = ancestor.role,
+              ["AXGroup", "AXScrollArea", "AXLayoutArea"].contains(role) else { break }
+        node = ancestor
+        guard let bounds = frame(ancestor) else { continue }
+        guard TransferAnchor(frame: bounds, window: window, pid: 0) != nil else {
+            // Full-document wrappers can extend off-window too. They are
+            // never shells, but their parent may be the visible viewport.
+            if role == "AXScrollArea" { break }
+            continue
+        }
+        if role == "AXScrollArea" {
+            // A multiline AX text area can describe its full document, extending
+            // beyond both the composer and the window when scrolled. Only a
+            // known scroll viewport may clip that geometry into a landing area.
+            editor = editor.intersection(bounds)
+            guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
+        }
+        // Intermediate groups can also clip the document. Continue until a
+        // scroll viewport supplies evidence for the visible editor bounds.
+        guard bounds.contains(editor) else { continue }
+        guard editor.minX - bounds.minX <= 80,
+              bounds.maxX - editor.maxX <= 120,
+              editor.minY - bounds.minY <= 200,
+              bounds.maxY - editor.maxY <= 120 else { break }
+        // An editor wrapper can have exactly the text area's bounds. It
+        // cannot be the visible shell enclosing padding and action controls.
+        guard bounds != editor else { continue }
+        var budget = 80
+        if hasPromptControl(under: ancestor, selectors: selectors, depth: 0, budget: &budget) {
+            return PromptTransferGeometry(editor: editor, shell: bounds)
+        }
+    }
+    guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
+    return PromptTransferGeometry(editor: editor, shell: nil)
+}
+
+private func hasPromptControl<Node: ElementNode>(under node: Node, selectors: AppSelectors,
+                                                 depth: Int, budget: inout Int) -> Bool {
+    guard depth <= 6, budget > 0 else { return false }
+    budget -= 1
+    let role = node.role
+    // Model/tool popups remain mounted when Send disappears in an empty
+    // ChatGPT prompt. Claude Code keeps its disabled Send control mounted.
+    if role == "AXPopUpButton" { return true }
+    if role == "AXButton" {
+        let label = node.label.lowercased()
+        if isSendButtonLabel(label, selectors: selectors)
+            || label.localizedCaseInsensitiveContains(selectors.stopKeyword)
+            || ["attach", "add files", "tools", "dictat", "voice", "record"]
+                .contains(where: { label.contains($0) })
+            || label == "add" { return true }
+    }
+    // The text area's contents cannot provide evidence for a toolbar.
+    if role == "AXTextArea" || role == "AXTextField" { return false }
+    for child in node.children {
+        if hasPromptControl(under: child, selectors: selectors, depth: depth + 1, budget: &budget) {
+            return true
+        }
+    }
+    return false
+}
+
 /// Called on the relay worker, where all other reads of the target occur.
 /// Missing or off-window geometry only suppresses decoration.
 func transferAnchor(for element: AXUIElement?, in target: TargetApp) -> TransferAnchor? {
     guard let element,
-          let frame = windowFrame(element),
           let windowValue = axAttribute(element, kAXWindowAttribute),
           CFGetTypeID(windowValue) == AXUIElementGetTypeID(),
           let window = windowFrame(windowValue as! AXUIElement) else { return nil }
-    return TransferAnchor(frame: frame, window: window, pid: target.app.processIdentifier)
+    guard let geometry = promptTransferGeometry(around: LiveElement(ax: element), window: window,
+                                    selectors: target.selectors, parent: { node in
+        guard let value = axAttribute(node.ax, kAXParentAttribute),
+              CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return LiveElement(ax: value as! AXUIElement)
+    }, frame: { windowFrame($0.ax) }) else { return nil }
+    return TransferAnchor(frame: geometry.editor, window: window, pid: target.app.processIdentifier,
+                          promptFrame: geometry.shell)
 }
 
 /// A copied reply still gets a flight when its copy control has scrolled out

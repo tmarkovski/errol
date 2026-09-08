@@ -85,9 +85,10 @@ final class TransferOverlay {
             }
         }
         let destination = axRect(flight.destination.frame)
+        let prompt = flight.destination.promptFrame.map(axRect)
         let starts = flight.sources.map { axRect($0.frame).center }
         for panel in panels {
-            panel.drawing.render(starts: starts, destination: destination,
+            panel.drawing.render(starts: starts, destination: destination, prompt: prompt,
                                  timing: flight.timing, now: now, screenOrigin: panel.frame.origin)
             if !panel.isVisible { panel.orderFrontRegardless() }
         }
@@ -178,7 +179,7 @@ final class TransferDrawing: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func render(starts: [CGPoint], destination: CGRect, timing: TransferTiming,
+    func render(starts: [CGPoint], destination: CGRect, prompt: CGRect?, timing: TransferTiming,
                 now: TimeInterval, screenOrigin: CGPoint) {
         func local(_ point: CGPoint) -> CGPoint {
             CGPoint(x: point.x - screenOrigin.x, y: point.y - screenOrigin.y)
@@ -237,11 +238,14 @@ final class TransferDrawing: NSView {
                                              width: bloomRadius * 2, height: bloomRadius * 2), transform: nil)
         bloom.opacity = arrival != nil && moving ? Float((1 - dissolve) * 0.65) : 0
 
-        let prompt = destination.offsetBy(dx: -screenOrigin.x, dy: -screenOrigin.y)
-            .insetBy(dx: -5, dy: -5)
-        let corner = min(16, prompt.height / 2)
-        outline.path = CGPath(roundedRect: prompt, cornerWidth: corner, cornerHeight: corner, transform: nil)
-        if let age = arrival {
+        if let prompt {
+            let border = prompt.offsetBy(dx: -screenOrigin.x, dy: -screenOrigin.y)
+            let corner = min(16, border.height / 2)
+            outline.path = CGPath(roundedRect: border, cornerWidth: corner, cornerHeight: corner, transform: nil)
+        } else {
+            outline.path = nil
+        }
+        if prompt != nil, let age = arrival {
             let rise = min(1, age / 0.09)
             let fall = max(0, 1 - max(0, age - 0.18) / 0.77)
             outline.opacity = timing.reducedMotion ? 0.85 : Float(rise * fall * fall)

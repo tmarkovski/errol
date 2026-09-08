@@ -3,15 +3,24 @@ import Observation
 
 /// Stable identifiers keep a saved selection independent of its display name.
 enum AppTheme: String, CaseIterable, Identifiable {
-    case creamBlue = "cream-blue"
+    case warmStone = "warm-stone"
     case classicAmber = "classic-amber"
+    // Lighter, warm candidates under evaluation; see PerchPalette for intent.
+    case chalkGraphite = "chalk-graphite"
+    case ivoryCobalt = "ivory-cobalt"
+    case pearlTeal = "pearl-teal"
+    case linenMoss = "linen-moss"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .creamBlue: "Cream & Blue Mist"
+        case .warmStone: "Warm Stone & Olive"
         case .classicAmber: "Classic Amber"
+        case .chalkGraphite: "Chalk & Graphite"
+        case .ivoryCobalt: "Ivory & Cobalt"
+        case .pearlTeal: "Pearl & Teal"
+        case .linenMoss: "Linen & Moss"
         }
     }
 }
@@ -50,8 +59,9 @@ final class AppearanceStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        // Retired palettes, including cream-blue, use the current default.
         theme = defaults.string(forKey: Self.themeKey)
-            .flatMap(AppTheme.init(rawValue:)) ?? .creamBlue
+            .flatMap(AppTheme.init(rawValue:)) ?? .warmStone
         appearance = defaults.string(forKey: Self.appearanceKey)
             .flatMap(AppAppearance.init(rawValue:)) ?? .system
     }

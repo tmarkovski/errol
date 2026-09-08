@@ -12,6 +12,7 @@
 //   swift tools/ax-dump.swift --list                    # running apps and bundle IDs
 //   swift tools/ax-dump.swift claude                    # summary fingerprint per window
 //   swift tools/ax-dump.swift chatgpt --buttons         # distinct button labels + inputs
+//   swift tools/ax-dump.swift chatgpt --prompt-geometry # input bounds, parents, nearby controls
 //   swift tools/ax-dump.swift claude --tree > a.txt     # full tree; flip state, dump b.txt, diff
 //   swift tools/ax-dump.swift claude --find stop        # every attribute of matching elements
 //   swift tools/ax-dump.swift claude --menus            # menu bar (hover-free AX targets)
@@ -130,7 +131,7 @@ func describeValue(_ value: CFTypeRef) -> String {
 // MARK: - Element rendering
 
 struct Options {
-    enum Mode { case list, summary, tree, buttons, find(String), menus, capture }
+    enum Mode { case list, summary, tree, buttons, find(String), menus, capture, promptGeometry }
     var mode = Mode.summary
     var appSpec: String?
     var windowIndex: Int?
@@ -237,6 +238,140 @@ func runTree(_ appElement: AXUIElement, options: Options) {
             print(String(repeating: "  ", count: depth + 1) + elementLine(element, options: options))
         }
     }
+}
+
+// MARK: - Prompt geometry
+
+/// Keep fractional screen coordinates and identifiers; omit text values. A long
+/// editor's AX frame may be its full document, not its visible scroll viewport.
+func promptGeometryLine(_ element: AXUIElement) -> String {
+    let attrs = axMultiple(element, [kAXRoleAttribute, kAXSubroleAttribute,
+        kAXPositionAttribute, kAXSizeAttribute, kAXEnabledAttribute, kAXFocusedAttribute,
+        "AXIdentifier", "AXNumberOfCharacters", "AXVisibleCharacterRange"] + labelAttributes)
+    var parts = ["[\(attrs[kAXRoleAttribute] as? String ?? "?")]"]
+    for name in [kAXSubroleAttribute, "AXIdentifier"] {
+        if let value = attrs[name] as? String, !value.isEmpty {
+            parts.append("\(name)=\(String(reflecting: value))")
+        }
+    }
+    let name = label(from: attrs)
+    if !name.isEmpty { parts.append("label=\(String(reflecting: truncate(name, 100)))") }
+    if let position = attrs[kAXPositionAttribute], CFGetTypeID(position) == AXValueGetTypeID(),
+       let size = attrs[kAXSizeAttribute], CFGetTypeID(size) == AXValueGetTypeID(),
+       AXValueGetType(position as! AXValue) == .cgPoint,
+       AXValueGetType(size as! AXValue) == .cgSize {
+        var point = CGPoint.zero
+        var dimensions = CGSize.zero
+        if AXValueGetValue(position as! AXValue, .cgPoint, &point),
+           AXValueGetValue(size as! AXValue, .cgSize, &dimensions) {
+            parts.append("frame=(x:\(point.x), y:\(point.y), w:\(dimensions.width), h:\(dimensions.height))")
+        } else {
+            parts.append("frame=<unreadable>")
+        }
+    } else {
+        parts.append("frame=<unavailable>")
+    }
+    for name in [kAXEnabledAttribute, kAXFocusedAttribute,
+                 "AXNumberOfCharacters", "AXVisibleCharacterRange"] {
+        if let value = attrs[name] { parts.append("\(name)=\(describeValue(value))") }
+    }
+    // A scrollbar's numeric value is useful evidence of the scroll position.
+    if attrs[kAXRoleAttribute] as? String == "AXScrollBar",
+       let value = axAttribute(element, kAXValueAttribute) as? NSNumber {
+        parts.append("scrollValue=\(value)")
+    }
+    return parts.joined(separator: " ")
+}
+
+func runPromptGeometry(_ appElement: AXUIElement, options: Options) {
+    print("Prompt geometry v1. Frames use AX screen coordinates (origin at top left).")
+    print("Text values omitted. Parent 1 is the immediate parent; no shell is inferred.")
+    var totalInputs = 0
+    for (index, window) in selectedWindows(appElement, options: options) {
+        print("\n-- Window \(index): \(promptGeometryLine(window))")
+        var inputs: [(AXUIElement, String)] = []
+        var searchBudget = 4000
+        var searchTruncated = false
+        func findInputs(_ element: AXUIElement, depth: Int, path: String) {
+            guard searchBudget > 0 else { searchTruncated = true; return }
+            searchBudget -= 1
+            let role = axAttribute(element, kAXRoleAttribute) as? String
+            if role == "AXTextArea" || role == "AXTextField" {
+                inputs.append((element, path))
+                return // Text contents cannot contain another composer.
+            }
+            if role == "AXStaticText" { return }
+            let children = axChildren(element)
+            guard depth < options.maxDepth else {
+                if !children.isEmpty { searchTruncated = true }
+                return
+            }
+            for (childIndex, child) in children.enumerated() {
+                findInputs(child, depth: depth + 1, path: "\(path).\(childIndex)")
+                if searchBudget == 0 { break }
+            }
+        }
+        findInputs(window, depth: 0, path: "w\(index)")
+        if searchTruncated || searchBudget == 0 { print("  <input search reached its depth/node limit>") }
+        for (inputIndex, entry) in inputs.enumerated() {
+            let (input, path) = entry
+            totalInputs += 1
+            print("\nInput \(inputIndex) at \(path): \(promptGeometryLine(input))")
+            var chain = [input]
+            var node = input
+            for level in 1...16 {
+                guard let value = axAttribute(node, kAXParentAttribute),
+                      CFGetTypeID(value) == AXUIElementGetTypeID() else {
+                    print("  <no readable parent>")
+                    break
+                }
+                let ancestor = value as! AXUIElement
+                guard !chain.contains(where: { CFEqual($0, ancestor) }) else {
+                    print("  <parent cycle>")
+                    break
+                }
+                print("  Parent \(level): \(promptGeometryLine(ancestor))")
+                let role = axAttribute(ancestor, kAXRoleAttribute) as? String
+                // Show each off-path branch once. These are the wrappers and
+                // controls the shell detector can encounter in its eight hops.
+                if level <= 8, ["AXGroup", "AXScrollArea", "AXLayoutArea"].contains(role ?? "") {
+                    var budget = 80
+                    func nearby(_ child: AXUIElement, depth: Int, path: String) {
+                        guard budget > 0 else { return }
+                        budget -= 1
+                        print(String(repeating: "  ", count: depth + 2)
+                              + "\(path): \(promptGeometryLine(child))")
+                        let childRole = axAttribute(child, kAXRoleAttribute) as? String
+                        if childRole == "AXTextArea" || childRole == "AXTextField"
+                            || childRole == "AXStaticText" { return }
+                        let children = axChildren(child)
+                        guard depth < 6 else {
+                            if !children.isEmpty { print("      <branch depth limit>") }
+                            return
+                        }
+                        for (childIndex, descendant) in children.enumerated() {
+                            nearby(descendant, depth: depth + 1, path: "\(path).\(childIndex)")
+                            if budget == 0 { break }
+                        }
+                    }
+                    for (childIndex, child) in axChildren(ancestor).enumerated() {
+                        if CFEqual(child, node) {
+                            print("    child[\(childIndex)]: <toward this input>")
+                        } else {
+                            nearby(child, depth: 1, path: "child[\(childIndex)]")
+                        }
+                    }
+                    if budget == 0 { print("    <nearby branch node limit>") }
+                }
+                chain.append(ancestor)
+                node = ancestor
+                if role == "AXWindow" || role == "AXApplication" { break }
+                if level == 16 { print("  <parent limit>") }
+            }
+        }
+        if inputs.isEmpty { print("  No text inputs found in this window.") }
+    }
+    print("\nFound \(totalInputs) text input(s).")
 }
 
 func runButtons(_ appElement: AXUIElement, options: Options) {
@@ -404,6 +539,7 @@ modes (default: summary)
   --summary        per-window role counts, button totals, text inputs
   --tree           full indented tree (redirect to a file; diff two captures)
   --buttons        distinct button labels with counts, plus text inputs
+  --prompt-geometry input frames, parent chain, and nearby controls (no text values)
   --find <text>    all attributes of elements matching role/subrole/label/value
   --menus          menu bar tree (menu items are hover-free AX targets)
   --capture        fixture JSON of the windows' trees, for the contract tests
@@ -430,6 +566,7 @@ func parseOptions() -> Options {
         case "--summary": options.mode = .summary
         case "--tree": options.mode = .tree
         case "--buttons": options.mode = .buttons
+        case "--prompt-geometry": options.mode = .promptGeometry
         case "--find": options.mode = .find(next(arg))
         case "--menus": options.mode = .menus
         case "--capture": options.mode = .capture
@@ -495,6 +632,7 @@ case .list: break
 case .summary: runSummary(appElement, options: options)
 case .tree: runTree(appElement, options: options)
 case .buttons: runButtons(appElement, options: options)
+case .promptGeometry: runPromptGeometry(appElement, options: options)
 case .find(let query): runFind(appElement, query: query, options: options)
 case .menus: runMenus(appElement, options: options)
 case .capture: runCapture(appElement, options: options)
