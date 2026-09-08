@@ -166,6 +166,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             // button; the in-memory run log and the inspector live here.
             menu.addItem(withTitle: "Show Last Run Log", action: #selector(showRunLog),
                          keyEquivalent: "").target = self
+            menu.addItem(withTitle: "Show Debug Logs in Finder", action: #selector(showDebugLogs),
+                         keyEquivalent: "").target = self
             let inspectItem = menu.addItem(
                 withTitle: "Inspect Apps", action: #selector(inspectApps), keyEquivalent: "")
             inspectItem.target = self
@@ -463,6 +465,20 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             logWindow = window
         }
         logWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    /// The on-disk debug logs (RunLog in Core/Logging.swift): one file per
+    /// run with the detail the window leaves out, plus the snapshots taken
+    /// at failures. Reveals the latest run's file when this process has
+    /// written one, else opens the folder.
+    @objc private func showDebugLogs() {
+        let directory = RunLog.directory
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let path = RunLog.lastPath {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        } else {
+            NSWorkspace.shared.open(directory)
+        }
     }
 
     /// Inspect from the menu: open the log window first, so the report —

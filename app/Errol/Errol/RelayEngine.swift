@@ -104,7 +104,12 @@ final class LiveRelayEngine: RelayEngine {
         // handoff — before the worker can read any of them.
         control.reset()
         let origin = currentFrontmostApp()
+        // The on-disk debug log opens before the first line and closes
+        // after the last, so a run's file holds the whole run and nothing
+        // else (Inspect reports and idle-time lines stay in the panel).
+        RunLog.begin()
         log("Run starting. Transcript: \(config.transcriptPath)")
+        if let path = RunLog.currentPath { log("Debug log: \(path)") }
         runExclusively { [events, control] in
             // First contact only: the scanner has usually nudged both long
             // ago, and then the trees are already populated and the settle
@@ -122,6 +127,7 @@ final class LiveRelayEngine: RelayEngine {
             }
             if mayRestore { refocus(to: origin) }
             events.post(.finished)
+            RunLog.end()
         }
     }
 

@@ -262,7 +262,16 @@ func pastedTextAttachmentCount(around input: AXUIElement,
     }
 }
 
-func inputArea(in target: TargetApp) -> AXUIElement? {
+/// Which way `inputArea` found the composer. The two answer differently
+/// once the app rebuilds its composer or moves focus, and a paste is
+/// verified against whichever element was handed back — so the debug log
+/// names the way alongside the element.
+enum InputAreaSource: String {
+    case focused = "the focused element"
+    case lastTextInput = "the window's last text input"
+}
+
+func resolveInputArea(in target: TargetApp) -> (element: AXUIElement, source: InputAreaSource)? {
     guard let root = chatWindow(in: target) else { return nil }
     // Prefer the focused element, but only if it lives in the chat window;
     // focus could be on another window (e.g. a Claude Code session).
@@ -271,10 +280,14 @@ func inputArea(in target: TargetApp) -> AXUIElement? {
         if axAttribute(el, kAXRoleAttribute) as? String == kAXTextAreaRole as String,
            let window = axAttribute(el, kAXWindowAttribute),
            CFEqual(window, root) {
-            return el
+            return (el, .focused)
         }
     }
-    return composerElement(under: LiveElement(ax: root))?.ax
+    return composerElement(under: LiveElement(ax: root)).map { ($0.ax, .lastTextInput) }
+}
+
+func inputArea(in target: TargetApp) -> AXUIElement? {
+    resolveInputArea(in: target)?.element
 }
 
 func composerValue(in target: TargetApp) -> String? {

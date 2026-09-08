@@ -1,0 +1,242 @@
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "description": "Code language: Plain Text",
+                "frame": [
+                  74,
+                  749,
+                  89,
+                  28
+                ],
+                "role": "AXPopUpButton",
+                "value": ""
+              }
+            ],
+            "frame": [
+              72,
+              745,
+              712,
+              36
+            ],
+            "role": "AXGroup",
+            "value": ""
+          },
+          {
+            "children": [
+              {
+                "frame": [
+                  80,
+                  790,
+                  227,
+                  76
+                ],
+                "role": "AXStaticText",
+                "value": "PASTE-TEST-3\ntabs:\tone\ttwo\ntrailing-spaces:···\nunicode: café — naïve — 日本語"
+              }
+            ],
+            "frame": [
+              80,
+              789,
+              696,
+              78
+            ],
+            "role": "AXGroup",
+            "subrole": "AXCodeStyleGroup",
+            "value": ""
+          },
+          {
+            "children": [
+              {
+                "frame": [
+                  72,
+                  880,
+                  619,
+                  17
+                ],
+                "role": "AXStaticText",
+                "value": "Confirmed, matches exactly — tabs, unicode, and the trailing-spaces marker all intact this time."
+              }
+            ],
+            "frame": [
+              72,
+              879,
+              712,
+              20
+            ],
+            "role": "AXGroup",
+            "value": ""
+          },
+          {
+            "children": [
+              {
+                "frame": [
+                  72,
+                  900,
+                  703,
+                  117
+                ],
+                "role": "AXStaticText",
+                "value": "Good data point on test 2 though: curly quotes (U+201C/U+201D) getting normalized to straight quotes and em dash likely surviving suggests something in the relay path is doing smart-quote-to-ASCII substitution specifically, not a broad Unicode strip. Worth checking if that's happening on my send side, your receive side, or a shared transport layer in between — that's the kind of silent corruption that'd bite real paste content later. Good place to stop for now unless you want to isolate which hop does it. [[END-CONVERSATION]]"
+              }
+            ],
+            "frame": [
+              72,
+              899,
+              712,
+              120
+            ],
+            "role": "AXGroup",
+            "value": ""
+          }
+        ],
+        "description": "Work with ChatGPT",
+        "frame": [
+          72,
+          745,
+          712,
+          274
+        ],
+        "role": "AXTextArea",
+        "value": "\nPASTE-TEST-3\ntabs:\tone\ttwo\ntrailing-spaces:···\nunicode: café — naïve — 日本語\nConfirmed, matches exactly — tabs, unicode, and the trailing-spaces marker all intact this time.\nGood data point on test 2 though: curly quotes (U+201C/U+201D) getting normalized to straight quotes and em dash likely surviving suggests something in the relay path is doing smart-quote-to-ASCII substitution specifically, not a broad Unicode strip. Worth checking if that's happening on my send side, your receive side, or a shared transport layer in between — that's the kind of silent corruption that'd bite real paste content later. Good place to stop for now unless you want to isolate which hop does it. [[END-CONVERSATION]]"
+      },
+      {
+        "children": [
+          {
+            "frame": [
+              74,
+              1005,
+              16,
+              16
+            ],
+            "role": "AXImage",
+            "value": ""
+          }
+        ],
+        "description": "Add files and more",
+        "frame": [
+          68,
+          999,
+          28,
+          28
+        ],
+        "role": "AXButton",
+        "value": ""
+      },
+      {
+        "children": [
+          {
+            "frame": [
+              108,
+              1005,
+              16,
+              16
+            ],
+            "role": "AXImage",
+            "value": ""
+          },
+          {
+            "children": [
+              {
+                "frame": [
+                  128,
+                  1006,
+                  93,
+                  15
+                ],
+                "role": "AXStaticText",
+                "value": "Approve for me"
+              }
+            ],
+            "frame": [
+              128,
+              1004,
+              93,
+              18
+            ],
+            "role": "AXGroup",
+            "value": ""
+          }
+        ],
+        "description": "Change permissions",
+        "frame": [
+          101,
+          999,
+          127,
+          28
+        ],
+        "role": "AXPopUpButton",
+        "value": ""
+      },
+      {
+        "frame": [
+          547,
+          999,
+          177,
+          28
+        ],
+        "role": "AXPopUpButton",
+        "title": "GPT-5.6 Terra Medium",
+        "value": ""
+      },
+      {
+        "children": [
+          {
+            "frame": [
+              730,
+              1005,
+              16,
+              16
+            ],
+            "role": "AXImage",
+            "value": ""
+          }
+        ],
+        "description": "Dictate",
+        "frame": [
+          724,
+          999,
+          28,
+          28
+        ],
+        "role": "AXButton",
+        "value": ""
+      },
+      {
+        "children": [
+          {
+            "frame": [
+              766,
+              1005,
+              16,
+              16
+            ],
+            "role": "AXImage",
+            "value": ""
+          }
+        ],
+        "description": "Send",
+        "frame": [
+          760,
+          999,
+          28,
+          28
+        ],
+        "role": "AXButton",
+        "value": ""
+      }
+    ],
+    "frame": [
+      60,
+      727,
+      736,
+      308
+    ],
+    "role": "AXGroup",
+    "value": ""
+  }
+]

@@ -201,18 +201,18 @@ final class PasteReceiptTests: XCTestCase {
         let after = attachmentCount(in: claudeWindow(lineCounts: [95]), selectors: selectors)
         XCTAssertEqual(before, 0)
         XCTAssertEqual(after, 1, "count the remove control once, not the preview as well")
-        XCTAssertEqual(observedPasteReceipt(needle: "The first words", composerValue: "",
+        XCTAssertEqual(observedPasteReceipt(expecting: expectation, composerValue: "",
                                              attachmentsBefore: before, attachmentsNow: after), .attachment)
     }
 
     func testClaudeCountsVariableLineLabelsAndRequiresANewAttachment() {
         let selectors = config.claudeSelectors
         let before = attachmentCount(in: claudeWindow(lineCounts: [95]), selectors: selectors)
-        XCTAssertNil(observedPasteReceipt(needle: "The first words", composerValue: "",
+        XCTAssertNil(observedPasteReceipt(expecting: expectation, composerValue: "",
                                           attachmentsBefore: before, attachmentsNow: before))
         let after = attachmentCount(in: claudeWindow(lineCounts: [95, 149]), selectors: selectors)
         XCTAssertEqual(after, 2)
-        XCTAssertEqual(observedPasteReceipt(needle: "The first words", composerValue: "",
+        XCTAssertEqual(observedPasteReceipt(expecting: expectation, composerValue: "",
                                              attachmentsBefore: before, attachmentsNow: after), .attachment)
     }
 
@@ -226,21 +226,30 @@ final class PasteReceiptTests: XCTestCase {
         XCTAssertEqual(attachmentCount(in: window, selectors: config.claudeSelectors), 0)
     }
 
+    /// The payload the receipt tests expect, pasted into an empty composer.
+    private var expectation: PasteExpectation {
+        PasteExpectation(payload: "The first words of the payload", valueBefore: "")
+    }
+
     func testOrdinaryTextConfirmsPaste() {
         XCTAssertEqual(observedPasteReceipt(
-            needle: "The first words", composerValue: "The first words of the payload",
+            expecting: expectation, composerValue: "The first words of the payload",
             attachmentsBefore: 0, attachmentsNow: 0), .text)
     }
 
     func testNewAttachmentConfirmsPasteWhenComposerKeepsPlaceholder() {
+        let placeholder = PasteExpectation(payload: "The first words of the payload",
+                                           valueBefore: "\nDo anything")
         XCTAssertEqual(observedPasteReceipt(
-            needle: "The first words", composerValue: "\nDo anything",
+            expecting: placeholder, composerValue: "\nDo anything",
             attachmentsBefore: 0, attachmentsNow: 1), .attachment)
     }
 
     func testExistingAttachmentDoesNotConfirmAnotherPaste() {
+        let placeholder = PasteExpectation(payload: "The first words of the payload",
+                                           valueBefore: "\nDo anything")
         XCTAssertNil(observedPasteReceipt(
-            needle: "The first words", composerValue: "\nDo anything",
+            expecting: placeholder, composerValue: "\nDo anything",
             attachmentsBefore: 1, attachmentsNow: 1))
     }
 }

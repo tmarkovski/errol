@@ -65,8 +65,10 @@ final class VerificationTests: XCTestCase {
     }
 
     func testNoReceiptFromEmptyNeedle() {
-        XCTAssertNil(observedPasteReceipt(needle: "", composerValue: "", attachmentsBefore: 0, attachmentsNow: 0))
-        XCTAssertEqual(observedPasteReceipt(needle: "\nhello", composerValue: "\nhello", attachmentsBefore: 0, attachmentsNow: 0), .text)
+        XCTAssertNil(observedPasteReceipt(expecting: PasteExpectation(payload: "", valueBefore: ""),
+                                          composerValue: "", attachmentsBefore: 0, attachmentsNow: 0))
+        XCTAssertEqual(observedPasteReceipt(expecting: PasteExpectation(payload: "\nhello", valueBefore: ""),
+                                            composerValue: "\nhello", attachmentsBefore: 0, attachmentsNow: 0), .text)
     }
 
     func testInspectionCanRefuseBeforeAnyPasteOrSubmission() {
