@@ -85,11 +85,8 @@ enum Perch {
     /// constant — the card is content-sized and the shell fits the window to
     /// what it reports (PerchPanelView, MenuBarController.fitPanel).
     static let cardWidth = s(464)
-    /// The title bar's strip: the panel wears an attached unified toolbar,
-    /// which grows the strip to the height Safari and Mail have — 52pt, the
-    /// close button centered in it (MenuBarController.buildPanel) — so this
-    /// is that height. Without the toolbar the bare strip is 28pt, which is
-    /// what the settings and log windows clear.
+    /// The content header keeps the familiar 52pt height of a unified
+    /// toolbar. The borderless panel draws its controls here (PerchChrome).
     static let chromeBand: CGFloat = 52
     /// The card's top padding: the strip, plus breathing room before the
     /// avatars — the app icons' squircles read heavier than the initial

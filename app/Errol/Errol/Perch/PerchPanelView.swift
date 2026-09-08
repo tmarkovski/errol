@@ -9,10 +9,10 @@
 // The console is two rows in every state: the head (PerchHead) and the
 // composer (PerchComposer), whose setup zone — quick shape pills and the
 // instruction preview above a hairline — folds into a context row while a
-// run is on. The window is a titled panel that draws none of its chrome
+// run is on. The window is a borderless panel
 // (MenuBarController.buildPanel): the card is content-sized and reported
-// through onCardResize, and the title strip carries the state pill and the
-// session overflow as real toolbar items (PerchChrome).
+// through onCardResize. PanelRootView overlays the header controls
+// (PerchChrome) in the space reserved at the top.
 
 import SwiftUI
 
@@ -29,7 +29,7 @@ struct PerchPanelView: View {
         PerchEqualSections {
             PerchHead(controller: controller)
                 .padding(.horizontal, Perch.contentInset)
-                // The head clears the native title strip; the composer
+                // The head clears the header controls; the composer
                 // below reaches the window's sides and bottom.
                 .padding(.top, Perch.chromeInset)
                 .padding(.bottom, Perch.s(14))
@@ -57,17 +57,6 @@ struct PerchPanelView: View {
         // Only the window rounds the composing surface. There is no
         // separate card edge or margin around the bottom section.
         .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
-        .overlay(RoundedRectangle(cornerRadius: Perch.shellCorner)
-            .stroke(Perch.panelEdge, lineWidth: 1))
-        // The wordmark, centered in the title strip like a window title, in
-        // sentence case as a window title is.
-        .overlay(alignment: .top) {
-            Text("Errol")
-                .font(Perch.text(13, .semibold))
-                .foregroundColor(Perch.ink)
-                .frame(height: Perch.chromeBand)
-                .allowsHitTesting(false)
-        }
         // Measured here — the card with its paddings — so the size reported
         // is the one the window should become. Fitting the card to the
         // window it sits in, and running it up under the title bar, is the

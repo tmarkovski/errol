@@ -1,49 +1,44 @@
-// What the panel puts in the window's own title strip: the state pill and
-// the session overflow menu, trailing. They are real toolbar items because
-// the title bar claims the strip's clicks (MenuBarController.buildPanel has
-// the account). See PerchPanelView for the panel.
+// Header controls live inside the borderless panel's content. The background
+// drags the window, while the buttons and menu receive clicks directly.
 
-import AppKit
 import SwiftUI
 
-final class PerchChromeToolbar: NSObject, NSToolbarDelegate {
-    private static let status = NSToolbarItem.Identifier("perch-status")
-    private static let overflow = NSToolbarItem.Identifier("perch-overflow")
+struct PerchChrome: View {
+    let controller: RelayController
+    let screen: PanelNavigation.Screen
+    let onBack: () -> Void
 
-    private let controller: RelayController
-
-    init(controller: RelayController) {
-        self.controller = controller
-    }
-
-    func makeToolbar() -> NSToolbar {
-        let toolbar = NSToolbar(identifier: "perch-chrome")
-        toolbar.delegate = self
-        toolbar.allowsUserCustomization = false
-        return toolbar
-    }
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.status, Self.overflow]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar)
-    }
-
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier,
-                 willBeInsertedIntoToolbar: Bool) -> NSToolbarItem? {
-        let item = NSToolbarItem(itemIdentifier: id)
-        item.isBordered = false
-        switch id {
-        case Self.status:
-            item.view = FirstMouseHostingView(rootView: PerchStatePill(controller: controller))
-        case Self.overflow:
-            item.view = FirstMouseHostingView(rootView: PerchOverflowMenu(controller: controller))
-        default:
-            return nil
+    var body: some View {
+        HStack(spacing: Perch.s(6)) {
+            Button(action: onBack) {
+                Label("Back", systemImage: "chevron.left")
+                    .font(Perch.text(12, .medium))
+                    .foregroundStyle(Perch.ink)
+                    .padding(.horizontal, Perch.s(6))
+                    .frame(height: Perch.s(28))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("[", modifiers: .command)
+            .help("Back to Errol")
+            .accessibilityLabel("Back to Errol")
+            .modifier(PanelScreenPresentation(isVisible: screen == .settings,
+                                              hiddenOffset: Perch.s(24)))
+            Spacer(minLength: 0)
+            HStack(spacing: Perch.s(6)) {
+                PerchStatePill(controller: controller)
+                PerchOverflowMenu(controller: controller)
+            }
+            .modifier(PanelScreenPresentation(isVisible: screen == .console,
+                                              hiddenOffset: -Perch.s(18)))
         }
-        return item
+        .padding(.horizontal, Perch.contentInset)
+        .frame(height: Perch.chromeBand)
+        .background {
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+        }
     }
 }
 
@@ -93,19 +88,14 @@ struct PerchStatePill: View {
     }
 }
 
-/// The session overflow: what the console offers but a run should not put a
-/// big button under — ending the session foremost, per the converged
-/// proposal, so Pause keeps the composer's only prominent control.
+/// The session overflow: what the console offers outside a run's own
+/// controls — Settings. Ending a run is the Stop button at the composer's
+/// foot (PerchComposer), beside Pause.
 struct PerchOverflowMenu: View {
     let controller: RelayController
 
     var body: some View {
         Menu {
-            Button("End session") { controller.stop() }
-                .disabled(!controller.isRunning)
-                .help("End the run at the next safe point")
-            Divider()
-            Button("Open transcript") { controller.openTranscript() }
             Button("Settings…") { controller.openSettings() }
         } label: {
             Image(systemName: "ellipsis")

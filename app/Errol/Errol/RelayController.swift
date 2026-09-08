@@ -94,6 +94,11 @@ final class RelayController {
     /// back down when a tiling could not be done.
     var windowsTiled = false
     var isRunning = false
+    /// Whether Stop has been pressed on this run — or on the run that just
+    /// finished, since the summary names it as the ending. The Stop button
+    /// dims on it, because the run may be mid-reply for a while before the
+    /// next safe point. Cleared at the next start and by New session.
+    private(set) var stopRequested = false
     /// The field opens only after focus ownership is granted. Both relay
     /// operations wait until Return or Continue closes the editor.
     var isSteering = false
@@ -141,8 +146,11 @@ final class RelayController {
     private var control: RelayControl { engine.control }
     @ObservationIgnored private var panelVisible = false
     /// Set by the AppKit shell; the panel's Settings… item routes here to
-    /// open the settings window above the panel.
+    /// navigate to Settings inside the panel.
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
+    /// Set by the AppKit shell; a finished run routes here so the console
+    /// takes the keyboard back from the chat app that replied last.
+    @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
     init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil,
@@ -300,8 +308,8 @@ final class RelayController {
     }
 
     /// The log is an in-memory tail read through the status item's debug
-    /// window (PerchLogWindowView) — the transcript file holds the whole
-    /// run. Bounded, trimming in chunks so removeFirst's element shuffle
+    /// window (PerchLogWindowView) — the debug log on disk (RunLog) holds
+    /// the whole run. Bounded, trimming in chunks so removeFirst's element shuffle
     /// stays off the per-line path.
     private static let logCap = 500
     private static let logTrimSlack = 100
@@ -337,6 +345,7 @@ final class RelayController {
         config.first = firstSpeaker
 
         isRunning = true
+        stopRequested = false
         transferOverlay?.stop()
         isHolding = false
         resetSteering()
@@ -356,19 +365,20 @@ final class RelayController {
     }
 
     /// Whether a finished run is still on the panel: a turn count, no run to
-    /// own it. The head shows New session in this state, and resetSession is
-    /// what leaves it.
+    /// own it. The composer shows the run's summary and New session in this
+    /// state (PerchComposer), and resetSession is what leaves it.
     var hasFinishedRun: Bool { !isRunning && currentTurn > 0 }
 
     /// New session: clear the finished run off the panel — the turn count,
-    /// the perches' sign-offs, the run clock, the last note's record. The
-    /// prompt and the run options stay as they are; they belong to the next
-    /// run, not the finished one.
+    /// the perches' sign-offs, the run clock, the last note's record, the
+    /// summary. The prompt and the run options stay as they are; they
+    /// belong to the next run, not the finished one.
     func resetSession() {
         guard hasFinishedRun else { return }
         currentTurn = 0
         lastRunDuration = nil
         lastReceipt = nil
+        stopRequested = false
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
     }
@@ -377,7 +387,9 @@ final class RelayController {
     /// after every line the run logged, because it rides the same stream.
     /// Whatever the note was doing becomes its record for the head, since
     /// the composer goes back to the topic and ending is exactly when
-    /// someone inspects what happened.
+    /// someone inspects what happened. Last, the console takes the keyboard
+    /// back: the run left it with whichever chat app replied last, and New
+    /// session is what comes next.
     private func finishRun() {
         if isSteering, let text = steeringEditor.end() { steeringText = text }
         lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
@@ -389,10 +401,12 @@ final class RelayController {
         recordSteeringAtRunEnd()
         resetSteering()
         updateScanner()
+        focusPanelHandler?()
     }
 
     func stop() {
         guard isRunning else { return }
+        stopRequested = true
         // Cancellation wins at both gates. Clearing pause first would admit
         // a focus operation between the two calls.
         isSteeringPending = false
@@ -628,9 +642,5 @@ final class RelayController {
     func runInspect() {
         guard !isRunning else { return }
         engine.inspect()
-    }
-
-    func openTranscript() {
-        engine.openTranscript()
     }
 }

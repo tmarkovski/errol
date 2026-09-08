@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session controls at the foot</title>
+<style>
+  :root {
+    --paper: #FAF7F0; --well: #EFECE4; --track: #E1DDD2; --panel-edge: #DBD7CB;
+    --chip-edge: #D6D2C5; --hairline: #DCD8CC; --ink: #33352B; --secondary: #53554A;
+    --muted: #696B5E; --placeholder: #6A6B5F; --accent: #73784F; --accent-text: #5B623C;
+    --accent-back: #E2E7D4; --on-accent: #FFFFFF; --green: #486748; --green-back: #E6EBDD;
+    --presence: #64865A; --path: #C9C6B7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 32px 64px; background: #C4C1B6; color: var(--ink);
+    font: 13px/1.45 -apple-system, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  h2 { font-size: 15px; margin: 40px 0 6px; }
+  p.lead { max-width: 720px; margin: 0 0 8px; color: #3a3b33; }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 18px; }
+  .study { width: 464px; }
+  .study .label { font-size: 12px; color: #3a3b33; margin: 0 0 8px; }
+  .study .label b { color: var(--ink); }
+  .study .note { font-size: 12px; color: #4b4c43; margin: 8px 0 0; max-width: 464px; }
+
+  /* The card, as the panel draws it: paper above, the well below. */
+  .card {
+    width: 464px; border-radius: 18px; background: var(--paper); overflow: hidden;
+    border: 1px solid var(--panel-edge); box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  }
+  .head { padding: 14px 12px 14px; text-align: center; }
+  .wordmark { font-weight: 600; font-size: 13px; margin-bottom: 14px; }
+  .perches { display: flex; align-items: flex-start; }
+  .perch { width: 132px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .avatar { width: 44px; height: 44px; border-radius: 11px; background: #E9E5D9; position: relative; }
+  .avatar.claude { background: #E8DDD0; }
+  .avatar i { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+              background: var(--presence); border: 2px solid var(--paper); }
+  .avatar i.live { background: var(--accent); }
+  .perch .name { font-weight: 600; font-size: 13px; }
+  .perch .sub { font-size: 11px; color: var(--muted); }
+  .flight { flex: 1; height: 44px; margin-top: 2px; position: relative; }
+  .flight svg { width: 100%; height: 100%; }
+  .turnline { font-size: 11px; color: var(--muted); margin-top: 12px; }
+
+  .composer { background: var(--well); }
+  .context { display: flex; gap: 6px; align-items: center; padding: 12px 14px 0; font-size: 11px; color: var(--muted); }
+  .context b { font-weight: 500; }
+  .context .dot { color: var(--chip-edge); }
+  .hairline { height: 1px; background: var(--hairline); margin: 8px 12px 0; }
+  .field { padding: 10px 12px 0; min-height: 52px; font-size: 12.5px; }
+  .field.notice { color: var(--placeholder); }
+  .field.queued { color: var(--ink); opacity: .55; }
+  .field.editor { color: var(--ink); }
+  .field .caret { display: inline-block; width: 1px; height: 14px; background: var(--ink); vertical-align: -2px; margin-left: 1px; }
+  .summary { padding: 10px 12px 0; }
+  .summary .headline { font-size: 13px; font-weight: 600; }
+  .summary .detail { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .summary .receipt { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .summary .link { font-size: 11px; font-weight: 500; color: var(--secondary); margin-top: 7px; }
+
+  .foot { display: flex; align-items: center; gap: 8px; padding: 8px 12px 12px; min-height: 56px; }
+  .foot .line { flex: 1; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .foot .line.live { color: var(--accent-text); }
+  .foot .line.hint { color: var(--placeholder); }
+  .foot .line .clear { font-weight: 500; color: var(--secondary); margin-left: 8px; }
+  .foot .spacer { flex: 1; }
+
+  .chip { display: flex; align-items: center; height: 32px; color: var(--secondary); }
+  .chip svg { width: 32px; height: 32px; padding: 9px; }
+  .chip.on { background: var(--accent-back); color: var(--accent-text); border-radius: 16px; padding-right: 12px; font-size: 12px; font-weight: 500; }
+
+  .primary {
+    display: flex; align-items: center; height: 36px; min-width: 36px; border-radius: 18px;
+    background: linear-gradient(180deg, #8A9060, var(--accent)); color: var(--on-accent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.18);
+    font-size: 12px; font-weight: 600;
+  }
+  .primary svg { width: 36px; height: 36px; padding: 11px; }
+  .primary.word { padding-right: 14px; }
+  .primary.word svg { margin-right: -3px; }
+  .primary.dim { opacity: .4; }
+
+  /* Stop, three weights. */
+  .stop-a { width: 36px; height: 36px; border-radius: 50%; background: var(--paper); border: 1px solid var(--chip-edge);
+            display: flex; align-items: center; justify-content: center; color: var(--secondary); }
+  .stop-a svg { width: 12px; height: 12px; }
+  .stop-b { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--secondary); }
+  .stop-b svg { width: 13px; height: 13px; }
+  .stop-c { height: 24px; padding: 0 12px; border-radius: 12px; background: var(--paper); border: 1px solid var(--chip-edge);
+            display: flex; align-items: center; font-size: 11px; font-weight: 500; color: var(--secondary); }
+  .dim { opacity: .4; }
+
+  .foot-only { border-radius: 0 0 18px 18px; }
+  .strip { background: var(--well); border-radius: 12px; border: 1px solid var(--panel-edge); }
+</style>
+</head>
+<body>
+
+<h1>Session controls at the foot</h1>
+<p class="lead">Errol's Perch console, September 8, 2026. The round button stays in the foot's corner and changes what it is in place: Run, then Pause, then Continue or Send while the field is open, then New session. Stop appears beside it for the length of the run. The field, closed while the agents work, carries the one thing a person at the console most needs told. When the run is over the summary takes the field's place and one button is left.</p>
+
+<h2>The run, start to finish</h2>
+<div class="row">
+
+  <div class="study">
+    <p class="label"><b>Running.</b> Run has turned into Pause; Stop stands beside it. The notice is where words would go.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i></i></div><div class="name">ChatGPT</div><div class="sub">Waiting</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="187" cy="31" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i class="live"></i></div><div class="name">Claude</div><div class="sub">Replying…</div></div>
+        </div>
+        <div class="turnline">Turn 4 · Claude is replying</div>
+      </div>
+      <div class="composer">
+        <div class="context"><b>Brainstorm</b><span class="dot">·</span><span>10 turns · Tiled</span></div>
+        <div class="hairline"></div>
+        <div class="field notice">Don't type into ChatGPT or Claude while the session runs. Type here to steer the conversation instead.</div>
+        <div class="foot">
+          <div class="line"></div>
+          <div class="stop-a"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+          <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="study">
+    <p class="label"><b>Field open.</b> Pause was pressed; the run holds at the next handoff. The button reads Continue until there are words, then closes to the send arrow.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i></i></div><div class="name">ChatGPT</div><div class="sub">Waiting</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="100" cy="18" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i></i></div><div class="name">Claude</div><div class="sub">Reply ready</div></div>
+        </div>
+        <div class="turnline">Turn 4 · Paused at the handoff</div>
+      </div>
+      <div class="composer">
+        <div class="context"><b>Brainstorm</b><span class="dot">·</span><span>10 turns · Tiled</span></div>
+        <div class="hairline"></div>
+        <div class="field editor">Push on the pricing question before you wrap up.<span class="caret"></span></div>
+        <div class="foot">
+          <div class="line hint">Return sends it to ChatGPT · Esc clears it</div>
+          <div class="stop-a"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+          <div class="primary"><svg viewBox="0 0 14 14"><path d="M7 12.5V2.5M3 6.5l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="study">
+    <p class="label"><b>Note queued.</b> The note waits dimmed where it was written; the foot's line says where it goes, with the one way to drop it.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i class="live"></i></div><div class="name">ChatGPT</div><div class="sub">Replying…</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="13" cy="31" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i></i></div><div class="name">Claude</div><div class="sub">Waiting</div></div>
+        </div>
+        <div class="turnline">Turn 5 · ChatGPT is replying</div>
+      </div>
+      <div class="composer">
+        <div class="context"><b>Brainstorm</b><span class="dot">·</span><span>10 turns · Tiled</span></div>
+        <div class="hairline"></div>
+        <div class="field queued">Push on the pricing question before you wrap up.</div>
+        <div class="foot">
+          <div class="line live">Note queued · goes to Claude with the next handoff<span class="clear">Clear note</span></div>
+          <div class="stop-a"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+          <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="study">
+    <p class="label"><b>Stop pressed.</b> Stop dims and the line says the end is coming; the run finishes at the next safe point.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i class="live"></i></div><div class="name">ChatGPT</div><div class="sub">Replying…</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="13" cy="31" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i></i></div><div class="name">Claude</div><div class="sub">Waiting</div></div>
+        </div>
+        <div class="turnline">Turn 5 · ChatGPT is replying</div>
+      </div>
+      <div class="composer">
+        <div class="context"><b>Brainstorm</b><span class="dot">·</span><span>10 turns · Tiled</span></div>
+        <div class="hairline"></div>
+        <div class="field notice">Don't type into ChatGPT or Claude while the session runs. Type here to steer the conversation instead.</div>
+        <div class="foot">
+          <div class="line live">Ending the run at the next safe point…</div>
+          <div class="stop-a dim"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+          <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="study">
+    <p class="label"><b>Finished.</b> Pause and Stop are gone. The summary stands where the field was, and New session is the one button.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i></i></div><div class="name">ChatGPT</div><div class="sub">Signed off</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="100" cy="18" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i></i></div><div class="name">Claude</div><div class="sub">Signed off</div></div>
+        </div>
+        <div class="turnline">Run complete · 6 turns</div>
+      </div>
+      <div class="composer">
+        <div class="context"><b>Brainstorm</b><span class="dot">·</span><span>10 turns · Tiled</span></div>
+        <div class="hairline"></div>
+        <div class="summary">
+          <div class="headline">Run complete</div>
+          <div class="detail">6 turns · ran 4:32 · both signed off</div>
+          <div class="receipt">Note sent to Claude with turn 5 · shared with ChatGPT at turn 6</div>
+        </div>
+        <div class="foot">
+          <div class="spacer"></div>
+          <div class="primary word"><svg viewBox="0 0 14 14"><path d="M2.5 3.5h5M2.5 3.5v8h8v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 8.5l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>New session</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="study">
+    <p class="label"><b>Idle again.</b> New session gives the composer back: tabs, preview, topic, the options, and Run. The prompt and options survived.</p>
+    <div class="card">
+      <div class="head">
+        <div class="wordmark">Errol</div>
+        <div class="perches">
+          <div class="perch"><div class="avatar"><i></i></div><div class="name">ChatGPT</div><div class="sub">Chat · 5.6 Sol High</div></div>
+          <div class="flight"><svg viewBox="0 0 200 44"><path d="M6 34 Q100 2 194 34" fill="none" stroke="#C9C6B7" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><circle cx="100" cy="18" r="5" fill="#73784F"/></svg></div>
+          <div class="perch"><div class="avatar claude"><i></i></div><div class="name">Claude</div><div class="sub">Chat · Fable 5 · Extra</div></div>
+        </div>
+        <div class="turnline">Turn 0 · ChatGPT opens</div>
+      </div>
+      <div class="composer">
+        <div style="display:flex; background: var(--track); padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--secondary);">
+          <div style="flex:1; text-align:center; padding:4px 0;">Free chat</div>
+          <div style="flex:1; text-align:center; padding:4px 0; background: var(--paper); border-radius: 6px; color: var(--ink);">Brainstorm</div>
+          <div style="flex:1; text-align:center; padding:4px 0;">Debate</div>
+          <div style="flex:1; text-align:center; padding:4px 0;">More ⌄</div>
+        </div>
+        <div style="padding: 8px 14px 0; font: 10px/1.5 ui-monospace, Menlo, monospace; color: var(--muted);">Brainstorm with me on the topic below. Open with three distinct directions, then build on whichever the other side picks up…</div>
+        <div class="hairline"></div>
+        <div class="field editor">Pricing by seat or by usage</div>
+        <div class="foot">
+          <div class="chip on"><svg viewBox="0 0 14 14"><path d="M3 12.5v-10h8l-1.5 2.5 1.5 2.5H3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>10 turns</div>
+          <div class="chip on"><svg viewBox="0 0 14 14"><rect x="1.5" y="2.5" width="11" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 2.5v9" stroke="currentColor" stroke-width="1.6"/></svg>Tiled</div>
+          <div class="spacer"></div>
+          <div class="primary"><svg viewBox="0 0 14 14"><path d="M3.5 2l9 5-9 5z" fill="currentColor"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Stop, three weights</h2>
+<p class="lead">The same foot mid-run with Stop drawn three ways. All three keep Pause the only filled button. A is what shipped.</p>
+<div class="row">
+  <div class="study">
+    <p class="label"><b>A · Outlined circle</b> (shipped). The primary's own size, paper on the well with the chip edge — the same raised look the tab thumb and the old New session capsule had. Reads as Pause's unfilled twin: same shape, same size, the fill alone telling them apart. (First drawn a size smaller; equal size won on the second look.)</p>
+    <div class="strip">
+      <div class="foot">
+        <div class="line live">Note queued · goes to Claude with the next handoff<span class="clear">Clear note</span></div>
+        <div class="stop-a"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+        <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+      </div>
+    </div>
+    <p class="note">For: a button that looks like a button, at a glance distinct from the option chips. Against: one more outlined shape on the card.</p>
+  </div>
+  <div class="study">
+    <p class="label"><b>B · Bare glyph.</b> The option chips' family: nothing at rest but the glyph in a 32pt square, the hover wash when the pointer rests on it.</p>
+    <div class="strip">
+      <div class="foot">
+        <div class="line live">Note queued · goes to Claude with the next handoff<span class="clear">Clear note</span></div>
+        <div class="stop-b"><svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg></div>
+        <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+      </div>
+    </div>
+    <p class="note">For: the quietest; it borrows the chips' idiom exactly. Against: the chips are toggles, and a glyph in that idiom next to Pause can read as an option rather than an action — and a bare square glyph is easy to miss when the end is wanted in a hurry.</p>
+  </div>
+  <div class="study">
+    <p class="label"><b>C · Word capsule.</b> "End", 24pt tall, the capsule the old New session button wore.</p>
+    <div class="strip">
+      <div class="foot">
+        <div class="line live">Note queued · goes to Claude with the next handoff<span class="clear">Clear note</span></div>
+        <div class="stop-c">End</div>
+        <div class="primary"><svg viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="currentColor"/></svg></div>
+      </div>
+    </div>
+    <p class="note">For: says what it does with no tooltip. Against: the word is heavier than the glyph beside it, so the eye lands on End before Pause; and a word capsule at the foot competes with Clear note, which is also a word there.</p>
+  </div>
+</div>
+
+<h2>What is where now</h2>
+<p class="lead">The head is the same two rows in every state: the perches and the turn line. The note's status line, Clear note, New session, and End session all left the head and the title strip for the composer's foot. The title strip keeps the state pill and the ··· menu with Settings. The summary is the one new element: how the run ended as its headline (Run complete, Run stopped, Turn limit reached, Run ended), the count and the clock, and the last note's record with the note in a tooltip and a popover.</p>
+
+</body>
+</html>

@@ -259,20 +259,4 @@ final class RelayFramingTests: XCTestCase {
         XCTAssertFalse(SendOutcome.abandoned.continuesRun)
         XCTAssertFalse(SendOutcome.refused.continuesRun)
     }
-
-    func testSteeringTranscriptLinesNeverImplySuccessWithoutIt() {
-        let sent = steeringTranscriptLine(
-            SteeringDelivery(leg: .note, note: "Push on pricing.", recipient: .claude, turn: 5, outcome: .delivered),
-            recipientName: "Claude")
-        XCTAssertTrue(sent.contains("delivered to Claude with turn 5"))
-        let unconfirmed = steeringTranscriptLine(
-            SteeringDelivery(leg: .note, note: "Push on pricing.", recipient: .claude, turn: 5, outcome: .unconfirmed),
-            recipientName: "Claude")
-        XCTAssertTrue(unconfirmed.contains("unconfirmed"))
-        XCTAssertFalse(unconfirmed.contains("delivered"))
-        let notShared = steeringTranscriptLine(
-            SteeringDelivery(leg: .echo, note: "Push on pricing.", recipient: .chatgpt, turn: 6, outcome: .runEnded),
-            recipientName: "ChatGPT")
-        XCTAssertTrue(notShared.contains("not shared with ChatGPT"))
-    }
 }

@@ -33,6 +33,7 @@ struct PerchTurnsField: NSViewRepresentable {
         field.alignment = .center
         field.font = font
         field.textColor = color
+        field.isEnabled = context.environment.isEnabled
         field.stringValue = String(value)
         field.cell?.usesSingleLineMode = true
         field.cell?.wraps = false
@@ -49,6 +50,7 @@ struct PerchTurnsField: NSViewRepresentable {
         context.coordinator.parent = self
         field.font = font
         field.textColor = color
+        field.isEnabled = context.environment.isEnabled
         // Never overwrite a number mid-edit: the binding is behind the
         // keystroke that just wrote it. Outside an edit the field follows
         // the controller.
@@ -64,7 +66,7 @@ struct PerchTurnsField: NSViewRepresentable {
             // The chip may be mid-insertion when the request lands, so the
             // field takes the keyboard once it is in its window.
             DispatchQueue.main.async {
-                guard field.window != nil else { return }
+                guard field.window != nil, field.isEnabled else { return }
                 field.selectText(nil)
             }
         }
@@ -88,6 +90,7 @@ struct PerchTurnsField: NSViewRepresentable {
         /// A step from the arrows or the wheel: clamped, committed, and left
         /// selected so the next step or keystroke replaces it.
         func nudge(by step: Int) {
+            guard field?.isEnabled == true else { return }
             let next = clamp(parent.value + step)
             guard next != parent.value else { return }
             parent.value = next

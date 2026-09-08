@@ -1,10 +1,11 @@
 // Every canvas the panel is worked on in, kept out of the view files so
 // each of those stays about its view. Each runs on PerchPreviewEngine, so
-// the controls do what they do in the app — Start starts a run, Stop ends
-// it, Pause to steer holds it at the next handoff, Return sends the note —
-// and nothing reaches either app. A canvas that opens mid-run starts its
-// run here, from the turn its engine is told to open on, and the run then
-// goes on at the engine's pace until the cap or Stop.
+// the controls do what they do in the app — Run starts a run, Stop ends it
+// at the next handoff and leaves the summary, Pause holds it at the next
+// handoff and opens the field, Return sends the note, New session clears
+// the summary — and nothing reaches either app. A canvas that opens
+// mid-run starts its run here, from the turn its engine is told to open
+// on, and the run then goes on at the engine's pace until the cap or Stop.
 
 import SwiftUI
 
@@ -91,13 +92,25 @@ private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine
 
 #Preview("Perch run ended") {
     // A run's leavings, set directly: what the panel shows once the engine
-    // has posted .finished. New session clears them and Start begins a
-    // fresh preview run, as in the app.
+    // has posted .finished — the summary where the field was, New session
+    // at the foot. New session clears them and Run begins a fresh preview
+    // run, as in the app.
     let controller = previewController()
     controller.currentTurn = 6
     controller.lastRunDuration = 272
     controller.chatgptConversation = .ended
     controller.claudeConversation = .ended
+    return PerchPanelView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Perch run stopped (played)") {
+    // A short run stopped from the foot: Stop dims and the line says the
+    // end is coming, then the summary reads "Run stopped". Both sides sign
+    // off from turn 8, so left alone it completes instead.
+    let controller = previewController(PerchPreviewEngine(pace: .seconds(2), signOffAt: 8))
+    controller.start()
     return PerchPanelView(controller: controller)
         .padding(24)
         .background(Color(white: 0.75))

@@ -63,7 +63,7 @@ struct PerchLogWindowView: View {
 #if DEBUG
 #Preview("Log window") {
     let controller = RelayController(engine: PerchPreviewEngine())
-    controller.append("Run starting. Transcript: ~/errol-transcript.md")
+    controller.append("Run starting.")
     controller.append("Turn 1 · ChatGPT is replying")
     controller.append("Turn 2 · Claude is replying")
     controller.append("Pause requested — the run holds at the next handoff.")

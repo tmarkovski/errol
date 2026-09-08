@@ -172,36 +172,6 @@ struct HandoffPayload {
     }
 }
 
-/// The transcript's line for one steering leg, written after the send it
-/// rode (or in place of one), so the permanent record never implies that
-/// an attempted handoff succeeded.
-func steeringTranscriptLine(_ delivery: SteeringDelivery, recipientName: String) -> String {
-    let line: String
-    switch (delivery.leg, delivery.outcome) {
-    case (.note, .delivered):
-        line = "Steering note delivered to \(recipientName) with turn \(delivery.turn)."
-    case (.note, .unconfirmed):
-        line = "Steering note delivery to \(recipientName) unconfirmed — check the app."
-    case (.note, .refused):
-        line = "Steering note not sent: the relay could not type into \(recipientName)."
-    case (.note, .tooLong):
-        line = "Steering note not sent: too long to travel whole with the reply."
-    case (.note, .runEnded):
-        line = "Steering note not sent: the run ended with it still queued."
-    case (.echo, .delivered):
-        line = "Steering note shared with \(recipientName) at turn \(delivery.turn)."
-    case (.echo, .unconfirmed):
-        line = "Steering note sharing with \(recipientName) unconfirmed — check the app."
-    case (.echo, .refused):
-        line = "Steering note not shared with \(recipientName): the relay could not type into it."
-    case (.echo, .tooLong):
-        line = "Steering note not shared with \(recipientName): too long to travel whole with the reply."
-    case (.echo, .runEnded):
-        line = "Steering note not shared with \(recipientName): the run ended first."
-    }
-    return "_\(line)_\n\n"
-}
-
 extension SteeringOutcome {
     /// What a send's outcome means for the note that rode it.
     init(_ send: SendOutcome) {
@@ -330,18 +300,15 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     func side(_ target: TargetApp) -> Speaker {
         target.app == chatgpt.app ? .chatgpt : .claude
     }
-    /// One steering leg's outcome, to the panel and the transcript alike.
+    /// One steering leg's outcome, to the panel.
     func reportSteering(_ leg: SteeringDelivery.Leg, _ note: String, to recipient: TargetApp,
                         turn: Int, outcome: SteeringOutcome) {
         let delivery = SteeringDelivery(leg: leg, note: note, recipient: side(recipient),
                                         turn: turn, outcome: outcome)
-        appendTranscript(steeringTranscriptLine(delivery, recipientName: recipient.name))
         relayEvents.post(.steering(delivery))
     }
 
-    appendTranscript("# Errol transcript, \(iso.string(from: Date()))\n\n")
     let opener = openingMessage()
-    appendTranscript("## Opening message (to \(speaker.name))\n\n\(opener)\n\n")
 
     log("Seeding \(speaker.name)...")
     guard beginOperation(.delivery, waiting: "Paused — waiting before the opening message.") else {
@@ -378,10 +345,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                               onPoll: inspection.map { probe in { probe.responsePoll(speaker, $0) } }) else {
             if relayControl.isCancelled {
                 log("Run stopped by user.")
-                appendTranscript("_Run stopped by user._\n\n")
             } else {
-                log("Stopping: no response activity detected from \(speaker.name).")
-                appendTranscript("_Run stopped: no response activity detected from \(speaker.name) for \(Int(config.timeout))s._\n\n")
+                log("Stopping: no response activity detected from \(speaker.name) for \(Int(config.timeout))s.")
             }
             break
         }
@@ -399,7 +364,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             break
         }
 
-        appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
         if inspection?.reply(speaker, turn, reply) == false {
             log("Verification stopped the relay after inspecting turn \(turn).")
             break
@@ -409,13 +373,11 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         if trimmedReply.isEmpty {
             setConversation(speaker, .ended)
             log("\(speaker.name) ended the conversation (empty reply).")
-            appendTranscript("_\(speaker.name) ended the conversation._\n\n")
             break
         }
         let signedOff = trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
         if signedOff {
             setConversation(speaker, .ended)
-            appendTranscript("_\(speaker.name) ended the conversation._\n\n")
             if lastReplyEnded {
                 log("\(speaker.name) ended the conversation too — both sides have signed off.")
                 break
@@ -475,14 +437,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
 
         guard case .commit(let note, let unfit) = decision else {
             log("Run stopped by user.")
-            appendTranscript("_Run stopped by user._\n\n")
             break
         }
         operationActive = true
 
         if let unfit {
             log("The human's steering note is too long to travel whole with this handoff; not sending it.")
-            appendTranscript("## Steering note (from the human)\n\n\(unfit)\n\n")
             reportSteering(.note, unfit, to: listener, turn: turn, outcome: .tooLong)
         }
         // A note queued while the reply was being written — or while the
@@ -492,7 +452,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         if let note {
             payload.note = note
             log("Relaying the human's steering note with this handoff.")
-            appendTranscript("## Steering note (from the human)\n\n\(note)\n\n")
             relayEvents.post(.steeringCommitted(note: note, recipient: side(listener), turn: turn))
         }
 
@@ -543,6 +502,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     if chatgptConversation != .ended { setConversation(chatgpt, .notStarted) }
     if claudeConversation != .ended { setConversation(claude, .notStarted) }
 
-    log("Done. Transcript: \(config.transcriptPath)")
+    log("Done.")
     return true
 }

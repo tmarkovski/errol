@@ -1,12 +1,12 @@
 // The settings card: the console's own idiom — paper, system type, soft
-// wells, capsule buttons — inside a real titled window that keeps the
-// system close button and floats one level above the console
-// (MenuBarController owns the window). Appearance preferences sit above the
+// wells, capsule buttons — as a screen inside the main panel. The native
+// header provides Back. Appearance preferences sit above the
 // conversation shapes behind the composer's pills.
 
 import SwiftUI
 
 struct SettingsView: View {
+    var isPresented = true
     @ObservedObject private var store = SettingsStore.shared
     @Bindable private var appearance = AppearanceStore.shared
     @State private var selected: String
@@ -17,11 +17,8 @@ struct SettingsView: View {
     @State private var nameDraft: String
     @FocusState private var nameFocused: Bool
 
-    /// The bare title strip the close button stands in (28pt — no toolbar
-    /// here, unlike the console's unified bar).
-    private let titleStrip: CGFloat = 28
-
-    init() {
+    init(isPresented: Bool = true) {
+        self.isPresented = isPresented
         let first = SettingsStore.shared.templates.first?.name ?? ""
         _selected = State(initialValue: first)
         _nameDraft = State(initialValue: first)
@@ -38,23 +35,28 @@ struct SettingsView: View {
         }
         .padding(.horizontal, Perch.s(18))
         .padding(.bottom, Perch.s(18))
-        .padding(.top, titleStrip + Perch.s(8))
-        .frame(width: Perch.s(480), height: Perch.s(470))
+        .padding(.top, Perch.chromeInset)
+        .frame(width: Perch.cardWidth, height: Perch.s(490))
         .background(Perch.paper)
         .tint(Perch.accent)
-        // The wordmark centered in the title strip, as on the console; the
-        // traffic lights sit at its left over the transparent title bar.
+        // The title stays centered in the header, as on the console.
         .overlay(alignment: .top) {
             Text("Settings")
                 .font(Perch.text(13, .semibold))
                 .foregroundColor(Perch.ink)
-                .frame(height: titleStrip)
+                .frame(height: Perch.chromeBand)
                 .allowsHitTesting(false)
         }
         .onAppear {
             if store.template(named: selected) == nil {
                 selected = store.templates.first?.name ?? ""
                 nameDraft = selected
+            }
+        }
+        .onChange(of: isPresented) { _, presented in
+            if !presented {
+                commitName()
+                nameFocused = false
             }
         }
     }

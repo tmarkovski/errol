@@ -1,0 +1,138 @@
+import Observation
+import SwiftUI
+
+/// Settings and permission setup share the console's window. A missing
+/// permission takes precedence over navigation, including after revocation.
+@Observable
+final class PanelNavigation {
+    enum Screen {
+        case console, settings, accessibility
+    }
+
+    var accessibilityGranted: Bool
+    var showsSettings = false
+
+    init(accessibilityGranted: Bool) {
+        self.accessibilityGranted = accessibilityGranted
+    }
+
+    var screen: Screen {
+        guard accessibilityGranted else { return .accessibility }
+        return showsSettings ? .settings : .console
+    }
+}
+
+/// The screen and native frame use the same smoothstep timing curve.
+enum PanelNavigationMotion {
+    static let duration = 0.32
+    static let animation = Animation.timingCurve(1.0 / 3, 0, 2.0 / 3, 1,
+                                                 duration: duration)
+}
+
+/// Animate only presentation, leaving destination measurements immediate.
+/// Animating layout here would continually restart the native frame animation.
+struct PanelScreenPresentation: ViewModifier {
+    let isVisible: Bool
+    let hiddenOffset: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            // Clear the outgoing text first, so two dense screens do not
+            // remain legible on top of each other during the crossfade.
+            .animation(reduceMotion ? .easeOut(duration: 0.12)
+                       : isVisible ? .easeInOut(duration: 0.24).delay(0.08)
+                       : .easeOut(duration: 0.12), value: isVisible)
+            .offset(x: isVisible || reduceMotion ? 0 : hiddenOffset)
+            .animation(reduceMotion ? nil : PanelNavigationMotion.animation,
+                       value: isVisible)
+            .disabled(!isVisible)
+            .allowsHitTesting(isVisible)
+            .accessibilityHidden(!isVisible)
+    }
+}
+
+/// Fill and clip to the current native frame throughout a resize, while the
+/// card inside continues to measure its destination size independently.
+struct PanelWindowSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(minWidth: 0, maxWidth: .infinity,
+                   minHeight: 0, maxHeight: .infinity, alignment: .top)
+            .background(Perch.paper.gesture(WindowDragGesture()))
+            .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+            .ignoresSafeArea()
+    }
+}
+
+struct PanelRootView: View {
+    let controller: RelayController
+    let navigation: PanelNavigation
+    var onCardResize: ((CGSize) -> Void)? = nil
+    var onBack: (() -> Void)? = nil
+
+    var body: some View {
+        let screen = navigation.screen
+        ZStack(alignment: .top) {
+            // Keep both screens mounted: navigating or changing appearance
+            // must not discard the native editor, its selection, or drafts.
+            PerchPanelView(controller: controller)
+                .blur(radius: screen == .accessibility ? 6 : 0)
+                .overlay {
+                    if screen == .accessibility {
+                        Perch.paper.opacity(0.45)
+                    }
+                }
+                .modifier(PanelScreenPresentation(isVisible: screen != .settings,
+                                                  hiddenOffset: -Perch.s(18)))
+                .disabled(screen != .console)
+                .allowsHitTesting(screen == .console)
+                .accessibilityHidden(screen != .console)
+                .frame(height: screen == .settings ? 0 : nil, alignment: .top)
+
+            SettingsView(isPresented: screen == .settings)
+                .modifier(PanelScreenPresentation(isVisible: screen == .settings,
+                                                  hiddenOffset: Perch.s(24)))
+                .frame(height: screen == .settings ? nil : 0, alignment: .top)
+
+            if screen == .accessibility {
+                PermissionOnboardingView()
+                    .padding(.horizontal, Perch.s(22))
+                    .padding(.top, Perch.chromeInset)
+                    .padding(.bottom, Perch.s(22))
+            }
+        }
+        .frame(width: Perch.cardWidth)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(Perch.paper.gesture(WindowDragGesture()))
+        .overlay(alignment: .top) {
+            PerchChrome(controller: controller, screen: screen) {
+                if let onBack {
+                    onBack()
+                } else {
+                    navigation.showsSettings = false
+                }
+            }
+        }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            onCardResize?(size)
+        }
+    }
+}
+
+#if DEBUG
+#Preview("Settings navigation") {
+    let navigation = PanelNavigation(accessibilityGranted: true)
+    navigation.showsSettings = true
+    return PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
+                         navigation: navigation)
+        .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+}
+
+#Preview("Accessibility overlay") {
+    PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
+                  navigation: PanelNavigation(accessibilityGranted: false))
+        .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+}
+#endif

@@ -6,12 +6,16 @@
 // choice is input, so it lives on the composing surface, and the card keeps
 // its anatomy across states — in a run the setup zone folds into a one-line
 // context row above the same hairline, and the editor becomes the steering
-// field. That field is closed while the agents work, with the one filled
-// circle standing in the middle of it as Pause to steer; pressing it holds
-// the run at the next handoff, springs the circle down to the foot's
-// corner, and opens the field. Return sends the note and closes the field
-// again, the note waiting under a blur for its handoff. Where the note is,
-// and what became of it, is the head's line to say (PerchSteering). The
+// field. That field is closed while the agents work, with a notice standing
+// in it: don't type into the chat apps, type here to steer. The one filled
+// circle stays at the foot's corner through every state and changes what it
+// is in place — Run, then Pause, then Continue or Send while the field is
+// open, then New session — with Stop, its unfilled twin, beside it for the
+// length of the run. Pause holds the run at the next handoff and opens the
+// field; Return sends the note and closes it again, the note waiting dimmed
+// in the field for its handoff. Where the note is, and what became of it,
+// is the foot's leading line to say (PerchRunLine); the finished run's
+// summary takes the field's place until New session (PerchRunSummary). The
 // foot follows the chat apps' own composers: the run options are bare
 // glyphs that grow a label when they are on, and one filled circle is the
 // primary action. See PerchPanelView for the panel.
@@ -23,48 +27,41 @@ import SwiftUI
 /// button that watches it, never the tabs or the perches above.
 struct PerchComposer: View {
     let controller: RelayController
-    /// The primary circle's coordinate space. Wherever the circle stands —
-    /// the foot's corner idle and while the field is open, the middle of
-    /// the field while it is closed — it is a source in this space under one
-    /// id, so a change of state moves it rather than swapping it.
-    @Namespace private var primarySpace
 
     var body: some View {
-        // The primary circle is Liquid Glass (PerchPrimaryFace), and glass
-        // morphs between two placements only inside one container — so the
-        // card is that container, with the editor's slot and the foot's
-        // corner both in it.
-        GlassEffectContainer {
-            VStack(alignment: .leading, spacing: Perch.cardGap) {
-                PerchConfigZone(controller: controller)
-                // Keep the probe outside the editor's conditional view identity.
-                // Otherwise the topic-to-steering transition detaches its AppKit
-                // view, leaving the opening handoff without a launch point.
-                ZStack {
-                    PerchComposerEditor(controller: controller, primarySpace: primarySpace)
-                }
-                .frame(maxHeight: .infinity,
-                       alignment: controller.isRunning && !controller.isSteering ? .center : .top)
-                .padding(.horizontal, Perch.contentInset)
-                .background {
-                    PromptTransferProbe(source: controller.promptTransferSource)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-                PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
-                    .padding(.horizontal, Perch.contentInset)
-                    .padding(.bottom, Perch.contentInset)
+        VStack(alignment: .leading, spacing: Perch.cardGap) {
+            PerchConfigZone(controller: controller)
+            // Keep the probe outside the editor's conditional view identity.
+            // Otherwise the topic-to-steering transition detaches its AppKit
+            // view, leaving the opening handoff without a launch point.
+            ZStack {
+                PerchComposerEditor(controller: controller)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, Perch.contentInset)
+            .background {
+                PromptTransferProbe(source: controller.promptTransferSource)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            PerchComposerToolbar(controller: controller)
+                .padding(.horizontal, Perch.contentInset)
+                .padding(.bottom, Perch.contentInset)
         }
         .animation(Perch.spring, value: controller.isSteering)
+        // The run's start is a press, animated at the press; its end
+        // arrives on the engine's stream, so the swap to the summary and
+        // the buttons' change are animated here.
+        .animation(Perch.spring, value: controller.isRunning)
+        .animation(Perch.spring, value: controller.hasFinishedRun)
         .background(Perch.well)
     }
 }
 
 /// The setup zone above the hairline: idle, the shape tabs and — for any
-/// shape but Free chat — the instruction preview; in a run, the one-line
-/// context row. The hairline itself is drawn here so the zone and its rule
-/// always move together.
+/// shape but Free chat — the instruction preview; in a run, and over the
+/// finished run until New session, the one-line context row. The hairline
+/// itself is drawn here so the zone and its rule always move together.
 private struct PerchConfigZone: View {
     let controller: RelayController
     /// The tab thumb's coordinate space: every tab is a source in it, and
@@ -73,7 +70,7 @@ private struct PerchConfigZone: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Perch.cardGap) {
-            if controller.isRunning {
+            if controller.isRunning || controller.hasFinishedRun {
                 contextLine
                     .frame(height: Perch.s(20), alignment: .leading)
                     .padding(.horizontal, Perch.contentInset)
@@ -276,11 +273,10 @@ private struct PerchConfigZone: View {
     // MARK: The zone mid-run
 
     /// The setup zone folded to one line: the loaded shape and the run
-    /// options, readable but no longer controls — a run owns them.
+    /// options, readable but no longer controls — a run owns them, and the
+    /// finished run keeps them as its record until New session.
     private var contextLine: some View {
         HStack(spacing: Perch.s(6)) {
-            Image(systemName: PerchShapeIcons.icon(for: controller.conversation))
-                .font(.system(size: Perch.s(10), weight: .medium))
             Text(controller.conversation)
                 .font(Perch.text(11, .medium))
             Text("·")
@@ -299,20 +295,19 @@ private struct PerchConfigZone: View {
     }
 }
 
-/// The editor in its three modes: topic (Free chat included), full prompt,
-/// steering field. Its own scope so typing invalidates only this view and
-/// the toolbar's morphing button.
+/// The editor in its modes: topic (Free chat included), full prompt, the
+/// steering field open or closed, and the finished run's summary. Its own
+/// scope so typing invalidates only this view and the toolbar's morphing
+/// button.
 private struct PerchComposerEditor: View {
     @Bindable var controller: RelayController
-    let primarySpace: Namespace.ID
 
     private static let steeringFont = NSFont.systemFont(ofSize: Perch.s(12.5))
 
-    /// The field's height floor in a run: the editor's two lines, or the
-    /// circle that stands in the closed field, whichever is taller, so
-    /// opening and closing the field moves no edge of the card.
-    private static let steeringMinimumHeight = max(
-        GrowingTextEditor.height(lines: 2, font: steeringFont), Perch.primaryDiameter)
+    /// The field's height floor in a run: the editor's two lines, which is
+    /// also the notice's two lines, so opening and closing the field moves
+    /// no edge of the card.
+    private static let steeringMinimumHeight = GrowingTextEditor.height(lines: 2, font: steeringFont)
 
     var body: some View {
         if controller.isRunning {
@@ -323,6 +318,9 @@ private struct PerchComposerEditor: View {
                 steeringRest
                     .transition(.opacity)
             }
+        } else if controller.hasFinishedRun {
+            PerchRunSummary(controller: controller)
+                .transition(.opacity)
         } else if !controller.showsFullInstructionsEditor {
             GrowingTextEditor(text: $controller.topic,
                               font: .systemFont(ofSize: Perch.s(12.5)),
@@ -369,8 +367,6 @@ private struct PerchComposerEditor: View {
                           placeholder: controller.steeringText.isEmpty
                               ? "A note for the next handoff…" : nil,
                           minimumLines: 2, maximumLines: 8,
-                          extraMinimumHeight: Self.steeringMinimumHeight
-                              - GrowingTextEditor.height(lines: 2, font: Self.steeringFont),
                           takesFocusOnAppear: true,
                           onSubmit: { withAnimation(Perch.spring) { controller.sendSteering() } },
                           onEscape: { _ in withAnimation(Perch.spring) { controller.escapeSteering() } },
@@ -380,50 +376,48 @@ private struct PerchComposerEditor: View {
                   : "The run holds at the next handoff while the field is open. Write a note and press Return, or Esc to continue without one.")
     }
 
-    /// The field, closed: no typing, the circle in the middle as Pause to
-    /// steer, and the queued note — when there is one — under a blur behind
-    /// it, there to be seen but not touched until the circle pulls it back
-    /// as Pause to edit. The whole area is the circle's target, so a click
-    /// on the blurred words does what the button does.
+    /// The field, closed: no typing here while the agents work, and none in
+    /// the chat apps either — which is what the notice standing in it says,
+    /// in the placeholder's voice, since it is the one thing a person at
+    /// the console most needs told. A queued note takes the notice's place,
+    /// dimmed: there to be seen but not touched until Pause pulls it back
+    /// into the field. The whole area is Pause's target, so a click on the
+    /// words does what the button at the foot does.
     private var steeringRest: some View {
-        Text(controller.steeringText)
-            .font(Font(Self.steeringFont as CTFont))
-            .foregroundColor(Perch.ink)
-            .lineLimit(8)
-            .multilineTextAlignment(.leading)
-            .padding(.vertical, GrowingTextEditor.insetHeight)
-            .frame(maxWidth: .infinity, minHeight: Self.steeringMinimumHeight,
-                   alignment: .topLeading)
-            .blur(radius: Perch.s(2.5))
-            .opacity(controller.steeringQueued ? 0.75 : 0)
-            .accessibilityHidden(true)
-            .overlay { pauseToSteer }
-            .contentShape(Rectangle())
-            .onTapGesture { begin() }
-            .animation(Perch.fade, value: controller.steeringQueued)
-    }
-
-    /// The circle where the words would be. Its word says what the press
-    /// opens the field with: nothing, or the queued note.
-    private var pauseToSteer: some View {
-        Button(action: begin) {
-            PerchPrimaryFace(icon: "pause.fill",
-                             word: controller.isSteeringPending ? "Pausing…"
-                                : controller.steeringQueued ? "Pause to edit" : "Pause to steer",
-                             space: primarySpace)
+        ZStack(alignment: .topLeading) {
+            Text(notice)
+                .font(Font(Self.steeringFont as CTFont))
+                .foregroundColor(Perch.placeholder)
+                .opacity(controller.steeringQueued ? 0 : 1)
+            Text(controller.steeringText)
+                .font(Font(Self.steeringFont as CTFont))
+                .foregroundColor(Perch.ink)
+                .lineLimit(8)
+                .opacity(controller.steeringQueued ? 0.55 : 0)
+                .accessibilityHidden(!controller.steeringQueued)
         }
-        .buttonStyle(.plain)
-        .disabled(controller.isSteeringPending)
-        .opacity(controller.isSteeringPending ? 0.55 : 1)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, GrowingTextEditor.insetHeight)
+        .frame(maxWidth: .infinity, minHeight: Self.steeringMinimumHeight,
+               alignment: .topLeading)
+        .contentShape(Rectangle())
+        .onTapGesture { begin() }
         .help(controller.steeringQueued
-              ? "Hold the run at the next handoff and bring the queued note back into the field"
-              : "Hold the run at the next handoff and open the field for a note")
-        .accessibilityLabel(controller.isSteeringPending ? "Pausing"
-                            : controller.steeringQueued ? "Pause to edit the note" : "Pause to steer")
+              ? "Pause the run at the next handoff and bring the queued note back into the field"
+              : "Pause the run at the next handoff and write a note here")
+        .animation(Perch.fade, value: controller.steeringQueued)
     }
 
-    /// The press springs the circle to the corner, so the state change is
-    /// animated from here rather than in the controller.
+    /// Named for the apps as the perches name them, so a side pointed at
+    /// another app by Settings is warned about under its own name.
+    private var notice: String {
+        "Don't type into \(controller.chatgptStatus.appName) or \(controller.claudeStatus.appName) "
+            + "while the session runs. Type here to steer the conversation instead."
+    }
+
+    /// The press changes the foot's button and opens the field, so the
+    /// state change is animated from here rather than in the controller.
     private func begin() {
         withAnimation(Perch.spring) { controller.beginSteering() }
     }
@@ -436,24 +430,20 @@ private struct PerchComposerEditor: View {
     }
 }
 
-/// The one filled circle's face, wherever it stands: the glyph in a circle
-/// of primaryDiameter and, when the role has a word, the word after it with
-/// the capsule grown around both. Every placement is a source in the
-/// composer's primary space under one id, so when the role moves — into the
-/// middle of the field as Pause to steer, back to the corner as Continue —
-/// the capsule travels and reshapes rather than appearing anew, and a word
-/// that leaves in place (Continue's, as words arrive in the field) scales
-/// out of the glyph's side the way the option chips' labels do. Clipped to
-/// itself so the word does not spill while the capsule closes to a circle.
-/// The theme's accent stays with the primary action, as the tint of its
-/// Liquid Glass: the capsule is glass over the card, not a filled shape.
+/// The one filled circle's face: the glyph in a circle of primaryDiameter
+/// and, when the role has a word, the word after it with the capsule grown
+/// around both. The circle never leaves the foot's corner; a change of role
+/// changes it in place — the glyph swaps with the system's own replace
+/// effect, and a word that arrives or leaves (Continue's, as words arrive in
+/// the field; New session's, at the run's end) scales out of the glyph's
+/// side the way the option chips' labels do. Clipped to itself so the word
+/// does not spill while the capsule closes to a circle. The theme's accent
+/// stays with the primary action, as the tint of its Liquid Glass: the
+/// capsule is glass over the card, not a filled shape.
 private struct PerchPrimaryFace: View {
     let icon: String
     var word: String? = nil
     var dimmed = false
-    let space: Namespace.ID
-
-    private static let id = "primary"
 
     var body: some View {
         HStack(spacing: 0) {
@@ -480,83 +470,78 @@ private struct PerchPrimaryFace: View {
         .clipShape(Capsule())
         .opacity(dimmed ? 0.4 : 1)
         .contentShape(Capsule())
-        // The glass morphs between the field and the corner under the same
-        // id the geometry matches on, so the material travels with the
-        // capsule instead of fading out and in.
-        .glassEffectID(Self.id, in: space)
-        .matchedGeometryEffect(id: Self.id, in: space)
     }
 }
 
 /// The foot of the card: the run options leading — the end condition and
-/// tiling, each its own control (a hint line, or Clear note, takes their
-/// place mid-run) — and the one primary circle trailing, when it is here.
-/// Ending a run lives in the title strip's overflow menu (PerchChrome), per
-/// the converged proposal — the circle is the safety action, so it stays
-/// the only big button.
+/// tiling, each its own control (the run's line takes their place mid-run,
+/// and nothing does over the finished run) — and the session's buttons
+/// trailing: the one primary circle in every state, with Stop beside it
+/// for the length of the run. Stop is the primary's size but unfilled —
+/// the two read as a pause/stop pair, and the fill alone says which is
+/// the safety action a hurried hand should find.
 private struct PerchComposerToolbar: View {
     @Bindable var controller: RelayController
-    let primarySpace: Namespace.ID
     /// Bumped whenever the turn count should take the keyboard: when the
     /// limit is switched on, and when its label is clicked.
     @State private var turnsFocus = 0
     /// The chips' height, and the square a bare glyph sits in.
     private static let chipSize = Perch.s(32)
+    /// Stop's circle: the primary's own diameter.
+    private static let stopDiameter = Perch.primaryDiameter
 
     var body: some View {
         HStack(spacing: Perch.s(8)) {
             if controller.isRunning {
-                runFoot
-            } else {
+                // Sized before the spacer, so the line has the whole
+                // width the buttons leave and truncates only past that.
+                PerchRunLine(controller: controller)
+                    .layoutPriority(1)
+                    .transition(.opacity)
+            } else if !controller.hasFinishedRun {
                 HStack(spacing: Perch.s(6)) {
                     turnLimitChip
                     tileChip
                 }
+                .transition(.opacity)
             }
             Spacer(minLength: Perch.s(8))
+            if controller.isRunning {
+                stopButton
+            }
             primaryButton
         }
-        // The circle sets the foot's height; while it stands in the field
-        // the foot keeps that height without it.
+        // The circle sets the foot's height.
         .frame(minHeight: Perch.primaryDiameter)
     }
 
-    // MARK: The foot mid-run
+    // MARK: Stop
 
-    /// The leading slot in a run: while the field is open, what the keys
-    /// do; while a note is queued, the one explicit way to drop it without
-    /// opening the field. Where the note is lives in the head.
-    @ViewBuilder
-    private var runFoot: some View {
-        if controller.steeringQueued, !controller.isSteering {
-            Button {
-                withAnimation(Perch.fade) { _ = controller.clearSteering() }
-            } label: {
-                Text("Clear note")
-                    .font(Perch.text(11, .medium))
-                    .perchHoverInk(idle: Perch.secondary, active: Perch.ink)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Drop the queued note — nothing goes with the next handoff")
-            .transition(.opacity)
-        } else {
-            Text(footHint)
-                .font(Perch.text(11))
-                .foregroundColor(Perch.placeholder)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .contentTransition(.opacity)
-                .animation(Perch.fade, value: footHint)
-                .transition(.opacity)
+    /// Ending the run, beside Pause: it asks for the end at the next safe
+    /// point and dims once it has, since the run may be mid-reply for a
+    /// while yet — the foot's line says so meanwhile; the summary follows
+    /// when the run actually ends.
+    private var stopButton: some View {
+        Button {
+            withAnimation(Perch.fade) { controller.stop() }
+        } label: {
+            Image(systemName: "stop.fill")
+                .font(.system(size: Perch.s(12), weight: .bold))
+                .foregroundColor(Perch.secondary)
+                .frame(width: Self.stopDiameter, height: Self.stopDiameter)
+                .background(Circle().fill(Perch.paper))
+                .overlay(Circle().stroke(Perch.chipEdge, lineWidth: 1))
+                .perchHover(Circle())
+                .contentShape(Circle())
         }
-    }
-
-    private var footHint: String {
-        guard controller.isSteering else { return "" }
-        return controller.steeringHasText
-            ? "Return sends it with the next handoff · Esc clears it"
-            : "Write a note · Esc continues without one"
+        .buttonStyle(.plain)
+        .disabled(controller.stopRequested)
+        .opacity(controller.stopRequested ? 0.4 : 1)
+        .help(controller.stopRequested
+              ? "Ending the run at the next safe point…"
+              : "End the session at the next safe point.")
+        .accessibilityLabel(controller.stopRequested ? "Ending the session" : "End session")
+        .transition(.scale(scale: 0.6).combined(with: .opacity))
     }
 
     // MARK: Run options
@@ -654,7 +639,7 @@ private struct PerchComposerToolbar: View {
             .buttonStyle(.plain)
             .help(controller.limitTurns
                   ? "Ending after the set number of turns. Click to end only when both agents sign off."
-                  : "End condition: stop after a set number of turns. Off, the run ends when both agents sign off (or on an empty reply, a timeout, or End session).")
+                  : "End condition: stop after a set number of turns. Off, the run ends when both agents sign off (or on an empty reply, a timeout, or Stop).")
             if controller.limitTurns {
                 turnCount.transition(labelTransition)
             }
@@ -686,32 +671,27 @@ private struct PerchComposerToolbar: View {
 
     // MARK: The primary button
 
-    /// The one filled circle at the foot's corner: Run idle, and in a run
-    /// only while the field is open — a capsule reading Continue while the
-    /// field is empty, since a bare play glyph there did not say whether it
-    /// went on with nothing or was waiting for words, closing to the arrow
-    /// circle once there are words to send. The word leaves exactly when
-    /// the button stops meaning "go on without a note". While the field is
-    /// closed the circle stands in the middle of it as Pause to steer
-    /// (PerchComposerEditor); the press springs it down here, and sending
-    /// springs it back. Run springs it up into the field the same way when
-    /// the run starts.
-    @ViewBuilder
+    /// The one filled circle at the foot's corner, in every state: Run
+    /// idle; Pause while the run relays, the glyph turned in place at
+    /// Start; while the field is open a capsule reading Continue as long as
+    /// the field is empty, since a bare play glyph there did not say
+    /// whether it went on with nothing or was waiting for words, closing to
+    /// the arrow circle once there are words to send — the word leaves
+    /// exactly when the button stops meaning "go on without a note"; and
+    /// once the run is over, New session, the one thing left to do. Return
+    /// is Run and New session; in a run the field's own Return sends.
     private var primaryButton: some View {
-        if let role = primaryRole {
-            Button(action: role.action) {
-                PerchPrimaryFace(icon: role.icon, word: role.word, dimmed: role.disabled,
-                                 space: primarySpace)
-            }
-            .buttonStyle(.plain)
-            .disabled(role.disabled)
-            .keyboardShortcut(controller.isRunning ? nil : .defaultAction)
-            .help(role.help)
-            .accessibilityLabel(role.label)
-            .animation(.easeInOut(duration: 0.15), value: role.icon)
-            .animation(Perch.spring, value: role.word)
-            .transition(.opacity)
+        let role = primaryRole
+        return Button(action: role.action) {
+            PerchPrimaryFace(icon: role.icon, word: role.word, dimmed: role.disabled)
         }
+        .buttonStyle(.plain)
+        .disabled(role.disabled)
+        .keyboardShortcut(controller.isRunning ? nil : .defaultAction)
+        .help(role.help)
+        .accessibilityLabel(role.label)
+        .animation(.easeInOut(duration: 0.15), value: role.icon)
+        .animation(Perch.spring, value: role.word)
     }
 
     private struct PrimaryRole {
@@ -726,26 +706,44 @@ private struct PerchComposerToolbar: View {
         let action: () -> Void
     }
 
-    /// nil while the circle stands in the field.
-    private var primaryRole: PrimaryRole? {
+    private var primaryRole: PrimaryRole {
+        if controller.hasFinishedRun {
+            return PrimaryRole(icon: "square.and.pencil", label: "New session", word: "New session",
+                               help: "Clear the finished run and get the composer back. The prompt and options stay.",
+                               disabled: false,
+                               action: { withAnimation(Perch.spring) { controller.resetSession() } })
+        }
         guard controller.isRunning else {
             return PrimaryRole(icon: "play.fill", label: "Run",
                                help: "Start the relay",
                                disabled: !controller.instructionsReady,
                                action: { withAnimation(Perch.spring) { controller.start() } })
         }
-        guard controller.isSteering else { return nil }
-        if controller.steeringHasText {
-            return PrimaryRole(icon: "arrow.up", label: "Send",
-                               help: "Send the note with the next handoff and let the run go on",
+        if controller.isSteering {
+            if controller.steeringHasText {
+                return PrimaryRole(icon: "arrow.up", label: "Send",
+                                   help: "Send the note with the next handoff and let the run go on",
+                                   disabled: false,
+                                   action: { withAnimation(Perch.spring) { controller.sendSteering() } })
+            }
+            return PrimaryRole(icon: "play.fill", label: "Continue", word: "Continue",
+                               help: controller.isHolding
+                                   ? "Send the held reply and go on, without a note"
+                                   : "Call off the pause and let the run carry on, without a note",
                                disabled: false,
                                action: { withAnimation(Perch.spring) { controller.sendSteering() } })
         }
-        return PrimaryRole(icon: "play.fill", label: "Continue", word: "Continue",
-                           help: controller.isHolding
-                               ? "Send the held reply and go on, without a note"
-                               : "Call off the pause and let the run carry on, without a note",
+        if controller.isSteeringPending {
+            return PrimaryRole(icon: "pause.fill", label: "Pausing", word: "Pausing…",
+                               help: "Holding at the next handoff — the field opens then",
+                               disabled: true, action: {})
+        }
+        return PrimaryRole(icon: "pause.fill",
+                           label: controller.steeringQueued ? "Pause to edit the note" : "Pause to steer",
+                           help: controller.steeringQueued
+                               ? "Pause the run at the next handoff and bring the queued note back into the field"
+                               : "Pause the run at the next handoff and open the field for a note",
                            disabled: false,
-                           action: { withAnimation(Perch.spring) { controller.sendSteering() } })
+                           action: { withAnimation(Perch.spring) { controller.beginSteering() } })
     }
 }

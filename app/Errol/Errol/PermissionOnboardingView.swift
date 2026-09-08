@@ -1,112 +1,85 @@
-// The pre-permission explainer shown at launch while the Accessibility
-// grant is missing. Standard priming pattern: say what will be requested
-// and why before the system dialog appears, offer the request as an
-// explicit choice, and keep watching so the screen acknowledges the grant
-// the moment it lands (the user is off in System Settings when it does).
-//
-// The first Grant click goes through AXIsProcessTrustedWithOptions so macOS
-// shows its own dialog and registers Errol in the Accessibility list; once
-// that dialog has been spent (the API only ever shows it once), later
-// clicks deep-link straight to the pane instead of silently doing nothing.
+// Permission setup is a blocking card over the blurred console. The shell
+// polls macOS and removes it as soon as access is granted. The first click
+// registers Errol with the system prompt; later clicks open its settings pane.
 
 import ApplicationServices
-import Combine
 import SwiftUI
 
 struct PermissionOnboardingView: View {
-    /// Close the window and open the panel — the "granted, get started" path.
-    let onFinished: () -> Void
-    /// Close the window without the grant; Start still re-asks later.
-    let onDismiss: () -> Void
-
-    @State private var trusted = AXIsProcessTrusted()
-    private let poll = Timer.publish(every: 1, on: .main, in: .common)
-        .autoconnect()
     private static let didPromptKey = "didRequestAXPermission"
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 72, height: 72)
-            Text("Errol needs Accessibility access")
-                .font(.title2.bold())
-            Text("Errol relays a conversation between the ChatGPT and Claude "
-                 + "desktop apps. macOS only lets it read and press another "
-                 + "app's controls through the Accessibility permission, so "
-                 + "nothing works until it is granted.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: Perch.s(18)) {
+            HStack(spacing: Perch.s(12)) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: Perch.s(24), weight: .medium))
+                    .foregroundStyle(Perch.accentText)
+                    .frame(width: Perch.s(48), height: Perch.s(48))
+                    .background(RoundedRectangle(cornerRadius: Perch.s(12))
+                        .fill(Perch.accentBack))
+                VStack(alignment: .leading, spacing: Perch.s(4)) {
+                    Text("Allow Accessibility access")
+                        .font(Perch.text(18, .semibold))
+                        .foregroundStyle(Perch.ink)
+                    Text("One step before your first conversation.")
+                        .font(Perch.text(12))
+                        .foregroundStyle(Perch.secondary)
+                }
+            }
+
+            Text("Errol needs permission to read replies and send messages between your two desktop apps.")
+                .font(Perch.text(13))
+                .foregroundStyle(Perch.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 14) {
-                row(icon: "text.magnifyingglass",
-                    title: "Reads the two chat windows",
-                    detail: "Finds each app's message box and copies finished "
-                        + "replies out — that is how a reply crosses over.")
-                row(icon: "keyboard",
-                    title: "Types and sends on your behalf",
-                    detail: "Pastes each reply into the other app and presses "
-                        + "its own Send button, one turn at a time.")
-                row(icon: "lock",
-                    title: "Stays on your Mac",
-                    detail: "Only ChatGPT and Claude are driven, nothing else "
-                        + "is read, and the transcript is saved to your "
-                        + "Documents folder.")
+            VStack(alignment: .leading, spacing: Perch.s(14)) {
+                step("1", "Open Accessibility in System Settings.")
+                step("2", "Turn on the switch next to Errol.")
+                step("3", "Come back here. This screen clears automatically when access is ready.")
             }
-            .padding(.vertical, 18)
 
-            if trusted {
-                Label("Accessibility access is granted", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-                    .font(.headline)
-                Button("Start Using Errol") { onFinished() }
-                    .keyboardShortcut(.defaultAction)
-                    .controlSize(.large)
-            } else {
-                Button("Grant Accessibility Access…") { requestAccess() }
-                    .keyboardShortcut(.defaultAction)
-                    .controlSize(.large)
-                Text("macOS will ask you to allow Errol under "
-                     + "Privacy & Security › Accessibility.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Not Now") { onDismiss() }
-                    .buttonStyle(.link)
-                    .padding(.top, 2)
+            Button(action: requestAccess) {
+                Text("Open Accessibility Settings…")
+                    .font(Perch.text(13, .semibold))
+                    .foregroundStyle(Perch.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Perch.s(11))
+                    .background(RoundedRectangle(cornerRadius: Perch.s(9)).fill(Perch.accent))
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+
+            Label("Waiting for Accessibility access", systemImage: "lock")
+                .font(Perch.text(11))
+                .foregroundStyle(Perch.muted)
+                .frame(maxWidth: .infinity)
         }
-        .padding(28)
-        .frame(width: 440)
-        .onReceive(poll) { _ in trusted = AXIsProcessTrusted() }
+        .padding(Perch.s(22))
+        .background(RoundedRectangle(cornerRadius: Perch.s(16)).fill(Perch.paper))
+        .overlay(RoundedRectangle(cornerRadius: Perch.s(16))
+            .stroke(Perch.chipEdge, lineWidth: 1))
+        .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
     }
 
-    private func row(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.tint)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(detail)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    private func step(_ number: String, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Perch.s(10)) {
+            Text(number)
+                .font(Perch.text(12, .semibold))
+                .foregroundStyle(Perch.accentText)
+                .frame(width: Perch.s(22))
+            Text(text)
+                .font(Perch.text(12))
+                .foregroundStyle(Perch.ink)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func requestAccess() {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let alreadyPrompted = UserDefaults.standard.bool(forKey: Self.didPromptKey)
-        if AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) {
-            trusted = true
-            return
-        }
+        guard !AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) else { return }
         UserDefaults.standard.set(true, forKey: Self.didPromptKey)
-        // The system dialog is one-shot per TCC entry; once it has been
-        // used up, take the user to the pane itself.
         if alreadyPrompted,
            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)

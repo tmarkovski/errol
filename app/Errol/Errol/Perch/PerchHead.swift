@@ -1,7 +1,10 @@
 // The head: the two perches with their avatars (PerchAvatar — the apps'
 // own icons) and presence dots, the dotted flight path between them with
 // the courier bead riding it, and the turn line that says in one quiet
-// sentence what the panel is doing. See PerchPanelView for the panel.
+// sentence what the panel is doing. Nothing else: where a note is and what
+// became of it, the finished run's summary, and the session's buttons all
+// live at the composer's foot (PerchComposer), so the head is the same two
+// rows in every state. See PerchPanelView for the panel.
 
 import SwiftUI
 
@@ -24,18 +27,6 @@ struct PerchHead: View {
                       feather: Perch.claudeFeather)
             }
             turnLine
-            if controller.isRunning || controller.hasFinishedRun {
-                // The note's line: where it is during the run, what became
-                // of it after, kept until New session since ending is when
-                // someone inspects what happened. The slot is reserved for
-                // the whole run, so the composer does not move when the
-                // field opens.
-                PerchSteeringLine(controller: controller)
-                    .frame(height: Perch.s(14))
-            }
-            if controller.hasFinishedRun {
-                newSessionButton
-            }
         }
     }
 
@@ -137,8 +128,10 @@ struct PerchHead: View {
     /// One sentence, centered: the turn count and what is happening to it.
     /// This is where the precise copy lives — "Will pause after Claude
     /// finishes" rather than a bare "Paused" — because the pause states are
-    /// exactly the ones a glance misreads. The hold is always Pause to
-    /// steer's; the line under this one says what the note is doing.
+    /// exactly the ones a glance misreads. The hold is always Pause's; what
+    /// the note is doing is the composer's foot line to say. Once the run
+    /// is over the line keeps to the count, and the composer's summary has
+    /// the clock and the ending.
     private var turnLine: some View {
         Text(turnText)
             .font(Perch.text(11))
@@ -161,12 +154,8 @@ struct PerchHead: View {
             return "\(turn) · Relaying"
         }
         if controller.hasFinishedRun {
-            var line = bothEnded ? "Run complete" : "Run ended"
-            line += " · \(controller.currentTurn) \(controller.currentTurn == 1 ? "turn" : "turns")"
-            if let duration = controller.lastRunDuration {
-                line += " · ran \(runClock(duration))"
-            }
-            return line
+            let count = "\(controller.currentTurn) \(controller.currentTurn == 1 ? "turn" : "turns")"
+            return (bothEnded ? "Run complete" : "Run ended") + " · " + count
         }
         return "Turn 0 · \(openerName) opens"
     }
@@ -184,14 +173,6 @@ struct PerchHead: View {
         }
     }
 
-    private func runClock(_ duration: TimeInterval) -> String {
-        let total = Int(duration.rounded())
-        let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60)
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-            : String(format: "%d:%02d", minutes, seconds)
-    }
-
     /// The bead parks under whichever side is composing and waits mid-arc
     /// when nobody is — before the run, between deliveries, and once a pause
     /// has parked a captured reply with the courier.
@@ -200,29 +181,6 @@ struct PerchHead: View {
         if controller.chatgptConversation == .chatting { return 0.06 }
         if controller.claudeConversation == .chatting { return 0.94 }
         return 0.5
-    }
-
-    // MARK: New session
-
-    /// The second step of the two-step ending: END leaves the finished run
-    /// readable — the turn count, the sign-offs, the clock — and this is
-    /// what clears it for the next one.
-    private var newSessionButton: some View {
-        Button {
-            controller.resetSession()
-        } label: {
-            Text("New session")
-                .font(Perch.text(11, .medium))
-                .foregroundColor(Perch.secondary)
-                .padding(.horizontal, Perch.s(12))
-                .frame(height: Perch.s(24))
-                .background(Capsule().fill(Perch.paper))
-                .overlay(Capsule().stroke(Perch.chipEdge, lineWidth: 1))
-                .perchHover(Capsule())
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help("Clear the finished run — turns, perches, and clock back to start")
     }
 }
 

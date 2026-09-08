@@ -123,6 +123,8 @@ struct GrowingTextEditor: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.scrollView = scrollView
         session?.attach(textView)
+        textView.isEditable = context.environment.isEnabled && (session?.acceptsInput ?? true)
+        textView.isSelectable = textView.isEditable
         if takesFocusOnAppear {
             // No window yet while the view is being made; by the next turn
             // of the loop it is in one.
@@ -144,6 +146,10 @@ struct GrowingTextEditor: NSViewRepresentable {
         if textView.insertionPointColor != textColor { textView.insertionPointColor = textColor }
         textView.placeholderColor = placeholderColor
         textView.trailingPlaceholder = placeholder
+        // A retained composer is disabled while Settings or permission
+        // setup covers it. SwiftUI's disabled state must reach AppKit too.
+        textView.isEditable = context.environment.isEnabled && (session?.acceptsInput ?? true)
+        textView.isSelectable = textView.isEditable
         if textView.string != text {
             textView.string = text
         }

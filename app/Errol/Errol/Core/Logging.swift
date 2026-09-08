@@ -1,6 +1,5 @@
 // Timestamped logging to stdout, the engine's outward event stream, the
-// app's inward control mailbox, the per-run debug log on disk, and the
-// incremental markdown transcript.
+// app's inward control mailbox, and the per-run debug log on disk.
 
 import Foundation
 
@@ -488,16 +487,4 @@ func completeFocusOperation(control: RelayControl, events: RelayEventBus,
     }
     if Thread.isMainThread { complete() }
     else { DispatchQueue.main.sync(execute: complete) }
-}
-
-func appendTranscript(_ text: String) {
-    let url = URL(fileURLWithPath: config.transcriptPath)
-    if !FileManager.default.fileExists(atPath: url.path) {
-        FileManager.default.createFile(atPath: url.path, contents: nil)
-    }
-    if let handle = try? FileHandle(forWritingTo: url) {
-        handle.seekToEndOfFile()
-        handle.write(text.data(using: .utf8)!)
-        try? handle.close()
-    }
 }

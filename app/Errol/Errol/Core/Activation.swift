@@ -76,8 +76,10 @@ func currentFrontmostApp() -> NSRunningApplication? {
     return NSWorkspace.shared.frontmostApplication
 }
 
-/// Hand focus back to the given app — whatever was frontmost when Start was
-/// pressed — at the end of each run.
+/// Hand focus back to the given app — whatever was frontmost before a
+/// verification case took it — once the case is done. The app's own runs
+/// end the other way round: the console takes the keyboard back
+/// (RelayController.finishRun).
 func refocus(to app: NSRunningApplication?) {
     guard let app, let bundleID = app.bundleIdentifier else { return }
     // Skip when it never lost focus (e.g. an inspection moves no windows).

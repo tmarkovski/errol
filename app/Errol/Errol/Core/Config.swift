@@ -140,9 +140,9 @@ struct Config {
     /// thinking and tool use can take longer than five minutes overall.
     var timeout: TimeInterval = 300
     var maxChars = 12000
-    /// Run artifacts live in Documents: the app is launched from Finder with
-    /// "/" as its working directory, so relative paths would be unwritable.
-    var transcriptPath = Config.documentsPath("errol-transcript.md")
+    /// The frame record lives in Documents: the app is launched from Finder
+    /// with "/" as its working directory, so a relative path would be
+    /// unwritable.
     var frameStatePath = Config.documentsPath(".errol-frames")
 
     // ChatGPT's response action bar uses bare "Copy"; "Copy message" (paired

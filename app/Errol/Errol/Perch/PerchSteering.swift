@@ -1,45 +1,51 @@
-// The steering note's chrome outside the field: the line under the head's
-// turn line that says where the note is — being written, queued, sending —
-// and then what became of it, and the popover that shows a note whole. The
-// field itself (PerchComposer) is closed while the agents work, with Pause
-// to steer standing in it and a queued note blurred behind; the press opens
-// it. The design is docs/design-proposals/steering/the-note-stays-put.md,
-// as revised at its end. See PerchHead for the slot this fills.
+// The run's lines outside the field: the composer's foot line that says
+// what the keys do while the field is open and where the note is once it
+// has left — queued, sending — and then what became of it; the summary
+// that takes the field's place when the run is over; and the popover that
+// shows a note whole. The field itself (PerchComposer) is closed while the
+// agents work, with the notice about the chat apps standing in it and a
+// queued note dimmed in its place; Pause at the foot opens it. The design
+// is docs/design-proposals/steering/the-note-stays-put.md, as revised at
+// its end. See PerchComposer for the foot and the slot these fill.
 
 import SwiftUI
 
-/// The head's steering line. One line in a slot the head reserves for the
-/// whole run, so the composer never moves when a note starts; empty when
-/// there is nothing to say. A note in flight outranks the open field, the
-/// open field outranks a queued note (opening it takes the note back), and
-/// the last note's record shows when none of those is true — so closing the
-/// field without a note brings the record back. The line describes the
-/// note; whether the run is running, pausing, or held is the turn line's to
-/// say, right above, and the two never restate each other.
-struct PerchSteeringLine: View {
+/// The foot's leading line during a run. Ending outranks everything, the
+/// open field outranks a note in flight (the keys need saying), the note in
+/// flight outranks a queued one, the queued note outranks the record
+/// (opening the field takes the note back), and the last note's record
+/// shows when none of those is true — so closing the field without a note
+/// brings the record back. The line describes the note; whether the run is
+/// running, pausing, or held is the head's turn line to say, and the two
+/// never restate each other.
+struct PerchRunLine: View {
     let controller: RelayController
 
     private enum Slot: Equatable {
-        case sending, queued, writing, record, empty
+        case ending, writing, sending, queued, record, empty
     }
 
     private var slot: Slot {
-        if controller.steeringInFlight != nil { return .sending }
+        if controller.stopRequested { return .ending }
         if controller.isSteering { return .writing }
+        if controller.steeringInFlight != nil { return .sending }
         if controller.steeringQueued { return .queued }
         if controller.lastReceipt != nil { return .record }
         return .empty
     }
 
     var body: some View {
-        ZStack {
+        HStack(spacing: Perch.s(8)) {
             switch slot {
+            case .ending:
+                live("Ending the run at the next safe point…")
+            case .writing:
+                hint(writingText)
             case .sending:
                 live("Sending note to \(controller.steeringInFlight?.recipient ?? "the next side")…")
             case .queued:
                 live(queuedText)
-            case .writing:
-                live(writingText)
+                clearNote
             case .record:
                 if let receipt = controller.lastReceipt {
                     PerchReceiptLine(controller: controller, receipt: receipt)
@@ -49,11 +55,12 @@ struct PerchSteeringLine: View {
                 EmptyView()
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(Perch.fade, value: slot)
     }
 
     /// A line about a note that is still the run's concern, in the quiet
-    /// amber the panel uses for "live".
+    /// accent the panel uses for "live".
     private func live(_ text: String) -> some View {
         Text(text)
             .font(Perch.text(11))
@@ -65,12 +72,30 @@ struct PerchSteeringLine: View {
             .transition(.opacity)
     }
 
-    /// The field is open. With nothing in it yet, the line says what the
-    /// hold is for; with words, who they are for.
+    /// What the keys do, in the placeholder's voice: instruction, not
+    /// state.
+    private func hint(_ text: String) -> some View {
+        Text(text)
+            .font(Perch.text(11))
+            .foregroundColor(Perch.placeholder)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .contentTransition(.opacity)
+            .animation(Perch.fade, value: text)
+            .transition(.opacity)
+    }
+
+    /// The field is open. With nothing in it yet, whom the note would be
+    /// for and how to continue without one; with words, how to send them
+    /// and how to clear them.
     private var writingText: String {
-        guard controller.steeringHasText else { return "Steering · write a note, or continue" }
-        if let side = controller.nextRecipient { return "Writing a note for \(side)" }
-        return "Writing a note for the next handoff"
+        let side = controller.nextRecipient
+        if controller.steeringHasText {
+            return side.map { "Return sends it to \($0) · Esc clears it" }
+                ?? "Return sends it with the next handoff · Esc clears it"
+        }
+        return side.map { "Write a note for \($0) · Esc continues without one" }
+            ?? "Write a note · Esc continues without one"
     }
 
     private var queuedText: String {
@@ -79,11 +104,106 @@ struct PerchSteeringLine: View {
         }
         return "Note queued · goes with the next handoff"
     }
+
+    /// While a note is queued, the one explicit way to drop it without
+    /// opening the field. Kept whole: the line beside it truncates first.
+    private var clearNote: some View {
+        Button {
+            withAnimation(Perch.fade) { _ = controller.clearSteering() }
+        } label: {
+            Text("Clear note")
+                .font(Perch.text(11, .medium))
+                .perchHoverInk(idle: Perch.secondary, active: Perch.ink)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help("Drop the queued note — nothing goes with the next handoff")
+        .transition(.opacity)
+    }
 }
 
-/// What became of the last note, in one muted line under the turn line,
-/// until the next note or New session. The tooltip is the quick peek at the
-/// note; a click or keyboard activation opens it whole.
+/// The finished run, where the field was: how it ended as the headline,
+/// the count and the clock under it, and the last note's record when there
+/// is one. It stays until New session, since ending is when someone
+/// inspects what happened. The head's turn line keeps to the count; this
+/// is where the rest of the story goes.
+struct PerchRunSummary: View {
+    let controller: RelayController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Perch.s(5)) {
+            Text(headline)
+                .font(Perch.text(13, .semibold))
+                .foregroundColor(Perch.ink)
+            Text(detail)
+                .font(Perch.text(11))
+                .foregroundColor(Perch.muted)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let receipt = controller.lastReceipt {
+                PerchReceiptLine(controller: controller, receipt: receipt)
+            }
+        }
+        .padding(.vertical, GrowingTextEditor.insetHeight)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var bothEnded: Bool {
+        controller.chatgptConversation == .ended && controller.claudeConversation == .ended
+    }
+
+    /// The side that ended the conversation when only one did: a sign-off
+    /// the other never answered in kind, or an empty reply.
+    private var soleEnder: String? {
+        switch (controller.chatgptConversation, controller.claudeConversation) {
+        case (.ended, .ended): return nil
+        case (.ended, _): return controller.chatgptStatus.appName
+        case (_, .ended): return controller.claudeStatus.appName
+        default: return nil
+        }
+    }
+
+    private var reachedTurnLimit: Bool {
+        controller.limitTurns && controller.currentTurn >= controller.turns
+    }
+
+    /// How it ended, most deliberate reading first: a mutual sign-off is
+    /// complete whatever else happened, a Stop is a stop, and the cap is
+    /// the cap. Anything else — an empty reply, a timeout, a copy that
+    /// failed — is an end the log explains.
+    private var headline: String {
+        if bothEnded { return "Run complete" }
+        if controller.stopRequested { return "Run stopped" }
+        if reachedTurnLimit { return "Turn limit reached" }
+        return "Run ended"
+    }
+
+    private var detail: String {
+        var parts = ["\(controller.currentTurn) \(controller.currentTurn == 1 ? "turn" : "turns")"]
+        if let duration = controller.lastRunDuration {
+            parts.append("ran \(runClock(duration))")
+        }
+        if bothEnded {
+            parts.append("both signed off")
+        } else if let side = soleEnder {
+            parts.append("\(side) ended the conversation")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func runClock(_ duration: TimeInterval) -> String {
+        let total = Int(duration.rounded())
+        let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60)
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
+            : String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+/// What became of the last note, in one muted line, until the next note or
+/// New session. The tooltip is the quick peek at the note; a click or
+/// keyboard activation opens it whole.
 struct PerchReceiptLine: View {
     let controller: RelayController
     let receipt: SteeringReceipt

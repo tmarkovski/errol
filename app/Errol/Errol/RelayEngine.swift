@@ -43,8 +43,6 @@ protocol RelayEngine: AnyObject {
     /// The debug dump of both apps' windows, buttons, and selector matches
     /// into the log. Does its own preflight.
     func inspect()
-    /// Open the last run's transcript, or say there is none.
-    func openTranscript()
 }
 
 /// The engine the app runs: the relay over Accessibility on a worker
@@ -103,12 +101,11 @@ final class LiveRelayEngine: RelayEngine {
         // Clear a stale cancel or pause — or a note that never found its
         // handoff — before the worker can read any of them.
         control.reset()
-        let origin = currentFrontmostApp()
         // The on-disk debug log opens before the first line and closes
         // after the last, so a run's file holds the whole run and nothing
         // else (Inspect reports and idle-time lines stay in the panel).
         RunLog.begin()
-        log("Run starting. Transcript: \(config.transcriptPath)")
+        log("Run starting.")
         if let path = RunLog.currentPath { log("Debug log: \(path)") }
         runExclusively { [events, control] in
             // First contact only: the scanner has usually nudged both long
@@ -120,12 +117,9 @@ final class LiveRelayEngine: RelayEngine {
             _ = runRelay(chatgpt: apps.chatgpt, claude: apps.claude, showTransfers: true) { continuing in
                 completeFocusOperation(control: control, events: events, continuingRun: continuing)
             }
-            // Decide before finished clears the editor state. Never save a
-            // restoration to run after the human has finished writing.
-            let mayRestore = DispatchQueue.main.sync {
-                NSApp.keyWindow == nil && !control.isPaused
-            }
-            if mayRestore { refocus(to: origin) }
+            // Focus is the controller's to settle on `.finished`: the
+            // console takes the keyboard back from whichever chat app
+            // replied last (RelayController.finishRun).
             events.post(.finished)
             RunLog.end()
         }
@@ -140,15 +134,6 @@ final class LiveRelayEngine: RelayEngine {
             if freshChatgpt || freshClaude { usleep(700_000) }
             let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
             events.post(.log(report))
-        }
-    }
-
-    func openTranscript() {
-        let url = URL(fileURLWithPath: config.transcriptPath)
-        if FileManager.default.fileExists(atPath: url.path) {
-            NSWorkspace.shared.open(url)
-        } else {
-            report("No transcript yet at \(config.transcriptPath).")
         }
     }
 

@@ -22,17 +22,32 @@ final class KeyablePanel: NSPanel {
     /// Fires on every path the panel appears or disappears through — toggle,
     /// Esc, the close button — so the readiness scanner tracks visibility.
     var onVisibilityChange: ((Bool) -> Void)?
+    /// Navigation gets the first chance at Escape; other screens hide the panel.
+    var onCancel: (() -> Bool)?
 
     override var canBecomeKey: Bool { true }
-    override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    override func cancelOperation(_ sender: Any?) {
+        if onCancel?() != true { orderOut(nil) }
+    }
     /// Every close path — the title bar's close button, Cmd+W, a menu Close
     /// — puts the console away rather than tearing it down. Errol is a
     /// menu-bar app: the window going away is the app going quiet in the
     /// status item, and the process only ends through Quit in that item's
     /// menu.
     override func performClose(_ sender: Any?) { orderOut(nil) }
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Borderless windows have no standard Close item of their own.
+        if !styleMask.contains(.titled),
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+           event.charactersIgnoringModifiers == "w" {
+            performClose(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
     override func makeKeyAndOrderFront(_ sender: Any?) {
         super.makeKeyAndOrderFront(sender)
+        invalidateShadow()
         onVisibilityChange?(true)
     }
     override func orderOut(_ sender: Any?) {
@@ -73,21 +88,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// doesn't restart the frame animation.
     private var lastPanelSize: CGSize?
     private var panelResizeTimer: Timer?
-    /// Settings rides the same non-activating panel machinery as the console
-    /// and floats one level above it, so it opens over the panel without
-    /// stealing focus; only the system close button distinguishes its chrome.
-    /// The permission explainer stays an ordinary activating window — it
-    /// greets a first launch, when there is nothing to avoid deactivating.
-    private var settingsWindow: NSWindow?
-    private var onboardingWindow: NSWindow?
+    private let navigation = PanelNavigation(accessibilityGranted: AXIsProcessTrusted())
+    private var permissionTimer: Timer?
     /// The debug log window, behind the status item's "Show Last Run Log".
     private var logWindow: NSWindow?
     /// Auto-update. Created at launch so background checks start immediately;
     /// everything that could interrupt a run is gated inside it.
     private var updater: UpdaterController!
-    /// The panel's toolbar delegate (PerchChrome). NSToolbar holds its
-    /// delegate weakly, so the shell keeps it alive.
-    private var panelChrome: PerchChromeToolbar?
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
@@ -102,13 +109,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         buildPanel()
         trackStatusIcon()
         relay.openSettingsHandler = { [weak self] in self?.showSettings() }
+        relay.focusPanelHandler = { [weak self] in self?.showPanel() }
         // A menu-bar app with no window gives a first-time user nothing to
         // discover the permission need from, so while the grant is missing
-        // every launch opens the explainer instead of waiting for a Start
-        // press to fail. It closes itself out of the way once granted.
-        if !AXIsProcessTrusted() {
-            showPermissionOnboarding()
+        // every launch opens the panel with setup covering its console.
+        // Keep watching for both grants and revocations, including while
+        // the user is in System Settings or the panel is hidden.
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.refreshAccessibility()
         }
+        if !navigation.accessibilityGranted { showPanel() }
     }
 
     // MARK: Appearance
@@ -123,7 +133,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             rearm.run()
         }
         NSApp.appearance = selection.1.nativeAppearance
-        settingsWindow?.backgroundColor = selection.0.palette.paper
         logWindow?.backgroundColor = selection.0.palette.paper
     }
 
@@ -206,52 +215,22 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Panel
 
-    /// The console's window is titled, but draws none of its chrome —
-    /// transparent title bar, hidden title, content run up under it — so the
-    /// paper card fills the window and AppKit's close button lands on the
-    /// strip across its top (Perch.chromeBand). That is the one way to get
-    /// the real window buttons with their own behavior (the hover glyphs, a
-    /// first click that lands on an unfocused window, Cmd+W) without AppKit
-    /// drawing a title bar over the card: a borderless window has no title
-    /// bar to hang them on, and `standardWindowButton` answers nil for one.
-    /// The cost is that AppKit owns where they sit — top-left, in the title
-    /// bar's strip — which is why the card pads its top past them, and owns
-    /// the window's corner mask and shadow, which the card reads as its own
-    /// edge instead of painting.
+    /// A borderless panel removes AppKit's title bar and window buttons.
+    /// SwiftUI provides the rounded surface and header controls; AppKit
+    /// still casts its native shadow, including the thin outer rim.
     ///
     /// Esc hides it; the bare paper drags it; the frame follows the card
     /// (fitPanel).
     private func buildPanel() {
         panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: PerchMetrics.initialPanel),
-                             styleMask: [.titled, .closable, .fullSizeContentView,
-                                         .nonactivatingPanel],
+                             styleMask: [.borderless, .nonactivatingPanel],
                              backing: .buffered, defer: false)
-        panel.titlebarAppearsTransparent = true
-        panel.titleVisibility = .hidden
-        panel.titlebarSeparatorStyle = .none
-        // The toolbar does two jobs. Attached at all, it grows the title
-        // strip from the bare 28pt to the unified bar's 52pt and centers the
-        // close button in it with the roomier inset Safari and Mail have
-        // (Perch.chromeBand mirrors the height). And it carries the strip's
-        // contents — the state pill and the session menu — as real toolbar
-        // items, the one way controls up there receive clicks rather than
-        // losing them to the bar's drag (PerchChromeToolbar).
-        let chrome = PerchChromeToolbar(controller: relay)
-        panelChrome = chrome
-        panel.toolbar = chrome.makeToolbar()
-        panel.toolbarStyle = .unified
-        // Close is the only button offered: the card is a fixed width and
-        // sizes its own height, so zoom has nothing to do, and a panel does
-        // not miniaturize.
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
-        // The card paints the paper over the whole window; AppKit masks the
-        // corners and casts the shadow from that shape.
+        // Keep the native shadow around the content's alpha silhouette.
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.hasShadow = true
         // The card covers its whole window, so it names its own drag region
-        // (PerchPanelView); this catches whatever it leaves, the title bar's
-        // own strip aside.
+        // (PanelRootView and PerchChrome); this catches whatever they leave.
         panel.isMovableByWindowBackground = true
         panel.title = "Errol"
         // Ordering and occlusion combine into one effective visibility: a
@@ -259,7 +238,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // ordering, but every sweep it drives is synchronous IPC into the
         // chat apps, so fully occluded counts as hidden. The notification
         // center retains the block observer for the app's life.
-        panel.onVisibilityChange = { [weak self] _ in self?.pushPanelVisibility() }
+        panel.onVisibilityChange = { [weak self] visible in
+            if visible { self?.refreshAccessibility() }
+            self?.pushPanelVisibility()
+        }
+        panel.onCancel = { [weak self] in
+            guard let self, self.navigation.screen == .settings else { return false }
+            self.showConsole()
+            return true
+        }
         _ = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,
             object: panel, queue: .main) { [weak self] _ in
@@ -270,36 +257,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let host = FirstMouseHostingView(rootView: PerchPanelView(
+        let host = FirstMouseHostingView(rootView: PanelRootView(
             controller: relay,
+            navigation: navigation,
             onCardResize: { [weak self] size in
                 // The report lands mid-layout; the hop keeps the window's
                 // frame change out of the pass that measured the card.
                 DispatchQueue.main.async { self?.fitPanel(to: size) }
-            })
-            // The card hangs from the top of whatever frame the window has
-            // at the moment — its opening size, or the last fit while a
-            // resize is still animating — and runs up under the title bar,
-            // whose strip is where the close button stands, so the
-            // safe-area inset is declined. Both are window concerns, kept
-            // here rather than in the view so it previews at its own size.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .ignoresSafeArea())
+            },
+            onBack: { [weak self] in self?.showConsole() })
+            .modifier(PanelWindowSurface()))
         // fitPanel is the one thing that sizes this window. Left to its
-        // default, the hosting view also gives itself an intrinsic size —
-        // the card plus the title strip's safe-area inset (66pt with the
-        // unified bar) — and its compression resistance outranks the
-        // window's stay-put priority, so every fit was undone a beat
-        // later: the window sprang back to card-plus-strip, a transparent
-        // band under the paper, and AppKit's own constraint passes were
-        // resizing the window behind the shell's back. With no intrinsic
-        // size the frame is exactly what the card reported.
+        // default, the hosting view also gives itself an intrinsic size and
+        // can fight the shell's animated resize. With no intrinsic size the
+        // frame is exactly what the card reported.
         host.sizingOptions = []
         panel.contentView = host
     }
 
     /// Follow the card: it is content-sized, and each size it reports
-    /// (PerchPanelView.onCardResize) becomes the window's, through an
+    /// (PanelRootView.onCardResize) becomes the window's, through an
     /// anchored, animated frame change.
     private func fitPanel(to size: CGSize) {
         guard size.width.isFinite, size.height.isFinite,
@@ -314,7 +291,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func pushPanelVisibility() {
         guard let panel else { return }
-        relay.setPanelVisible(panel.isVisible && panel.occlusionState.contains(.visible))
+        relay.setPanelVisible(panel.isVisible && panel.occlusionState.contains(.visible)
+                              && navigation.screen == .console)
     }
 
     // MARK: Observation bridges
@@ -351,8 +329,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             frame.origin.x = max(visible.minX + 8,
                                  min(frame.origin.x, visible.maxX - size.width - 8))
         }
-        guard panel.isVisible else {
-            panel.setFrame(frame, display: false)
+        guard panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.setFrame(frame, display: true)
+            panel.invalidateShadow()
             return
         }
         // Apply frames on run-loop ticks. This keeps the resize out of
@@ -364,14 +343,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let startedAt = ProcessInfo.processInfo.systemUptime
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak panel] timer in
             guard let panel else { timer.invalidate(); return }
-            let progress = min(1, (ProcessInfo.processInfo.systemUptime - startedAt) / 0.32)
+            let progress = min(1, (ProcessInfo.processInfo.systemUptime - startedAt)
+                               / PanelNavigationMotion.duration)
             let eased = progress * progress * (3 - 2 * progress)
             let next = NSRect(
                 x: start.minX + (target.minX - start.minX) * eased,
                 y: start.minY + (target.minY - start.minY) * eased,
                 width: start.width + (target.width - start.width) * eased,
                 height: start.height + (target.height - start.height) * eased)
-            panel.setFrame(progress == 1 ? target : next, display: false)
+            panel.setFrame(progress == 1 ? target : next, display: true)
+            panel.invalidateShadow()
             if progress == 1 { timer.invalidate() }
         }
         panelResizeTimer = timer
@@ -406,41 +387,41 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.setFrameTopLeftPoint(NSPoint(x: x, y: y))
     }
 
-    // MARK: Settings window
+    // MARK: Navigation
 
-    /// The settings card wears the console's idiom, so its window chrome
-    /// follows the console's: non-activating (typing works — KeyablePanel
-    /// forces key status), titled but bare so only the system close button
-    /// shows over the card's paper, and a level above the floating console
-    /// so it always opens on top of it.
-    @objc private func showSettings() {
-        if settingsWindow == nil {
-            let window = KeyablePanel(contentRect: .zero,
-                                      styleMask: [.titled, .closable,
-                                                  .fullSizeContentView,
-                                                  .nonactivatingPanel],
-                                      backing: .buffered, defer: false)
-            window.title = "Errol Settings"
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = true
-            window.isReleasedWhenClosed = false
-            window.isFloatingPanel = true
-            window.hidesOnDeactivate = false
-            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = Perch.paperNS
-            window.contentViewController = NSHostingController(rootView: SettingsView())
-            window.center()
-            settingsWindow = window
+    @objc func showSettings() {
+        refreshAccessibility()
+        if navigation.accessibilityGranted {
+            panel.makeFirstResponder(nil)
+            navigation.showsSettings = true
+            updateNavigation()
         }
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        showPanel()
+    }
+
+    private func showConsole() {
+        panel.makeFirstResponder(nil)
+        navigation.showsSettings = false
+        updateNavigation()
+    }
+
+    private func refreshAccessibility() {
+        let granted = AXIsProcessTrusted()
+        guard granted != navigation.accessibilityGranted else { return }
+        panel.makeFirstResponder(nil)
+        navigation.accessibilityGranted = granted
+        updateNavigation()
+    }
+
+    private func updateNavigation() {
+        pushPanelVisibility()
     }
 
     // MARK: Debug log window
 
     /// The last run's in-memory log, live while a run is going — the well
     /// the console used to carry, in a window of its own so it costs no
-    /// panel room. Chrome follows the settings card: non-activating,
+    /// panel room. Chrome follows the console: non-activating,
     /// bare-titled, floating a level above the console; resizable, because
     /// inspect reports are long.
     @objc private func showRunLog() {
@@ -489,37 +470,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         relay.runInspect()
     }
 
-    // MARK: Permission explainer
-
-    private func showPermissionOnboarding() {
-        if onboardingWindow == nil {
-            let view = PermissionOnboardingView(
-                onFinished: { [weak self] in
-                    self?.onboardingWindow?.close()
-                    self?.showPanel()
-                },
-                onDismiss: { [weak self] in
-                    self?.onboardingWindow?.close()
-                })
-            let window = NSWindow(contentViewController:
-                NSHostingController(rootView: view))
-            // Onboarding chrome: closable but title-less, dragged by its
-            // own background like the system's first-run sheets.
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = true
-            window.isReleasedWhenClosed = false
-            window.center()
-            onboardingWindow = window
-        }
-        onboardingWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate()
-    }
-
+    /// The console, forward and key. Besides its own callers, this is the
+    /// end of every run: the chat app that replied last still has the
+    /// keyboard, and New session is what comes next. A panel Esc put away
+    /// mid-run comes back too — the summary is what there is to look at
+    /// now. Making the panel key is the whole move: a non-activating panel
+    /// takes keyboard focus without the app activating (see the file's
+    /// header), and activating the app, which earlier builds did at run
+    /// end through LaunchServices, left the panel without key status.
     private func showPanel() {
-        guard !panel.isVisible else { return }
-        positionPanel()
+        if !panel.isVisible { positionPanel() }
         panel.makeKeyAndOrderFront(nil)
     }
 }

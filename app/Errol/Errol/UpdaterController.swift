@@ -16,8 +16,8 @@
 //     back and offered when the run ends.
 //   - A manual check is refused while a run is live, rather than queued.
 //   - A relaunch Sparkle asks for mid-run is postponed until the run is idle.
-//   - Termination cancels a run first, so the transcript is flushed and focus
-//     handed back before an install-on-quit takes over.
+//   - Termination cancels a run first, so the run winds down at a safe point
+//     and the debug log closes before an install-on-quit takes over.
 //
 // Installation stays user-mediated in this version: SUAutomaticallyUpdate and
 // SUAllowsAutomaticUpdates are both off in Info.plist. The guards here are the

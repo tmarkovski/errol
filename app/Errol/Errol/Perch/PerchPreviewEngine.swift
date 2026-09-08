@@ -102,10 +102,6 @@ final class PerchPreviewEngine: RelayEngine {
     func inspect() {
         events.post(.log("Inspect reads both apps' Accessibility trees; a preview has none."))
     }
-
-    func openTranscript() {
-        events.post(.log("A preview run writes no transcript."))
-    }
 }
 
 /// One played run. Off the engine, so a run in progress does not keep a

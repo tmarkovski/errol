@@ -181,7 +181,6 @@ final class LiveScenarioRunner {
         let originalFocus = returnFocus ?? currentFrontmostApp()
         config.maxChars = options.cap
         config.timeout = min(120, options.timeout)
-        config.transcriptPath = evidence.directory.appendingPathComponent("transcript.md").path
         relayControl.reset()
         let deadline = CaseDeadline(seconds: options.timeout, emergency: evidence.directory.appendingPathComponent("deadline.txt"))
         deadlines = deadline
@@ -488,9 +487,8 @@ final class LiveScenarioRunner {
             } else { _ = relayControl.endOperation(continuingRun: continuing) }
         })
         let hold = holdProbe.finish()
-        evidence.artifact("transcript.md")
         if submitCount != outcomes.count {
-            evidence.check("relay-submission-retries", .inconclusive, "\(submitCount) submission attempts for \(outcomes.count) handoffs; uniqueness requires transcript inspection")
+            evidence.check("relay-submission-retries", .inconclusive, "\(submitCount) submission attempts for \(outcomes.count) handoffs; uniqueness requires inspecting the chats")
         }
         if scenario.behavior == .cancel {
             evidence.check("cancel-stops-handoff", replies.count == 1 && outcomes.count == 1 && relayControl.isCancelled ? .passed : .failed,
@@ -503,9 +501,7 @@ final class LiveScenarioRunner {
         if scenario.behavior == .steering {
             evidence.check("held-focus", hold.observed && hold.passed ? .passed : .failed,
                            "Observed the live worker parked at the delivery gate with unchanged clipboard/focus, then resumed it")
-            let transcript = (try? String(contentsOfFile: config.transcriptPath, encoding: .utf8)) ?? ""
-            evidence.check("steering-committed", hold.passed && transcript.contains(note) ? .passed : .failed, "Steering note is present in the relay transcript after the capture hold")
-            // Composer evidence, not the transcript, establishes the actual two deliveries.
+            // Composer evidence establishes the actual two deliveries.
             let delivered = cleanup.filter { $0.1.contains(note) }.count
             evidence.check("steering-both-legs", delivered == 2 ? .passed : .failed, "Note found in \(delivered) observed pasted payloads; expected note and echo")
         }
