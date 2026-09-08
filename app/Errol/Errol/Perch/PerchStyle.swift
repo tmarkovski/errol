@@ -85,6 +85,9 @@ enum Perch {
     /// constant — the card is content-sized and the shell fits the window to
     /// what it reports (PerchPanelView, MenuBarController.fitPanel).
     static let cardWidth = s(464)
+    /// Settings keeps its card width; the console is a wide, low widget.
+    static let widgetWidth = s(940)
+    static let widgetHeight = s(112)
     /// The content header keeps the familiar 52pt height of a unified
     /// toolbar. The borderless panel draws its controls here (PerchChrome).
     static let chromeBand: CGFloat = 52
@@ -127,5 +130,5 @@ enum Perch {
 /// reports (MenuBarController.fitPanel) — so this is a first-frame stand-in,
 /// corrected the moment the card lays out.
 enum PerchMetrics {
-    static let initialPanel = CGSize(width: Perch.cardWidth, height: Perch.s(320))
+    static let initialPanel = CGSize(width: Perch.widgetWidth, height: Perch.widgetHeight)
 }

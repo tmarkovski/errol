@@ -11,6 +11,7 @@ final class PanelNavigation {
 
     var accessibilityGranted: Bool
     var showsSettings = false
+    var consoleWidth = Perch.widgetWidth
 
     init(accessibilityGranted: Bool) {
         self.accessibilityGranted = accessibilityGranted
@@ -56,13 +57,26 @@ struct PanelScreenPresentation: ViewModifier {
 /// Fill and clip to the current native frame throughout a resize, while the
 /// card inside continues to measure its destination size independently.
 struct PanelWindowSurface: ViewModifier {
+    var navigation: PanelNavigation? = nil
+
     func body(content: Content) -> some View {
         content
             .frame(minWidth: 0, maxWidth: .infinity,
                    minHeight: 0, maxHeight: .infinity, alignment: .top)
             .background(Perch.paper.gesture(WindowDragGesture()))
-            .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+            .clipShape(PanelSurfaceShape(isWidget: navigation?.screen == .console))
             .ignoresSafeArea()
+    }
+}
+
+/// Console corners follow the current animated frame, including while a
+/// growing editor changes height. Settings retains its conventional corners.
+struct PanelSurfaceShape: Shape {
+    var isWidget: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let radius = isWidget ? min(rect.width, rect.height) / 2 : Perch.shellCorner
+        return Path(roundedRect: rect, cornerRadius: radius)
     }
 }
 
@@ -77,7 +91,7 @@ struct PanelRootView: View {
         ZStack(alignment: .top) {
             // Keep both screens mounted: navigating or changing appearance
             // must not discard the native editor, its selection, or drafts.
-            PerchPanelView(controller: controller)
+            PerchPanelView(controller: controller, width: navigation.consoleWidth)
                 .blur(radius: screen == .accessibility ? 6 : 0)
                 .overlay {
                     if screen == .accessibility {
@@ -89,12 +103,12 @@ struct PanelRootView: View {
                 .disabled(screen != .console)
                 .allowsHitTesting(screen == .console)
                 .accessibilityHidden(screen != .console)
-                .frame(height: screen == .settings ? 0 : nil, alignment: .top)
+                .frame(width: 0, height: screen == .settings ? 0 : nil, alignment: .top)
 
             SettingsView(isPresented: screen == .settings)
                 .modifier(PanelScreenPresentation(isVisible: screen == .settings,
                                                   hiddenOffset: Perch.s(24)))
-                .frame(height: screen == .settings ? nil : 0, alignment: .top)
+                .frame(width: 0, height: screen == .settings ? nil : 0, alignment: .top)
 
             if screen == .accessibility {
                 PermissionOnboardingView()
@@ -103,16 +117,18 @@ struct PanelRootView: View {
                     .padding(.bottom, Perch.s(22))
             }
         }
-        .frame(width: Perch.cardWidth)
+        .frame(width: screen == .console ? navigation.consoleWidth : Perch.cardWidth)
         .fixedSize(horizontal: false, vertical: true)
         .background(Perch.paper.gesture(WindowDragGesture()))
         .overlay(alignment: .top) {
-            PerchChrome(controller: controller, screen: screen) {
+            if screen == .settings {
+              PerchChrome(controller: controller, screen: screen) {
                 if let onBack {
                     onBack()
                 } else {
                     navigation.showsSettings = false
                 }
+              }
             }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in

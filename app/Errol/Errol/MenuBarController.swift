@@ -266,7 +266,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async { self?.fitPanel(to: size) }
             },
             onBack: { [weak self] in self?.showConsole() })
-            .modifier(PanelWindowSurface()))
+            .modifier(PanelWindowSurface(navigation: navigation)))
         // fitPanel is the one thing that sizes this window. Left to its
         // default, the hosting view also gives itself an intrinsic size and
         // can fight the shell's animated resize. With no intrinsic size the
@@ -368,22 +368,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Drop the panel just under the status item, clamped to the screen.
+    /// Open centrally near the top of the screen containing the menu item.
     private func positionPanel() {
         guard let button = statusItem.button, let window = button.window else { return }
-        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
         let screen = window.screen ?? NSScreen.main
-        var x = buttonFrame.midX - panel.frame.width / 2
-        var y = buttonFrame.minY - 8
-        if let visible = screen?.visibleFrame {
-            x = max(visible.minX + 8, min(x, visible.maxX - panel.frame.width - 8))
-            // Lift a panel whose bottom would run off the screen — but only
-            // while it still fits; taller than the screen, hanging from the
-            // status item at least keeps the instrument head in view.
-            if panel.frame.height + 16 <= visible.height {
-                y = max(y, visible.minY + panel.frame.height + 8)
-            }
-        }
+        guard let visible = screen?.visibleFrame else { return }
+        navigation.consoleWidth = min(Perch.widgetWidth, max(600, visible.width - 32))
+        let x = visible.midX - panel.frame.width / 2
+        let proposedTop = visible.maxY - min(120, visible.height * 0.16)
+        let y = min(visible.maxY - 16, max(proposedTop, visible.minY + panel.frame.height + 16))
         panel.setFrameTopLeftPoint(NSPoint(x: x, y: y))
     }
 

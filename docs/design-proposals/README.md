@@ -3,6 +3,9 @@
 Durable records of UI directions that may inform production work but are not
 part of the application build.
 
+- [Floating conversation widget](widget/README.md) — saved layout and control
+  concepts, the selected capsule direction, and icon-only running controls.
+
 - [Chat composer redesign](chat-composer/README.md) — three interactive proposals,
   a reconciliation direction, and a converged proposal for conversation setup,
   run controls, steering, and the wireframe instrument language.

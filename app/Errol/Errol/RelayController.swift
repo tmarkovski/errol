@@ -133,6 +133,12 @@ final class RelayController {
     /// a run finishes; cleared by resetSession and at the next start.
     var lastRunDuration: TimeInterval?
     @ObservationIgnored private var runStartedAt: Date?
+
+    /// Read by the widget's one-second timeline, without publishing a tick
+    /// through the controller or changing any relay timing.
+    func elapsedRunDuration(at date: Date = Date()) -> TimeInterval {
+        max(0, runStartedAt.map { date.timeIntervalSince($0) } ?? lastRunDuration ?? 0)
+    }
     @ObservationIgnored private var nextLogID = 0
     /// What drives the apps and reports back; LiveRelayEngine in the app.
     @ObservationIgnored private let engine: RelayEngine

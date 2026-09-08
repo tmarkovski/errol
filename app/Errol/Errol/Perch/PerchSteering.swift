@@ -1,12 +1,5 @@
-// The run's lines outside the field: the composer's foot line that says
-// what the keys do while the field is open and where the note is once it
-// has left — queued, sending — and then what became of it; the summary
-// that takes the field's place when the run is over; and the popover that
-// shows a note whole. The field itself (PerchComposer) is closed while the
-// agents work, with the notice about the chat apps standing in it and a
-// queued note dimmed in its place; Pause at the foot opens it. The design
-// is docs/design-proposals/steering/the-note-stays-put.md, as revised at
-// its end. See PerchComposer for the foot and the slot these fill.
+// Shared steering feedback and finished-run summary for the widget. The
+// native editor and run actions live in PerchWidget.swift.
 
 import SwiftUI
 
