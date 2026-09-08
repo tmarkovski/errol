@@ -28,17 +28,29 @@ import ApplicationServices
 // internal API without the library growing a public surface it doesn't
 // otherwise need. The `tools/verify` wrapper always builds debug.
 @testable import ErrolKit
+@testable import ErrolVerification
 
 @main
 struct Verify {
     static var failures = 0
+    static var incomplete = 0
 
     static func report(_ status: String, _ name: String, _ detail: String) {
         print("\(status.padding(toLength: 5, withPad: " ", startingAt: 0)) \(name) — \(detail)")
         if status == "FAIL" { failures += 1 }
+        if status == "SKIP" { incomplete += 1 }
     }
 
     static func main() {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments.contains("--help") || arguments.contains("-h") {
+            print(GuidedVerification.help)
+            print("Legacy probes: tools/verify [--nudge] [--live chatgpt|claude|all] [--app chatgpt|claude]")
+            exit(0)
+        }
+        if arguments.contains(where: { ["--guided", "--suite", "--list", "--dry-run", "--filter", "--output"].contains($0) }) {
+            exit(GuidedVerification.run(arguments: arguments))
+        }
         var tiers: Set<String> = ["static"]
         var apps: Set<String> = ["chatgpt", "claude"]
         var args = Array(CommandLine.arguments.dropFirst())
@@ -60,6 +72,7 @@ struct Verify {
             default: usageAndExit()
             }
         }
+        guard !apps.isEmpty, apps.isSubset(of: ["chatgpt", "claude"]) else { usageAndExit() }
 
         guard AXIsProcessTrusted() else {
             print("FAIL: this process is not trusted for Accessibility (see tools/ax-dump.swift header for the grant recipe).")
@@ -81,11 +94,14 @@ struct Verify {
             }
             enableElectronAccessibility(target)
             usleep(700_000)
+            let failuresBefore = failures
             runStatic(target, key: key)
+            guard failures == failuresBefore else { continue }
             if tiers.contains("nudge") { runNudge(target, key: key) }
+            guard failures == failuresBefore else { continue }
             if tiers.contains("live") { runLive(target) }
         }
-        exit(failures == 0 ? 0 : 1)
+        exit(failures > 0 ? 1 : incomplete > 0 ? 2 : 0)
     }
 
     static func usageAndExit() -> Never {
@@ -172,23 +188,28 @@ struct Verify {
 
     // MARK: nudge tier — reversible UI touches
 
-    static let keyA: CGKeyCode = 0
-    static let keyDelete: CGKeyCode = 51
-
     static func runNudge(_ target: TargetApp, key: String) {
+        let desktopLease: DesktopLease
+        do { desktopLease = try DesktopLease() }
+        catch { report("SKIP", "desktop-ownership", String(describing: error)); return }
+        defer { desktopLease.release() }
         let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
+        let clipboard = ClipboardLease()
         defer {
-            if let saved { pasteboard.clearContents(); pasteboard.setString(saved, forType: .string) }
+            if !clipboard.restore() { report("FAIL", "clipboard", "could not restore clipboard") }
         }
         // Never touch a composer that already holds the user's text: the
         // revert step clears the WHOLE composer, so running over a human
         // draft would destroy it (this happened once — hence the guard).
-        if let draft = composerDraft(in: target) {
-            report("SKIP", "nudge-paste",
-                   "composer already holds text (\"\(draft.prefix(30))\") — refusing to touch a possible draft")
+        guard let originalInput = inputArea(in: target) else {
+            report("FAIL", "nudge-paste", "no composer")
             return
         }
+        guard let binding = TargetBinding(target, context: .existing) else { report("FAIL", "nudge-window", "no stable window"); return }
+        let safe = composerSafety(value: axAttribute(originalInput, kAXValueAttribute) as? String,
+                                  attachments: attachmentControls(originalInput, target: target).count,
+                                  busy: hasStopButton(in: target))
+        guard safe.status == .passed else { report("SKIP", "nudge-paste", safe.detail); return }
         // A conversation mid-run morphs the composer controls (Send becomes
         // Stop/Queue), so the checks below would report app breakage that is
         // really just a busy conversation.
@@ -204,7 +225,7 @@ struct Verify {
             report("FAIL", "nudge-activate", "could not bring the app frontmost")
             return
         }
-        guard let input = inputArea(in: target) else {
+        guard let input = inputArea(in: target), CFEqual(input, originalInput), binding.valid() else {
             report("FAIL", "nudge-paste", "no composer to paste into")
             return
         }
@@ -221,7 +242,7 @@ struct Verify {
         }
         keystroke(keyV, flags: .maskCommand)
         usleep(500_000)
-        let landed = composerValue(in: target)?.contains(needle) == true
+        let landed = composerValue(in: target) == needle
         report(landed ? "PASS" : "FAIL", "nudge-paste",
                landed ? "probe text visible in composer" : "paste did not land (key-window routing?)")
 
@@ -239,21 +260,13 @@ struct Verify {
         // both apps' composers) — never destructive keystrokes first: a
         // select-all + delete that chases moved focus can destroy content in
         // whatever window the user switched to (nearly happened once).
+        guard binding.valid(), axAttribute(input, kAXValueAttribute) as? String == needle else {
+            report("FAIL", "nudge-revert", "composer changed; retaining content for inspection")
+            return
+        }
         AXUIElementSetAttributeValue(input, kAXValueAttribute as CFString, "" as CFString)
         usleep(400_000)
-        var reverted = composerValue(in: target)?.contains(needle) != true
-        if !reverted, isFrontmost(target) {
-            // Fallback for a composer that rejects the value write, guarded
-            // by a fresh frontmost check right before each keystroke.
-            AXUIElementSetAttributeValue(input, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-            usleep(150_000)
-            if isFrontmost(target) {
-                keystroke(keyA, flags: .maskCommand)
-                if isFrontmost(target) { keystroke(keyDelete) }
-                usleep(400_000)
-                reverted = composerValue(in: target)?.contains(needle) != true
-            }
-        }
+        let reverted = composerValue(in: target).map { composerPlaceholders.contains($0) } == true
         report(reverted ? "PASS" : "FAIL", "nudge-revert",
                reverted ? "composer cleared" : "probe text still in composer — clear it by hand")
 
@@ -261,7 +274,7 @@ struct Verify {
             let before = copyButtons(in: target).count
             guard let last = messageAffordances(in: target).last,
                   isMessageActionsToggle(last, selectors: target.selectors) else {
-                report("SKIP", "nudge-expand", "newest affordance is not a collapsed toggle (already expanded, or no messages)")
+                report("INFO", "nudge-expand", "newest affordance is not a collapsed toggle (already expanded, or no messages)")
                 return
             }
             expandLastMessageActions(in: target)
@@ -274,52 +287,30 @@ struct Verify {
     // MARK: live tier — one probe message through the production relay path
 
     static func runLive(_ target: TargetApp) {
-        guard let window = chatWindow(in: target) else {
-            report("FAIL", "live", "no targetable window")
+        let side = scanSide(bundleID: target.app.bundleIdentifier ?? "", name: target.name, selectors: target.selectors)
+        let app: DesktopApp = target.app.bundleIdentifier == config.chatgptBundleID ? .chatgpt : .claude
+        guard let endpoint = Endpoint.all.first(where: { $0.app == app && $0.surface == side.surface }) else {
+            report("FAIL", "live-surface", "unrecognized surface; use the guided suite to inspect it")
             return
         }
-        let title = (axAttribute(window, kAXTitleAttribute) as? String) ?? "untitled"
-        if let draft = composerDraft(in: target) {
-            report("SKIP", "live",
-                   "composer already holds text (\"\(draft.prefix(30))\") — refusing to touch a possible draft")
-            return
-        }
-        print("live: sending ONE probe message into \"\(title)\"'s displayed conversation in 3s (Ctrl+C to abort)...")
-        sleep(3)
-
-        let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
-        let probe = "Automated verification probe: reply with one short sentence. No tools, no commands."
-        let savedTimeout = config.timeout
-        config.timeout = 120
-        defer { config.timeout = savedTimeout }
-
-        let start = Date()
-        var baseline = responseBaseline(in: target)
-        let outcome = send(probe, to: target)
-        guard outcome.continuesRun else {
-            report("FAIL", "live-send", "send() ended the attempt: \(outcome)")
-            return
-        }
-        if outcome == .unconfirmed {
-            report("WARN", "live-send", "send() could not confirm the submission; continuing on the response")
-        }
-        baseline = absorbEchoIntoBaseline(in: target, preSend: baseline)
-        report("PASS", "live-send", "sent; baseline \(baseline.affordances) affordance(s)"
-            + (baseline.lastOrdinal.map { ", message \($0)" } ?? ""))
-
-        guard waitForResponse(in: target, baseline: baseline) else {
-            report("FAIL", "live-complete", "no completion within \(Int(config.timeout))s")
-            return
-        }
-        report("PASS", "live-complete",
-               String(format: "response detected after %.1fs", Date().timeIntervalSince(start)))
-
-        if let reply = copyLastResponse(from: target), !reply.isEmpty {
-            report("PASS", "live-copy", "copied \(reply.count) chars: \"\(reply.prefix(60))\"")
-        } else {
-            report("FAIL", "live-copy", "could not copy the response")
-        }
-        if let saved { pasteboard.clearContents(); pasteboard.setString(saved, forType: .string) }
+        var options = VerificationOptions()
+        options.timeout = 180
+        let scenario = DesktopScenario(endpoint: endpoint, conversation: messageAffordances(in: target).isEmpty ? .new : .existing)
+        let runID = UUID().uuidString
+        let directory = URL(fileURLWithPath: ".artifacts/verify/" + runID)
+        do {
+            var result = VerificationReport(runID: runID, suite: "legacy-live", totalSuiteCases: 1,
+                maxCharacters: options.cap, caseTimeout: options.timeout,
+                environment: GuidedVerification.environment(), results: [CaseResult(scenario: scenario)])
+            try result.write(to: directory)
+            let evidence = try CaseEvidence(scenario: scenario, directory: directory.appendingPathComponent(scenario.id))
+            print("Sending one real test prompt to the displayed conversation in 3 seconds. Ctrl+C aborts.")
+            sleep(3)
+            result.results[0] = LiveScenarioRunner(options: options, evidence: evidence, nonce: runID).run()
+            try result.write(to: directory)
+            if result.exitCode == 1 { failures += 1 }
+            else if result.exitCode != 0 { incomplete += 1 }
+            print("Live report: \(directory.appendingPathComponent("report.md").path)")
+        } catch { report("FAIL", "live-report", String(describing: error)) }
     }
 }

@@ -5,7 +5,7 @@
 // at in place) as the ErrolKit library, plus the tools that reuse it:
 //
 //   swift test               # contract tests for the pure detection logic
-//   tools/verify [...]       # the guided live harness (see tools/verify.swift)
+//   tools/verify [...]       # guided live harness (docs/desktop-verification.md)
 //
 // The Xcode app does NOT depend on this package; it keeps compiling Core
 // directly. The package exists so tools and tests consume the identical
@@ -24,11 +24,19 @@ let package = Package(
             path: "app/Errol/Errol/Core"),
         .executableTarget(
             name: "errol-verify",
-            dependencies: ["ErrolKit"],
+            dependencies: ["ErrolKit", "ErrolVerification"],
             path: "tools/errol-verify"),
+        .target(
+            name: "ErrolVerification",
+            dependencies: ["ErrolKit"],
+            path: "tools/ErrolVerification"),
+        .testTarget(
+            name: "ErrolVerificationTests",
+            dependencies: ["ErrolVerification", "ErrolKit"],
+            path: "tests/ErrolVerificationTests"),
         .testTarget(
             name: "ErrolKitTests",
-            dependencies: ["ErrolKit"],
+            dependencies: ["ErrolKit", "ErrolVerification"],
             path: "tests/ErrolKitTests",
             resources: [.copy("Fixtures")]),
     ]

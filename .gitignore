@@ -28,3 +28,4 @@ xcuserdata/
 # .swiftpm
 # Swift Package Manager build products
 .build/
+.artifacts/

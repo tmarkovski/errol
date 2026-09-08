@@ -73,6 +73,12 @@ A markdown transcript of each run is written incrementally to `~/Documents/errol
 
 ## Setup
 
+For guided checks against the installed desktop apps, run
+`tools/verify --guided --suite desktop-smoke`. The harness walks through Chat,
+Work, Codex, Claude Chat, Cowork, and Code with disposable conversations and
+records delivery evidence. See [Live desktop compatibility tests](docs/desktop-verification.md)
+for the full scenario matrix, prerequisites, reports, and verification limits.
+
 1. Open `app/Errol/Errol.xcodeproj` in Xcode and run, or build and copy `Errol.app` wherever you keep apps.
 2. Launch both chat apps with a conversation open in each.
 3. On a launch without the Accessibility grant, Errol opens an explainer window first: what the permission lets it do (read the two chat windows, type and send on the user's behalf, nothing leaving the Mac) and a button that triggers the system prompt — macOS only ever shows that dialog once per app, so later clicks deep-link to the Privacy & Security > Accessibility pane instead. The window polls for the grant and flips to a "Start Using Errol" button the moment it lands; dismissing it with Not Now is fine, since Start re-asks on demand.

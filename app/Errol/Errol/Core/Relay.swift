@@ -238,10 +238,20 @@ enum ConversationStatus: String {
     case ended = "Conversation ended"
 }
 
+/// Optional observations used by the live harness. No alternate relay engine.
+struct RelayInspection {
+    var sendInspection: (TargetApp) -> SendInspection
+    var delivered: (TargetApp, SendOutcome) -> Void = { _, _ in }
+    var reply: (TargetApp, Int, String) -> Bool = { _, _, _ in true }
+    var mayContinue: (TargetApp) -> Bool = { _ in true }
+    var responsePoll: (TargetApp, ResponseSighting) -> Void = { _, _ in }
+}
+
 /// The whole relay run. Runs on a worker thread while the main thread serves
 /// the panel's event loop. Returns false on preflight or seeding failure.
 func runRelay(chatgpt: TargetApp, claude: TargetApp,
               showTransfers: Bool = false,
+              inspection: RelayInspection? = nil,
               operationCompleted: (Bool) -> Void = {
                   _ = relayControl.endOperation(continuingRun: $0)
               }) -> Bool {
@@ -338,7 +348,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         return false
     }
     var baseline = responseBaseline(in: speaker)
-    let openingOutcome = send(opener, to: speaker, sources: [.userPrompt], showTransfer: showTransfers)
+    let openingOutcome = send(opener, to: speaker, sources: [.userPrompt], showTransfer: showTransfers,
+                              inspection: inspection?.sendInspection(speaker))
+    inspection?.delivered(speaker, openingOutcome)
     if openingOutcome.continuesRun {
         setConversation(speaker, .chatting)
         setConversation(listener, .waiting)
@@ -361,7 +373,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     while true {
         turn += 1
         relayEvents.post(.turn(turn))
-        guard waitForResponse(in: speaker, baseline: baseline) else {
+        guard waitForResponse(in: speaker, baseline: baseline,
+                              mayContinue: { inspection?.mayContinue(speaker) != false },
+                              onPoll: inspection.map { probe in { probe.responsePoll(speaker, $0) } }) else {
             if relayControl.isCancelled {
                 log("Run stopped by user.")
                 appendTranscript("_Run stopped by user._\n\n")
@@ -377,6 +391,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             log("Run stopped by user.")
             break
         }
+        guard inspection?.mayContinue(speaker) != false else { break }
         var copiedAnchor: TransferAnchor?
         guard let reply = copyLastResponse(from: speaker,
                                            onCopy: showTransfers ? { copiedAnchor = $0 } : nil) else {
@@ -385,6 +400,10 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         }
 
         appendTranscript("## Turn \(turn): \(speaker.name)\n\n\(reply)\n\n")
+        if inspection?.reply(speaker, turn, reply) == false {
+            log("Verification stopped the relay after inspecting turn \(turn).")
+            break
+        }
 
         let trimmedReply = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedReply.isEmpty {
@@ -479,7 +498,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
 
         baseline = responseBaseline(in: listener)
         let outcome = send(payload.text(reply: reply, cap: config.maxChars), to: listener,
-                           sources: payload.transferSources(reply: copiedAnchor), showTransfer: showTransfers)
+                           sources: payload.transferSources(reply: copiedAnchor), showTransfer: showTransfers,
+                           inspection: inspection?.sendInspection(listener))
+        inspection?.delivered(listener, outcome)
         if let note {
             reportSteering(.note, note, to: listener, turn: turn, outcome: SteeringOutcome(outcome))
         }

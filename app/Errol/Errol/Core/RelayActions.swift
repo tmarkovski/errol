@@ -113,9 +113,8 @@ enum SendOutcome: Equatable {
     /// the paste itself never verified, in which case no later signal can
     /// vouch for what was submitted.
     case unconfirmed
-    /// The foreground was lost during confirmation, after a submission may
-    /// already have gone out. The relay stops rather than type into
-    /// whatever took focus.
+    /// The attempt started but cannot continue safely (lost focus,
+    /// cancellation, or an inspection veto). Submission may have happened.
     case abandoned
     /// The foreground could not be taken before typing; nothing was typed.
     case refused
@@ -131,13 +130,22 @@ enum PasteReceipt: Equatable {
     case attachment
 }
 
+/// Optional synchronous diagnostics for the live compatibility harness. The
+/// normal app supplies none. A probe may veto submission after inspecting the
+/// actual paste, but it never substitutes a different paste/send implementation.
+struct SendInspection {
+    var event: (String) -> Void = { _ in }
+    var mayContinue: () -> Bool = { true }
+    var inspectPaste: (AXUIElement?, String, Int, Int, PasteReceipt?) -> Bool = { _, _, _, _, _ in true }
+}
+
 /// A paste is visible either as ordinary composer text or as a newly mounted
 /// pasted-text attachment. Claude and ChatGPT remove long paste contents from
 /// AXValue when they build the attachment chip, so checking text alone causes the
 /// recovery path to paste the same payload a second time.
 func observedPasteReceipt(needle: String, composerValue: String?,
                           attachmentsBefore: Int, attachmentsNow: Int) -> PasteReceipt? {
-    if needle.isEmpty || composerValue?.contains(needle) == true { return .text }
+    if !needle.isEmpty, composerValue?.contains(needle) == true { return .text }
     if attachmentsNow > attachmentsBefore { return .attachment }
     return nil
 }
@@ -167,7 +175,9 @@ func waitForPasteReceipt(needle: String, input: AXUIElement?, selectors: AppSele
 /// receipt is allowed to rest on.
 func send(_ text: String, to target: TargetApp,
           sources: [TransferSource] = [],
-          showTransfer: Bool = false) -> SendOutcome {
+          showTransfer: Bool = false,
+          inspection: SendInspection? = nil) -> SendOutcome {
+    guard !relayControl.isCancelled, inspection?.mayContinue() != false else { return .refused }
     let payload = truncatedForRelay(text)
     if payload.count != text.count {
         log("\(target.name): payload truncated to \(config.maxChars) chars")
@@ -206,8 +216,14 @@ func send(_ text: String, to target: TargetApp,
             }
         }
     }
-    let needle = String(payload.prefix(while: { $0 != "\n" }).prefix(32))
+    // A leading blank line must not produce an empty, automatically matching
+    // receipt. Use the first nonempty line, retaining the existing tolerance
+    // for how each app exposes paragraph separators through Accessibility.
+    let needle = String(payload.split(whereSeparator: \.isNewline).first?.prefix(32) ?? "")
     pasteAttempts: for attempt in 0..<2 {
+        guard !relayControl.isCancelled, inspection?.mayContinue() != false else {
+            return attempt == 0 ? .refused : .abandoned
+        }
         let input = inputArea(in: target)
         let transferID = UUID()
         let attachmentsBefore = input.map {
@@ -239,10 +255,22 @@ func send(_ text: String, to target: TargetApp,
                 return attempt == 0 ? .refused : .abandoned
             }
         }
+        guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else {
+            return attempt == 0 ? .refused : .abandoned
+        }
+        inspection?.event("paste-attempt-\(attempt + 1)")
         keystroke(keyV, flags: .maskCommand)
-        if let receipt = waitForPasteReceipt(needle: needle, input: input,
+        let receipt = waitForPasteReceipt(needle: needle, input: input,
                                              selectors: target.selectors,
-                                             attachmentsBefore: attachmentsBefore) {
+                                             attachmentsBefore: attachmentsBefore)
+        if let inspection {
+            let attachmentsNow = input.map { pastedTextAttachmentCount(around: $0, selectors: target.selectors) } ?? 0
+            if !inspection.inspectPaste(input, payload, attachmentsBefore, attachmentsNow, receipt) {
+                log("\(target.name): verification stopped the handoff before submission")
+                return .abandoned
+            }
+        }
+        if let receipt {
             if receipt == .attachment {
                 log("\(target.name): paste landed as a text attachment")
             }
@@ -270,6 +298,8 @@ func send(_ text: String, to target: TargetApp,
     }
 
     let beforeSend = composerValue(in: target)
+    guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else { return .abandoned }
+    inspection?.event("submit-attempt-1")
 
     // A send button press is more reliable than a Return keystroke (no
     // Return-vs-Cmd+Return ambiguity, no dependence on keyboard focus).
@@ -280,6 +310,7 @@ func send(_ text: String, to target: TargetApp,
         log("\(target.name): sent via send button")
     } else {
         hadSendButton = false
+        guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else { return .abandoned }
         keystroke(keyReturn)
         log("\(target.name): sent via Return keystroke")
     }
@@ -292,20 +323,22 @@ func send(_ text: String, to target: TargetApp,
     var confirmation = confirmSend(in: target, from: beforeSend,
                                    buttonSignal: hadSendButton, within: 3)
     if confirmation == .pending {
-        guard isFrontmost(target) else {
+        guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else {
             log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
             return .abandoned
         }
         log("\(target.name): send unconfirmed, trying Return keystroke")
+        inspection?.event("submit-attempt-2")
         keystroke(keyReturn)
         confirmation = confirmSend(in: target, from: beforeSend,
                                    buttonSignal: hadSendButton, within: 3)
         if confirmation == .pending {
-            guard isFrontmost(target) else {
+            guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else {
                 log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
                 return .abandoned
             }
             log("\(target.name): send still unconfirmed, trying Cmd+Return")
+            inspection?.event("submit-attempt-3")
             keystroke(keyReturn, flags: .maskCommand)
             confirmation = confirmSend(in: target, from: beforeSend,
                                        buttonSignal: hadSendButton, within: 3)
@@ -472,17 +505,20 @@ func absorbEchoIntoBaseline(in target: TargetApp, preSend: ResponseBaseline) -> 
     return preSend
 }
 
-func waitForResponse(in target: TargetApp, baseline: ResponseBaseline) -> Bool {
+func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
+                     mayContinue: () -> Bool = { true },
+                     onPoll: ((ResponseSighting) -> Void)? = nil) -> Bool {
     log("\(target.name): waiting for response (baseline \(baseline.affordances) message affordances"
         + (baseline.lastOrdinal.map { ", message \($0)" } ?? "") + ")...")
     let timeout = config.timeout
     let startedAt = ProcessInfo.processInfo.systemUptime
     var wait = ResponseWaitState(timeout: timeout, startedAt: startedAt)
     while true {
-        if relayControl.isCancelled { return false }
+        if relayControl.isCancelled || !mayContinue() { return false }
         let sighting = ResponseSighting(affordances: messageAffordances(in: target).count,
                                         lastOrdinal: lastMessageOrdinal(in: target),
                                         streaming: hasStopButton(in: target))
+        onPoll?(sighting)
         let now = ProcessInfo.processInfo.systemUptime
         switch wait.observe(sighting, since: baseline, selectors: target.selectors, at: now) {
         case .complete:
