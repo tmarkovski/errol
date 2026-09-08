@@ -70,16 +70,11 @@ enum Perch {
     /// its label.
     static let spring = Animation.spring(response: 0.32, dampingFraction: 0.82)
 
-    /// The two corners the panel cuts: the panel's own edge, and the composer
-    /// card set into it. The tabs' track and thumb and the option chips are
-    /// capsules and name no radius.
+    /// The window is the composer's only outer edge. The tabs and option
+    /// chips are capsules and name no radius.
     static let shellCorner = s(18)
-    /// The composer card: a tight inset, so the words sit close to the edge
-    /// the way they do in the chat apps' own composers, and a corner a step
-    /// rounder than the shell's — enough to rhyme with the primary circle
-    /// set into its foot without the card reading as a pill.
-    static let boxInset = s(8)
-    static let boxCorner = s(22)
+    /// One inset for the head and the full-width composer's contents.
+    static let contentInset = s(12)
     static let primaryDiameter = s(36)
     /// A step tighter than the card, for a well set inside a window: the
     /// log window's text area.

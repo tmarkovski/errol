@@ -26,14 +26,15 @@ struct PerchPanelView: View {
     var onCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: Perch.s(14)) {
+        VStack(spacing: 0) {
             PerchHead(controller: controller)
+                .padding(.horizontal, Perch.contentInset)
+                // The head clears the native title strip; the composer
+                // below reaches the window's sides and bottom.
+                .padding(.top, Perch.chromeInset)
+                .padding(.bottom, Perch.s(14))
             PerchComposer(controller: controller)
         }
-        .padding(.horizontal, Perch.s(18))
-        .padding(.bottom, Perch.s(18))
-        // The top clears the title band and the window strip behind it.
-        .padding(.top, Perch.chromeInset)
         .frame(width: Perch.cardWidth)
         // The card reports its content height to the window. Taking the
         // window's proposed height here would feed an in-flight resize
@@ -52,6 +53,9 @@ struct PerchPanelView: View {
                 // gesture lives on the paper, not over it.
                 .gesture(WindowDragGesture())
         )
+        // Only the window rounds the composing surface. There is no
+        // separate card edge or margin around the bottom section.
+        .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
         .overlay(RoundedRectangle(cornerRadius: Perch.shellCorner)
             .stroke(Perch.panelEdge, lineWidth: 1))
         // The wordmark, centered in the title strip like a window title, in

@@ -1,5 +1,5 @@
-// The composer: one card whose first two lines are the conversation's setup
-// — the shape tabs and the selected shape's instructions — closed off by a
+// The composer fills the bottom of the window. Its first two lines are the
+// conversation's setup — shape tabs and instructions — closed off by a
 // hairline, with the person's own words below the line and the actions at
 // the foot. The arrangement is the converged proposal
 // (docs/design-proposals/chat-composer/converged-composer.html): the shape
@@ -18,7 +18,7 @@
 
 import SwiftUI
 
-/// The card: structure only. The zone, the editor, and the toolbar are
+/// The bottom surface: structure only. The zone, editor, and toolbar have
 /// their own observation scopes so a keystroke invalidates the text and the
 /// button that watches it, never the tabs or the perches above.
 struct PerchComposer: View {
@@ -51,9 +51,9 @@ struct PerchComposer: View {
                 PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
             }
         }
-        .padding(Perch.boxInset)
+        .padding(Perch.contentInset)
         .animation(Perch.spring, value: controller.isSteering)
-        .background(RoundedRectangle(cornerRadius: Perch.boxCorner).fill(Perch.well))
+        .background(Perch.well)
     }
 }
 
@@ -129,12 +129,8 @@ private struct PerchConfigZone: View {
         moreHoldsSelection ? Self.moreTabID : controller.conversation
     }
 
-    /// One track, the shapes as text in equal cells, and a single paper
-    /// thumb that springs to the chosen one, with the selection moving
-    /// rather than each cell lighting up on its own. The thumb is flat: the
-    /// system glass casts a shadow under the row, and a control this small
-    /// should sit in the card, not float over it. Names alone: the shapes
-    /// are words, and a glyph per word made the row read as a toolbar.
+    /// A quiet track groups the shapes in equal cells, with a single paper
+    /// thumb that springs to the chosen one.
     private var shapeTabs: some View {
         HStack(spacing: 0) {
             shapeTab(RelayController.freeConversation)
@@ -166,7 +162,7 @@ private struct PerchConfigZone: View {
               : "Open with the \(name) instructions")
     }
 
-    /// A cell in the track: the name, ink when it is the selection and a
+    /// A tab's name, ink when it is the selection and a
     /// step quieter otherwise, darkening under the pointer. The cell is a
     /// source for the thumb, so it is measured whole — padding included.
     private func tabLabel(_ text: String, id: String, selected: Bool,
@@ -455,6 +451,9 @@ private struct PerchPrimaryFace: View {
                 .font(.system(size: Perch.s(13), weight: .bold))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: Perch.primaryDiameter, height: Perch.primaryDiameter)
+                // Keep the icon centered in its circle while bringing a
+                // label slightly closer to its visible edge.
+                .padding(.trailing, word == nil ? 0 : -Perch.s(3))
             if let word {
                 Text(word)
                     .font(Perch.text(12, .semibold))
@@ -580,6 +579,7 @@ private struct PerchComposerToolbar: View {
             .symbolEffect(.bounce, value: !swaps && on)
             .frame(width: Self.chipSize, height: Self.chipSize)
             .padding(.leading, on ? Perch.s(3) : 0)
+            .padding(.trailing, on ? -Perch.s(3) : 0)
     }
 
     /// The label a chip grows: out of the glyph's side, scaling up as the
