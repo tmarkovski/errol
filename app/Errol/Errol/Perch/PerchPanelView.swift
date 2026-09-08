@@ -26,13 +26,14 @@ struct PerchPanelView: View {
     var onCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
+        PerchEqualSections {
             PerchHead(controller: controller)
                 .padding(.horizontal, Perch.contentInset)
                 // The head clears the native title strip; the composer
                 // below reaches the window's sides and bottom.
                 .padding(.top, Perch.chromeInset)
                 .padding(.bottom, Perch.s(14))
+                .frame(maxHeight: .infinity)
             PerchComposer(controller: controller)
         }
         .frame(width: Perch.cardWidth)
@@ -77,5 +78,33 @@ struct PerchPanelView: View {
         } action: { size in
             onCardResize?(size)
         }
+    }
+}
+
+/// Measure both sections at their natural height, then give each the larger
+/// height. The split stays even without feeding the window's animated frame
+/// back into content measurement or clipping a growing prompt.
+private struct PerchEqualSections: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews,
+                      cache: inout ()) -> CGSize {
+        let width = proposal.width ?? Perch.cardWidth
+        return CGSize(width: width, height: sectionHeight(width: width, subviews: subviews)
+                      * CGFloat(subviews.count))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize,
+                       subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        let height = bounds.height / CGFloat(subviews.count)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX, y: bounds.minY + CGFloat(index) * height),
+                          anchor: .topLeading,
+                          proposal: ProposedViewSize(width: bounds.width, height: height))
+        }
+    }
+
+    private func sectionHeight(width: CGFloat, subviews: Subviews) -> CGFloat {
+        subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+            .max() ?? 0
     }
 }

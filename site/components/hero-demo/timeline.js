@@ -115,31 +115,15 @@ export function mountErrolDemo(root, onChange) {
     if (e.textContent !== txt) e.textContent = txt;
   };
   const between = (a, b) => t >= a && t < b;
+  // The only camera move is the opening one: start close on Errol while the
+  // topic is typed, then pull back to the full desktop before Play is pressed.
+  // The relay plays out on the full desktop with no further moves.
+  const desktop = [600, 365, 1];
   const openingShots = [
     [0, 600, 207, 1.92],
     [3.05, 600, 207, 1.92],
-    [3.95, 600, 365, 1],
-    [START_PRESS, 600, 365, 1],
-  ];
-  const shots = [
-    [START_PRESS - SETUP_EXTENSION, 600, 365, 1],
-    [3.95, 600, 365, 1],
-    [4.9, 297, 491, 1.72],
-    // Ease out over 1.55 seconds so the opening text leads the camera move.
-    [5.5, 297, 491, 1.72],
-    [7.05, 600, 365, 1],
-    [8.75, 600, 365, 1],
-    [9.6, 903, 491, 1.72],
-    [11.4, 903, 491, 1.72],
-    [13.1, 600, 365, 1],
-    // Begin steering during ChatGPT's opening words. Frame both Errol and the
-    // streaming reply, so the viewer can see the conversation continue.
-    [STEER_APPROACH, 600, 365, 1],
-    [18.1, 480, 327, 1.4, 'steer'],
-    [NOTE_END, 480, 327, 1.4, 'steer'],
-    // Pull back as the note finishes, before both dots collect their texts.
-    [steeringCopy.at, 600, 365, 1],
-    [29, 600, 365, 1],
+    [3.95, ...desktop],
+    [START_PRESS, ...desktop],
   ];
   const relayCopies = [
     { app: 'gpt', at: 7.85, until: 8.75 },
@@ -148,35 +132,25 @@ export function mountErrolDemo(root, onChange) {
   ];
   // Every frame is a pure function of time, so scrubbing never skips a state.
   function camera(stateOpacity) {
-    const opening = setupTime < START_PRESS;
-    const cameraShots = opening ? openingShots : shots;
-    const cameraTime = opening ? setupTime : t;
-    let i = 0;
-    while (i < cameraShots.length - 2 && cameraShots[i + 1][0] <= cameraTime)
-      i++;
     const portrait = root.clientWidth <= 580;
-    const framing = (shot) => {
-      if (!portrait) return shot;
-      const [at, x, y, z, kind] = shot;
-      // Keep both the note editor and ChatGPT's full text width on phones.
-      if (kind === 'steer') return [at, 430, 350, 1.55, kind];
-      // Keep close-ups readable, then reveal the whole desktop during replies.
-      if (x !== 600) return [at, x, 535, 1200 / 540];
-      if (z > 1.5) return [at, 600, y === 207 ? 221 : 238, (1200 / 450) * 1.04];
-      return [at, 600, 410, 1];
+    const framing = ([at, x, y, z]) => {
+      if (!portrait) return [at, x, y, z];
+      // Keep the close-up readable on phones, then show the whole desktop.
+      return z > 1 ? [at, 600, 221, (1200 / 450) * 1.04] : [at, 600, 410, 1];
     };
-    const a = framing(cameraShots[i]),
-      b = framing(cameraShots[i + 1]),
-      p = reduced.matches ? 0 : smooth((cameraTime - a[0]) / (b[0] - a[0]));
-    const x = a[1] + (b[1] - a[1]) * p,
-      y = a[2] + (b[2] - a[2]) * p,
+    let [, x, y, z] = framing([START_PRESS, ...desktop]);
+    if (setupTime < START_PRESS) {
+      let i = 0;
+      while (i < openingShots.length - 2 && openingShots[i + 1][0] <= setupTime)
+        i++;
+      const a = framing(openingShots[i]),
+        b = framing(openingShots[i + 1]),
+        p = reduced.matches ? 0 : smooth((setupTime - a[0]) / (b[0] - a[0]));
+      x = a[1] + (b[1] - a[1]) * p;
+      y = a[2] + (b[2] - a[2]) * p;
       z = a[3] + (b[3] - a[3]) * p;
-    const appFocus = (shot) =>
-      shot[4] === 'steer' ? 0 : Math.abs(shot[1] - 600);
-    const focus = appFocus(a) + (appFocus(b) - appFocus(a)) * p;
-    $('.ef-errol').style.opacity = String(
-      (1 - smooth((focus - 45) / 180)) * stateOpacity,
-    );
+    }
+    $('.ef-errol').style.opacity = String(stateOpacity);
     const s = (width / 1200) * z;
     world.style.transform = `translate(${width / 2 - x * s}px,${height / 2 - y * s}px) scale(${s})`;
   }

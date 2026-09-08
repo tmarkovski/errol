@@ -23,6 +23,23 @@ private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine
         .background(Color(white: 0.75))
 }
 
+#Preview("Perch console (Free chat)") {
+    let controller = previewController()
+    controller.selectConversation(RelayController.freeConversation)
+    return PerchPanelView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Perch console (long prompt)") {
+    let controller = previewController()
+    controller.topic = Array(repeating: "Compare pricing by seat and by usage. Consider predictability, fairness, and how each option grows with a team.", count: 8)
+        .joined(separator: "\n\n")
+    return PerchPanelView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
 #Preview("Perch avatars (icon and fallback)") {
     // The first wears whatever Claude Desktop's icon is on this Mac; the
     // second names no installed app, so it is the initial-in-a-circle

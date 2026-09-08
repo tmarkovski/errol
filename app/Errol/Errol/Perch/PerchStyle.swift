@@ -70,9 +70,10 @@ enum Perch {
     /// its label.
     static let spring = Animation.spring(response: 0.32, dampingFraction: 0.82)
 
-    /// The window is the composer's only outer edge. The tabs and option
-    /// chips are capsules and name no radius.
+    /// The window is the composer's only outer edge. Shape tabs use a
+    /// smaller radius so their selection reads as a rounded rectangle.
     static let shellCorner = s(18)
+    static let tabCorner = s(6)
     /// One inset for the head and the full-width composer's contents.
     static let contentInset = s(12)
     static let primaryDiameter = s(36)

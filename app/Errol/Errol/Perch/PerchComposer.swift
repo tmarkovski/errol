@@ -43,15 +43,19 @@ struct PerchComposer: View {
                 ZStack {
                     PerchComposerEditor(controller: controller, primarySpace: primarySpace)
                 }
+                .frame(maxHeight: .infinity,
+                       alignment: controller.isRunning && !controller.isSteering ? .center : .top)
+                .padding(.horizontal, Perch.contentInset)
                 .background {
                     PromptTransferProbe(source: controller.promptTransferSource)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
                 PerchComposerToolbar(controller: controller, primarySpace: primarySpace)
+                    .padding(.horizontal, Perch.contentInset)
+                    .padding(.bottom, Perch.contentInset)
             }
         }
-        .padding(Perch.contentInset)
         .animation(Perch.spring, value: controller.isSteering)
         .background(Perch.well)
     }
@@ -72,7 +76,10 @@ private struct PerchConfigZone: View {
             if controller.isRunning {
                 contextLine
                     .frame(height: Perch.s(20), alignment: .leading)
+                    .padding(.horizontal, Perch.contentInset)
+                    .padding(.top, Perch.contentInset)
                 hairline
+                    .padding(.horizontal, Perch.contentInset)
             } else {
                 shapeTabs
                 // Free chat has no instructions to preview, so it shows
@@ -84,8 +91,10 @@ private struct PerchConfigZone: View {
                 if !controller.isFreeChat {
                     previewRow
                         .frame(height: Perch.previewHeight, alignment: .topLeading)
+                        .padding(.horizontal, Perch.contentInset)
                         .transition(.opacity.combined(with: .offset(y: -Perch.s(6))))
                     hairline
+                        .padding(.horizontal, Perch.contentInset)
                         .transition(.opacity)
                 }
             }
@@ -129,8 +138,8 @@ private struct PerchConfigZone: View {
         moreHoldsSelection ? Self.moreTabID : controller.conversation
     }
 
-    /// A quiet track groups the shapes in equal cells, with a single paper
-    /// thumb that springs to the chosen one.
+    /// A full-width strip groups the shapes in equal cells, with a single
+    /// softly squared paper thumb that springs to the chosen one.
     private var shapeTabs: some View {
         HStack(spacing: 0) {
             shapeTab(RelayController.freeConversation)
@@ -139,15 +148,16 @@ private struct PerchConfigZone: View {
             }
             moreTab
         }
-        .padding(Perch.s(3))
         .background {
             // The thumb takes the selected tab's frame through the shared
             // namespace, so a change of selection is a move, not a swap.
-            Capsule()
+            RoundedRectangle(cornerRadius: Perch.tabCorner, style: .continuous)
                 .fill(Perch.paper)
                 .matchedGeometryEffect(id: selectedTab, in: tabSpace, isSource: false)
         }
-        .background(Capsule().fill(Perch.track))
+        .padding(.horizontal, Perch.contentInset)
+        .padding(.vertical, Perch.s(6))
+        .background(Perch.track)
     }
 
     private func shapeTab(_ name: String) -> some View {
@@ -181,7 +191,7 @@ private struct PerchConfigZone: View {
         .frame(maxWidth: .infinity)
         .frame(height: Perch.s(24))
         .perchHoverInk(idle: selected ? Perch.ink : Perch.secondary, active: Perch.ink)
-        .contentShape(Capsule())
+        .contentShape(RoundedRectangle(cornerRadius: Perch.tabCorner, style: .continuous))
         .matchedGeometryEffect(id: id, in: tabSpace)
     }
 

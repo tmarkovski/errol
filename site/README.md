@@ -85,10 +85,8 @@ as it stops; reduced motion omits the dot and shows only the outline. Each
 finished reply's container gains an amber outline as Copy highlights. The mouse
 pointer only illustrates the person's setup and steering actions. ChatGPT opens, Claude responds, and ChatGPT begins answering
 again before the person intervenes. As “Those features matter” streams, the
-camera moves halfway toward Errol while keeping ChatGPT's response in view.
-The person opens the note field and sends their note while ChatGPT is still
-typing. The camera pulls back as the note finishes, keeping the submitted text
-visible with no dot yet. When ChatGPT finishes, its reply and the note are copied
+person opens the note field and sends their note while ChatGPT is still
+typing. The submitted text stays visible with no dot yet. When ChatGPT finishes, its reply and the note are copied
 together, and two dots leave the Copy control and the note field at the same
 moment. Their separate wakes converge inside Claude's prompt, where both texts
 appear together before one message sends. This handoff fits within a 34-second
@@ -99,11 +97,12 @@ demo. The uninterrupted first exchange makes it clear that steering is optional.
 timing; the React component provides the scene and accessible playback controls.
 The demonstration starts when visible, pauses offscreen or in a background tab,
 and supports pause, replay, and seeking. Reduced motion starts on a completed
-response with playback paused. The camera pulls back as ChatGPT and Claude start
-their opening replies, so the full desktop is visible before each reply finishes.
-The steering view keeps Errol and ChatGPT visible together, including on phones.
-After the steering note, the camera returns to the full desktop for the remaining exchange.
-Narrow containers use closer portrait framing for typing and the same desktop reveals.
+response with playback paused. The camera moves once: it opens close on Errol while
+the topic is typed and pulls back to the full desktop before Play is pressed.
+The relay, the steering note, and both replies play out on the full desktop with
+no further camera moves, so Errol and both apps stay visible together.
+Narrow containers use closer portrait framing for the opening close-up and the
+same desktop view afterwards.
 ChatGPT and Claude use their actual app icons from `public/app-icons/`.
 
 ## Deploy to Cloudflare
