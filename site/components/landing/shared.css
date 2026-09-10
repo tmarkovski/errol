@@ -11,12 +11,12 @@
 .brand-dot {
   color: var(--gold);
 }
-.owl {
+.errol-symbol {
   object-fit: contain;
-  filter: invert(89%) sepia(16%) saturate(318%) hue-rotate(356deg)
+  filter: brightness(0) invert(89%) sepia(16%) saturate(318%) hue-rotate(356deg)
     brightness(106%) contrast(95%);
 }
-.brand .owl {
+.brand .errol-symbol {
   width: 37px;
   height: 37px;
 }

@@ -1,10 +1,10 @@
 import './shared.css';
 
-export function Owl({ className = '' }: { className?: string }) {
+export function ErrolSymbol({ className = '' }: { className?: string }) {
   return (
     <img
-      className={`owl ${className}`}
-      src="/errol.svg"
+      className={`errol-symbol ${className}`}
+      src="/errol-symbol.svg"
       width="40"
       height="40"
       alt=""
@@ -15,7 +15,7 @@ export function Owl({ className = '' }: { className?: string }) {
 export function Brand() {
   return (
     <a href="#" className="brand" aria-label="Errol home">
-      <Owl />
+      <ErrolSymbol />
       <span>
         errol<span className="brand-dot">.</span>
       </span>

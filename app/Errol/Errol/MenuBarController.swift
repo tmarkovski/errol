@@ -1,4 +1,4 @@
-// The AppKit shell around the SwiftUI interface: the status item (an owl,
+// The AppKit shell around the SwiftUI interface: the status item (the Errol symbol,
 // hidden until clicked) and the floating panel that hosts the console
 // (PerchPanelView).
 //
@@ -148,7 +148,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     private func statusIcon(running: Bool) -> NSImage? {
-        if let image = NSImage(named: "MenuBarIcon")?.copy() as? NSImage {
+        // Keep the original owl as a fallback; ErrolSymbol is the default mark.
+        let mark = NSImage(named: "ErrolSymbol") ?? NSImage(named: "MenuBarIcon")
+        if let image = mark?.copy() as? NSImage {
             image.size = NSSize(width: 18, height: 18)
             image.isTemplate = true
             image.accessibilityDescription = running ? "Errol is running" : "Errol"

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: siteConfig.title,
   description: siteConfig.description,
-  icons: { icon: '/favicon.svg' },
+  icons: { icon: '/errol-symbol-favicon.svg' },
 };
 
 export default function RootLayout({
