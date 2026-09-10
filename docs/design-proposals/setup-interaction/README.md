@@ -8,12 +8,29 @@ and should be read with it: that document records the findings; this one
 records a setup flow that answers several of them through the user's own
 actions.
 
+**Implementation reference:** [Participatory setup and session UI spec](SPEC.md)
+records the subsequent screen-by-screen decisions, native appearance, desktop
+app icons, implementation sequence, and acceptance criteria. Use it for the
+current build direction; the discussion below retains the earlier alternatives.
+
 ## Interactive preview
 
 Open [the saved preview](preview.html) in a browser. It includes all ten mock
-screens and starts at the ChatGPT connection step. The arrow nudges toward the
-active logo; Claude's step mirrors the arrow and right-aligns the instructions.
+screens and starts with Accessibility. The main bar keeps a consistent capsule
+shape through setup, composition, pausing, and completion. It uses system type,
+compact controls, and the permission-symbol / explanation / action arrangement
+from [the existing Accessibility view](../../../app/Errol/Errol/PermissionOnboardingView.swift).
+Narrow layouts can grow to keep instructions readable.
+
+During connection, the arrow nudges toward the active logo; Claude's step mirrors
+the arrow and right-aligns the instructions.
+Four short progress segments replace the numbered setup labels: completed
+steps fill green, the current step is amber and slightly thicker, and all four
+fill when both conversations are connected.
 Use the screen navigation to explore the full setup and returning-user flow.
+Demo explanations are hidden by default. Necessary guidance stays inside the
+bar, with destination details available on demand. In Codex, the design controls
+also offer a rounded-corner alternative to the capsule at the same width.
 
 The preview uses HTML, CSS, and JavaScript. [The editable source](preview-source.html)
 is the original inline fragment; `preview.html` wraps it for use outside Codex.

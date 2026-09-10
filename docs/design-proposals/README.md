@@ -3,6 +3,10 @@
 Durable records of UI directions that may inform production work but are not
 part of the application build.
 
+- [Participatory setup and session UI — implementation spec](setup-interaction/SPEC.md)
+  — the agreed native capsule, desktop app icons, all ten reference screens,
+  connection and recovery behavior, current-code mapping, and acceptance criteria.
+
 - [Participatory setup: connect the conversations, then start](setup-interaction/README.md)
   — the user opens the apps, arranges the windows, connects each logo to
   its conversation, and starts with a named recipient; returning-user
