@@ -36,26 +36,3 @@ struct PerchChrome: View {
         }
     }
 }
-
-/// Settings remains available beside Run and New session.
-struct PerchOverflowMenu: View {
-    let controller: RelayController
-
-    var body: some View {
-        Menu {
-            Button("Settings…") { controller.openSettings() }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: Perch.s(12), weight: .semibold))
-                .foregroundColor(Perch.muted)
-                .frame(width: Perch.s(22), height: Perch.s(22))
-                .contentShape(Rectangle())
-                .perchHover(RoundedRectangle(cornerRadius: Perch.s(6)))
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Session actions")
-    }
-}

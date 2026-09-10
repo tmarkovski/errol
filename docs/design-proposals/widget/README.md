@@ -11,9 +11,21 @@ shared composing surface between them. It opens horizontally centered near the
 top of the active screen and retains the native macOS shadow. The shadow's fine
 rim is intentional; there is no additional border or title bar.
 
-- **Idle:** a growing prompt, direct mode selection, and a turn stepper. Clicking
-  either participant chooses who starts. Additional shapes, custom prompts, the
-  automatic end condition, tiling, and Settings remain available.
+- **Idle (revised September 9):** the prompt is the only content in the center.
+  One sliders button immediately before Run opens Settings: conversation shapes,
+  custom prompts, automatic ending or a turn limit, starting app, window tiling,
+  theme, appearance, and the conversation-shape editor. Clicking either
+  participant also chooses who starts. The menu remains available during a run,
+  with conversation options disabled until it ends.
+- **Settings:** a compact panel with Conversation and Appearance tabs and a
+  fixed height. Conversation uses a shape dropdown, segmented starting-app and
+  ending choices, an always-present inline turn count, and tile/restore and edit
+  commands. Appearance groups System/Light/Dark above a grid of palette swatches.
+  Switching tabs or enabling the turn limit does not resize the panel.
+- **Typing:** the prompt shrinks from 19 to 15 design points (20.9 to 16.5 native
+  points at the current scale) before soft wrapping. It grows to three visible
+  lines, then scrolls internally. Deleting text restores the larger type. Custom
+  instructions and steering notes use the same sizing.
 - **Running:** who is replying, the mode, turn count, elapsed time, and Pause to
   steer. Pause is filled; Stop is outlined, the same size, and follows Pause.
   Both are icon-only, vertically centered, with tooltips and accessible names.
@@ -22,8 +34,10 @@ rim is intentional; there is no additional border or title bar.
   delivery receipts, pending pauses, and stop requests retain explicit feedback.
 - **Finished:** the outcome and run summary remain until New session.
 - **Navigation:** Settings and Accessibility setup remain in the same window;
-  Settings animates to a taller card and back. Permission setup covers a blurred
-  console until access is granted. Longer prompts grow the widget vertically.
+  Settings animates to a taller card and back. Permission setup takes the
+  console's capsule, with the request at the leading end and the action at the
+  trailing end, and crossfades into the console once access is granted. Prompt
+  growth is bounded by three lines.
 
 The production view uses the selected theme. App marks are read from installed
 apps when available, with their app icon as fallback; generated logos are not
@@ -39,8 +53,9 @@ The opposite-end arrangement was preferred for its stereo-like silhouette.
 
 ### Configuration controls
 
-Direct controls are the primary direction. Compact secondary controls preserve
-access to the app's full set of shapes and options without dropdown arrows.
+The original direction used direct controls. The September 9 revision consolidates
+them in the sliders popover beside Run, leaving the writing surface clear. These
+concept images record the earlier alternatives.
 
 ![Control alternatives](02-control-options.png)
 

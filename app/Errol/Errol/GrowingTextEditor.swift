@@ -56,6 +56,8 @@ final class TextEditorSession {
 struct GrowingTextEditor: NSViewRepresentable {
     @Binding var text: String
     var font: NSFont
+    /// Shrink to this size before soft wrapping. Nil keeps a fixed font.
+    var minimumFontSize: CGFloat?
     var textColor: NSColor = .labelColor
     var placeholderColor: NSColor = .placeholderTextColor
     var placeholder: String?
@@ -99,6 +101,7 @@ struct GrowingTextEditor: NSViewRepresentable {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
 
         let textView = TrailingPlaceholderTextView(frame: .zero)
         textView.delegate = context.coordinator
@@ -119,6 +122,9 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.placeholderColor = placeholderColor
         textView.string = text
         textView.trailingPlaceholder = placeholder
+        textView.onWidthChange = { [weak coordinator = context.coordinator] in
+            coordinator?.updateFont()
+        }
 
         scrollView.documentView = textView
         context.coordinator.scrollView = scrollView
@@ -141,7 +147,6 @@ struct GrowingTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? TrailingPlaceholderTextView else {
             return
         }
-        if textView.font != font { textView.font = font }
         if textView.textColor != textColor { textView.textColor = textColor }
         if textView.insertionPointColor != textColor { textView.insertionPointColor = textColor }
         textView.placeholderColor = placeholderColor
@@ -153,6 +158,7 @@ struct GrowingTextEditor: NSViewRepresentable {
         if textView.string != text {
             textView.string = text
         }
+        context.coordinator.updateFont()
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
@@ -161,9 +167,12 @@ struct GrowingTextEditor: NSViewRepresentable {
 
         let proposedWidth = proposal.width ?? scrollView.bounds.width
         let width = proposedWidth.isFinite ? max(0, proposedWidth) : scrollView.bounds.width
+        let fittedFont = context.coordinator.textLayout.fittedFont(
+            for: textView.string, width: width, preferred: font, minimumSize: minimumFontSize)
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: fittedFont)
         let insets = textView.textContainerInset.height * 2
-        let minimumHeight = lineHeight * CGFloat(minimumLines) + insets + extraMinimumHeight
-        let maximumHeight = max(lineHeight * CGFloat(maximumLines) + insets, minimumHeight)
+        let minimumHeight = Self.height(lines: minimumLines, font: font) + extraMinimumHeight
+        let maximumHeight = max(ceil(lineHeight * CGFloat(maximumLines)) + insets, minimumHeight)
         guard width > 0 else {
             return CGSize(width: width, height: minimumHeight)
         }
@@ -171,43 +180,32 @@ struct GrowingTextEditor: NSViewRepresentable {
         // SwiftUI probes several widths during a layout pass. Measuring
         // must not resize the live NSTextView: that relays out its scroll
         // view and invalidates the hosting view's constraints mid-pass.
-        let contentHeight = ceil(context.coordinator.measuredTextHeight(
-            textView.attributedString(), width: width) + insets)
+        let measuredText = NSMutableAttributedString(attributedString: textView.attributedString())
+        measuredText.addAttribute(.font, value: fittedFont,
+                                  range: NSRange(location: 0, length: measuredText.length))
+        let contentHeight = ceil(context.coordinator.textLayout.textHeight(
+            measuredText, width: width) + insets)
         let height = min(max(contentHeight, minimumHeight), maximumHeight)
         return CGSize(width: width, height: height)
-    }
-
-    private var lineHeight: CGFloat {
-        ceil(NSLayoutManager().defaultLineHeight(for: font))
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: GrowingTextEditor
         weak var scrollView: NSScrollView?
-        private let measurementStorage = NSTextStorage()
-        private let measurementLayout = NSLayoutManager()
-        private let measurementContainer = NSTextContainer(
-            containerSize: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        let textLayout = PromptTextLayout()
 
         init(parent: GrowingTextEditor) {
             self.parent = parent
             super.init()
-            measurementContainer.lineFragmentPadding = 0
-            measurementLayout.addTextContainer(measurementContainer)
-            measurementStorage.addLayoutManager(measurementLayout)
         }
 
-        /// A separate TextKit stack measures the same attributed text,
-        /// without changing any view involved in AppKit's current layout.
-        func measuredTextHeight(_ text: NSAttributedString, width: CGFloat) -> CGFloat {
-            if !measurementStorage.isEqual(to: text) {
-                measurementStorage.setAttributedString(text)
-            }
-            if measurementContainer.containerSize.width != width {
-                measurementContainer.containerSize.width = width
-            }
-            measurementLayout.ensureLayout(for: measurementContainer)
-            return measurementLayout.usedRect(for: measurementContainer).height
+        func updateFont() {
+            guard let textView = scrollView?.documentView as? NSTextView,
+                  textView.bounds.width > 0, !textView.hasMarkedText() else { return }
+            let fittedFont = textLayout.fittedFont(
+                for: textView.string, width: textView.bounds.width,
+                preferred: parent.font, minimumSize: parent.minimumFontSize)
+            if textView.font != fittedFont { textView.font = fittedFont }
         }
 
         func textDidChange(_ notification: Notification) {
@@ -217,9 +215,14 @@ struct GrowingTextEditor: NSViewRepresentable {
             // Do not leave the hint painted under the first character while
             // SwiftUI propagates the new binding back through updateNSView.
             textView.trailingPlaceholder = nil
+            updateFont()
             parent.text = textView.string
             scrollView?.invalidateIntrinsicContentSize()
             scrollView?.superview?.needsLayout = true
+            DispatchQueue.main.async { [weak textView] in
+                guard let textView, textView.window?.firstResponder === textView else { return }
+                textView.scrollRangeToVisible(textView.selectedRange())
+            }
         }
 
         func textView(_ textView: NSTextView,
@@ -249,6 +252,14 @@ struct GrowingTextEditor: NSViewRepresentable {
 /// Draws a hint in NSTextView's extra line fragment — the insertion line
 /// after the template body — without adding those characters to its storage.
 private final class TrailingPlaceholderTextView: NSTextView {
+    var onWidthChange: (() -> Void)?
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let widthChanged = frame.width != newSize.width
+        super.setFrameSize(newSize)
+        if widthChanged { onWidthChange?() }
+    }
+
     var placeholderColor: NSColor = .placeholderTextColor {
         didSet { needsDisplay = true }
     }

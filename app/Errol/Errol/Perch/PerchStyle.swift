@@ -98,6 +98,11 @@ enum Perch {
 
     // MARK: The composer's measures
 
+    /// The oval's editors shrink before wrapping, then scroll after three lines.
+    static let promptFont = NSFont.systemFont(ofSize: s(19))
+    static let promptMinimumFontSize = s(15)
+    static let promptMaximumLines = 3
+
     /// The gap between the composer's rows: tabs, preview, hairline, editor,
     /// foot. Named because the preview zone's height is summed from it.
     static let cardGap = s(8)

@@ -64,18 +64,19 @@ struct PanelWindowSurface: ViewModifier {
             .frame(minWidth: 0, maxWidth: .infinity,
                    minHeight: 0, maxHeight: .infinity, alignment: .top)
             .background(Perch.paper.gesture(WindowDragGesture()))
-            .clipShape(PanelSurfaceShape(isWidget: navigation?.screen == .console))
+            .clipShape(PanelSurfaceShape(isCard: navigation?.screen == .settings))
             .ignoresSafeArea()
     }
 }
 
-/// Console corners follow the current animated frame, including while a
-/// growing editor changes height. Settings retains its conventional corners.
+/// The console and permission setup share one capsule, whose corners follow
+/// the current animated frame, including while a growing editor changes
+/// height. Settings retains its conventional corners.
 struct PanelSurfaceShape: Shape {
-    var isWidget: Bool
+    var isCard: Bool
 
     func path(in rect: CGRect) -> Path {
-        let radius = isWidget ? min(rect.width, rect.height) / 2 : Perch.shellCorner
+        let radius = isCard ? Perch.shellCorner : min(rect.width, rect.height) / 2
         return Path(roundedRect: rect, cornerRadius: radius)
     }
 }
@@ -89,35 +90,28 @@ struct PanelRootView: View {
     var body: some View {
         let screen = navigation.screen
         ZStack(alignment: .top) {
-            // Keep both screens mounted: navigating or changing appearance
-            // must not discard the native editor, its selection, or drafts.
+            // Keep every screen mounted: navigating, changing appearance, or
+            // losing the grant must not discard the native editor, its
+            // selection, or drafts.
             PerchPanelView(controller: controller, width: navigation.consoleWidth)
-                .blur(radius: screen == .accessibility ? 6 : 0)
-                .overlay {
-                    if screen == .accessibility {
-                        Perch.paper.opacity(0.45)
-                    }
-                }
-                .modifier(PanelScreenPresentation(isVisible: screen != .settings,
-                                                  hiddenOffset: -Perch.s(18)))
-                .disabled(screen != .console)
-                .allowsHitTesting(screen == .console)
-                .accessibilityHidden(screen != .console)
-                .frame(width: 0, height: screen == .settings ? 0 : nil, alignment: .top)
+                // Settings slides the console aside as it comes in. Setup
+                // shares the console's capsule, so the two only crossfade.
+                .modifier(PanelScreenPresentation(
+                    isVisible: screen == .console,
+                    hiddenOffset: screen == .settings ? -Perch.s(18) : 0))
+                .frame(width: 0, height: screen == .console ? nil : 0, alignment: .top)
 
             SettingsView(isPresented: screen == .settings)
                 .modifier(PanelScreenPresentation(isVisible: screen == .settings,
                                                   hiddenOffset: Perch.s(24)))
                 .frame(width: 0, height: screen == .settings ? nil : 0, alignment: .top)
 
-            if screen == .accessibility {
-                PermissionOnboardingView()
-                    .padding(.horizontal, Perch.s(22))
-                    .padding(.top, Perch.chromeInset)
-                    .padding(.bottom, Perch.s(22))
-            }
+            PermissionOnboardingView(width: navigation.consoleWidth)
+                .modifier(PanelScreenPresentation(isVisible: screen == .accessibility,
+                                                  hiddenOffset: 0))
+                .frame(width: 0, height: screen == .accessibility ? nil : 0, alignment: .top)
         }
-        .frame(width: screen == .console ? navigation.consoleWidth : Perch.cardWidth)
+        .frame(width: screen == .settings ? Perch.cardWidth : navigation.consoleWidth)
         .fixedSize(horizontal: false, vertical: true)
         .background(Perch.paper.gesture(WindowDragGesture()))
         .overlay(alignment: .top) {
@@ -146,9 +140,9 @@ struct PanelRootView: View {
         .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
 }
 
-#Preview("Accessibility overlay") {
+#Preview("Accessibility setup") {
     PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                   navigation: PanelNavigation(accessibilityGranted: false))
-        .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+        .clipShape(Capsule())
 }
 #endif
