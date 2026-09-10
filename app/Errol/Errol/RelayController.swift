@@ -107,6 +107,15 @@ final class RelayController {
     /// Whether the worker has parked at a capture or delivery gate. A hold
     /// requested during an operation stays pending until that operation ends.
     var isHolding = false
+    /// The condition in the apps the run is standing on — a changed
+    /// conversation, an unsent draft — until the apps clear it. Separate
+    /// from the steering hold, which the human asks for; the two can
+    /// coincide, and neither clears the other.
+    private(set) var block: RunBlock?
+    /// How the last run ended, from the run itself. Set by the run's
+    /// `.ended` event — or by a start that failed before the run began —
+    /// and cleared by New session and at the next start.
+    var lastReport: RunReport?
     /// The field's text: what the human is writing while the field is open,
     /// and the queued note as written — shown under a blur — while the
     /// mailbox holds it. The composer writes it through setSteeringText.
@@ -133,6 +142,19 @@ final class RelayController {
     /// a run finishes; cleared by resetSession and at the next start.
     var lastRunDuration: TimeInterval?
     @ObservationIgnored private var runStartedAt: Date?
+
+    /// The apps' names as the panel shows them, for the summary and the
+    /// hold lines the engine reports by side.
+    var names: (chatgpt: String, claude: String) {
+        (chatgptStatus.appName, claudeStatus.appName)
+    }
+
+    /// The reason the last start failed, while nothing has replaced it: the
+    /// line under the composer, where the run would have been.
+    var failedStart: String? {
+        if case .failedStart(let reason)? = lastReport?.outcome { return reason }
+        return nil
+    }
 
     /// Read by the widget's one-second timeline, without publishing a tick
     /// through the controller or changing any relay timing.
@@ -194,6 +216,11 @@ final class RelayController {
                 currentTurn = turn
             case .holding(let holding):
                 isHolding = holding
+            case .blocked(let block):
+                self.block = block
+            case .ended(let report):
+                lastReport = report
+                block = nil
             case .steeringGranted:
                 guard isRunning, isSteeringPending, control.canOpenSteering else { return }
                 isSteeringPending = false
@@ -342,6 +369,9 @@ final class RelayController {
             }
             return
         }
+        // A failed preflight reports itself as the run's ending; the last
+        // run's summary goes first so that report has the panel.
+        lastReport = nil
         guard engine.preflight() else { return }
 
         config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -354,6 +384,7 @@ final class RelayController {
         stopRequested = false
         transferOverlay?.stop()
         isHolding = false
+        block = nil
         resetSteering()
         lastReceipt = nil
         updateScanner()
@@ -370,17 +401,25 @@ final class RelayController {
         veils?.begin(chatgptName: chatgptStatus.appName, claudeName: claudeStatus.appName)
     }
 
-    /// Whether a finished run is still on the panel: a turn count, no run to
-    /// own it. The composer shows the run's summary and New session in this
-    /// state (PerchComposer), and resetSession is what leaves it.
-    var hasFinishedRun: Bool { !isRunning && currentTurn > 0 }
+    /// Whether a finished run is still on the panel: a report from a run
+    /// that began, no run to own it. The composer shows the run's summary
+    /// and New session in this state, and resetSession is what leaves it.
+    /// A start that failed is not a finished run: its reason shows under
+    /// the composer, and Run stays the action.
+    var hasFinishedRun: Bool {
+        guard !isRunning, let report = lastReport else { return false }
+        return !report.outcome.isFailedStart
+    }
 
-    /// New session: clear the finished run off the panel — the turn count,
-    /// the perches' sign-offs, the run clock, the last note's record, the
-    /// summary. The prompt and the run options stay as they are; they
-    /// belong to the next run, not the finished one.
+    /// New session: clear the finished run off the panel — the report and
+    /// its summary, the turn count, the perches' sign-offs, the run clock,
+    /// the last note's record. The prompt and the run options stay as they
+    /// are; they belong to the next run, not the finished one. Only Errol
+    /// resets: the conversations in the two apps are as the run left them.
     func resetSession() {
         guard hasFinishedRun else { return }
+        lastReport = nil
+        block = nil
         currentTurn = 0
         lastRunDuration = nil
         lastReceipt = nil
@@ -402,6 +441,7 @@ final class RelayController {
         runStartedAt = nil
         isRunning = false
         isHolding = false
+        block = nil
         veils?.end()
         transferOverlay?.stop()
         recordSteeringAtRunEnd()

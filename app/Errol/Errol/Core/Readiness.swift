@@ -75,6 +75,11 @@ struct WindowScan {
     var lastPopupLabel: String?
     /// First path component of the window's claude.ai AXWebArea URL.
     var surfacePath: String?
+    /// The path of the window's web-area URL when it names one conversation
+    /// (AppSelectors.conversationRoutePrefixes): "/chat/<uuid>" on a Claude
+    /// chat, "/epitaxy/<id>" on a Claude Code session. nil on a fresh chat,
+    /// a Cowork task, a project page, and everywhere ChatGPT.
+    var conversationRoute: String?
 }
 
 /// The text after `prefix` in a joined AX label. axLabel concatenates several
@@ -164,11 +169,18 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
             scan.surfaceTab = name
         }
     } else if role == "AXWebArea" {
-        if scan.surfacePath == nil, !selectors.surfacePathNames.isEmpty,
-           let url = element.url,
-           url.host?.localizedCaseInsensitiveContains("claude.ai") == true {
-            scan.surfacePath = url.path.split(separator: "/").first
-                .map { String($0).lowercased() }
+        // Only the app's own web host counts: Claude's window also carries
+        // the outer file:// shell, and ChatGPT's an app:// one.
+        if let url = element.url, let host = url.host,
+           selectors.identityHosts.contains(where: { host.localizedCaseInsensitiveContains($0) }) {
+            let components = url.path.split(separator: "/").map { String($0) }
+            if scan.surfacePath == nil, !selectors.surfacePathNames.isEmpty {
+                scan.surfacePath = components.first?.lowercased()
+            }
+            if scan.conversationRoute == nil, components.count >= 2,
+               selectors.conversationRoutePrefixes.contains(components[0].lowercased()) {
+                scan.conversationRoute = url.path
+            }
         }
     }
 

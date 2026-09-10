@@ -27,6 +27,11 @@ enum RelayEvent {
     /// the request lands mid-reply and takes effect only once that reply
     /// is ready to capture — and nothing else the app can see tells them apart.
     case holding(Bool)
+    /// The run standing on a condition observed in the apps — a changed
+    /// conversation, an unsent draft — and, with nil, standing on none.
+    /// Separate from the steering hold above: the human asks for that one,
+    /// the apps clear this one, and the two can coincide.
+    case blocked(RunBlock?)
     /// The focus operation has finished and a pending steering editor may open.
     case steeringGranted
     /// The worker took the human's note off the mailbox for the handoff it
@@ -37,6 +42,10 @@ enum RelayEvent {
     /// What became of a note, or of its echo, at the handoff it rode — or
     /// did not ride. Posted after the send, or in place of one.
     case steering(SteeringDelivery)
+    /// How the run ended, from the run itself: the outcome, the replies it
+    /// captured, and the hold or sign-off it ended on. Posted before
+    /// `finished`, and on a failed start in place of any turn.
+    case ended(RunReport)
     /// The run is over — however it ended — and its worker has stopped
     /// touching the apps.
     case finished

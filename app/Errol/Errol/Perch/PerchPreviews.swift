@@ -97,6 +97,7 @@ private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine
     // run, as in the app.
     let controller = previewController()
     controller.currentTurn = 6
+    controller.lastReport = RunReport(outcome: .completed, repliesCaptured: 6)
     controller.lastRunDuration = 272
     controller.chatgptConversation = .ended
     controller.claudeConversation = .ended

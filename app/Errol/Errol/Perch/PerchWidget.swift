@@ -17,7 +17,8 @@ struct PerchWidgetCenter: View {
                             .foregroundStyle(Perch.ink)
                             .lineLimit(2)
                             .contentTransition(.opacity)
-                            .perchShimmer(active: !controller.holdRequested && !controller.stopRequested)
+                            .perchShimmer(active: !controller.holdRequested && !controller.stopRequested
+                                                  && controller.block == nil)
                     }
                 } else if controller.hasFinishedRun {
                     PerchRunSummary(controller: controller)
@@ -35,7 +36,9 @@ struct PerchWidgetCenter: View {
             if controller.isRunning {
                 runningDetails
             } else if !controller.hasFinishedRun {
-                if let problem = readinessProblem {
+                // A start that failed says why, where the run would have
+                // been; otherwise what the readiness sweep found wanting.
+                if let problem = controller.failedStart ?? readinessProblem {
                     Text(problem)
                         .font(Perch.text(11))
                         .foregroundStyle(Perch.red)
@@ -90,6 +93,7 @@ struct PerchWidgetCenter: View {
 
     private var runHeadline: String {
         if controller.stopRequested { return "Ending at the next safe point…" }
+        if let block = controller.block { return block.headline(names: controller.names) }
         if controller.isSteeringPending { return "Finishing the handoff…" }
         if controller.isHolding { return "Paused at the handoff" }
         if controller.chatgptConversation == .chatting {
@@ -132,6 +136,14 @@ struct PerchWidgetCenter: View {
                     .fixedSize()
                     .help("Pause at a safe handoff and add a note here; avoid typing in the chat apps during a run.")
                 }
+            }
+            if let block = controller.block, !controller.stopRequested {
+                Text(block.recovery(names: controller.names))
+                    .font(Perch.text(11))
+                    .foregroundStyle(Perch.red)
+                    .lineLimit(2)
+                    .help(block.recovery(names: controller.names))
+                    .transition(.opacity)
             }
             if hasNoteFeedback {
                 PerchRunLine(controller: controller)

@@ -362,3 +362,57 @@ documentation-only proposal.
 Mid-run redirection, automatic creation of fresh provider conversations, and
 transcript export require further design. They are not implemented or implied
 by the first batch above.
+
+## Implementation status
+
+September 10, 2026. The engine hardening from the delivery sequence above is
+in the application; the setup redesign and the website copy are not.
+
+Landed (packages 1, 2, and 4, with the start-time half of package 3):
+
+- **Bound destinations** (`Core/Destination.swift`). Each side is bound at
+  Run to its window and to a graded identity — route, title, or nothing —
+  read through the same window scan the readiness strip uses (the scan now
+  keeps the conversation route; `AppSelectors` carries the hosts, route
+  prefixes, and generic titles per app). The binding is checked before and
+  after both gates, immediately before every paste and submit keystroke, and
+  on every poll of the response wait, whose inactivity clock is suspended
+  and whose baseline is kept while the conversation is out of view. A fresh
+  chat adopts the route or name it gains until its first reply is captured;
+  a bound route is binding; a world or surface switch is always a change;
+  a quit app or closed window ends the run as `destinationLost`.
+- **Holds separate from outcomes** (`RunBlock`, `.blocked` on the event
+  stream). Destination changed, draft, attachment, reply underway,
+  unreadable composer, and history changed are holds: the run owns no focus
+  operation while standing in one, so the steering editor still opens over
+  it, nothing is copied, pasted, or activated, and Stop is answered at every
+  poll. A send whose pre-keystroke check fails is `withheld` and returns to
+  the gate with any committed note kept in hand.
+- **Unsent work** (`classifyComposer`). Both composers are classified at Run
+  and the recipient's at every delivery; only an empty one admits a paste.
+  Whitespace reads as empty because Claude's idle composer reports a bare
+  newline; a value matching the element's own label reads as the placeholder.
+- **Explicit outcomes** (`Core/RunOutcome.swift`, `.ended` on the event
+  stream). `runRelay` returns and posts a `RunReport` — outcome, replies
+  captured, the sign-off or hold it ended on — from which the summary is
+  rendered. Failed starts, including preflight failures in the engine,
+  report a reason the panel shows under the composer.
+- **Clipboard leases** (`Core/ClipboardLease.swift`). Per-operation capture
+  and conditional restore, in both the copy and the send; the harness now
+  shares the type, using its unconditional `restore()` per case.
+- Tests: `DestinationTests`, `ComposerStateTests`, `ClipboardLeaseTests`,
+  `RunReportTests`, and the suspended-clock cases in `ResponseWaitTests`,
+  over the recorded fixtures. No live run was made for these changes.
+
+Not landed, and still as proposed above:
+
+- The visible destination line, actionable readiness text, visible shape
+  selection, each shape's topic prompt as the placeholder, and the "New
+  session" wording (package 3's panel half; the action itself still only
+  resets Errol, which the summary now says).
+- The website's transcript and data-flow claims (package 5).
+- "Use revised reply", recovery from a changed history beyond Stop, and
+  message-sequence evidence stronger than the affordance count and ordinal
+  the capture gate compares; the decisions listed above stand.
+- The readiness strip's "Ready" still means window plus composer; the
+  composer's contents are judged at Run, not in the strip.

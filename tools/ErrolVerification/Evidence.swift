@@ -115,37 +115,9 @@ struct EvidenceSnapshot {
     }
 }
 
-/// All pasteboard items and representations, including a genuinely empty board.
-/// Captured data is kept in memory only. Restoration also runs on failed cases.
-final class ClipboardLease {
-    private let pasteboard: NSPasteboard
-    private let items: [[NSPasteboard.PasteboardType: Data]]
-    private let captureComplete: Bool
-    init(_ pasteboard: NSPasteboard = .general) {
-        self.pasteboard = pasteboard
-        var complete = pasteboard.changeCount >= 0
-        items = (pasteboard.pasteboardItems ?? []).map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                guard let data = item.data(forType: type) else { complete = false; return nil }
-                return (type, data)
-            })
-        }
-        captureComplete = complete
-    }
-    @discardableResult func restore() -> Bool {
-        pasteboard.clearContents()
-        let restored = items.map { data -> NSPasteboardItem in
-            let item = NSPasteboardItem()
-            for (type, value) in data { item.setData(value, forType: type) }
-            return item
-        }
-        if !restored.isEmpty { _ = pasteboard.writeObjects(restored) }
-        let actual = (pasteboard.pasteboardItems ?? []).map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in item.data(forType: type).map { (type, $0) } })
-        }
-        return captureComplete && actual == items
-    }
-}
+// The clipboard capture and restore live in ErrolKit (ClipboardLease):
+// the relay leases the clipboard per operation, and the harness takes one
+// lease per case and puts everything back with `restore()` at the end.
 
 final class CaseEvidence {
     let directory: URL

@@ -120,7 +120,9 @@ struct PerchRunLine: View {
 /// the count and the clock under it, and the last note's record when there
 /// is one. It stays until New session, since ending is when someone
 /// inspects what happened. The head's turn line keeps to the count; this
-/// is where the rest of the story goes.
+/// is where the rest of the story goes — rendered from the run's own
+/// report (RunReport), so a timeout on the last permitted turn reads as
+/// a timeout and the count is of replies actually relayed.
 struct PerchRunSummary: View {
     let controller: RelayController
 
@@ -132,8 +134,9 @@ struct PerchRunSummary: View {
             Text(detail)
                 .font(Perch.text(11))
                 .foregroundColor(Perch.muted)
-                .lineLimit(1)
+                .lineLimit(2)
                 .truncationMode(.tail)
+                .help(detail)
             if let receipt = controller.lastReceipt {
                 PerchReceiptLine(controller: controller, receipt: receipt)
             }
@@ -142,55 +145,13 @@ struct PerchRunSummary: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private var bothEnded: Bool {
-        controller.chatgptConversation == .ended && controller.claudeConversation == .ended
-    }
-
-    /// The side that ended the conversation when only one did: a sign-off
-    /// the other never answered in kind, or an empty reply.
-    private var soleEnder: String? {
-        switch (controller.chatgptConversation, controller.claudeConversation) {
-        case (.ended, .ended): return nil
-        case (.ended, _): return controller.chatgptStatus.appName
-        case (_, .ended): return controller.claudeStatus.appName
-        default: return nil
-        }
-    }
-
-    private var reachedTurnLimit: Bool {
-        controller.limitTurns && controller.currentTurn >= controller.turns
-    }
-
-    /// How it ended, most deliberate reading first: a mutual sign-off is
-    /// complete whatever else happened, a Stop is a stop, and the cap is
-    /// the cap. Anything else — an empty reply, a timeout, a copy that
-    /// failed — is an end the log explains.
     private var headline: String {
-        if bothEnded { return "Run complete" }
-        if controller.stopRequested { return "Run stopped" }
-        if reachedTurnLimit { return "Turn limit reached" }
-        return "Run ended"
+        controller.lastReport?.headline(names: controller.names) ?? "Run ended"
     }
 
     private var detail: String {
-        var parts = ["\(controller.currentTurn) \(controller.currentTurn == 1 ? "turn" : "turns")"]
-        if let duration = controller.lastRunDuration {
-            parts.append("ran \(runClock(duration))")
-        }
-        if bothEnded {
-            parts.append("both signed off")
-        } else if let side = soleEnder {
-            parts.append("\(side) ended the conversation")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private func runClock(_ duration: TimeInterval) -> String {
-        let total = Int(duration.rounded())
-        let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60)
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-            : String(format: "%d:%02d", minutes, seconds)
+        controller.lastReport?.detail(names: controller.names, duration: controller.lastRunDuration,
+                                      timeout: config.timeout) ?? ""
     }
 }
 

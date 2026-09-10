@@ -35,8 +35,12 @@ func expandLastMessageActions(in target: TargetApp) {
 /// activation — the one call that moves key status too, which is what the
 /// renderer actually reads.
 func copyLastResponse(from target: TargetApp,
+                      mayContinue: () -> Bool = { true },
                       onCopy: ((TransferAnchor?) -> Void)? = nil) -> String? {
     for attempt in 0..<2 {
+        // The destination is the caller's to judge; a press into a
+        // conversation the human switched to would copy their message.
+        guard mayContinue() else { return nil }
         if !makeFrontmost(target) {
             // Unlike a keystroke, an AXPress lands on the element whatever is
             // frontmost, so the press is still worth making — but say what
@@ -73,6 +77,11 @@ func pressCopyButton(in target: TargetApp,
     // Copy controls can unmount as soon as focus moves to the recipient.
     // Remember their position while the actual button is still present.
     let origin = onCopy == nil ? nil : replyTransferAnchor(for: button, in: target)
+    // Whatever the human had on the clipboard goes back the moment the
+    // reply is in memory: the clipboard is not held across the wait for
+    // the delivery gate (ClipboardLease).
+    let lease = ClipboardLease(pasteboard)
+    defer { noteRelease(lease.release(), of: "the copied reply", in: target) }
     let before = pasteboard.changeCount
     let err = AXUIElementPerformAction(button, kAXPressAction as CFString)
     if err != .success {
@@ -87,10 +96,27 @@ func pressCopyButton(in target: TargetApp,
         }
         usleep(50_000)
     }
+    lease.claim()
     let text = pasteboard.string(forType: .string)?
         .trimmingCharacters(in: .whitespacesAndNewlines)
     if text != nil { onCopy?(origin) }
     return text
+}
+
+/// What became of the clipboard at the end of an operation, to the debug
+/// log — and to the run log when the human's contents were left as they
+/// were, which is worth knowing when a later paste surprises.
+func noteRelease(_ release: ClipboardLease.Release, of what: String, in target: TargetApp) {
+    switch release {
+    case .restored:
+        trace("clipboard: the earlier contents are back after \(what)")
+    case .nothingOwned:
+        trace("clipboard: nothing written for \(what), nothing to put back")
+    case .preservedNewer:
+        log("\(target.name): the clipboard changed after \(what) was written; leaving the newer contents in place")
+    case .leftInPlace(let reason):
+        log("\(target.name): leaving \(what) on the clipboard — \(reason)")
+    }
 }
 
 /// What a cut message ends with, so the peer sees it was cut rather than a
@@ -121,10 +147,15 @@ enum SendOutcome: Equatable {
     case abandoned
     /// The foreground could not be taken before typing; nothing was typed.
     case refused
+    /// Nothing was typed because a check made just before the keystroke
+    /// found the destination changed or the clipboard taken. The composer
+    /// stands as it was, so the delivery can be tried again once the
+    /// condition clears; the caller holds rather than ends.
+    case withheld
 
     /// Whether the relay can go on to the next turn: a message that may
     /// well have landed does not end the run, the two that lost the
-    /// machine do.
+    /// machine do. A withheld send is neither; the caller retries it.
     var continuesRun: Bool { self == .confirmed || self == .unconfirmed }
 }
 
@@ -431,6 +462,7 @@ private func describeAnchor(_ anchor: TransferAnchor) -> String {
 func send(_ text: String, to target: TargetApp,
           sources: [TransferSource] = [],
           showTransfer: Bool = false,
+          destination: BoundDestination? = nil,
           inspection: SendInspection? = nil) -> SendOutcome {
     guard !relayControl.isCancelled, inspection?.mayContinue() != false else { return .refused }
     let payload = truncatedForRelay(text)
@@ -438,8 +470,12 @@ func send(_ text: String, to target: TargetApp,
         log("\(target.name): payload truncated to \(config.maxChars) chars")
     }
 
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(payload, forType: .string)
+    // The clipboard is the human's until the paste needs it and again as
+    // soon as the send is over: what was there is captured now and goes
+    // back at return, unless they copied something newer meanwhile.
+    let lease = ClipboardLease()
+    lease.write(payload)
+    defer { noteRelease(lease.release(), of: "the message", in: target) }
 
     // Keystrokes go to the frontmost app no matter what has AX focus, so
     // never type unless the target is verified frontmost.
@@ -447,6 +483,31 @@ func send(_ text: String, to target: TargetApp,
         log("\(target.name): could not bring app to front; refusing to type into another app's window")
         log("\(target.name): \(focusReport(target))")
         return .refused
+    }
+
+    // The two checks made right before every keystroke, after any
+    // activation or wait: the window still shows the bound conversation,
+    // and the clipboard still holds the payload. Either failing before
+    // the first paste withholds the send with the composer untouched;
+    // after typing began, it abandons it.
+    func destinationHolds() -> Bool {
+        guard let destination else { return true }
+        switch destination.check() {
+        case .same: return true
+        case .changed(let seen):
+            log("\(target.name): the conversation changed before the keystroke (\(seen)); not typing")
+            return false
+        case .lost(let detail):
+            log("\(target.name): the destination is gone (\(detail)); not typing")
+            return false
+        }
+    }
+    func clipboardHolds() -> Bool {
+        guard lease.isOwned else {
+            log("\(target.name): the clipboard changed since the message was written; not pasting what is on it now")
+            return false
+        }
+        return true
     }
 
     // Synthesized keystrokes follow the KEY window, which can lag behind the
@@ -540,6 +601,9 @@ func send(_ text: String, to target: TargetApp,
         guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else {
             return attempt == 0 ? .refused : .abandoned
         }
+        // A retry only happens over a composer that stands as it did, so
+        // a withheld retry has typed nothing that landed either.
+        guard destinationHolds(), clipboardHolds() else { return .withheld }
         inspection?.event("paste-attempt-\(attempt + 1)")
         trace("pasting (Cmd+V): pasteboard change count \(NSPasteboard.general.changeCount); \(focusReport(target))")
         keystroke(keyV, flags: .maskCommand)
@@ -606,6 +670,12 @@ func send(_ text: String, to target: TargetApp,
     let beforeSend = composerValue(in: target)
     trace("composer before the send: " + (beforeSend.map { "\($0.count) chars (payload \(payload.count))" } ?? "unreadable"))
     guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else { return .abandoned }
+    // The paste is in a composer; whether that composer still belongs to
+    // the bound conversation is checked once more before it is submitted.
+    guard destinationHolds() else {
+        log("\(target.name): WARNING: the conversation changed after the paste; not submitting. The pasted text may still be in a composer.")
+        return .abandoned
+    }
     inspection?.event("submit-attempt-1")
 
     // A send button press is more reliable than a Return keystroke (no
@@ -634,6 +704,7 @@ func send(_ text: String, to target: TargetApp,
             log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
             return .abandoned
         }
+        guard destinationHolds() else { return .abandoned }
         log("\(target.name): send unconfirmed, trying Return keystroke")
         inspection?.event("submit-attempt-2")
         keystroke(keyReturn)
@@ -644,6 +715,7 @@ func send(_ text: String, to target: TargetApp,
                 log("\(target.name): WARNING: lost frontmost during send; not retrying keystrokes")
                 return .abandoned
             }
+            guard destinationHolds() else { return .abandoned }
             log("\(target.name): send still unconfirmed, trying Cmd+Return")
             inspection?.event("submit-attempt-3")
             keystroke(keyReturn, flags: .maskCommand)
@@ -730,7 +802,7 @@ func responseBaseline(in target: TargetApp) -> ResponseBaseline {
 }
 
 /// One poll of the responding side, as waitForResponse sees it.
-struct ResponseSighting {
+struct ResponseSighting: Equatable {
     var affordances: Int
     var lastOrdinal: Int?
     var streaming: Bool
@@ -767,10 +839,30 @@ struct ResponseWaitState {
     private var lastActivity: TimeInterval
     private var stableTicks = 0
     private(set) var sawStreaming = false
+    private var suspendedAt: TimeInterval?
 
     init(timeout: TimeInterval, startedAt: TimeInterval) {
         self.timeout = timeout
         lastActivity = startedAt
+    }
+
+    /// Whether observation is suspended (`suspend`), the conversation
+    /// being out of view.
+    var isSuspended: Bool { suspendedAt != nil }
+
+    /// Stop the inactivity clock: the window is showing something other
+    /// than the conversation being waited on, so nothing seen means
+    /// nothing. Idempotent.
+    mutating func suspend(at now: TimeInterval) {
+        if suspendedAt == nil { suspendedAt = now }
+    }
+
+    /// The conversation is back: the time it was out of view is taken off
+    /// the inactivity clock, so a hold never becomes a timeout. Idempotent.
+    mutating func resume(at now: TimeInterval) {
+        guard let since = suspendedAt else { return }
+        lastActivity += max(0, now - since)
+        suspendedAt = nil
     }
 
     mutating func observe(_ sighting: ResponseSighting, since baseline: ResponseBaseline,
@@ -819,17 +911,47 @@ func absorbEchoIntoBaseline(in target: TargetApp, preSend: ResponseBaseline) -> 
     return preSend
 }
 
+/// The wait's verdict. A completed reply's sighting travels with it, so
+/// the capture that follows can tell that reply from anything said since.
+enum ResponseWait: Equatable {
+    case complete(ResponseSighting)
+    case timedOut
+    /// Cancelled, vetoed by `mayContinue`, or the destination is gone.
+    case ended
+}
+
 func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
                      mayContinue: () -> Bool = { true },
-                     onPoll: ((ResponseSighting) -> Void)? = nil) -> Bool {
+                     blocked: (() -> RunBlock?)? = nil,
+                     onBlock: ((RunBlock?) -> Void)? = nil,
+                     onPoll: ((ResponseSighting) -> Void)? = nil) -> ResponseWait {
     log("\(target.name): waiting for response (baseline \(baseline.affordances) message affordances"
         + (baseline.lastOrdinal.map { ", message \($0)" } ?? "") + ")...")
     let timeout = config.timeout
     let startedAt = ProcessInfo.processInfo.systemUptime
     var wait = ResponseWaitState(timeout: timeout, startedAt: startedAt)
     var lastSeen = ""
+    var block: RunBlock?
+    defer { if block != nil { onBlock?(nil) } }
     while true {
-        if relayControl.isCancelled || !mayContinue() { return false }
+        if relayControl.isCancelled || !mayContinue() { return .ended }
+        // While the window shows another conversation, what it shows is
+        // not evidence about this one: no sighting is taken, and the time
+        // does not count against the reply. The baseline is kept, so a
+        // reply that completed out of view is seen on return.
+        if let blocked {
+            let now = blocked()
+            if now != block {
+                onBlock?(now)
+                block = now
+            }
+            if now != nil {
+                wait.suspend(at: ProcessInfo.processInfo.systemUptime)
+                usleep(1_200_000)
+                continue
+            }
+            wait.resume(at: ProcessInfo.processInfo.systemUptime)
+        }
         let sighting = ResponseSighting(affordances: messageAffordances(in: target).count,
                                         lastOrdinal: lastMessageOrdinal(in: target),
                                         streaming: hasStopButton(in: target))
@@ -844,7 +966,7 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
         case .complete:
             log("\(target.name): response complete (\(sighting.affordances) message affordances"
                 + (sighting.lastOrdinal.map { ", message \($0)" } ?? "") + ")")
-            return true
+            return .complete(sighting)
         case .timedOut:
             log("\(target.name): timed out after \(Int(timeout))s without detected response activity"
                 + " (\(Int(now - startedAt))s total wait,"
@@ -852,7 +974,7 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
                 + " message \(sighting.lastOrdinal.map(String.init) ?? "-")"
                 + "/\(baseline.lastOrdinal.map(String.init) ?? "-"),"
                 + " streaming seen: \(wait.sawStreaming), streaming now: \(sighting.streaming))")
-            return false
+            return .timedOut
         case .waiting:
             break
         }

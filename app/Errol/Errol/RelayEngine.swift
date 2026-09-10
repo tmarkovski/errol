@@ -64,9 +64,18 @@ final class LiveRelayEngine: RelayEngine {
     }
 
     func preflight() -> Bool {
-        guard ensureTrusted() else { return false }
-        apps = resolveApps()
+        guard ensureTrusted() else {
+            failStart("Accessibility permission missing. Grant Errol in System Settings > Privacy & Security > Accessibility, then Run again.")
+            return false
+        }
+        apps = resolveApps(reportingStart: true)
         return apps != nil
+    }
+
+    /// A start that never reached the worker still ends with a report, so
+    /// the panel shows the reason where the run would have been.
+    private func failStart(_ reason: String) {
+        events.post(.ended(RunReport(outcome: .failedStart(reason: reason))))
     }
 
     func setTiling(_ tiled: Bool) {
@@ -95,6 +104,7 @@ final class LiveRelayEngine: RelayEngine {
     func startRun() {
         guard let apps else {
             report("Start skipped: the apps were not resolved.")
+            failStart("The apps were not resolved. Press Run again.")
             events.post(.finished)
             return
         }
@@ -152,15 +162,20 @@ final class LiveRelayEngine: RelayEngine {
         return false
     }
 
-    private func resolveApps() -> (chatgpt: TargetApp, claude: TargetApp)? {
+    /// Both apps as running processes. `reportingStart` is the preflight
+    /// before a run, whose failure is the run's report; tiling and Inspect
+    /// resolve the apps too and only log what is missing.
+    private func resolveApps(reportingStart: Bool = false) -> (chatgpt: TargetApp, claude: TargetApp)? {
         guard let chatgpt = findApp(bundleID: config.chatgptBundleID, name: "Codex",
                                     selectors: config.chatgptSelectors) else {
             report("ERROR: Codex/ChatGPT (\(config.chatgptBundleID)) is not running. Launch it with a conversation open.")
+            if reportingStart { failStart("ChatGPT is not running. Launch it with a conversation open, then Run again.") }
             return nil
         }
         guard let claude = findApp(bundleID: config.claudeBundleID, name: "Claude",
                                    selectors: config.claudeSelectors) else {
             report("ERROR: Claude Desktop (\(config.claudeBundleID)) is not running. Launch it with a conversation open.")
+            if reportingStart { failStart("Claude is not running. Launch it with a conversation open, then Run again.") }
             return nil
         }
         return (chatgpt, claude)

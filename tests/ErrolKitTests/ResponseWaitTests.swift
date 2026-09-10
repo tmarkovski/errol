@@ -47,6 +47,38 @@ final class ResponseWaitTests: XCTestCase {
                                     selectors: config.chatgptSelectors, at: 301.2), .complete)
     }
 
+    func testTimeOutOfViewDoesNotCountAgainstTheReply() {
+        // The window showed another conversation from 100s to 500s: nothing
+        // seen there is about this reply, and the inactivity allowance
+        // resumes where it stood, so the timeout lands at 700s, not 300s.
+        var wait = ResponseWaitState(timeout: 300, startedAt: 0)
+        XCTAssertEqual(wait.observe(idle, since: baseline,
+                                    selectors: config.claudeSelectors, at: 99), .waiting)
+        wait.suspend(at: 100)
+        wait.suspend(at: 250)
+        XCTAssertTrue(wait.isSuspended, "a second suspend keeps the first moment")
+        wait.resume(at: 500)
+        wait.resume(at: 900)
+        XCTAssertFalse(wait.isSuspended, "a second resume adds nothing")
+        XCTAssertEqual(wait.observe(idle, since: baseline,
+                                    selectors: config.claudeSelectors, at: 699.9), .waiting)
+        XCTAssertEqual(wait.observe(idle, since: baseline,
+                                    selectors: config.claudeSelectors, at: 700), .timedOut)
+    }
+
+    func testAReplyThatCompletedOutOfViewIsSeenOnReturn() {
+        // The baseline is kept through the suspension, so the reply that
+        // landed while the window showed something else counts on return.
+        var wait = ResponseWaitState(timeout: 300, startedAt: 0)
+        wait.suspend(at: 10)
+        wait.resume(at: 400)
+        let reply = ResponseSighting(affordances: 2, lastOrdinal: nil, streaming: false)
+        XCTAssertEqual(wait.observe(reply, since: baseline,
+                                    selectors: config.chatgptSelectors, at: 400), .waiting)
+        XCTAssertEqual(wait.observe(reply, since: baseline,
+                                    selectors: config.chatgptSelectors, at: 401.2), .complete)
+    }
+
     func testBriefIdlePollBetweenWorkDoesNotCompleteTheResponse() {
         var wait = ResponseWaitState(timeout: 300, startedAt: 0)
         for (time, sighting) in [(0.0, working), (299.0, idle), (300.2, working), (601.0, idle)] {

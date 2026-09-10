@@ -108,6 +108,20 @@ struct AppSelectors {
     /// ("Fable 5") immediately followed by "Effort: Extra" — so the effort
     /// match also names the popup right before it as the model.
     var effortPopupPrefix: String?
+    /// Hosts whose URLs in a window's AXWebArea identify what the window is
+    /// showing (the surface path, and a conversation route where one is
+    /// exposed). Matched as substrings of the URL's host.
+    var identityHosts: [String] = []
+    /// First path components under which the rest of the path names one
+    /// conversation ("chat" for claude.ai/chat/<id>, "epitaxy" for a Claude
+    /// Code session). A URL under any other path — "/new", a project — is
+    /// not a conversation identity, however specific it looks.
+    var conversationRoutePrefixes: [String] = []
+    /// Window titles that name no conversation: the app's own name, and the
+    /// titles it gives an unnamed chat. A title outside this list is a hint
+    /// to the conversation being shown — automatic naming can change it and
+    /// two conversations can share one — never a proof.
+    var genericWindowTitles: [String] = []
 }
 
 struct Config {
@@ -168,7 +182,13 @@ struct Config {
         composerSurfaceNames: ["Message ChatGPT": "Chat", "Work with ChatGPT": "Work"],
         // "high" and "medium" observed live (Aug 2026); "low" is expected.
         modelPopupSuffixes: ["high", "medium", "low"],
-        modelPopupDefaultLabel: "Select ChatGPT model")
+        modelPopupDefaultLabel: "Select ChatGPT model",
+        // The desktop app exposes an app:// shell URL, never a conversation
+        // URL (captured Aug 2026); the hosts and route are for a build that
+        // does, and cost nothing until then. Identity rests on the title.
+        identityHosts: ["chatgpt.com", "chat.openai.com"],
+        conversationRoutePrefixes: ["c"],
+        genericWindowTitles: ["ChatGPT", "Codex", "New chat", "New task"])
     var claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
@@ -207,7 +227,13 @@ struct Config {
         // Chat and Cowork announce model plus effort in one "Model:" popup;
         // Claude Code splits them into the bare-model + "Effort:" pair.
         modelPopupPrefix: "Model:",
-        effortPopupPrefix: "Effort:")
+        effortPopupPrefix: "Effort:",
+        identityHosts: ["claude.ai"],
+        // /chat/<uuid> and /epitaxy/<id> name one conversation; /new is
+        // every fresh chat and every Cowork task, and /project/<uuid> is a
+        // project, not a conversation in it (fixtures, Sep 2026).
+        conversationRoutePrefixes: ["chat", "epitaxy"],
+        genericWindowTitles: ["Claude", "New chat", "New task"])
 
     static func documentsPath(_ name: String) -> String {
         (FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first

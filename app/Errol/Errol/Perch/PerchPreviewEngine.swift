@@ -157,6 +157,9 @@ private final class PreviewRun {
         var turn = startTurn - 1
         var replyInHand = atHandoff
         var lastReplyEnded = false
+        var captured = max(0, startTurn - 1)
+        var signedOffBy: Speaker?
+        var outcome = RunOutcome.stopped
         // A note travels twice: with the handoff it lands on, and echoed
         // with the next.
         var echo: (note: String, turn: Int)?
@@ -175,6 +178,7 @@ private final class PreviewRun {
             }
 
             set(speaker, .replied)
+            captured += 1
             if reserved != .delivery {
                 var capture = reserved == .capture ? OperationDecision.proceed : control.beginOperation(.capture)
                 if capture == .hold {
@@ -198,8 +202,11 @@ private final class PreviewRun {
                 set(speaker, .ended)
                 if lastReplyEnded {
                     log("\(name(speaker)) ended the conversation too — both sides have signed off.")
+                    signedOffBy = nil
+                    outcome = .completed
                     break
                 }
+                signedOffBy = speaker
                 log("\(name(speaker)) ended the conversation; relaying the sign-off so \(name(listener)) can close out.")
             }
             lastReplyEnded = signedOff
@@ -207,6 +214,7 @@ private final class PreviewRun {
             log("Turn \(turn)\(turnCap.map { "/\($0)" } ?? ""): \(name(speaker)) -> \(name(listener))")
             if let turnCap, turn >= turnCap {
                 log("Turn cap reached.")
+                outcome = .turnLimitReached
                 break
             }
             if reserved != .delivery { endOperation(continuing: true) }
@@ -268,6 +276,7 @@ private final class PreviewRun {
         }
         if chatgpt != .ended { set(.chatgpt, .notStarted) }
         if claude != .ended { set(.claude, .notStarted) }
+        events.post(.ended(RunReport(outcome: outcome, repliesCaptured: captured, signedOffBy: signedOffBy)))
         log("Done.")
         events.post(.finished)
     }

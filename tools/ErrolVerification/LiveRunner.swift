@@ -358,7 +358,7 @@ final class LiveScenarioRunner {
         var sawStreaming = false
         var previousStreaming = false
         var changedTarget = false
-        let completed = waitForResponse(in: target, baseline: baseline, mayContinue: { [self] in
+        let wait = waitForResponse(in: target, baseline: baseline, mayContinue: { [self] in
             let valid = bindings[target.name]?.valid() == true && evidence.writeError == nil
             if !valid { changedTarget = true }
             return valid
@@ -371,9 +371,11 @@ final class LiveScenarioRunner {
             sawStreaming = sawStreaming || sighting.streaming
             previousStreaming = sighting.streaming
         })
+        var completed = false
+        if case .complete = wait { completed = true }
         if changedTarget { evidence.check("target-retained", .failed, "Window/conversation changed or evidence writing failed while waiting") }
         evidence.check("completion", completed ? .passed : .failed,
-                       completed ? "Production waitForResponse reached stable completion" : "Production wait ended without completion")
+                       completed ? "Production waitForResponse reached stable completion" : "Production wait ended without completion (\(wait))")
         if requireStreaming {
             evidence.check("streaming-observed", sawStreaming ? .passed : .inconclusive,
                            sawStreaming ? "Busy-to-idle transition observed" : "No sampled busy state; streaming path untested")
@@ -469,7 +471,7 @@ final class LiveScenarioRunner {
             evidence.event("relay-response-poll", ["app": target.name, "affordances": sighting.affordances,
                                                    "ordinal": sighting.lastOrdinal as Any? ?? NSNull(), "streaming": sighting.streaming])
         })
-        let succeeded = runRelay(chatgpt: firstTarget, claude: secondTarget, inspection: inspection, operationCompleted: { [self] continuing in
+        let report = runRelay(chatgpt: firstTarget, claude: secondTarget, inspection: inspection, operationCompleted: { [self] continuing in
             operation += 1
             if scenario.behavior == .steering && operation == 2 && continuing {
                 let grant = relayControl.requestHold()
@@ -487,6 +489,11 @@ final class LiveScenarioRunner {
             } else { _ = relayControl.endOperation(continuingRun: continuing) }
         })
         let hold = holdProbe.finish()
+        // The run's own account of its ending, beside the checks made from
+        // the outside; a failed start is the one report that ran nothing.
+        let succeeded = !report.outcome.isFailedStart
+        evidence.event("relay-report", ["outcome": String(describing: report.outcome), "repliesCaptured": report.repliesCaptured,
+                                        "signedOffBy": report.signedOffBy.map(\.rawValue) ?? NSNull(), "block": report.block.map { String(describing: $0) } ?? NSNull()])
         if submitCount != outcomes.count {
             evidence.check("relay-submission-retries", .inconclusive, "\(submitCount) submission attempts for \(outcomes.count) handoffs; uniqueness requires inspecting the chats")
         }
