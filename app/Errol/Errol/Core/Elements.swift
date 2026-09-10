@@ -35,12 +35,24 @@ func worldName(_ label: String) -> String {
 func isExclusionMarker<Node: ElementNode>(_ element: Node, role: String,
                                           selectors: AppSelectors) -> Bool {
     if role == kAXRadioButtonRole as String {
-        guard let world = selectors.excludedWorldName, element.numberValue == 1 else { return false }
-        return worldName(element.label).caseInsensitiveCompare(world) == .orderedSame
+        guard selectors.excludedWorldName != nil, element.numberValue == 1 else { return false }
+        return isExclusionMarker(role: role, label: element.label, selected: true, selectors: selectors)
     }
     guard role == kAXButtonRole as String || role == kAXTextFieldRole as String,
           !selectors.windowExcludeLabels.isEmpty else { return false }
-    let label = element.label
+    return isExclusionMarker(role: role, label: element.label, selected: false, selectors: selectors)
+}
+
+/// The same rule over a label already read — the readiness scan reads each
+/// button's label once for several purposes and must not read it again.
+/// `selected` is the radio button's value; buttons and text fields pass
+/// anything.
+func isExclusionMarker(role: String, label: String, selected: Bool, selectors: AppSelectors) -> Bool {
+    if role == kAXRadioButtonRole as String {
+        guard let world = selectors.excludedWorldName, selected else { return false }
+        return worldName(label).caseInsensitiveCompare(world) == .orderedSame
+    }
+    guard role == kAXButtonRole as String || role == kAXTextFieldRole as String else { return false }
     return selectors.windowExcludeLabels.contains { label.localizedCaseInsensitiveContains($0) }
 }
 
@@ -218,9 +230,22 @@ func hasTextArea(_ window: AXUIElement) -> Bool {
     hasTextArea(LiveElement(ax: window))
 }
 
+/// Whether a window element still answers: one the app has torn down
+/// replies invalidUIElement to every read. An app that is merely slow
+/// (cannotComplete) still has the window.
+func windowIsAlive(_ window: AXUIElement) -> Bool {
+    axAttributeResult(window, kAXRoleAttribute).error != .invalidUIElement
+}
+
 func chatWindow(in target: TargetApp) -> AXUIElement? {
-    chooseChatWindow(from: axWindows(target).map(LiveElement.init),
-                     selectors: target.selectors)?.ax
+    if let bound = target.boundWindow {
+        // The chosen window or nothing. A general search here could hand a
+        // copy or a paste to another window of the same app, which is the
+        // one substitution setup exists to rule out.
+        return windowIsAlive(bound) ? bound : nil
+    }
+    return chooseChatWindow(from: axWindows(target).map(LiveElement.init),
+                            selectors: target.selectors)?.ax
 }
 
 func isMessageActionsToggle(_ element: AXUIElement, selectors: AppSelectors) -> Bool {

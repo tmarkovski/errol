@@ -64,7 +64,7 @@ struct PermissionOnboardingView: View {
                 .font(Perch.text(12))
                 .foregroundStyle(Perch.secondary)
                 .lineLimit(3)
-            Text("System Settings › Privacy & Security › Accessibility, then turn on Errol.")
+            Text("System Settings › Privacy & Security › Accessibility. Turn on Errol.")
                 .font(Perch.text(11))
                 .foregroundStyle(Perch.muted)
                 .lineLimit(3)
@@ -90,7 +90,7 @@ struct PermissionOnboardingView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.defaultAction)
-            Label("Clears on its own once access is ready", systemImage: "lock")
+            Label("Checks access automatically", systemImage: "lock")
                 .font(Perch.text(11))
                 .foregroundStyle(Perch.muted)
         }

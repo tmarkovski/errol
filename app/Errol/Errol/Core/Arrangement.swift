@@ -1,7 +1,9 @@
-// Window tiling for watching a run: the same result as the native Fill &
-// Arrange "Left & Right", which only pairs windows interactively and can't
-// be aimed at a specific window across two apps. Frames are set directly
-// through AX, with the pre-tiling frames snapshotted for restore.
+// Window arrangement for watching a run: the two chosen windows side by
+// side or stacked on one screen, their original frames kept so a restore
+// puts back exactly those windows — and only where nobody has moved them
+// since. Frames are set directly through AX; the native Fill & Arrange
+// only pairs windows interactively and cannot be aimed at a specific
+// window across two apps.
 
 import AppKit
 import ApplicationServices
@@ -15,15 +17,8 @@ func axRect(_ rect: CGRect) -> CGRect {
 }
 
 func windowFrameDescription(_ window: AXUIElement) -> String {
-    var position = CGPoint.zero
-    var size = CGSize.zero
-    if let value = axAttribute(window, kAXPositionAttribute) {
-        AXValueGetValue(value as! AXValue, .cgPoint, &position)
-    }
-    if let value = axAttribute(window, kAXSizeAttribute) {
-        AXValueGetValue(value as! AXValue, .cgSize, &size)
-    }
-    return "(\(Int(position.x)),\(Int(position.y))) \(Int(size.width))x\(Int(size.height))"
+    let frame = windowFrame(window) ?? .zero
+    return "(\(Int(frame.minX)),\(Int(frame.minY))) \(Int(frame.width))x\(Int(frame.height))"
 }
 
 func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint, size: CGSize) {
@@ -65,84 +60,193 @@ func currentFrame(_ window: AXUIElement) -> CGRect {
     windowFrame(window) ?? .zero
 }
 
-/// Snapshot the pre-tiling frames so the Tile chip's next press can put them back.
-func saveFrames(_ entries: [(TargetApp, AXUIElement)]) {
-    let lines = entries.map { target, window -> String in
-        let frame = currentFrame(window)
-        return "\(target.name)\t\(frame.origin.x)\t\(frame.origin.y)\t\(frame.width)\t\(frame.height)"
-    }
-    try? lines.joined(separator: "\n").write(toFile: config.frameStatePath, atomically: true, encoding: .utf8)
-}
+// MARK: - Layouts
 
-/// Restore the frames saved by the last tiling. Without a snapshot the
-/// best effort is centering both windows, lightly cascaded.
-func unarrange(_ targets: [TargetApp]) {
-    if let content = try? String(contentsOfFile: config.frameStatePath, encoding: .utf8) {
-        for line in content.split(separator: "\n") {
-            let parts = line.split(separator: "\t")
-            guard parts.count == 5,
-                  let x = Double(parts[1]), let y = Double(parts[2]),
-                  let width = Double(parts[3]), let height = Double(parts[4]),
-                  let target = targets.first(where: { $0.name == parts[0] }),
-                  let window = chatWindow(in: target) else { continue }
-            setWindowFrame(target, window, origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))
-            log("restored \(target.name) to \(windowFrameDescription(window))")
+/// The layouts setup offers. Keep positions is a choice too: it completes
+/// the step without moving anything.
+enum LayoutChoice: String, CaseIterable, Equatable {
+    case sideBySide
+    case stacked
+    case keepPositions
+
+    var title: String {
+        switch self {
+        case .sideBySide: return "Side by side"
+        case .stacked: return "Stacked"
+        case .keepPositions: return "Keep positions"
         }
-        try? FileManager.default.removeItem(atPath: config.frameStatePath)
-        return
     }
-    log("restore: no saved frames at \(config.frameStatePath); centering both windows instead")
-    let area = axRect(NSScreen.screens[0].visibleFrame)
-    let size = CGSize(width: (area.width * 0.7).rounded(), height: (area.height * 0.85).rounded())
-    var cascade: CGFloat = -30
-    for target in targets {
-        guard let window = chatWindow(in: target) else { continue }
-        let origin = CGPoint(x: (area.midX - size.width / 2 + cascade).rounded(),
-                             y: (area.midY - size.height / 2 + cascade / 2).rounded())
-        setWindowFrame(target, window, origin: origin, size: size)
-        log("centered \(target.name) at \(windowFrameDescription(window))")
-        cascade += 60
+
+    /// The action that applies it.
+    var applyTitle: String { self == .keepPositions ? "Use positions" : "Arrange" }
+
+    var movesWindows: Bool { self != .keepPositions }
+}
+
+/// The frames a layout gives the two windows in `area` (AX coordinates):
+/// the first for the window on the left or on top, the second for the
+/// other. nil for a layout that moves nothing.
+func layoutFrames(_ layout: LayoutChoice, in area: CGRect) -> (first: CGRect, second: CGRect)? {
+    switch layout {
+    case .keepPositions:
+        return nil
+    case .sideBySide:
+        let half = (area.width / 2).rounded(.down)
+        return (CGRect(x: area.minX, y: area.minY, width: half, height: area.height),
+                CGRect(x: area.minX + half, y: area.minY, width: area.width - half, height: area.height))
+    case .stacked:
+        let half = (area.height / 2).rounded(.down)
+        return (CGRect(x: area.minX, y: area.minY, width: area.width, height: half),
+                CGRect(x: area.minX, y: area.minY + half, width: area.width, height: area.height - half))
     }
 }
 
-/// Tile the two chat windows into the halves of one screen: the Tile
-/// chip's press. Returns whether both windows were found and moved.
-func arrangeSideBySide(left: TargetApp, right: TargetApp) -> Bool {
-    guard let leftWindow = chatWindow(in: left), let rightWindow = chatWindow(in: right) else {
-        log("arrange: could not resolve a chat window in both apps")
-        return false
+/// Whether a window took the frame asked of it, to within the few points
+/// of rounding a move involves. A window held larger than asked has a
+/// minimum size the layout does not respect.
+func windowTookFrame(_ landed: CGRect, asked: CGRect, tolerance: CGFloat = 4) -> Bool {
+    landed.width <= asked.width + tolerance && landed.height <= asked.height + tolerance
+}
+
+/// Whether a window still stands where an arrangement left it, so a
+/// restore does not undo a move the human made since.
+func windowStandsWhereLeft(_ current: CGRect, applied: CGRect, tolerance: CGFloat = 4) -> Bool {
+    abs(current.minX - applied.minX) <= tolerance && abs(current.minY - applied.minY) <= tolerance
+        && abs(current.width - applied.width) <= tolerance && abs(current.height - applied.height) <= tolerance
+}
+
+enum ArrangeOutcome: Equatable {
+    case arranged
+    /// Keep positions: nothing moved, by choice.
+    case kept
+    case windowMissing(Speaker)
+    /// A window would not take the frame asked of it — its minimum size is
+    /// larger — and both were put back where they were.
+    case cannotFit(Speaker, String)
+}
+
+/// A window a layout moves, with its app for the frame setter.
+struct ArrangedWindow {
+    let side: Speaker
+    let target: TargetApp
+    let window: AXUIElement
+}
+
+/// The arranger the engine keeps: applies a layout to the chosen windows
+/// on the worker thread and remembers where they were. The first
+/// arrangement's snapshot survives re-arrangements until a restore, so
+/// putting the windows back means where the human had them, not where an
+/// earlier layout left them.
+final class WindowArranger {
+    private struct Entry {
+        let side: Speaker
+        let target: TargetApp
+        let window: AXUIElement
+        let original: CGRect
+        var applied: CGRect
     }
-    // The frames as they stand are what the chip's next press puts back.
-    // Every tiling takes the snapshot afresh: the chip is the one control,
-    // so a tiling follows a restore and never another tiling — and a
-    // snapshot left by a process that ended tiled is not trusted over the
-    // layout the chip was actually pressed on.
-    saveFrames([(left, leftWindow), (right, rightWindow)])
-    // Tile on whichever screen currently hosts the left app's window.
-    var screen = NSScreen.screens[0]
-    if let value = axAttribute(leftWindow, kAXPositionAttribute) {
-        var position = CGPoint.zero
-        AXValueGetValue(value as! AXValue, .cgPoint, &position)
-        for candidate in NSScreen.screens where axRect(candidate.frame).contains(position) {
+
+    private let lock = NSLock()
+    private var snapshot: [Entry] = []
+
+    /// Whether a restore has anything to put back.
+    var canRestore: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !snapshot.isEmpty
+    }
+
+    /// Worker thread. Apply `layout` to the two windows — the first on the
+    /// left or on top — on the screen hosting the first, raise both, and
+    /// say how it went.
+    func apply(_ layout: LayoutChoice, to windows: [ArrangedWindow]) -> ArrangeOutcome {
+        guard layout.movesWindows else { return .kept }
+        guard windows.count == 2 else { return .windowMissing(windows.first?.side ?? .chatgpt) }
+        var originals: [CGRect] = []
+        for arranged in windows {
+            guard let frame = windowFrame(arranged.window) else { return .windowMissing(arranged.side) }
+            originals.append(frame)
+        }
+        let area = axRect(screenHosting(originals[0]).visibleFrame)
+        guard let frames = layoutFrames(layout, in: area) else { return .kept }
+        let asked = [frames.first, frames.second]
+
+        // The snapshot is taken once, for these windows; a re-arrangement
+        // of the same windows keeps the original frames.
+        lock.lock()
+        let sameWindows = snapshot.count == windows.count
+            && zip(snapshot, windows).allSatisfy { CFEqual($0.window, $1.window) }
+        if !sameWindows {
+            snapshot = zip(windows, originals).map { arranged, original in
+                Entry(side: arranged.side, target: arranged.target, window: arranged.window,
+                      original: original, applied: original)
+            }
+        }
+        lock.unlock()
+
+        for (arranged, frame) in zip(windows, asked) {
+            setWindowFrame(arranged.target, arranged.window, origin: frame.origin, size: frame.size)
+        }
+        usleep(150_000)
+        for (arranged, frame) in zip(windows, asked) {
+            guard let landed = windowFrame(arranged.window) else { return .windowMissing(arranged.side) }
+            guard windowTookFrame(landed, asked: frame) else {
+                // Neither window is left squeezed or half-moved.
+                _ = putBack(all: true)
+                let reason = "\(arranged.target.name)'s window can't be made "
+                    + "\(Int(frame.width))\u{00D7}\(Int(frame.height)) on this display."
+                log("arrange: \(reason) (it stayed \(Int(landed.width))x\(Int(landed.height)))")
+                return .cannotFit(arranged.side, reason)
+            }
+        }
+        lock.lock()
+        for index in snapshot.indices where index < asked.count { snapshot[index].applied = asked[index] }
+        lock.unlock()
+        for arranged in windows {
+            raiseWindow(arranged.window)
+            _ = makeFrontmost(arranged.target)
+        }
+        log("arranged \(layout.title.lowercased()) on \(Int(area.width))x\(Int(area.height)): "
+            + windows.map { "\($0.target.name) \(windowFrameDescription($0.window))" }.joined(separator: ", "))
+        return .arranged
+    }
+
+    /// Worker thread. Put back every window of the snapshot that still
+    /// exists and still stands where the arrangement left it; a window the
+    /// human moved since is theirs. Returns how many were put back.
+    @discardableResult
+    func restore() -> Int {
+        putBack(all: false)
+    }
+
+    private func putBack(all: Bool) -> Int {
+        lock.lock()
+        let entries = snapshot
+        snapshot = []
+        lock.unlock()
+        var restored = 0
+        for entry in entries {
+            guard let current = windowFrame(entry.window) else {
+                log("restore: \(entry.target.name)'s window is gone; nothing to put back")
+                continue
+            }
+            guard all || windowStandsWhereLeft(current, applied: entry.applied) else {
+                log("restore: \(entry.target.name)'s window was moved since; leaving it")
+                continue
+            }
+            setWindowFrame(entry.target, entry.window, origin: entry.original.origin, size: entry.original.size)
+            log("restored \(entry.target.name) to \(windowFrameDescription(entry.window))")
+            restored += 1
+        }
+        return restored
+    }
+
+    /// The screen a frame's origin lies on, the primary one otherwise.
+    private func screenHosting(_ frame: CGRect) -> NSScreen {
+        var screen = NSScreen.screens[0]
+        for candidate in NSScreen.screens where axRect(candidate.frame).contains(frame.origin) {
             screen = candidate
         }
+        return screen
     }
-    let area = axRect(screen.visibleFrame)
-    let half = (area.width / 2).rounded(.down)
-    setWindowFrame(left, leftWindow,
-                   origin: area.origin,
-                   size: CGSize(width: half, height: area.height))
-    setWindowFrame(right, rightWindow,
-                   origin: CGPoint(x: area.origin.x + half, y: area.origin.y),
-                   size: CGSize(width: area.width - half, height: area.height))
-    // Raise both so they are the visible pair.
-    for target in [left, right] {
-        if let window = chatWindow(in: target) {
-            AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
-            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-        }
-        _ = makeFrontmost(target)
-    }
-    log("arranged on \(Int(area.width))x\(Int(area.height)): \(left.name) \(windowFrameDescription(leftWindow)), \(right.name) \(windowFrameDescription(rightWindow))")
-    return true
 }

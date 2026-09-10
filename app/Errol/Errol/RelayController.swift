@@ -81,18 +81,14 @@ final class RelayController {
     var customInstructions = ""
     var limitTurns = config.limitTurns
     var turns = config.turns
-    /// Which side sends the opening message. Chosen before a run by clicking
-    /// a perch (the turn line names the opener), and copied into config at
+    /// Which side sends the opening message. Chosen in the session settings
+    /// (the Send button names the recipient), and copied into config at
     /// Start, which is where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
-    /// Whether the chat windows stand tiled — ChatGPT left, Claude right —
-    /// by the Tile chip. A live arrangement, not a run option: the chip
-    /// tiles the windows the moment it is pressed and puts them back where
-    /// they were when pressed again, so the layout is settled and visible
-    /// before Start and the console can be set beside it. Flipped here at
-    /// the press, for the chip's sake; the engine's `.arranged` pulls it
-    /// back down when a tiling could not be done.
-    var windowsTiled = false
+    /// The guided setup: which apps are open, how their windows are
+    /// arranged, and which conversation each side is connected to. A run
+    /// starts only from its editor phase, into the windows it bound.
+    let setup: SetupController
     var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
     /// finished, since the summary names it as the ending. The Stop button
@@ -186,16 +182,24 @@ final class RelayController {
         self.engine = engine
         self.veils = veils
         self.transferOverlay = transferOverlay
+        setup = SetupController(engine: engine)
         transferOverlay?.promptSource = promptTransferSource
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only
-        // changed statuses reach the observable properties.
-        engine.onReadiness = { [weak self] chatgpt, claude in
-            DispatchQueue.main.async {
+        // changed statuses reach the observable properties. The setup
+        // state does its own no-change filtering per side.
+        engine.onReadiness = { [weak self] report in
+            let apply = {
                 guard let self else { return }
-                if self.chatgptStatus != chatgpt { self.chatgptStatus = chatgpt }
-                if self.claudeStatus != claude { self.claudeStatus = claude }
+                if self.chatgptStatus != report.chatgpt { self.chatgptStatus = report.chatgpt }
+                if self.claudeStatus != report.claude { self.claudeStatus = report.claude }
+                self.setup.names = self.names
+                self.setup.apply(report)
             }
+            // The live sweep reports from its own thread; a preview engine
+            // answers on the main thread at once, so a canvas can step
+            // through setup in its own setup code.
+            if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
         }
         // The engine's ordered event stream, delivered on the main thread.
         // Consuming it in one place keeps related updates — a turn, a hold,
@@ -232,11 +236,6 @@ final class RelayController {
                 steeringDelivered(delivery)
             case .finished:
                 finishRun()
-            case .arranged(let tiled):
-                // The engine's word on where the windows stand. True only
-                // confirms a press already shown; false takes the chip down
-                // — a tiling that found no window, or a restore done.
-                if !tiled { windowsTiled = false }
             }
         }
         // A shape deleted or renamed in Settings can leave the picker
@@ -317,27 +316,35 @@ final class RelayController {
         engine.setScanning(panelVisible && !isRunning)
     }
 
-    // MARK: Tiling
+    // MARK: What the capsule shows
 
-    /// Tiling needs both chat windows found: the strip's two Ready dots,
-    /// the same test the run preflight applies. Tiled windows can always
-    /// be put back, whatever the strip says by then.
-    var canTile: Bool {
-        chatgptStatus.state == .ready && claudeStatus.state == .ready
+    /// The capsule's content, in the order the run's lifetime gives it:
+    /// the guided screens, the editor, the exchange, the ending.
+    enum Stage: Equatable {
+        case setup, compose, running, finished
     }
 
-    /// The Tile chip: tile the chat windows now, or put them back. Not a
-    /// run option — a run owns the windows, and the chip is not offered
-    /// during one.
-    func toggleTiling() {
-        guard !isRunning else { return }
-        if windowsTiled {
-            windowsTiled = false
-            engine.setTiling(false)
-        } else if canTile {
-            windowsTiled = true
-            engine.setTiling(true)
+    var stage: Stage {
+        if isRunning { return .running }
+        if hasFinishedRun { return .finished }
+        return setup.isGuiding ? .setup : .compose
+    }
+
+    /// The named Send: whoever starts the conversation receives the topic.
+    var sendLabel: String {
+        "Send to \(appName(firstSpeaker))"
+    }
+
+    /// Why Send is unavailable now, beside it: the topic missing, or a
+    /// destination not ready. nil when it can go.
+    var sendBlocker: String? {
+        if let blocker = setup.state.sendBlocker(names: names) { return blocker }
+        guard instructionsReady else {
+            if showsFullInstructionsEditor { return "Write the opening prompt first." }
+            return isFreeChat ? "Add a topic first: it is the whole opening message."
+                              : "Add a topic first: it completes the \(conversation) opening."
         }
+        return nil
     }
 
     /// The log is an in-memory tail read through the status item's debug
@@ -357,21 +364,17 @@ final class RelayController {
     }
 
     func start() {
-        guard !isRunning else { return }
+        guard !isRunning, stage == .compose else { return }
 
-        guard instructionsReady else {
-            if showsFullInstructionsEditor {
-                append("Write the instructions first — they become the opening message handed to the first agent.")
-            } else if isFreeChat {
-                append("Add a topic first — it is the whole opening message handed to the first agent.")
-            } else {
-                append("Add a topic first — it completes the \(conversation) opening handed to the first agent.")
-            }
+        // Rechecked at the click, against the last sweep: the destinations
+        // must read ready and the opening content must exist. A refusal
+        // shows where the run would have been and leaves the topic alone.
+        lastReport = nil
+        if let blocker = sendBlocker {
+            append(blocker)
+            lastReport = RunReport(outcome: .failedStart(reason: blocker))
             return
         }
-        // A failed preflight reports itself as the run's ending; the last
-        // run's summary goes first so that report has the panel.
-        lastReport = nil
         guard engine.preflight() else { return }
 
         config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -387,6 +390,7 @@ final class RelayController {
         block = nil
         resetSteering()
         lastReceipt = nil
+        setup.runStarted()
         updateScanner()
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
@@ -411,11 +415,11 @@ final class RelayController {
         return !report.outcome.isFailedStart
     }
 
-    /// New session: clear the finished run off the panel — the report and
-    /// its summary, the turn count, the perches' sign-offs, the run clock,
-    /// the last note's record. The prompt and the run options stay as they
-    /// are; they belong to the next run, not the finished one. Only Errol
-    /// resets: the conversations in the two apps are as the run left them.
+    /// Clear the finished run off the panel — the report and its summary,
+    /// the turn count, the perches' sign-offs, the run clock, the last
+    /// note's record. The run options stay as they are; they belong to the
+    /// next run, not the finished one. Only Errol resets: the conversations
+    /// in the two apps are as the run left them.
     func resetSession() {
         guard hasFinishedRun else { return }
         lastReport = nil
@@ -426,6 +430,35 @@ final class RelayController {
         stopRequested = false
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
+    }
+
+    /// Another topic in these conversations: the editor comes back empty,
+    /// and both destinations are verified again before Send is offered.
+    /// Their context carries on in the apps; nothing there is touched.
+    func anotherTopicHere() {
+        guard hasFinishedRun else { return }
+        resetSession()
+        topic = ""
+        setup.revalidate()
+    }
+
+    /// Set up fresh conversations: the topic is cleared with the run and
+    /// both sides are connected anew, once the human has opened new chats
+    /// in the apps. Errol makes no chats itself.
+    func setUpFreshConversations() {
+        guard hasFinishedRun else { return }
+        resetSession()
+        topic = ""
+        setup.setUpFresh()
+    }
+
+    /// Choose another conversation for one side, from its details. A
+    /// finished run's summary gives way first, so the picker has the
+    /// capsule; the topic stays.
+    func chooseAnotherConversation(_ side: Speaker) {
+        guard !isRunning else { return }
+        if hasFinishedRun { resetSession() }
+        setup.chooseAnother(side)
     }
 
     /// The run's `.finished` event: put the panel back to idle. Ordered
@@ -494,7 +527,7 @@ final class RelayController {
         appName == chatgptStatus.appName ? claudeStatus.appName : chatgptStatus.appName
     }
 
-    private func appName(_ speaker: Speaker) -> String {
+    func appName(_ speaker: Speaker) -> String {
         switch speaker {
         case .chatgpt: chatgptStatus.appName
         case .claude: claudeStatus.appName
@@ -555,6 +588,15 @@ final class RelayController {
         }
         isSteering = false
         control.finishSteering(note: note.isEmpty ? nil : note)
+    }
+
+    /// Resume without a note: whatever the field holds is dropped, the
+    /// field closes, and the run goes on.
+    func resumeWithoutNote() {
+        guard isRunning, isSteering else { return }
+        steeringEditor.clear()
+        steeringText = ""
+        sendSteering()
     }
 
     /// Esc in the open field. The first press empties it; the second, on an

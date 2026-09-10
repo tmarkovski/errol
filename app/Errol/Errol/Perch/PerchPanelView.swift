@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// The widget has one shared surface, with the participants at opposite ends.
-/// Its natural content height drives the native window; longer drafts grow it.
+/// The one capsule every phase shares — permission aside, which has its
+/// own view in the same shape: the participants at opposite ends, the
+/// content between them changing with the stage (guided setup, the editor,
+/// the exchange, the ending), the actions beside it. Its natural content
+/// height drives the native window; longer text grows it downward.
 struct PerchPanelView: View {
     let controller: RelayController
     var width: CGFloat = Perch.widgetWidth
@@ -9,16 +12,23 @@ struct PerchPanelView: View {
 
     var body: some View {
         HStack(spacing: Perch.s(18)) {
-            PerchWidgetParticipant(controller: controller, speaker: .chatgpt)
+            PerchParticipant(controller: controller, speaker: .chatgpt)
             separator
-            PerchWidgetCenter(controller: controller)
-                .layoutPriority(1)
+            VStack(alignment: .leading, spacing: Perch.s(8)) {
+                if showsMeter {
+                    PerchProgressMeter(controller: controller)
+                        .transition(.opacity)
+                }
+                PerchWidgetCenter(controller: controller)
+            }
+            .layoutPriority(1)
+            .animation(Perch.fade, value: showsMeter)
             PerchWidgetActions(controller: controller)
             separator
-            PerchWidgetParticipant(controller: controller, speaker: .claude)
+            PerchParticipant(controller: controller, speaker: .claude)
         }
         .padding(.horizontal, Perch.s(24))
-        .padding(.vertical, Perch.s(22))
+        .padding(.vertical, Perch.s(18))
         .frame(width: width)
         .frame(minHeight: Perch.widgetHeight)
         .fixedSize(horizontal: false, vertical: true)
@@ -26,6 +36,12 @@ struct PerchPanelView: View {
         .background(Perch.paper.gesture(WindowDragGesture()))
         .clipShape(Capsule())
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onCardResize?($0) }
+    }
+
+    /// The four-segment meter: through the guided steps and on first
+    /// reaching the editor; gone once a run has started.
+    private var showsMeter: Bool {
+        (controller.stage == .setup || controller.stage == .compose) && controller.setup.state.meterVisible
     }
 
     private var separator: some View {

@@ -174,7 +174,7 @@ final class DestinationTests: XCTestCase {
         XCTAssertEqual(draft.headline(names: names), "Paused: ChatGPT has an unsent draft")
         XCTAssertTrue(draft.recovery(names: names).contains("16-character draft"))
         XCTAssertEqual(draft.startRefusal(name: "ChatGPT"),
-                       "ChatGPT has an unsent draft (16 characters). Finish or clear it, then Run again.")
+                       "ChatGPT has an unsent draft (16 characters). Finish or clear it, then send again.")
         XCTAssertEqual(RunBlock.historyChanged(side: .claude).headline(names: names),
                        "Paused: Claude's conversation moved on")
     }

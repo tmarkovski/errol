@@ -21,6 +21,8 @@ struct PerchAvatar: View {
     /// The fallback circle's fill (Perch.chatgptFeather / claudeFeather).
     let feather: Color
     let presence: Color
+    /// A check in place of the dot: the side is connected and ready.
+    var check = false
 
     /// The layout slot: the same for the icon and the fallback so the head
     /// does not shift depending on which apps are installed.
@@ -52,11 +54,18 @@ struct PerchAvatar: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            Circle()
-                .fill(presence)
-                .frame(width: Perch.s(11), height: Perch.s(11))
-                .overlay(Circle().stroke(Perch.paper, lineWidth: Perch.s(2)))
-                .offset(x: Perch.s(1), y: Perch.s(1))
+            ZStack {
+                Circle()
+                    .fill(presence)
+                    .frame(width: Perch.s(check ? 14 : 11), height: Perch.s(check ? 14 : 11))
+                    .overlay(Circle().stroke(Perch.paper, lineWidth: Perch.s(2)))
+                if check {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: Perch.s(7), weight: .heavy))
+                        .foregroundStyle(.white)
+                }
+            }
+            .offset(x: Perch.s(1), y: Perch.s(1))
         }
     }
 }
@@ -211,92 +220,5 @@ enum AppIcons {
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         cache[bundleID] = icon
         return icon
-    }
-}
-
-struct PerchWidgetParticipant: View {
-    let controller: RelayController
-    let speaker: Speaker
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var status: SideStatus {
-        speaker == .chatgpt ? controller.chatgptStatus : controller.claudeStatus
-    }
-    private var conversation: ConversationStatus {
-        speaker == .chatgpt ? controller.chatgptConversation : controller.claudeConversation
-    }
-    private var bundleID: String {
-        speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID
-    }
-    private var active: Bool { controller.isRunning && conversation == .chatting }
-    private var chosen: Bool {
-        !controller.isRunning && !controller.hasFinishedRun && controller.firstSpeaker == speaker
-    }
-    private var markColor: Color { speaker == .claude ? Perch.claudeFeather : Perch.ink }
-    private var presence: Color {
-        switch status.state {
-        case .ready: return Perch.presence
-        case .checking: return Perch.path
-        case .notReady, .missing: return Perch.red
-        }
-    }
-
-    var body: some View {
-        Button {
-            guard !controller.isRunning, !controller.hasFinishedRun else { return }
-            controller.firstSpeaker = speaker
-        } label: {
-            VStack(spacing: Perch.s(9)) {
-                Group {
-                    if let mark = AppIcons.mark(forBundleID: bundleID) {
-                        Image(nsImage: mark).resizable().renderingMode(.template)
-                            .interpolation(.high).scaledToFit().foregroundStyle(markColor)
-                    } else if let icon = AppIcons.icon(forBundleID: bundleID) {
-                        Image(nsImage: icon).resizable().interpolation(.high).scaledToFit()
-                    } else {
-                        Text(String(status.appName.prefix(1)))
-                            .font(Perch.text(30, .medium)).foregroundStyle(markColor)
-                    }
-                }
-                .frame(width: Perch.s(40), height: Perch.s(40))
-                .opacity(controller.isRunning && !active ? 0.6 : 1)
-                Group {
-                    if active {
-                        TimelineView(.animation(minimumInterval: 0.3, paused: reduceMotion)) { context in
-                            HStack(spacing: Perch.s(3)) {
-                                ForEach(0..<3) { index in
-                                    Circle().fill(markColor)
-                                        .opacity(reduceMotion || Int(context.date.timeIntervalSinceReferenceDate * 3) % 3 == index ? 1 : 0.3)
-                                        .frame(width: Perch.s(4), height: Perch.s(4))
-                                }
-                            }
-                        }
-                    } else if chosen {
-                        Capsule().fill(presence).frame(width: Perch.s(18), height: Perch.s(3))
-                    } else {
-                        Circle().fill(presence).frame(width: Perch.s(5), height: Perch.s(5))
-                    }
-                }
-                .frame(height: Perch.s(5))
-            }
-            .frame(width: Perch.s(56))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(details)
-        .accessibilityLabel(status.appName)
-        .accessibilityValue(details)
-        .accessibilityAddTraits(chosen ? .isSelected : [])
-    }
-
-    private var details: String {
-        var parts = [status.headline]
-        if let surface = status.surface { parts.append(surface) }
-        if let model = status.model { parts.append(model) }
-        if active { parts.append("Replying") }
-        else if chosen { parts.append("Starts the conversation") }
-        else if !controller.isRunning && !controller.hasFinishedRun { parts.append("Click to start with \(status.appName)") }
-        if let detail = status.detail, !detail.isEmpty { parts.append(detail) }
-        return parts.joined(separator: " · ")
     }
 }

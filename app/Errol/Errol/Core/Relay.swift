@@ -234,8 +234,14 @@ struct RelayInspection {
 /// conversations in the gap. Nothing is typed, copied, or activated while
 /// blocked; the run waits for the apps to come back, and Stop is answered
 /// at every poll.
+///
+/// `bindings` are the destinations the human connected in setup, one per
+/// side: they are checked again here, at the click, and never re-found. A
+/// side without one is bound the way the readiness strip picks a window —
+/// the path of a run started without setup, such as the harness's.
 @discardableResult
 func runRelay(chatgpt: TargetApp, claude: TargetApp,
+              bindings prebound: [Speaker: BoundDestination] = [:],
               showTransfers: Bool = false,
               inspection: RelayInspection? = nil,
               operationCompleted: (Bool) -> Void = {
@@ -302,28 +308,51 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     // earlier; this is the check that counts, made at the click.
     var bindings: [Speaker: BoundDestination] = [:]
     for target in [chatgpt, claude] {
-        guard let bound = BoundDestination(target: target) else {
-            log("Open a chat conversation in \(target.name) and press Run again. (Inspect shows how each window was classified.)")
-            return failedStart("\(target.name) has no conversation window to relay into.")
+        let bound: BoundDestination
+        if let chosen = prebound[side(target)] {
+            // The human's choice, checked again now. A window that no longer
+            // shows the chosen conversation is a refusal with the reason,
+            // not a search for another.
+            switch chosen.check() {
+            case .same:
+                bound = chosen
+            case .changed(let seen):
+                let block = RunBlock.destinationChanged(side: side(target), bound: chosen.identity.displayName, seen: seen)
+                return failedStart(block.startRefusal(name: target.name))
+            case .lost(let detail):
+                return failedStart("\(detail.prefix(1).uppercased())\(detail.dropFirst()). Connect \(target.name)'s conversation again.")
+            }
+        } else {
+            guard let found = BoundDestination(target: target) else {
+                log("Open a chat conversation in \(target.name) and try again. (Inspect shows how each window was classified.)")
+                return failedStart("\(target.name) has no conversation window to relay into.")
+            }
+            bound = found
         }
         log(bound.bindingReport)
         if bound.identity.excluded {
             // Not a fault, and on the current single-window Claude Desktop not
             // even unusual: the Code world replaces the chat inside the one
-            // window instead of opening beside it, so this fires on every run
-            // started while Code is up. Lead with what is being targeted; the
-            // absent chat is the reason for it, not the news.
-            log("\(target.name): NOTE: relaying into a \(target.selectors.excludedSurfaceName ?? "non-chat") session, since no chat conversation is open. Everything relayed lands in that session.")
+            // window instead of opening beside it. With setup, the human
+            // chose the session deliberately. Lead with what is being
+            // targeted either way.
+            log("\(target.name): NOTE: relaying into a \(target.selectors.excludedSurfaceName ?? "non-chat") session. Everything relayed lands in that session.")
         }
-        guard inputArea(in: target) != nil else {
+        // From here every read of the side goes through the bound window.
+        let scoped = bound.target
+        guard inputArea(in: scoped) != nil else {
             return failedStart("\(target.name)'s chat window has no message field.")
         }
-        if let refusal = deliveryBlock(for: composerState(in: target), side: side(target)) {
+        if let refusal = deliveryBlock(for: composerState(in: scoped), side: side(target)) {
             return failedStart(refusal.startRefusal(name: target.name))
         }
         bindings[side(target)] = bound
     }
     func bound(_ target: TargetApp) -> BoundDestination { bindings[side(target)]! }
+    // The targets the run drives are the bound ones: a finder asked about
+    // `chatgpt` answers for the window the human chose.
+    let chatgpt = bindings[.chatgpt]!.target
+    let claude = bindings[.claude]!.target
 
     var speaker = config.first == .claude ? claude : chatgpt
     var listener = speaker.app == chatgpt.app ? claude : chatgpt
@@ -378,11 +407,16 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         }
         return .clear
     }
-    /// Before pasting into `target`: the destination, and a composer with
-    /// nothing of the human's in it.
+    /// Before pasting into `target`: the destination — in front of the
+    /// app's other windows, raised there if need be, since the paste
+    /// follows the key window — and a composer with nothing of the human's
+    /// in it.
     func deliveryGuard(_ target: TargetApp) -> GuardVerdict {
         let destination = destinationGuard(target)
         guard case .clear = destination else { return destination }
+        if let obstruction = bound(target).block(side: side(target), raising: true) {
+            return .block(obstruction)
+        }
         if let found = deliveryBlock(for: composerState(in: target), side: side(target)) {
             return .block(found)
         }

@@ -8,6 +8,20 @@ struct TargetApp {
     let app: NSRunningApplication
     let ax: AXUIElement
     let selectors: AppSelectors
+    /// The one window every finder is scoped to once the human has chosen
+    /// it in setup, or a run has bound it: `chatWindow(in:)` answers with
+    /// this window and never with another in its place, so a paste cannot
+    /// be handed to a window the human did not pick (docs/design-proposals/
+    /// setup-interaction/SPEC.md). nil until then, when the finders pick a
+    /// window the way the readiness strip does.
+    var boundWindow: AXUIElement? = nil
+
+    /// The same app, with every finder scoped to `window`.
+    func bound(to window: AXUIElement) -> TargetApp {
+        var copy = self
+        copy.boundWindow = window
+        return copy
+    }
 }
 
 func findApp(bundleID: String, name: String, selectors: AppSelectors) -> TargetApp? {

@@ -24,10 +24,17 @@ final class KeyablePanel: NSPanel {
     var onVisibilityChange: ((Bool) -> Void)?
     /// Navigation gets the first chance at Escape; other screens hide the panel.
     var onCancel: (() -> Bool)?
+    /// The window picker's keys — arrows, Return, Escape — before the
+    /// responder chain's own handling. True when the key was taken.
+    var onKeyDown: ((NSEvent) -> Bool)?
 
     override var canBecomeKey: Bool { true }
     override func cancelOperation(_ sender: Any?) {
         if onCancel?() != true { orderOut(nil) }
+    }
+    override func keyDown(with event: NSEvent) {
+        if onKeyDown?(event) == true { return }
+        super.keyDown(with: event)
     }
     /// Every close path — the title bar's close button, Cmd+W, a menu Close
     /// — puts the console away rather than tearing it down. Errol is a
@@ -245,9 +252,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             self?.pushPanelVisibility()
         }
         panel.onCancel = { [weak self] in
-            guard let self, self.navigation.screen == .settings else { return false }
+            guard let self else { return false }
+            if self.relay.setup.cancelIfPicking() { return true }
+            guard self.navigation.screen == .settings else { return false }
             self.showConsole()
             return true
+        }
+        panel.onKeyDown = { [weak self] event in
+            guard let self, self.navigation.screen == .console else { return false }
+            return self.relay.setup.handleKey(event)
         }
         _ = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,

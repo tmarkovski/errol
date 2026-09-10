@@ -379,3 +379,62 @@ remain unpromised until tested on those configurations.
 Defer manual first-send, mandatory countdowns or teaching pauses, mid-run
 redirection, named reusable setups, automatic fresh-chat creation, and automatic
 layout restoration. These are not prerequisites for the agreed initial flow.
+
+## Implementation status
+
+September 10, 2026. The first pass of stages 1–4 landed in the app; stage 5
+(real apps and recovery scenarios) has not been run. What is built:
+
+- **The shell.** One 860 × 156-point capsule for every phase, with the
+  installed desktop app icons at the ends (`PerchParticipant`), the four-segment
+  meter over the center through screens 02–06 (`PerchProgressMeter`), labeled
+  capsule actions beside it (`PerchButtons`), and the settings entry point in
+  every state. Previews for all ten screens are in `PerchPreviews.swift`, on a
+  preview engine that answers setup actions with canned windows.
+- **The state.** `Core/Setup.swift` holds the pure flow — presence per app,
+  candidates per window, steps completing only on their actions, connections
+  judged by the same evidence the preflight uses, a lost conversation
+  reopening only its side — with state-transition tests
+  (`SetupStateTests`, `WindowCandidateTests`, `ArrangementTests`).
+- **Selected windows reach the engine unchanged.** A connection binds the
+  chosen `AXUIElement` (`BoundDestination(target:window:)`) and every finder is
+  scoped to it through `TargetApp.boundWindow`; `chatWindow(in:)` answers with
+  the bound window or nothing. `runRelay` takes the bindings, rechecks them at
+  Send, and refuses with the reason rather than re-finding a window. Before a
+  paste the bound window must also be the app's front window, raised there if
+  it can be, else the run holds ("behind another ChatGPT window").
+- **Readiness.** The sweep that drove the strip now also refreshes the engine's
+  window registry, offers candidates with frames, and verifies each binding
+  (`ReadinessReport`); the setup UI and the preflight read the same
+  classification. Ready means the window still shows the connection, the
+  composer is readable and empty, nothing is generating, and any work surface
+  was accepted explicitly.
+- **Arrangement.** Side by side, Stacked, and Keep positions, applied to the
+  specific windows; a window that will not take its frame puts both back and
+  reports it. The original frames are kept from the first arrangement, and
+  restore skips windows moved by hand since. No automatic restoration.
+- **Connection.** The keyboard picker (Return starts, arrows move, Return
+  connects, Escape cancels) with the accent highlight over the candidate
+  window (`WindowHighlight`), pointer selection on the rows, a Code session
+  offered as a deliberate choice with **Use this session** in the destination
+  details, remembered destinations shown as **Last used** and pre-highlighted
+  in the picker, never as live connections.
+- **Send, pause, ending, return.** **Send to ChatGPT** / **Send to Claude** by
+  the starting-assistant setting, enabled only when both destinations read
+  ready, with the reason beside it otherwise; the pause states worded as
+  agreed; **Another topic here** revalidates both connections; **Set up fresh
+  conversations…** returns to the connect steps.
+
+Not built, deliberately:
+
+- **The drag from the icon onto a window.** The picker and the icon click are
+  the connection gestures; both end in `SetupController.connect(_:to:)`, which
+  the drag will call too. The connect instruction reads "Connect ChatGPT to its
+  conversation" until the drag lands, since "Drag ChatGPT onto its conversation"
+  would not be true.
+- **Live validation** of the picker's keys inside the non-activating panel,
+  of `AXFocusedWindow` and `AXRaise` on the Electron windows, of the arrangement
+  read-back, and of cross-display and cross-Space behavior. None of these has
+  been exercised against the real apps yet.
+- The website copy, mandatory countdowns, mid-run redirection, named setups,
+  and automatic fresh-chat creation, as the spec defers them.

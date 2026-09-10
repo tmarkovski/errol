@@ -493,7 +493,7 @@ func send(_ text: String, to target: TargetApp,
     func destinationHolds() -> Bool {
         guard let destination else { return true }
         switch destination.check() {
-        case .same: return true
+        case .same: break
         case .changed(let seen):
             log("\(target.name): the conversation changed before the keystroke (\(seen)); not typing")
             return false
@@ -501,6 +501,13 @@ func send(_ text: String, to target: TargetApp,
             log("\(target.name): the destination is gone (\(detail)); not typing")
             return false
         }
+        // The keystroke lands in the app's key window, so the bound window
+        // must be that window — raised there now, since the app is frontmost.
+        guard destination.isFrontWindow(raising: true) else {
+            log("\(target.name): another \(target.name) window is in front of the conversation; not typing")
+            return false
+        }
+        return true
     }
     func clipboardHolds() -> Bool {
         guard lease.isOwned else {

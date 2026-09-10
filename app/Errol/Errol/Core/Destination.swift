@@ -228,21 +228,21 @@ enum RunBlock: Equatable {
     }
 
     /// Why a run does not start on this, for the failed-start report: the
-    /// condition and what to do before pressing Run again.
+    /// condition and what to do before pressing Send again.
     func startRefusal(name: String) -> String {
         switch self {
         case .destinationChanged(_, _, let seen):
-            return "\(name) is \(seen). Show the conversation to relay into, then Run again."
+            return "\(name) is \(seen). Show the conversation to relay into, then send again."
         case .draft(_, let characters):
-            return "\(name) has an unsent draft (\(characters) characters). Finish or clear it, then Run again."
+            return "\(name) has an unsent draft (\(characters) characters). Finish or clear it, then send again."
         case .attachments(_, let count):
-            return "\(name) has \(count) unsent attachment\(count == 1 ? "" : "s"). Send or remove \(count == 1 ? "it" : "them"), then Run again."
+            return "\(name) has \(count) unsent attachment\(count == 1 ? "" : "s"). Send or remove \(count == 1 ? "it" : "them"), then send again."
         case .replying:
-            return "\(name) is still replying. Wait for it to finish, then Run again."
+            return "\(name) is still replying. Wait for it to finish, then send again."
         case .composerUnreadable:
-            return "\(name)'s message field can't be read. Click into it, then Run again."
+            return "\(name)'s message field can't be read. Click into it, then send again."
         case .historyChanged:
-            return "\(name)'s conversation changed. Run again."
+            return "\(name)'s conversation changed. Send again."
         }
     }
 
@@ -285,12 +285,29 @@ func deliveryBlock(for state: ComposerState, side: Speaker) -> RunBlock? {
 /// walk the readiness strip makes — so callers poll it at the pace of the
 /// operation they guard, not in a tight loop.
 final class BoundDestination {
+    /// The app, with every finder scoped to the bound window.
     let target: TargetApp
     let window: AXUIElement
-    private(set) var identity: DestinationIdentity
+    // The identity is read by the readiness sweep between setup and a
+    // run and by the run itself, and adoption rewrites it; one lock
+    // covers both fields.
+    private let lock = NSLock()
+    private var boundIdentity: DestinationIdentity
+    private var adoptionIsOpen = true
+
+    var identity: DestinationIdentity {
+        lock.lock()
+        defer { lock.unlock() }
+        return boundIdentity
+    }
+
     /// Open until the side's first reply has been captured: the interval
     /// in which a fresh chat acquires its route and its name.
-    private(set) var adoptionOpen = true
+    var adoptionOpen: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return adoptionIsOpen
+    }
 
     /// What a check found beyond the pure verdict: the window itself gone.
     enum Check: Equatable {
@@ -300,17 +317,28 @@ final class BoundDestination {
         case lost(String)
     }
 
-    init?(target: TargetApp) {
-        guard let window = chatWindow(in: target) else { return nil }
-        self.target = target
+    /// Bind `window` — the one the human chose, or the one a run found.
+    init(target: TargetApp, window: AXUIElement) {
+        self.target = target.bound(to: window)
         self.window = window
-        identity = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
-                                       selectors: target.selectors)
+        boundIdentity = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
+                                            selectors: target.selectors)
+    }
+
+    /// Bind the window the finders would pick: the path for a run started
+    /// without setup (the harness), and for a target already bound.
+    convenience init?(target: TargetApp) {
+        guard let window = chatWindow(in: target) else { return nil }
+        self.init(target: target, window: window)
     }
 
     /// The side has produced a reply in this conversation: from here a new
     /// route or name is navigation, not naming.
-    func closeAdoption() { adoptionOpen = false }
+    func closeAdoption() {
+        lock.lock()
+        adoptionIsOpen = false
+        lock.unlock()
+    }
 
     /// Whether the bound window is still the one the relay would target,
     /// showing the bound conversation. Adoption updates `identity`.
@@ -320,6 +348,9 @@ final class BoundDestination {
         // read; one that merely lost its place in the list is still there.
         let role = axAttributeResult(window, kAXRoleAttribute)
         if role.error == .invalidUIElement { return .lost("the \(target.name) window closed") }
+        if (axAttribute(window, kAXMinimizedAttribute) as? Bool) == true {
+            return .changed("minimized")
+        }
         guard let current = chatWindow(in: target) else {
             return .changed("no chat window can be found")
         }
@@ -328,25 +359,56 @@ final class BoundDestination {
         }
         let now = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
                                       selectors: target.selectors)
-        switch compareDestination(bound: identity, now: now, adoptionOpen: adoptionOpen,
+        lock.lock()
+        defer { lock.unlock() }
+        switch compareDestination(bound: boundIdentity, now: now, adoptionOpen: adoptionIsOpen,
                                   selectors: target.selectors) {
         case .same:
             return .same
         case .adopted(let adopted):
             log("\(target.name): the conversation is now \(adopted.displayName)"
                 + (adopted.route.map { " (\($0))" } ?? ""))
-            identity = adopted
+            boundIdentity = adopted
             return .same
         case .changed(let seen):
             return .changed(seen)
         }
     }
 
+    /// Whether the app's focused window is this one — the window a
+    /// keystroke lands in once the app is frontmost. With `raising`, the
+    /// window is brought to the front of the app's windows first and given
+    /// a moment to get there; a reorder inside the app moves nobody's
+    /// focus, so this is safe outside a focus operation. An app that does
+    /// not answer for its focused window is taken at its word.
+    func isFrontWindow(raising: Bool) -> Bool {
+        func focusedIsBound() -> Bool {
+            guard let focused = axAttribute(target.ax, kAXFocusedWindowAttribute),
+                  CFGetTypeID(focused) == AXUIElementGetTypeID() else { return true }
+            return CFEqual(focused, window)
+        }
+        if focusedIsBound() { return true }
+        guard raising else { return false }
+        raiseWindow(window)
+        for _ in 0..<5 {
+            usleep(100_000)
+            if focusedIsBound() { return true }
+        }
+        return false
+    }
+
     /// The check as a hold on `side`, nil while the destination holds.
     /// A lost destination is not a hold; the caller ends the run on it.
-    func block(side: Speaker) -> RunBlock? {
+    /// With `raising`, the window must also be the app's front window,
+    /// raised where it can be: the delivery gate's version, since a paste
+    /// follows the key window.
+    func block(side: Speaker, raising: Bool = false) -> RunBlock? {
         if case .changed(let seen) = check() {
             return .destinationChanged(side: side, bound: identity.displayName, seen: seen)
+        }
+        if raising, !isFrontWindow(raising: true) {
+            return .destinationChanged(side: side, bound: identity.displayName,
+                                       seen: "behind another \(target.name) window")
         }
         return nil
     }

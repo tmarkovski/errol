@@ -23,7 +23,7 @@ struct PerchSettingsPopover: View {
                 case .appearance: appearanceControls
                 }
             }
-            .frame(height: Perch.s(238), alignment: .top)
+            .frame(height: Perch.s(318), alignment: .top)
         }
         .padding(Perch.s(18))
         .frame(width: Perch.s(360))
@@ -83,17 +83,31 @@ struct PerchSettingsPopover: View {
             .help(controller.limitTurns
                   ? "Stop after at most \(controller.turns) turns"
                   : "End when both apps agree they’re done")
+            row("Windows") {
+                SettingsSegments(label: "Window layout",
+                                 selection: Binding(get: { controller.setup.state.layout },
+                                                    set: { controller.setup.choose($0) }),
+                                 options: LayoutChoice.allCases.map { ($0.title, $0) })
+            }
             Rectangle().fill(Perch.hairline).frame(height: 1)
                 .padding(.top, Perch.s(2))
             VStack(spacing: Perch.s(4)) {
-                command(controller.windowsTiled ? "Restore window positions" : "Tile chat windows",
-                        icon: controller.windowsTiled ? "arrow.uturn.backward" : "rectangle.split.2x1") {
-                    controller.toggleTiling()
+                command("Arrange windows now", icon: "rectangle.split.2x1") {
+                    controller.setup.applyLayout()
                 }
-                .disabled(!controller.windowsTiled && !controller.canTile)
-                .help(controller.windowsTiled ? "Put both chat windows back where they were"
-                      : controller.canTile ? "Arrange the chat windows side by side"
+                .disabled(!controller.setup.state.layout.movesWindows || !controller.setup.state.canArrange)
+                .help(controller.setup.state.canArrange
+                      ? "Move both chat windows into the chosen layout"
                       : "Open a chat in both apps to arrange their windows")
+                command("Restore window positions", icon: "arrow.uturn.backward") {
+                    controller.setup.restoreLayout()
+                }
+                .disabled(!controller.setup.canRestoreLayout)
+                .help("Put the arranged windows back where they were")
+                command("Show the guided setup", icon: "list.number") {
+                    controller.setup.restart()
+                }
+                .help("Open the apps, arrange, and connect the conversations step by step")
                 command("Edit conversation shapes", icon: "square.and.pencil",
                         opensPage: true, action: onEditShapes)
             }

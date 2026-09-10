@@ -85,9 +85,16 @@ enum Perch {
     /// constant — the card is content-sized and the shell fits the window to
     /// what it reports (PerchPanelView, MenuBarController.fitPanel).
     static let cardWidth = s(464)
-    /// Settings keeps its card width; the console is a wide, low widget.
-    static let widgetWidth = s(940)
-    static let widgetHeight = s(112)
+    /// The capsule's footprint: the reference is 860 × 156 CSS pixels at
+    /// full desktop width (docs/design-proposals/setup-interaction/SPEC.md),
+    /// taken as points and not put through `s` — here the mockup's own
+    /// measure is the panel's, and every screen from permission to the
+    /// ending shares it. Settings keeps its card width.
+    static let widgetWidth: CGFloat = 860
+    static let widgetHeight: CGFloat = 156
+    /// A participant's column: the app's icon over a destination name,
+    /// kept to one line and truncated in the middle.
+    static let participantWidth = s(92)
     /// The content header keeps the familiar 52pt height of a unified
     /// toolbar. The borderless panel draws its controls here (PerchChrome).
     static let chromeBand: CGFloat = 52
@@ -98,9 +105,11 @@ enum Perch {
 
     // MARK: The composer's measures
 
-    /// The oval's editors shrink before wrapping, then scroll after three lines.
-    static let promptFont = NSFont.systemFont(ofSize: s(19))
-    static let promptMinimumFontSize = s(15)
+    /// The oval's editors shrink before wrapping, then scroll after three
+    /// lines. The reference sets the editor at 16 points under a 19-point
+    /// instruction; both go through `s` like every other size here.
+    static let promptFont = NSFont.systemFont(ofSize: s(16))
+    static let promptMinimumFontSize = s(13)
     static let promptMaximumLines = 3
 
     /// The gap between the composer's rows: tabs, preview, hairline, editor,

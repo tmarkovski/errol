@@ -1,14 +1,22 @@
 import SwiftUI
 
-/// The center of the capsule shares the controller's existing editing and
-/// handoff lifetimes. The transfer probe stays mounted through every state.
+/// The center of the capsule: the guided instruction, then the topic
+/// editor, then the exchange's one running sentence — or the note editor
+/// while the run is paused — and the ending's summary. It shares the
+/// controller's existing editing and handoff lifetimes, and the transfer
+/// probe stays mounted through every state.
 struct PerchWidgetCenter: View {
     @Bindable var controller: RelayController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(9)) {
+        VStack(alignment: .leading, spacing: Perch.s(8)) {
             ZStack(alignment: .leading) {
-                if controller.isRunning {
+                switch controller.stage {
+                case .setup:
+                    PerchSetupCenter(controller: controller)
+                case .compose:
+                    composer
+                case .running:
                     if controller.isSteering {
                         steeringEditor
                     } else {
@@ -20,10 +28,8 @@ struct PerchWidgetCenter: View {
                             .perchShimmer(active: !controller.holdRequested && !controller.stopRequested
                                                   && controller.block == nil)
                     }
-                } else if controller.hasFinishedRun {
+                case .finished:
                     PerchRunSummary(controller: controller)
-                } else {
-                    openingEditor
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -33,28 +39,52 @@ struct PerchWidgetCenter: View {
                     .accessibilityHidden(true)
             }
 
-            if controller.isRunning {
+            if controller.stage == .running {
                 runningDetails
-            } else if !controller.hasFinishedRun {
-                // A start that failed says why, where the run would have
-                // been; otherwise what the readiness sweep found wanting.
-                if let problem = controller.failedStart ?? readinessProblem {
-                    Text(problem)
-                        .font(Perch.text(11))
-                        .foregroundStyle(Perch.red)
-                        .lineLimit(2)
-                        .help(problem)
-                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var readinessProblem: String? {
-        let problems = [controller.chatgptStatus, controller.claudeStatus]
-            .filter { $0.state == .missing || $0.state == .notReady }
-            .map { "\($0.appName): \($0.headline)" }
-        return problems.isEmpty ? nil : problems.joined(separator: " · ")
+    // MARK: Compose
+
+    /// The topic, the shape it completes, the one sentence about what
+    /// happens next, and — when a destination is not ready — why Send
+    /// waits.
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: Perch.s(6)) {
+            openingEditor
+            HStack(spacing: Perch.s(8)) {
+                PerchShapeMenu(controller: controller)
+                Text("Errol exchanges replies automatically. Pause before typing in either app.")
+                    .font(Perch.text(11))
+                    .foregroundStyle(Perch.muted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            if let (problem, isProblem) = composeProblem {
+                Text(problem)
+                    .font(Perch.text(11))
+                    .foregroundStyle(isProblem ? Perch.red : Perch.muted)
+                    .lineLimit(2)
+                    .help(problem)
+                    .contentTransition(.opacity)
+            }
+        }
+        .animation(Perch.fade, value: composeProblem?.0)
+    }
+
+    /// A start that failed says why, where the run would have been;
+    /// otherwise a destination that is not ready. The topic's own absence
+    /// only disables Send, whose tooltip says so.
+    private var composeProblem: (String, Bool)? {
+        if let failed = controller.failedStart { return (failed, true) }
+        if let problem = controller.setup.problem { return (problem, true) }
+        guard let blocker = controller.setup.state.sendBlocker(names: controller.names) else { return nil }
+        let verifying = [Speaker.chatgpt, .claude].contains {
+            controller.setup.state[$0].connection?.readiness == .unverified
+        }
+        return (blocker, !verifying)
     }
 
     @ViewBuilder private var openingEditor: some View {
@@ -70,12 +100,19 @@ struct PerchWidgetCenter: View {
                               font: Perch.promptFont,
                               minimumFontSize: Perch.promptMinimumFontSize,
                               textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
-                              placeholder: controller.topic.isEmpty
-                                  ? "What should they work on together?" : nil,
+                              placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
                               onSubmit: { controller.start() })
         }
     }
+
+    /// Each shape's own topic prompt; Free chat asks for the whole message.
+    private var topicPlaceholder: String {
+        if let template = controller.selectedTemplate { return template.topicPrompt }
+        return "What should they work on together?"
+    }
+
+    // MARK: Running
 
     private var steeringEditor: some View {
         GrowingTextEditor(text: Binding(get: { controller.steeringText },
@@ -84,25 +121,30 @@ struct PerchWidgetCenter: View {
                           minimumFontSize: Perch.promptMinimumFontSize,
                           textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
                           placeholder: controller.steeringText.isEmpty
-                              ? "A note for the next handoff…" : nil,
+                              ? "A note for the next handoff\u{2026}" : nil,
                           minimumLines: 1, maximumLines: Perch.promptMaximumLines, takesFocusOnAppear: true,
                           onSubmit: { controller.sendSteering() },
                           onEscape: { _ in controller.escapeSteering() },
                           session: controller.steeringEditor)
     }
 
+    /// The one running sentence: what is happening in the apps now.
     private var runHeadline: String {
-        if controller.stopRequested { return "Ending at the next safe point…" }
-        if let block = controller.block { return block.headline(names: controller.names) }
-        if controller.isSteeringPending { return "Finishing the handoff…" }
-        if controller.isHolding { return "Paused at the handoff" }
-        if controller.chatgptConversation == .chatting {
-            return "\(controller.chatgptStatus.appName) is replying…"
+        let names = controller.names
+        if controller.stopRequested { return "Ending at the next safe point\u{2026}" }
+        if let block = controller.block { return block.headline(names: names) }
+        if controller.isSteeringPending { return "Pausing after the current handoff\u{2026}" }
+        if controller.isHolding { return "Paused \u{00B7} Nothing is being copied or sent" }
+        switch (controller.chatgptConversation, controller.claudeConversation) {
+        case (.chatting, _): return "\(names.chatgpt) is replying\u{2026}"
+        case (_, .chatting): return "\(names.claude) is replying\u{2026}"
+        case (.replied, _): return "Sending \(names.chatgpt)'s reply to \(names.claude)"
+        case (_, .replied): return "Sending \(names.claude)'s reply to \(names.chatgpt)"
+        default:
+            return controller.currentTurn == 0
+                ? "Sending the topic to \(controller.appName(controller.firstSpeaker))\u{2026}"
+                : "Relaying the reply\u{2026}"
         }
-        if controller.claudeConversation == .chatting {
-            return "\(controller.claudeStatus.appName) is replying…"
-        }
-        return controller.currentTurn == 0 ? "Starting the conversation…" : "Relaying the reply…"
     }
 
     private var hasNoteFeedback: Bool {
@@ -111,31 +153,20 @@ struct PerchWidgetCenter: View {
     }
 
     private var runningDetails: some View {
-        VStack(alignment: .leading, spacing: Perch.s(6)) {
-            HStack(spacing: Perch.s(12)) {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("\(controller.conversation) · \(turnText) · \(clock(at: context.date))")
-                        .font(Perch.text(11))
-                        .foregroundStyle(Perch.muted)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                if !controller.holdRequested && !controller.stopRequested {
-                    Button { controller.beginSteering() } label: {
-                        Label(controller.steeringQueued ? "Edit note" : "Pause to steer",
-                              systemImage: "pencil")
-                            .font(Perch.text(11, .medium))
-                            .foregroundStyle(Perch.secondary)
-                            .padding(.horizontal, Perch.s(10))
-                            .frame(height: Perch.s(26))
-                            .background(Capsule().fill(Perch.well))
-                            .perchHover(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .fixedSize()
-                    .help("Pause at a safe handoff and add a note here; avoid typing in the chat apps during a run.")
-                }
+        VStack(alignment: .leading, spacing: Perch.s(5)) {
+            if controller.isSteering {
+                Text("Paused \u{00B7} Nothing is being copied or sent")
+                    .font(Perch.text(11, .medium))
+                    .foregroundStyle(Perch.accentText)
+                    .lineLimit(1)
+            }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text("\(controller.conversation) \u{00B7} \(turnText) \u{00B7} \(clock(at: context.date))")
+                    .font(Perch.text(11))
+                    .foregroundStyle(Perch.muted)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             if let block = controller.block, !controller.stopRequested {
                 Text(block.recovery(names: controller.names))
@@ -164,10 +195,51 @@ struct PerchWidgetCenter: View {
     }
 
     private func clock(at date: Date) -> String {
-        let elapsed = Int(controller.elapsedRunDuration(at: date))
-        return elapsed >= 3600
-            ? String(format: "%d:%02d:%02d", elapsed / 3600, elapsed / 60 % 60, elapsed % 60)
-            : String(format: "%d:%02d", elapsed / 60, elapsed % 60)
+        runClock(controller.elapsedRunDuration(at: date))
+    }
+}
+
+/// The conversation shape, in the editor's own line: the name to read,
+/// the menu to change it. Locked with the rest of the options during a run.
+struct PerchShapeMenu: View {
+    let controller: RelayController
+    @ObservedObject private var settings = SettingsStore.shared
+
+    var body: some View {
+        Menu {
+            Picker("Conversation shape", selection: Binding(
+                get: { controller.conversation }, set: { controller.selectConversation($0) })) {
+                Text(RelayController.freeConversation).tag(RelayController.freeConversation)
+                ForEach(settings.templates) { template in Text(template.name).tag(template.name) }
+                Text("Write from scratch").tag(RelayController.customConversation)
+            }
+        } label: {
+            HStack(spacing: Perch.s(4)) {
+                Image(systemName: PerchShapeIcons.icon(for: controller.conversation))
+                    .font(Perch.text(10, .medium))
+                Text(controller.conversation == RelayController.customConversation
+                     ? "Write from scratch" : controller.conversation)
+                    .font(Perch.text(11, .medium))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(Perch.text(8, .semibold))
+                    .foregroundStyle(Perch.muted)
+            }
+            .foregroundStyle(Perch.secondary)
+            .padding(.horizontal, Perch.s(7))
+            .frame(height: Perch.s(22))
+            .background(Capsule().fill(Perch.well))
+            .perchHover(Capsule())
+            .contentShape(Capsule())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(controller.isRunning)
+        .accessibilityLabel("Conversation shape")
+        .accessibilityValue(controller.conversation)
+        .help("The conversation's shape; the topic completes it")
     }
 }
 
@@ -182,14 +254,14 @@ struct PerchWidgetSetup: View {
             Image(systemName: "slider.horizontal.3")
                 .font(Perch.text(15, .medium))
                 .foregroundStyle(Perch.secondary)
-                .frame(width: Perch.s(42), height: Perch.s(42))
+                .frame(width: Perch.s(38), height: Perch.s(38))
                 .background(Circle().fill(showingSetup ? Perch.well : .clear))
                 .perchHover(Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Settings")
-        .help("Conversation, turn limit, windows, and appearance")
+        .help("Conversation, who starts, turn limit, windows, and appearance")
         .popover(isPresented: $showingSetup, arrowEdge: .bottom) {
             PerchSettingsPopover(controller: controller) {
                 showingSetup = false
@@ -199,73 +271,77 @@ struct PerchWidgetSetup: View {
     }
 }
 
+/// The actions beside the center: the step's during setup, the named Send
+/// with the editor, Pause to steer and Stop during the exchange, the
+/// note's send and resume while paused, and the two next intentions at
+/// the end. The settings entry point stands beside them throughout.
 struct PerchWidgetActions: View {
     let controller: RelayController
 
     var body: some View {
-        HStack(spacing: Perch.s(10)) {
+        HStack(alignment: .center, spacing: Perch.s(10)) {
             PerchWidgetSetup(controller: controller)
-            Button(action: primaryAction) {
-                Image(systemName: primaryIcon)
-                    .font(Perch.text(16, .semibold))
-                    .foregroundStyle(Perch.onAccent)
-                    .frame(width: Perch.s(42), height: Perch.s(42))
-                    .background(Circle().fill(Perch.accent))
-                    .perchHover(Circle(), tint: .white)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(primaryDisabled)
-            .opacity(primaryDisabled ? 0.4 : 1)
-            .help(primaryLabel)
-            .accessibilityLabel(primaryLabel)
-            .keyboardShortcut(controller.isRunning ? nil : .defaultAction)
-
-            if controller.isRunning {
-                Button { controller.stop() } label: {
-                    Image(systemName: "stop.fill")
-                        .font(Perch.text(14, .semibold))
-                        .foregroundStyle(Perch.accentText)
-                        .frame(width: Perch.s(42), height: Perch.s(42))
-                        .overlay(Circle().stroke(Perch.accent.opacity(0.8), lineWidth: 1.2))
-                        .perchHover(Circle())
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(controller.stopRequested)
-                .opacity(controller.stopRequested ? 0.4 : 1)
-                .help("Stop at the next safe point")
-                .accessibilityLabel("Stop")
+            switch controller.stage {
+            case .setup:
+                PerchSetupActions(controller: controller)
+            case .compose:
+                send
+            case .running:
+                if controller.isSteering { paused } else { running }
+            case .finished:
+                finished
             }
         }
         .fixedSize()
     }
 
-    private var primaryDisabled: Bool {
-        if controller.isRunning { return controller.isSteeringPending || controller.stopRequested }
-        return !controller.hasFinishedRun && !controller.instructionsReady
+    private var send: some View {
+        PerchCapsuleButton(title: controller.sendLabel, icon: "paperplane.fill") { controller.start() }
+            .disabled(controller.sendBlocker != nil)
+            .keyboardShortcut(.defaultAction)
+            .help(controller.sendBlocker ?? "Send the topic to \(controller.appName(controller.firstSpeaker)) and start relaying")
     }
 
-    private var primaryIcon: String {
-        if controller.hasFinishedRun { return "square.and.pencil" }
-        if !controller.isRunning { return "play.fill" }
-        if controller.isSteering { return controller.steeringHasText ? "arrow.up" : "play.fill" }
-        return "pause.fill"
+    private var running: some View {
+        HStack(spacing: Perch.s(8)) {
+            PerchCapsuleButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
+                               icon: "pause.fill") { controller.beginSteering() }
+                .disabled(controller.isSteeringPending || controller.stopRequested)
+                .help(controller.isSteeringPending
+                      ? "Pausing after the current handoff"
+                      : "Pause at a safe handoff and write a note for the next side")
+            stop
+        }
     }
 
-    private var primaryLabel: String {
-        if controller.hasFinishedRun { return "New session" }
-        if !controller.isRunning { return "Run" }
-        if controller.stopRequested { return "Ending the run" }
-        if controller.isSteeringPending { return "Pausing at the next safe handoff" }
-        if controller.isSteering { return controller.steeringHasText ? "Send note" : "Continue without a note" }
-        return "Pause"
+    private var paused: some View {
+        VStack(alignment: .trailing, spacing: Perch.s(6)) {
+            HStack(spacing: Perch.s(8)) {
+                PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }
+                    .disabled(!controller.steeringHasText)
+                    .help(controller.nextRecipient.map { "The note goes to \($0) with the next handoff" }
+                          ?? "The note goes with the next handoff")
+                stop
+            }
+            PerchTextButton(title: "Resume without note") { controller.resumeWithoutNote() }
+        }
     }
 
-    private func primaryAction() {
-        if controller.hasFinishedRun { controller.resetSession() }
-        else if !controller.isRunning { controller.start() }
-        else if controller.isSteering { controller.sendSteering() }
-        else { controller.beginSteering() }
+    private var stop: some View {
+        PerchCapsuleButton(title: "Stop", style: .outlined, icon: "stop.fill") { controller.stop() }
+            .disabled(controller.stopRequested)
+            .help("Stop at the next safe point")
+    }
+
+    private var finished: some View {
+        VStack(alignment: .trailing, spacing: Perch.s(6)) {
+            PerchCapsuleButton(title: "Another topic here", icon: "arrow.counterclockwise") {
+                controller.anotherTopicHere()
+            }
+            .keyboardShortcut(.defaultAction)
+            .help("A new topic in these same conversations; their context carries on")
+            PerchTextButton(title: "Set up fresh conversations\u{2026}") { controller.setUpFreshConversations() }
+                .help("Open new chats in the apps, then connect them")
+        }
     }
 }

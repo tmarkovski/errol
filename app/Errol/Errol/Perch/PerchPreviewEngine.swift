@@ -5,6 +5,10 @@
 // read as ready throughout. The run's shape follows runRelay's: the same
 // events in the same order, so the panel is exercised the way the real
 // engine exercises it, only on a clock of seconds instead of minutes.
+//
+// Setup is played the same way: the apps' presence and windows are what
+// the canvas says they are, a launch makes an app appear, a bind answers
+// at once with the window's identity, and an arrangement moves nothing.
 
 #if DEBUG
 import Foundation
@@ -17,8 +21,8 @@ final class PerchPreviewEngine: RelayEngine {
     let control = RelayControl()
     /// Nothing sweeps; the picture is fixed and handed over as soon as the
     /// controller asks for it — a canvas never says the panel is visible.
-    var onReadiness: ((SideStatus, SideStatus) -> Void)? {
-        didSet { onReadiness?(readiness.chatgpt, readiness.claude) }
+    var onReadiness: ((ReadinessReport) -> Void)? {
+        didSet { publish() }
     }
 
     /// Both apps up with a chat open, the way the head likes to see them.
@@ -31,7 +35,54 @@ final class PerchPreviewEngine: RelayEngine {
                            detail: "\u{201C}Pricing by seat or by usage\u{201D}")
     )
 
-    private let readiness: (chatgpt: SideStatus, claude: SideStatus)
+    /// The windows each app offers a canvas: the ids a preview connects by.
+    enum Windows {
+        static let chatgptConversation = WindowID(raw: 101)
+        static let chatgptFresh = WindowID(raw: 102)
+        static let claudeConversation = WindowID(raw: 201)
+        static let claudeCode = WindowID(raw: 202)
+    }
+
+    private static func candidate(_ id: WindowID, title: String, composer: String,
+                                  route: String? = nil, model: String? = nil,
+                                  excluded: Bool = false, messages: Int, selectors: AppSelectors,
+                                  frame: CGRect) -> WindowCandidate {
+        var scan = WindowScan()
+        scan.title = title
+        scan.hasComposer = true
+        scan.composerValue = composer
+        scan.composerLabel = composer
+        scan.conversationRoute = route
+        scan.model = model
+        scan.isExcluded = excluded
+        scan.surfacePath = excluded ? "epitaxy" : nil
+        scan.messageAffordances = messages
+        return WindowCandidate(id: id, scan: scan, selectors: selectors, frame: frame)
+    }
+
+    static let chatgptWindows = [
+        candidate(Windows.chatgptConversation, title: "Pricing by seat or by usage", composer: "\nMessage ChatGPT",
+                  model: "5.6 Sol High", messages: 4, selectors: config.chatgptSelectors,
+                  frame: CGRect(x: 0, y: 25, width: 720, height: 875)),
+        candidate(Windows.chatgptFresh, title: "ChatGPT", composer: "\nMessage ChatGPT",
+                  messages: 0, selectors: config.chatgptSelectors,
+                  frame: CGRect(x: 60, y: 80, width: 720, height: 875)),
+    ]
+    static let claudeWindows = [
+        candidate(Windows.claudeConversation, title: "Naming ideas", composer: "\n",
+                  route: "/chat/8f3c2a91-77aa-4bfa-9f21-0d6e2b9d5c44", model: "Fable 5 \u{00B7} Extra",
+                  messages: 6, selectors: config.claudeSelectors,
+                  frame: CGRect(x: 720, y: 25, width: 720, height: 875)),
+        candidate(Windows.claudeCode, title: "Claude", composer: "\n",
+                  route: "/epitaxy/a1b2c3d4-5e6f-7089-9abc-def012345678", model: "Fable 5",
+                  excluded: true, messages: 2, selectors: config.claudeSelectors,
+                  frame: CGRect(x: 760, y: 80, width: 700, height: 800)),
+    ]
+
+    private var readiness: (chatgpt: SideStatus, claude: SideStatus)
+    private var installed: [Speaker: Bool] = [.chatgpt: true, .claude: true]
+    private var bindings: [Speaker: WindowCandidate] = [:]
+    private var restorable = false
     private let replyTime: Duration
     private let signOffAt: Int?
     /// Where the first run stands when Start is pressed, for canvases that
@@ -53,14 +104,18 @@ final class PerchPreviewEngine: RelayEngine {
     ///     the run goes on until the turn cap or Stop.
     ///   - openingOperation: Start inside capture or delivery so a pause made
     ///     immediately after Start exercises the pending editor state.
-    ///   - readiness: What the perches show for the two apps.
+    ///   - readiness: What the perches show for the two apps. A side
+    ///     reported missing offers no windows and can be "opened".
+    ///   - installed: Whether each app is on this Mac at all.
     init(pace replyTime: Duration = .seconds(4),
          turn: Int = 1, atHandoff: Bool = false, signOffAt: Int? = nil,
          openingOperation: FocusOperation? = nil,
-         readiness: (chatgpt: SideStatus, claude: SideStatus) = PerchPreviewEngine.bothReady) {
+         readiness: (chatgpt: SideStatus, claude: SideStatus) = PerchPreviewEngine.bothReady,
+         installed: [Speaker: Bool] = [.chatgpt: true, .claude: true]) {
         self.replyTime = replyTime
         self.signOffAt = signOffAt
         self.readiness = readiness
+        self.installed = installed
         opening = (max(1, turn), atHandoff)
         self.openingOperation = openingOperation
     }
@@ -69,16 +124,84 @@ final class PerchPreviewEngine: RelayEngine {
         run?.cancel()
     }
 
+    // MARK: Readiness
+
+    private func windows(_ side: Speaker) -> [WindowCandidate] {
+        let status = side == .chatgpt ? readiness.chatgpt : readiness.claude
+        guard status.state != .missing else { return [] }
+        return side == .chatgpt ? Self.chatgptWindows : Self.claudeWindows
+    }
+
+    /// The fixed picture, as a sweep would report it.
+    private func publish() {
+        var report = ReadinessReport(chatgpt: readiness.chatgpt, claude: readiness.claude, installed: installed)
+        for side in [Speaker.chatgpt, .claude] {
+            report.candidates[side] = windows(side)
+            if let bound = bindings[side] {
+                report.bindings[side] = BindingObservation(check: .same, identity: bound.identity,
+                                                           composer: bound.composer)
+            }
+        }
+        onReadiness?(report)
+    }
+
     func setScanning(_ scanning: Bool) {}
 
-    func preflight() -> Bool { true }
-
-    /// No windows to move; the chip hears the answer it would in the app.
-    func setTiling(_ tiled: Bool) {
-        events.post(.log(tiled ? "Preview: the chat windows would tile now."
-                               : "Preview: the chat windows would go back now."))
-        events.post(.arranged(tiled: tiled))
+    func requestSweep() {
+        publish()
     }
+
+    // MARK: Setup
+
+    func launch(_ side: Speaker) -> Bool {
+        guard installed[side] ?? true else { return false }
+        // The app "appears" a moment later, the way a launched one does.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            let ready = side == .chatgpt ? Self.bothReady.chatgpt : Self.bothReady.claude
+            if side == .chatgpt { readiness.chatgpt = ready } else { readiness.claude = ready }
+            publish()
+        }
+        return true
+    }
+
+    func bringForward(_ side: Speaker) {
+        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now."))
+    }
+
+    func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void) {
+        guard let candidate = windows(side).first(where: { $0.id == window }) else {
+            completion(nil)
+            return
+        }
+        bindings[side] = candidate
+        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") connected to \(candidate.name)."))
+        completion(BindingObservation(check: .same, identity: candidate.identity, composer: candidate.composer))
+    }
+
+    func unbind(_ side: Speaker) {
+        bindings[side] = nil
+    }
+
+    func arrange(_ layout: LayoutChoice, windows: [Speaker: WindowID],
+                 completion: @escaping (ArrangeOutcome) -> Void) {
+        events.post(.log("Preview: the chat windows would be arranged \(layout.title.lowercased()) now."))
+        restorable = layout.movesWindows
+        completion(layout.movesWindows ? .arranged : .kept)
+    }
+
+    var canRestoreArrangement: Bool { restorable }
+
+    func restoreArrangement(completion: @escaping (Int) -> Void) {
+        events.post(.log("Preview: the chat windows would go back now."))
+        let restored = restorable ? 2 : 0
+        restorable = false
+        completion(restored)
+    }
+
+    // MARK: Runs
+
+    func preflight() -> Bool { true }
 
     func startRun() {
         control.reset()

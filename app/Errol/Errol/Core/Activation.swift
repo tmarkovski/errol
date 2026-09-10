@@ -107,6 +107,13 @@ func activateViaLaunchServices(_ target: TargetApp) {
     open.waitUntilExit()
 }
 
+/// Bring one window to the front of its app's windows, without activating
+/// the app: a reorder inside a background app moves nobody's focus.
+func raiseWindow(_ window: AXUIElement) {
+    AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+    AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+}
+
 /// Let go of Errol's own keyboard focus before driving another app.
 ///
 /// The panel is a non-activating floating panel that is nonetheless allowed to
@@ -133,6 +140,10 @@ func resignOurOwnKeyStatus() {
 /// (which honors the Accessibility grant) and raising the chat window.
 func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Bool {
     resignOurOwnKeyStatus()
+    // A bound window comes to the front of its app's own windows first:
+    // activation alone leaves whichever window was key, and keystrokes
+    // follow the key window, not the app.
+    if let bound = target.boundWindow { raiseWindow(bound) }
     let deadline = Date().addingTimeInterval(seconds)
     var attempt = 0
     while Date() < deadline {

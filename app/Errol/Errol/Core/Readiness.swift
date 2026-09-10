@@ -80,6 +80,21 @@ struct WindowScan {
     /// chat, "/epitaxy/<id>" on a Claude Code session. nil on a fresh chat,
     /// a Cowork task, a project page, and everywhere ChatGPT.
     var conversationRoute: String?
+    /// The value and label of the window's last text input — the composer,
+    /// the way `composerElement` picks it — for judging what it holds
+    /// (classifyComposer) without a second walk. nil when the window has
+    /// no text input.
+    var composerValue: String?
+    var composerLabel = ""
+    /// A stop control is mounted: the app is producing a reply.
+    var isReplying = false
+    /// Pasted-text attachment chips anywhere in the window. Coarse — the
+    /// composer-scoped count needs the live parent walk — so a chip left in
+    /// the history can count; a connection's readiness reads the precise one.
+    var attachmentChips = 0
+    /// Messages in the window's tree by their affordances (copy buttons and
+    /// collapsed action bars, the count the relay's baselines use).
+    var messageAffordances = 0
 }
 
 /// The text after `prefix` in a joined AX label. axLabel concatenates several
@@ -107,20 +122,44 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
     guard depth <= 80 else { return }
     let role = element.role ?? ""
 
-    // Shared with the relay's own window choice, rather than restated here:
-    // the strip must classify a window exactly the way chooseChatWindow will,
-    // and two copies of the rule drift.
-    if !scan.isExcluded, isExclusionMarker(element, role: role, selectors: selectors) {
-        scan.isExcluded = true
-    }
-
-    if role == kAXTextAreaRole as String {
-        scan.hasComposer = true
-        if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
-            let label = element.label
-            scan.composerSurface = selectors.composerSurfaceNames
-                .first { label.contains($0.key) }?.value
+    if role == kAXButtonRole as String {
+        // One label read serves every rule a button can match. The
+        // exclusion rule is shared with the relay's own window choice
+        // rather than restated: the strip must classify a window exactly
+        // the way chooseChatWindow will, and two copies of the rule drift.
+        let label = element.label
+        if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
+            scan.isExcluded = true
         }
+        if isCopyButtonLabel(label, selectors: selectors)
+            || selectors.messageActionsLabel.map({ label.localizedCaseInsensitiveContains($0) }) == true {
+            scan.messageAffordances += 1
+        }
+        if !scan.isReplying, label.localizedCaseInsensitiveContains(selectors.stopKeyword) {
+            scan.isReplying = true
+        }
+        if let remove = selectors.pastedTextAttachmentRemoveLabel,
+           label.localizedCaseInsensitiveContains(remove) {
+            scan.attachmentChips += 1
+        }
+    } else if role == kAXTextAreaRole as String || role == kAXTextFieldRole as String {
+        let label = element.label
+        if role == kAXTextAreaRole as String {
+            scan.hasComposer = true
+            if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
+                scan.composerSurface = selectors.composerSurfaceNames
+                    .first { label.contains($0.key) }?.value
+            }
+        } else if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
+            scan.isExcluded = true
+        }
+        // The last text input in tree order is the composer, exactly as
+        // composerElement picks it; each one seen overwrites the last.
+        scan.composerValue = element.stringValue
+        scan.composerLabel = label
+    } else if role == kAXRadioButtonRole as String, !scan.isExcluded,
+              isExclusionMarker(element, role: role, selectors: selectors) {
+        scan.isExcluded = true
     } else if role == kAXPopUpButtonRole as String {
         let wantsMode = scan.modeLabel == nil && selectors.modePopupPrefix != nil
         let wantsModel = scan.model == nil
@@ -212,14 +251,25 @@ func surfaceName(_ scan: WindowScan, selectors: AppSelectors) -> String? {
 
 // MARK: - Per-side sweep
 
+/// Everything one sweep of one side learned: the strip's status, and the
+/// windows behind it for the setup flow to offer as candidates. The
+/// elements stay with the engine; the pure state only ever sees the
+/// candidates.
+struct SideSweep {
+    var status: SideStatus
+    var target: TargetApp?
+    var windows: [AXUIElement] = []
+    var scans: [WindowScan] = []
+}
+
 /// One sweep of one side. Mirrors chatWindow's selection rules so the strip
 /// reports readiness for exactly the window a run would target.
-func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideStatus {
+func sweepSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSweep {
     guard let target = findApp(bundleID: bundleID, name: name, selectors: selectors) else {
         var status = SideStatus(appName: name)
         status.state = .missing
         status.headline = "Not running"
-        return status
+        return SideSweep(status: status)
     }
 
     let firstContact = electronNudges.beginContact(target)
@@ -237,7 +287,54 @@ func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSt
     }
     if !windows.isEmpty { electronNudges.recordWindowsSeen(target) }
     let scans = windows.map { scanWindow(LiveElement(ax: $0), selectors: selectors) }
-    return composeSideStatus(appName: name, scans: scans, selectors: selectors)
+    return SideSweep(status: composeSideStatus(appName: name, scans: scans, selectors: selectors),
+                     target: target, windows: windows, scans: scans)
+}
+
+func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideStatus {
+    sweepSide(bundleID: bundleID, name: name, selectors: selectors).status
+}
+
+/// A window's identity for the length of the process, from the element's
+/// own hash: the same window hashes the same across sweeps, so a candidate
+/// chosen from one sweep is found in the registry the next sweep refreshed.
+func windowID(of window: AXUIElement) -> WindowID {
+    WindowID(raw: UInt(CFHash(window)))
+}
+
+/// The candidates one sweep offers for a side, with each window's frame
+/// and minimized state read for the picker's highlight.
+func windowCandidates(from sweep: SideSweep, selectors: AppSelectors) -> [WindowCandidate] {
+    let ids = sweep.windows.map(windowID(of:))
+    var candidates = windowCandidates(sweep.scans, ids: ids, selectors: selectors)
+    for index in candidates.indices {
+        guard let position = ids.firstIndex(of: candidates[index].id) else { continue }
+        let window = sweep.windows[position]
+        candidates[index].frame = windowFrame(window)
+        candidates[index].isMinimized = (axAttribute(window, kAXMinimizedAttribute) as? Bool) ?? false
+    }
+    return candidates
+}
+
+/// What one readiness sweep reports: the strip's status per side, whether
+/// each app is installed at all, the windows each app offers, and — for a
+/// side the human has connected — how its bound conversation reads now.
+struct ReadinessReport: Equatable {
+    var chatgpt: SideStatus
+    var claude: SideStatus
+    var installed: [Speaker: Bool] = [:]
+    var candidates: [Speaker: [WindowCandidate]] = [:]
+    var bindings: [Speaker: BindingObservation] = [:]
+
+    /// The report while the Accessibility grant is missing: nothing can be
+    /// read, and the strip says so.
+    static func blocked(installed: [Speaker: Bool]) -> ReadinessReport {
+        func status(_ name: String) -> SideStatus {
+            SideStatus(appName: name, state: .missing, headline: "No access",
+                       detail: "grant Accessibility permission")
+        }
+        return ReadinessReport(chatgpt: status("ChatGPT"), claude: status("Claude"), installed: installed)
+    }
 }
 
 /// The pure half of a sweep: window scans in, the strip's status out. Split
@@ -416,7 +513,14 @@ final class AXWakeHints {
 /// low. Any change, lifecycle event, or fresh activation snaps it back.
 final class ReadinessScanner {
     /// Called on the worker thread after each sweep.
-    var onUpdate: ((SideStatus, SideStatus) -> Void)?
+    var onUpdate: ((ReadinessReport) -> Void)?
+    /// The sweep itself, run on the worker thread: the engine supplies one
+    /// that also refreshes its window registry and checks its bindings.
+    /// The default is the strip's plain sweep of both apps.
+    var sweep: () -> ReadinessReport = {
+        let both = scanBothSides()
+        return ReadinessReport(chatgpt: both.chatgpt, claude: both.claude)
+    }
 
     private static let baseInterval: TimeInterval = 3
     private static let maxInterval: TimeInterval = 10
@@ -508,7 +612,7 @@ final class ReadinessScanner {
 
     private func loop() {
         var interval = Self.baseInterval
-        var previous: (chatgpt: SideStatus, claude: SideStatus)?
+        var previous: ReadinessReport?
         var lastSweepEnded = Date.distantPast
         while true {
             condition.lock()
@@ -523,13 +627,13 @@ final class ReadinessScanner {
             let spacing = Self.minSpacing + lastSweepEnded.timeIntervalSinceNow
             if spacing > 0 { usleep(useconds_t(spacing * 1_000_000)) }
 
-            let sweep = scanBothSides()
+            let report = sweep()
             lastSweepEnded = Date()
-            onUpdate?(sweep.chatgpt, sweep.claude)
+            onUpdate?(report)
             DispatchQueue.main.async { [weak self] in self?.reconcileWakeHints() }
 
-            let changed = previous == nil || previous! != sweep
-            previous = sweep
+            let changed = previous == nil || previous! != report
+            previous = report
             interval = changed ? Self.baseInterval
                                : min(interval * 1.6, Self.maxInterval)
 
