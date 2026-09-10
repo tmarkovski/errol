@@ -3,6 +3,15 @@
 Durable records of UI directions that may inform production work but are not
 part of the application build.
 
+- [Participatory setup: connect the conversations, then start](setup-interaction/README.md)
+  — the user opens the apps, arranges the windows, connects each logo to
+  its conversation, and starts with a named recipient; returning-user
+  cards, the intervention contract, and the interaction experiments to test.
+
+- [First-run usability and predictable relay behavior](first-run-usability/README.md)
+  — setup blockers, deliberate destinations, draft protection, recoverable
+  pauses, explicit outcomes, and the proposed implementation sequence.
+
 - [Floating conversation widget](widget/README.md) — saved layout and control
   concepts, the selected capsule direction, and icon-only running controls.
 
