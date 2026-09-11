@@ -11,6 +11,7 @@
 // at once with the window's identity, and an arrangement moves nothing.
 
 #if DEBUG
+import CoreGraphics
 import Foundation
 
 final class PerchPreviewEngine: RelayEngine {
