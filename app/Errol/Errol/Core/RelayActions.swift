@@ -531,18 +531,6 @@ func send(_ text: String, to target: TargetApp,
     // at unconfirmed whatever the composer does afterwards: a send signal
     // cannot vouch for a payload nobody saw land.
     var pasteVerified = false
-    var pastedTransfer: (id: UUID, input: AXUIElement)?
-    defer {
-        // Submission can collapse a prompt that grew during paste. Update
-        // its outline without replaying the arrival or implying send success.
-        if let transfer = pastedTransfer {
-            if let latest = transferAnchor(for: transfer.input, in: target) {
-                relayEvents.post(.transfer(.pasted(id: transfer.id, destination: latest)))
-            } else {
-                relayEvents.post(.transfer(.cancelled(id: transfer.id)))
-            }
-        }
-    }
     // The opening letters and digits, fence lines skipped: what the composer
     // is expected to hold once the paste lands (pasteNeedle).
     let needle = pasteNeedle(for: payload)
@@ -590,14 +578,17 @@ func send(_ text: String, to target: TargetApp,
             let startedAt = ProcessInfo.processInfo.systemUptime
             relayEvents.post(.transfer(.began(id: transferID, sources: sources,
                                               destination: destination, startedAt: startedAt)))
-            // Give the live app's dot one short beat to reach the prompt.
-            // No renderer callback gates delivery. CLI runs, missing destination
-            // geometry, and Reduce Motion skip this beat entirely.
-            if !sources.isEmpty, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                let deadline = startedAt + TransferTiming.flightDuration
-                while ProcessInfo.processInfo.systemUptime < deadline, !relayControl.isCancelled {
-                    Thread.sleep(forTimeInterval: 0.01)
-                }
+            // The dot's flight and the prompt's light run on this clock in
+            // the overlay, and the paste waits for the light to fade: the
+            // text going in can grow the composer and move the border the
+            // light traces, so the light plays first, over the border the
+            // dot landed on. No renderer callback gates delivery. CLI runs
+            // and missing composer geometry have no destination and skip
+            // the wait; Reduce Motion skips the flight and keeps the light.
+            let timing = TransferTiming(startedAt: startedAt, travels: !sources.isEmpty,
+                                        reducedMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            while ProcessInfo.processInfo.systemUptime < timing.pasteTime, !relayControl.isCancelled {
+                Thread.sleep(forTimeInterval: 0.01)
             }
             // The human may have switched apps or stopped during the flight.
             guard !relayControl.isCancelled, isFrontmost(target) else {
@@ -634,11 +625,10 @@ func send(_ text: String, to target: TargetApp,
             if receipt != .attachment, let input {
                 noteRepeatedPaste(payload: payload, needle: needle, input: input, in: target)
             }
-            // The input may have grown during paste. Refresh before the send
-            // clears it; a missing frame must not produce a misplaced glow.
+            // Where the paste landed, for the event stream and the trace; the
+            // light has faded by now, so nothing is drawn from it.
             if destination != nil {
                 if let input, let landed = transferAnchor(for: input, in: target) {
-                    pastedTransfer = (transferID, input)
                     trace("transfer landed: \(describeAnchor(landed))")
                     relayEvents.post(.transfer(.pasted(id: transferID, destination: landed)))
                 } else {

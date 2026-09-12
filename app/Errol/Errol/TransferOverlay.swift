@@ -2,14 +2,15 @@ import AppKit
 import QuartzCore
 
 /// Short-lived, click-through decoration driven by the relay's ordered events.
-/// AX stays on the worker; drawing never acquires focus. The flight uses
-/// the same start time as the worker's short, bounded pre-paste beat.
+/// AX stays on the worker; drawing never acquires focus. The flight and the
+/// prompt's light run on the worker's clock (TransferTiming): the worker
+/// pastes once the light has faded, so the border it traced stays put.
 final class TransferOverlay {
     private struct Flight {
         let id: UUID
         let sources: [TransferAnchor]
-        var destination: TransferAnchor
-        var timing: TransferTiming
+        let destination: TransferAnchor
+        let timing: TransferTiming
     }
 
     private var flight: Flight?
@@ -50,11 +51,9 @@ final class TransferOverlay {
             timer = clock
             RunLoop.main.add(clock, forMode: .common)
             draw()
-        case .pasted(let id, let destination):
-            guard flight?.id == id else { return }
-            flight?.destination = destination
-            flight?.timing.confirmPaste(at: ProcessInfo.processInfo.systemUptime)
-            draw()
+        case .pasted:
+            // The light has faded by the time the paste lands; nothing to draw.
+            break
         case .cancelled(let id):
             if flight?.id == id { stop() }
         }

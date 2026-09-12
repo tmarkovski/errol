@@ -267,8 +267,12 @@ enum TransferSource: Equatable {
 enum TransferFeedback {
     case began(id: UUID, sources: [TransferSource], destination: TransferAnchor,
                startedAt: TimeInterval)
-    /// Confirms only the paste, not submission or a reply from the other app.
+    /// The paste landed, after the light. Confirms only the paste, not
+    /// submission or a reply from the other app; the overlay has nothing
+    /// left to draw by then.
     case pasted(id: UUID, destination: TransferAnchor)
+    /// The handoff stopped before the paste — Stop, a switched app, a lost
+    /// composer — and the flight ends where it is.
     case cancelled(id: UUID)
 }
 
@@ -291,22 +295,28 @@ struct TransferTrajectory {
     }
 }
 
-/// A receipt can arrive before or after the dot. Neither travel completion
-/// nor a timeout can light the prompt without an actual paste receipt.
+/// One clock for the dot, the prompt's light, and the paste. The light
+/// plays when the dot lands, and the worker pastes only once it has faded
+/// (pasteTime), so the border the light traces is the one the dot landed
+/// on: the text going in can grow the composer and move that border.
+/// Without a flight — Reduce Motion, or no visible source — the light
+/// plays at once, and the paste still waits for it.
 struct TransferTiming {
     static let flightDuration: TimeInterval = 0.55
+    /// The light's quick rise, short hold, and long fall (TransferDrawing).
+    static let lightDuration: TimeInterval = 0.95
     let startedAt: TimeInterval
     let travels: Bool
     let reducedMotion: Bool
-    private(set) var pastedAt: TimeInterval?
-
-    mutating func confirmPaste(at time: TimeInterval) {
-        if pastedAt == nil { pastedAt = time }
-    }
 
     var flightDuration: TimeInterval {
         travels && !reducedMotion ? Self.flightDuration : 0
     }
+
+    var arrivalTime: TimeInterval { startedAt + flightDuration }
+
+    /// When the paste may go in: the light has faded.
+    var pasteTime: TimeInterval { arrivalTime + Self.lightDuration }
 
     func progress(at time: TimeInterval) -> Double {
         guard flightDuration > 0 else { return 1 }
@@ -314,13 +324,10 @@ struct TransferTiming {
     }
 
     func arrivalAge(at time: TimeInterval) -> TimeInterval? {
-        guard let pastedAt else { return nil }
-        let arrival = max(startedAt + flightDuration, pastedAt)
-        return time >= arrival ? time - arrival : nil
+        time >= arrivalTime ? time - arrivalTime : nil
     }
 
     func isFinished(at time: TimeInterval) -> Bool {
-        if let age = arrivalAge(at: time) { return age >= 0.95 }
-        return time - startedAt >= 3
+        time >= pasteTime
     }
 }

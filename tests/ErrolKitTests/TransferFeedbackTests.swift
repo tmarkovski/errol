@@ -53,37 +53,24 @@ final class TransferFeedbackTests: XCTestCase {
                        "External windows still require the captured frame to match")
     }
 
-    func testArrivalWithoutPasteNeverHighlightsAndTimesOut() {
+    func testTheLightPlaysOnArrivalAndThePasteWaitsForItToFade() {
         let timing = TransferTiming(startedAt: 10, travels: true, reducedMotion: false)
         XCTAssertEqual(timing.progress(at: 11), 1)
-        XCTAssertNil(timing.arrivalAge(at: 11), "Finishing the flight is not evidence of a paste")
-        XCTAssertTrue(timing.isFinished(at: 13))
-    }
-
-    func testEarlyPasteWaitsForFlightBeforeDissolving() {
-        var timing = TransferTiming(startedAt: 10, travels: true, reducedMotion: false)
-        timing.confirmPaste(at: 10.1)
-        XCTAssertNil(timing.arrivalAge(at: 10.3))
+        XCTAssertNil(timing.arrivalAge(at: 10.3), "The prompt does not light before the dot lands")
         XCTAssertEqual(timing.arrivalAge(at: 10.6)!, 0.05, accuracy: 0.001)
-        XCTAssertTrue(timing.isFinished(at: 11.6))
+        XCTAssertEqual(timing.pasteTime, 11.5, accuracy: 0.001,
+                       "The paste waits for the whole light, so the border it traced does not move under it")
+        XCTAssertFalse(timing.isFinished(at: 11.49))
+        XCTAssertTrue(timing.isFinished(at: 11.5))
     }
 
-    func testLatePasteStartsHighlightAtReceiptAndFrameRefreshDoesNotRestartIt() {
-        var timing = TransferTiming(startedAt: 10, travels: true, reducedMotion: false)
-        XCTAssertNil(timing.arrivalAge(at: 11))
-        timing.confirmPaste(at: 11.2)
-        timing.confirmPaste(at: 11.5)
-        XCTAssertEqual(timing.arrivalAge(at: 11.6)!, 0.4, accuracy: 0.001)
-    }
-
-    func testReducedMotionAndMissingSourceStillRequirePaste() {
+    func testReducedMotionAndMissingSourceLightAtOnceAndStillWaitForTheLight() {
         for timing in [TransferTiming(startedAt: 10, travels: true, reducedMotion: true),
                        TransferTiming(startedAt: 10, travels: false, reducedMotion: false)] {
-            var timing = timing
             XCTAssertEqual(timing.flightDuration, 0)
-            XCTAssertNil(timing.arrivalAge(at: 10.1))
-            timing.confirmPaste(at: 10.1)
-            XCTAssertEqual(timing.arrivalAge(at: 10.1), 0)
+            XCTAssertEqual(timing.progress(at: 10), 1)
+            XCTAssertEqual(timing.arrivalAge(at: 10), 0)
+            XCTAssertEqual(timing.pasteTime, 10.95, accuracy: 0.001)
         }
     }
 
