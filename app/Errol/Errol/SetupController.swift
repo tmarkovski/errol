@@ -431,11 +431,6 @@ final class SetupController {
         }
     }
 
-    /// The deliberate choice to relay into a work session.
-    func acceptSurface(_ side: Speaker) {
-        state.acceptSurface(side)
-    }
-
     /// Choose another conversation for a connected side: the connection is
     /// dropped and the picker opens for that side alone.
     func chooseAnother(_ side: Speaker) {

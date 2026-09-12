@@ -195,18 +195,16 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.phase, .compose)
     }
 
-    func testAWorkSurfaceIsADeliberateChoice() throws {
+    func testAWorkSurfaceConnectsLikeAnyConversation() throws {
+        // An existing Code session is a place the human chose on purpose: it
+        // is named as one under the icon and asks for no further choice.
         var state = SetupState()
         let code = try candidate("claude-code-collapsed", selectors: claude)
         XCTAssertTrue(code.isEligible, "Claude allows a Code session when the human picks it")
         XCTAssertEqual(code.name, "Code session")
         state.connected(.claude, window: code.id, identity: code.identity, model: nil, observation: observation(code))
-        XCTAssertEqual(state.claude.connection?.readiness, .needsSurfaceChoice("Code"))
-        XCTAssertEqual(state.claude.connection?.readiness.problem(name: "Claude"),
-                       "Claude is showing a Code session. Choose whether to use it.")
-        state.acceptSurface(.claude)
         XCTAssertEqual(state.claude.connection?.readiness, .ready)
-        // Later sweeps keep the acceptance.
+        XCTAssertNil(state.claude.connection?.readiness.problem(name: "Claude"))
         state.observe(.claude, binding: observation(code))
         XCTAssertEqual(state.claude.connection?.readiness, .ready)
     }

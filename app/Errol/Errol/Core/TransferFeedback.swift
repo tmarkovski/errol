@@ -39,7 +39,7 @@ struct TransferAnchor: Equatable {
     }
 }
 
-/// A bounded editor landing area and the surrounding composer border.
+/// A bounded editor landing area and the field the app draws around it.
 struct PromptTransferGeometry {
     let editor: CGRect
     let shell: CGRect?
@@ -48,8 +48,10 @@ struct PromptTransferGeometry {
 /// Find the nearest shell enclosing the editor AND its controls. A fixed
 /// parent count does not work across Chat, Work, and Claude Code: some put
 /// scrolling/attachment wrappers between the text area and the prompt shell.
-/// Geometry limits keep this walk out of the conversation pane. Missing
-/// evidence suppresses the outline; it never changes the paste target.
+/// Geometry limits keep this walk out of the conversation pane. The shell
+/// is then widened through wrappers that only pad it (visibleShell), since
+/// the border the app draws is often one level out. Missing evidence
+/// suppresses the outline; it never changes the paste target.
 func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRect,
                                               selectors: AppSelectors,
                                               parent: (Node) -> Node?,
@@ -72,7 +74,8 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
         if role == "AXGroup", !bounds.contains(editor),
            let clipped = toolbarClippedPromptEditor(editor, in: ancestor, bounds: bounds,
                                                    selectors: selectors, frame: frame) {
-            return PromptTransferGeometry(editor: clipped, shell: bounds)
+            return PromptTransferGeometry(editor: clipped, shell: visibleShell(
+                around: ancestor, shell: bounds, window: window, parent: parent, frame: frame))
         }
         if role == "AXScrollArea" {
             // A multiline AX text area can describe its full document, extending
@@ -93,11 +96,43 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
         guard bounds != editor else { continue }
         var budget = 80
         if hasPromptControl(under: ancestor, selectors: selectors, depth: 0, budget: &budget) {
-            return PromptTransferGeometry(editor: editor, shell: bounds)
+            return PromptTransferGeometry(editor: editor, shell: visibleShell(
+                around: ancestor, shell: bounds, window: window, parent: parent, frame: frame))
         }
     }
     guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
     return PromptTransferGeometry(editor: editor, shell: nil)
+}
+
+/// The border an app draws around its composer is often one level out from
+/// the group holding the text area and its controls: a wrapper with the
+/// same inset on every side and nothing else framed in it (8 px on Claude's
+/// chat and Code composers, live Sep 12 2026). Widen the shell through such
+/// wrappers and stop at anything that grows on some sides only or carries
+/// other content — the band around ChatGPT's composer, the row under
+/// Claude's with the model popup — which is layout, not the field.
+private func visibleShell<Node: ElementNode>(around node: Node, shell: CGRect, window: CGRect,
+                                             parent: (Node) -> Node?,
+                                             frame: (Node) -> CGRect?) -> CGRect {
+    var node = node
+    var shell = shell
+    for _ in 0..<4 {
+        guard let wrapper = parent(node), wrapper.role == "AXGroup",
+              let bounds = frame(wrapper), bounds.contains(shell),
+              TransferAnchor(frame: bounds, window: window, pid: 0) != nil else { break }
+        let insets = [shell.minX - bounds.minX, shell.minY - bounds.minY,
+                      bounds.maxX - shell.maxX, bounds.maxY - shell.maxY]
+        guard let thinnest = insets.min(), let widest = insets.max(),
+              widest <= 16, widest - thinnest <= 1 else { break }
+        let onlyPads = wrapper.children.allSatisfy { child in
+            guard let rect = frame(child) else { return true }
+            return rect.width <= 1 || rect.height <= 1 || shell.contains(rect)
+        }
+        guard onlyPads else { break }
+        node = wrapper
+        shell = bounds
+    }
+    return shell
 }
 
 /// ChatGPT's scrolling prompt can expose only an AXGroup around the full text

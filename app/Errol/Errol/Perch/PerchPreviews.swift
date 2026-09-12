@@ -81,8 +81,8 @@ private func canvas(_ controller: RelayController) -> some View {
 }
 
 #Preview("05 · Connect Claude (Code session chosen)") {
-    // A work surface is a deliberate choice: the icon's details offer
-    // Use this session, and Send waits for it.
+    // A Code session connects like any chat: "Code session" stands under
+    // the icon, and Send is offered once both sides read ready.
     let controller = stepped(to: .connect(.claude))
     controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeCode)
     return canvas(controller)

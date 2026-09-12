@@ -334,8 +334,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             // Not a fault, and on the current single-window Claude Desktop not
             // even unusual: the Code world replaces the chat inside the one
             // window instead of opening beside it. With setup, the human
-            // chose the session deliberately. Lead with what is being
-            // targeted either way.
+            // chose that window, named as a Code session under the icon.
+            // Lead with what is being targeted either way.
             log("\(target.name): NOTE: relaying into a \(target.selectors.excludedSurfaceName ?? "non-chat") session. Everything relayed lands in that session.")
         }
         // From here every read of the side goes through the bound window.

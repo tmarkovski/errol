@@ -441,8 +441,8 @@ struct PerchWindowPickerList: View {
 // MARK: - Destination details
 
 /// The connected side in full — app, surface, conversation, model, and
-/// how it reads now — with the choices that belong to it: use a work
-/// session deliberately, or choose another conversation.
+/// how it reads now — with the one choice that belongs to it: another
+/// conversation. A Code session is named as one and connects like any chat.
 struct PerchDestinationDetails: View {
     let controller: RelayController
     let speaker: Speaker
@@ -463,23 +463,9 @@ struct PerchDestinationDetails: View {
                 detail("Surface", connection.identity.surface ?? "Not observed")
                 detail("Model", connection.model ?? "Not observed")
                 detail("Status", connection.readiness.problem(name: name) ?? "Ready to relay into")
-                if case .needsSurfaceChoice(let surface) = connection.readiness {
-                    Text("Messages relayed into this \(surface) session may lead to actions using that session's tools.")
-                        .font(Perch.text(11))
-                        .foregroundStyle(Perch.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: Perch.s(8)) {
-                    if case .needsSurfaceChoice = connection.readiness {
-                        PerchCapsuleButton(title: "Use this session") {
-                            setup.acceptSurface(speaker)
-                            dismiss()
-                        }
-                    }
-                    PerchCapsuleButton(title: "Choose another conversation", style: .outlined) {
-                        dismiss()
-                        controller.chooseAnotherConversation(speaker)
-                    }
+                PerchCapsuleButton(title: "Choose another conversation", style: .outlined) {
+                    dismiss()
+                    controller.chooseAnotherConversation(speaker)
                 }
                 .disabled(controller.isRunning)
             } else {

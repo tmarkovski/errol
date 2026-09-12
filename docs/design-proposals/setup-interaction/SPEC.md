@@ -205,8 +205,8 @@ where to drop; releasing back over the console puts the icon back and says
 nothing. For an ordinary eligible chat, dropping on its area or choosing it in
 the picker confirms the connection; do not require an additional identical
 modal confirmation. Show the connected destination beneath the app icon and
-continue to screen 05. Special work surfaces require the deliberate choice described
-under recovery states.
+continue to screen 05. A Code session connects the same way; its name under
+the icon says what it is.
 
 Errol owns this drag interaction. It is selecting a window, not transferring an
 image file or message into the assistant's composer. Do not rely on the target
@@ -237,7 +237,7 @@ selection behavior. Starting-assistant changes must update the send label.
 Show concise destination names beside/beneath the app icons, with enough visible
 context to distinguish **New chat** from **Continues here**. **Destinations**
 opens fuller app, surface, conversation, and observed model details on demand.
-Do not require opening that popover to discover that a work surface was chosen.
+Do not require opening that popover to discover that a work surface is connected.
 
 Essential pre-send guidance remains inside the bar: **Errol exchanges replies
 automatically. Pause before typing in either app.** Use each shape's topic
@@ -330,7 +330,7 @@ animation frame or repeat an attention cue on every readiness poll.
 
 **Ready** means the selected window still represents the intended supported
 destination, its composer is observable and empty, there are no unsent
-attachments, it is not replying, and any work-surface choice has been explicit.
+attachments, and it is not replying.
 The setup UI and final preflight must use the same evidence and classification.
 
 | Condition | Required experience |
@@ -339,7 +339,7 @@ The setup UI and final preflight must use the same evidence and classification.
 | Existing draft or unsent attachment | Show **Finish preparing** and the observed reason. Let the user resolve it in the assistant or choose another conversation; never delete or send it for them. |
 | Assistant already replying | Wait for it to finish before Ready. Preserve the setup state. |
 | Unreadable composer or unsupported surface | Explain what cannot be established. Do not turn unknown into Ready. |
-| Code, Work, Cowork, or another supported work surface | Name the actual surface and context. Say that messages may lead to actions using that session's tools; offer **Use this session** and **Choose another conversation** in the destination card. Do not infer its complete tools or permissions from its name. |
+| Code, Work, Cowork, or another supported work surface | Name the actual surface and context under the icon and in the destination card, and connect it like any conversation: an existing session is where the human wants the relay to land. Do not infer its complete tools or permissions from its name. |
 | Model or conversation context not observable | Omit the unknown field or state that it is unavailable. The demo's **Model · App default** is not a production fallback assertion. |
 | Fresh chat acquires its first title/route | Treat it as provisional, then adopt identity only within the existing phase-appropriate binding rules. A generic title or zero visible messages does not prove freshness. |
 | Conversation changes during setup | Invalidate that connection and explain what needs reconnecting. Keep the topic and the unaffected side. |
@@ -467,8 +467,8 @@ incomplete. What is built:
   window registry, offers candidates with frames, and verifies each binding
   (`ReadinessReport`); the setup UI and the preflight read the same
   classification. Ready means the window still shows the connection, the
-  composer is readable and empty, nothing is generating, and any work surface
-  was accepted explicitly.
+  composer is readable and empty, and nothing is generating; a Code session
+  reads like any other conversation.
 - **Arrangement.** Side by side, Stacked, and Keep positions, applied to the
   specific windows; a window that will not take its frame puts both back and
   reports it. The original frames are kept from the first arrangement, and
@@ -479,8 +479,8 @@ incomplete. What is built:
 - **Connection.** The keyboard picker (Return starts, arrows move, Return
   connects, Escape cancels) with the accent highlight over the candidate
   window (`WindowHighlight`), pointer selection on the rows, a Code session
-  offered as a deliberate choice with **Use this session** in the destination
-  details, remembered destinations shown as **Last used** and pre-highlighted
+  connecting like any chat and named as one under the icon, remembered
+  destinations shown as **Last used** and pre-highlighted
   in the picker, never as live connections.
 - **Drag connection.** `PerchConnectionDragHandle` tracks the active icon's
   pointer outside the capsule without creating a pasteboard item or external
@@ -488,7 +488,8 @@ incomplete. What is built:
   icon's edge to the pointer on a click-through panel over the console, and the
   engine brings the app forward beneath the console (`connectionDropZones`),
   waits for the window server to show its windows, and reads each eligible
-  window's message field the way the transfer outline does; the overlay draws
+  window's message field the way the transfer outline does — the field the app
+  draws, widened past the group that merely pads it; the overlay draws
   an area over each field, saying what the drop does, and the lead's plug
   swells with the area under it. The areas are the drop targets: the pure geometry in
   `Core/WindowHitTesting.swift` (`WindowHitTestingTests`) gives a window no

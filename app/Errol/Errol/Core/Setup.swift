@@ -197,9 +197,6 @@ enum DestinationReadiness: Equatable {
     /// finished run's, until the next sweep reads it.
     case unverified
     case ready
-    /// A work surface (a Claude Code session) waits for the deliberate
-    /// choice to use it.
-    case needsSurfaceChoice(String)
     /// The composer holds unsent work, or the app is replying, or the
     /// composer cannot be read: something to finish in the app first.
     case finishPreparing(RunBlock)
@@ -215,7 +212,6 @@ enum DestinationReadiness: Equatable {
         switch self {
         case .unverified: return "Last used"
         case .ready: return "Connected"
-        case .needsSurfaceChoice: return "Needs a choice"
         case .finishPreparing: return "Finish preparing"
         case .changed: return "Changed"
         case .lost: return "Lost"
@@ -227,8 +223,6 @@ enum DestinationReadiness: Equatable {
         switch self {
         case .unverified: return "Checking \(name)'s conversation\u{2026}"
         case .ready: return nil
-        case .needsSurfaceChoice(let surface):
-            return "\(name) is showing a \(surface) session. Choose whether to use it."
         case .finishPreparing(let block): return block.startRefusal(name: name)
         case .changed(let seen):
             return "\(name) is \(seen). Show the connected conversation again, or choose another."
@@ -245,15 +239,14 @@ struct BindingObservation: Equatable {
     var composer: ComposerState
 }
 
-func destinationReadiness(_ observation: BindingObservation, side: Speaker,
-                          surfaceAccepted: Bool) -> DestinationReadiness {
+/// A work surface — a Claude Code session — reads like any other
+/// conversation: the human chose that window, it is named as a Code
+/// session under the icon, and the run's log says where everything lands.
+func destinationReadiness(_ observation: BindingObservation, side: Speaker) -> DestinationReadiness {
     switch observation.check {
     case .lost(let detail): return .lost(detail)
     case .changed(let seen): return .changed(seen)
     case .same: break
-    }
-    if observation.identity.excluded, !surfaceAccepted {
-        return .needsSurfaceChoice(observation.identity.surface ?? "work")
     }
     if let block = deliveryBlock(for: observation.composer, side: side) {
         return .finishPreparing(block)
@@ -270,11 +263,6 @@ struct SideConnection: Equatable {
     var identity: DestinationIdentity
     var model: String?
     var readiness = DestinationReadiness.unverified
-    /// A work surface is used only after the deliberate choice.
-    var surfaceAccepted = false
-    /// The last observation, kept so accepting the surface can re-judge
-    /// readiness without waiting for the next sweep.
-    var lastObservation: BindingObservation?
 
     /// The conversation's name under the icon.
     var name: String {
@@ -496,9 +484,7 @@ struct SetupState: Equatable {
     mutating func observe(_ side: Speaker, binding: BindingObservation) {
         guard var connection = self[side].connection else { return }
         connection.identity = binding.identity
-        connection.lastObservation = binding
-        connection.readiness = destinationReadiness(binding, side: side,
-                                                    surfaceAccepted: connection.surfaceAccepted)
+        connection.readiness = destinationReadiness(binding, side: side)
         if case .lost = connection.readiness {
             disconnect(side)
             return
@@ -581,22 +567,11 @@ struct SetupState: Equatable {
     mutating func connected(_ side: Speaker, window: WindowID, identity: DestinationIdentity,
                             model: String?, observation: BindingObservation) {
         var connection = SideConnection(window: window, identity: identity, model: model)
-        connection.lastObservation = observation
-        connection.readiness = destinationReadiness(observation, side: side, surfaceAccepted: false)
+        connection.readiness = destinationReadiness(observation, side: side)
         self[side].connection = connection
         self[side].hint = DestinationHint(identity: identity) ?? self[side].hint
         completed.insert(.connect(side))
         if phase.isConnecting || phase == .compose { advanceToConnection() }
-    }
-
-    /// The deliberate choice to relay into a work session.
-    mutating func acceptSurface(_ side: Speaker) {
-        guard var connection = self[side].connection else { return }
-        connection.surfaceAccepted = true
-        if let observation = connection.lastObservation {
-            connection.readiness = destinationReadiness(observation, side: side, surfaceAccepted: true)
-        }
-        self[side].connection = connection
     }
 
     /// Drop a side's connection: the side needs connecting again, and only

@@ -29,6 +29,89 @@ final class PromptTransferFrameTests: XCTestCase {
         XCTAssertEqual(resolve(input, in: pane, selectors: Config().claudeSelectors), compact)
     }
 
+    func testClaudeCodeFieldIsThePaddedBoxAroundTheTextRow() {
+        // Live Sep 12 2026: the row holding the text area and its Stop control
+        // sits 8 px inside the bordered field. The band around that holds the
+        // repository chips above and the +/mode/model toolbar below, both
+        // outside the box the app draws.
+        let codeWindow = CGRect(x: 0, y: 34, width: 1710, height: 1017)
+        let input = Node(role: "AXTextArea", label: "Prompt",
+                         bounds: CGRect(x: 402, y: 986, width: 1229, height: 20))
+        let padded = CGRect(x: 398, y: 984, width: 1233, height: 24)
+        let wrapper = Node(bounds: padded, children: [
+            Node(bounds: padded, children: [input]),
+            Node(bounds: CGRect(x: 398, y: 984, width: 1, height: 1)),
+        ])
+        let row = Node(bounds: CGRect(x: 398, y: 984, width: 1263, height: 24), children: [
+            wrapper, Node(role: "AXButton", label: "Stop", bounds: CGRect(x: 1637, y: 984, width: 24, height: 24)),
+        ])
+        let field = CGRect(x: 390, y: 976, width: 1279, height: 40)
+        let box = Node(bounds: field, children: [row])
+        let band = Node(bounds: CGRect(x: 358, y: 930, width: 1351, height: 112), children: [
+            Node(bounds: CGRect(x: 390, y: 930, width: 1279, height: 40), children: [
+                Node(role: "AXPopUpButton", label: "main", bounds: CGRect(x: 398, y: 938, width: 139, height: 24)),
+            ]),
+            box,
+            Node(bounds: CGRect(x: 382, y: 1008, width: 1295, height: 42), children: [
+                Node(role: "AXPopUpButton", label: "Model: Fable 5.1",
+                     bounds: CGRect(x: 1529, y: 1022, width: 62, height: 20)),
+            ]),
+        ])
+        withExtendedLifetime(band) {
+            let geometry = promptTransferGeometry(around: input, window: codeWindow,
+                                                   selectors: Config().claudeSelectors,
+                                                   parent: { $0.parent }, frame: { $0.bounds })
+            XCTAssertEqual(geometry?.shell, field)
+            XCTAssertEqual(geometry?.editor, input.bounds)
+        }
+    }
+
+    func testAWrapperThatGrowsOnSomeSidesOnlyIsLayoutNotTheField() {
+        // Claude's chat composer, live Sep 12 2026: the field is the 8 px box
+        // around the text row and its controls; the group outside it adds the
+        // project and model row underneath, which hangs outside the box.
+        let claudeWindow = CGRect(x: 0, y: 34, width: 1710, height: 1017)
+        let input = Node(role: "AXTextArea", bounds: CGRect(x: 726, y: 504, width: 616, height: 44))
+        let row = Node(bounds: CGRect(x: 718, y: 499, width: 624, height: 88), children: [
+            Node(bounds: CGRect(x: 718, y: 499, width: 624, height: 54), children: [input]),
+            Node(role: "AXPopUpButton", label: "Add files, connectors, and more",
+                 bounds: CGRect(x: 718, y: 555, width: 32, height: 32)),
+        ])
+        let field = CGRect(x: 710, y: 491, width: 640, height: 104)
+        let outer = Node(bounds: CGRect(x: 710, y: 491, width: 640, height: 136), children: [
+            Node(bounds: field, children: [row]),
+            Node(role: "AXPopUpButton", label: "Model: Fable 5.1 Extra",
+                 bounds: CGRect(x: 1234, y: 603, width: 108, height: 24)),
+        ])
+        let pane = Node(bounds: CGRect(x: 390, y: 82, width: 1280, height: 969), children: [outer])
+        withExtendedLifetime(pane) {
+            XCTAssertEqual(promptTransferGeometry(around: input, window: claudeWindow,
+                                                  selectors: Config().claudeSelectors,
+                                                  parent: { $0.parent }, frame: { $0.bounds })?.shell, field)
+        }
+
+        // ChatGPT, same day: the box is the group with the buttons as direct
+        // children; the band around it grows sideways only and carries the
+        // scroll-to-bottom control, so it is not the field either.
+        let gptWindow = CGRect(x: 0, y: 34, width: 855, height: 1017)
+        let gptInput = Node(role: "AXTextArea", bounds: CGRect(x: 72, y: 951, width: 712, height: 44))
+        let gptShell = CGRect(x: 60, y: 937, width: 736, height: 98)
+        let composer = Node(bounds: gptShell, children: [
+            gptInput, Node(role: "AXButton", label: "Send", bounds: CGRect(x: 760, y: 999, width: 28, height: 28)),
+        ])
+        let twins = Node(bounds: gptShell, children: [Node(bounds: gptShell, children: [composer])])
+        let band = Node(bounds: CGRect(x: 44, y: 937, width: 768, height: 98), children: [
+            Node(role: "AXButton", label: "Scroll to bottom", bounds: CGRect(x: 412, y: 881, width: 32, height: 32)),
+            twins,
+        ])
+        let strip = Node(bounds: CGRect(x: 0, y: 937, width: 855, height: 114), children: [band])
+        withExtendedLifetime(strip) {
+            XCTAssertEqual(promptTransferGeometry(around: gptInput, window: gptWindow,
+                                                  selectors: Config().chatgptSelectors,
+                                                  parent: { $0.parent }, frame: { $0.bounds })?.shell, gptShell)
+        }
+    }
+
     func testOutlineTracksGrowthAndCollapseIncludingAttachmentRow() {
         let input = Node(role: "AXTextArea", bounds: editor)
         let composer = Node(bounds: shell, children: [input, Node(role: "AXButton", label: "Send")])
