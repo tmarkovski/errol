@@ -52,7 +52,7 @@ final class ConnectionHandleView: NSView {
         if !dragging {
             guard hypot(point.x - origin.x, point.y - origin.y) >= 4 else { return }
             dragging = true
-            setup?.beginDragging(side)
+            setup?.beginDragging(side, from: iconFrame)
             NSCursor.closedHand.push()
             cursorPushed = true
         }
@@ -82,6 +82,13 @@ final class ConnectionHandleView: NSView {
     /// The pointer in AX coordinates, which the drawn areas use.
     private func axPoint(_ point: CGPoint) -> CGPoint {
         axRect(CGRect(origin: point, size: .zero)).origin
+    }
+
+    /// The icon on screen (AX coordinates): this view covers it, and the
+    /// lead leaves its edge.
+    private var iconFrame: CGRect {
+        let inWindow = convert(bounds, to: nil)
+        return axRect(window?.convertToScreen(inWindow) ?? inWindow)
     }
 
     /// Whether the pointer (Cocoa coordinates) is over the console. The

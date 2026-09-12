@@ -181,9 +181,11 @@ The primary visual gesture starts at the desktop app icon. Place a left-pointing
 arrow beside the instruction, nudging toward that icon three times, then staying
 still. The reference uses about 7 points of movement and 0.9 seconds per nudge.
 Hide the cue when dragging or picking begins. Respect Reduce Motion with a
-static arrow. The arrow identifies what to pick up. As the drag begins, bring
-the app forward beneath the console and draw a drop area over each showing
-conversation's message field, the way the transfer outline marks the receiving
+static arrow. The arrow identifies what to pick up. As the drag begins, run a
+lead out of the icon to the pointer, with a plug at its end, so the gesture
+reads as connecting the app's perch to its conversation; bring the app forward
+beneath the console and draw a drop area over each showing conversation's
+message field, the way the transfer outline marks the receiving
 composer during a run; the drop area identifies where to drop it, and where
 Errol will write. A field whose geometry cannot be read gets the whole window
 as its area. Say what the drop does on the area itself ("Drop here", "Errol
@@ -482,11 +484,13 @@ incomplete. What is built:
   in the picker, never as live connections.
 - **Drag connection.** `PerchConnectionDragHandle` tracks the active icon's
   pointer outside the capsule without creating a pasteboard item or external
-  file drop. As the drag begins the engine brings the app forward beneath the
-  console (`connectionDropZones`), waits for the window server to show its
-  windows, and reads each eligible window's message field the way the transfer
-  outline does; `ConnectionDropOverlay` draws an area over each field, saying
-  what the drop does. The areas are the drop targets: the pure geometry in
+  file drop. As the drag begins `ConnectionDropOverlay` runs a lead from the
+  icon's edge to the pointer on a click-through panel over the console, and the
+  engine brings the app forward beneath the console (`connectionDropZones`),
+  waits for the window server to show its windows, and reads each eligible
+  window's message field the way the transfer outline does; the overlay draws
+  an area over each field, saying what the drop does, and the lead's plug
+  swells with the area under it. The areas are the drop targets: the pure geometry in
   `Core/WindowHitTesting.swift` (`WindowHitTestingTests`) gives a window no
   area while the server does not show it or another window covers its field,
   so an area never floats over something else. The pointer over an area arms

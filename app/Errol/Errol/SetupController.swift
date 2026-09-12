@@ -250,14 +250,15 @@ final class SetupController {
 
     // MARK: Connect
 
-    /// The drag from the icon. Errol tracks the pointer itself, so no file
-    /// drag reaches the destination app. The engine brings the app forward
-    /// under the console and answers with an area over each of its message
-    /// fields, drawn as soon as it does; the drop resolves against those
-    /// areas as drawn — the pointer over one arms it, releasing there
-    /// connects its window — never against whatever window happens to be
-    /// under the pointer.
-    func beginDragging(_ side: Speaker) {
+    /// The drag from the icon, whose frame `icon` is (AX coordinates): a
+    /// lead runs out of it to the pointer from the first move. Errol tracks
+    /// the pointer itself, so no file drag reaches the destination app. The
+    /// engine brings the app forward under the console and answers with an
+    /// area over each of its message fields, drawn as soon as it does; the
+    /// drop resolves against those areas as drawn — the pointer over one
+    /// arms it, releasing there connects its window — never against
+    /// whatever window happens to be under the pointer.
+    func beginDragging(_ side: Speaker, from icon: CGRect) {
         guard !isBinding, state.phase == .connect(side) else { return }
         cancelPicking()
         problem = nil
@@ -269,6 +270,7 @@ final class SetupController {
         dragPoint = nil
         dragOverConsole = false
         dropPoint = nil
+        dropOverlay.beginLead(from: icon)
         let windows = state[side].candidates.filter { $0.isEligible && !$0.isMinimized }.map(\.id)
         engine.connectionDropZones(for: side, windows: windows) { [weak self] zones in
             guard let self, generation == dragGeneration, draggingSide == side else { return }
@@ -289,6 +291,7 @@ final class SetupController {
         guard let side = draggingSide, dropPoint == nil else { return }
         dragPoint = point
         dragOverConsole = overConsole
+        dropOverlay.moveLead(to: point)
         guard let zones = dropZones else { return }
         let zone = overConsole ? nil : dropZone(at: point, among: zones)
         let candidate = zone.flatMap { zone in state[side].candidates.first { $0.id == zone.window } }
