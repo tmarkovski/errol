@@ -9,9 +9,9 @@ experience to build; it does not report that the application implements it.
 - [Interactive screen reference](preview.html): open in a browser and select
   the numbered screen controls underneath it. The ten numbers in this document
   refer to those controls, not to steps shown in the product.
-- [Editable reference](preview-source.html): the current HTML/CSS/JavaScript
-  mockup. Its default appearance is the reference; design-control alternatives
-  are experiments.
+- The interactive reference is also the editable HTML/CSS/JavaScript source.
+  Its default appearance is the reference; design-control alternatives are
+  experiments.
 - [Setup proposal](README.md): rationale and alternatives considered.
 - [First-run usability](../first-run-usability/README.md): relay behavior,
   destination evidence, and its updated implementation status.
@@ -61,16 +61,29 @@ this experience. Preserve the same app icons after setup rather than switching
 to bare marks when the run starts.
 
 Keep existing run options, app configuration, appearance, and log access
-available through the existing settings entry point. The demo omits some of
-these controls for clarity; it does not authorize removing their capabilities.
+available through the existing settings entry point. The setup reference now
+places the existing **sliders icon** at the upper trailing edge of the
+capsule's central content, beside the progress meter. Match the app's
+`slider.horizontal.3` entry: icon only, no visible label or chevron, with a
+quiet circular hover target and **Configure** as its accessible label and
+tooltip. Keep its position consistent through Open apps, Arrange, both
+connection steps, Compose, and Return, including the mirrored Claude
+instruction. Compose and Return share the entry's row with the conversation
+shape. Omit configuration from the Accessibility screen.
+
+For now the reference opens an anchored placeholder containing **No options
+yet.** Menu content will be designed later. It dismisses on a second click,
+outside click, or Escape, and is reachable by keyboard. This placeholder is
+only for the design reference; preserve the native app's existing settings
+capabilities.
 
 ## Screen index
 
 | Preview screen | Product phase | Primary content and action |
 | --- | --- | --- |
 | [01 · Access](#screen-01-access) | Permission needed | Accessibility request in the capsule; Open Accessibility Settings… |
-| [02 · Open apps](#screen-02-open-apps) | Prepare apps | Click each desktop app icon to open it; continue when prepared. |
-| [03 · Arrange](#screen-03-arrange) | Choose layout | Side by side, Stacked, or Keep positions; apply explicitly. |
+| [02 · Open apps](#screen-02-open-apps) | Prepare apps | Click each app's logo to open it; Continue once both are open. |
+| [03 · Arrange](#screen-03-arrange) | Choose layout | Keep positions (the default), Side by side, or Stacked; a choice applies at once, and Continue is offered from the start. |
 | [04 · ChatGPT](#screen-04-connect-chatgpt) | Connect first destination | Drag the left app icon, or click to choose a window. |
 | [05 · Claude](#screen-05-connect-claude) | Connect second destination | Mirrored right-hand instruction and arrow. |
 | [06 · Compose](#screen-06-compose) | Ready to start | Shape, topic, visible destination summaries; Send to the named first assistant. |
@@ -78,6 +91,13 @@ these controls for clarity; it does not authorize removing their capabilities.
 | [08 · Pause](#screen-08-pause) | Paused at a safe boundary | Steering editor inside the same capsule; send, resume, or stop. |
 | [09 · Finished](#screen-09-finished) | Terminal outcome | Actual run outcome; another topic here or fresh conversations. |
 | [10 · Return](#screen-10-return) | Prepare another topic | Revalidated destinations and a new topic in the compact capsule. |
+
+Across the guided screens the capsule keeps one structure: the participant
+columns at the ends, each the app's icon over its name and, under that, its
+state; the center between two hairlines, with the progress meter at its top
+left and the settings entry point at its top right; the step's copy under
+them; and the step's actions under the copy, in the compact pill buttons of
+the reference, never in a column of their own.
 
 ### Screen 01: Access
 
@@ -101,30 +121,49 @@ running content and prevents further automation until resolved.
 
 ### Screen 02: Open apps
 
-Check the configured applications and present each side's next useful action:
-**Open ChatGPT**, **Opening…**, **Open a conversation**, or the observed ready
-state. Launch only in response to the corresponding user action. A running app
-is not necessarily signed in or showing a usable conversation.
+Check the configured applications and show each side's state under its name:
+**Click to open**, **Opening…**, **App open**, or **Not installed**. Launch only
+in response to the corresponding user action. The step asks only that both
+apps be open: a running app is not necessarily signed in or showing a usable
+conversation, and that is the connect steps' concern, not this one's.
 
-Keep the other side's progress if one application needs installation, sign-in,
-or a conversation opened. Show the reason in the capsule. Do not imply that
-clicking an unavailable icon installs an application. The preview's **Open both
-apps** is an optional convenience that can call the same two launch actions.
+Keep the other side's progress if one application needs installation or
+opening. Show the reason in the capsule. Do not imply that clicking an
+unavailable icon installs an application. **Open both apps** calls the same
+launch action for whichever app is not open.
 
-The normal primary action becomes **Continue** once suitable candidate windows
-can be prepared. This does not yet connect or authorize a destination for a run.
+The one primary action sits under the copy: **Open both apps** until both are
+open, then **Continue**. Going on does not yet connect or authorize a
+destination for a run.
 
 ### Screen 03: Arrange
 
-Use a compact segmented selector inside the capsule: **Side by side**,
-**Stacked**, **Keep positions**. Apply via **Arrange** or **Use positions**;
-when successfully applied or intentionally kept, offer **Continue**.
+Use three separate compact action buttons inside the capsule: **Side by side**,
+**Stacked**, **Keep positions**, with Keep positions selected at first. Each
+has a layout icon and label; the selected choice has a checkmark and a subtle
+accent. Give each button its own boundary and spacing, without a shared
+segmented track. The buttons communicate an immediate window action, and
+the selection records the current choice. A choice applies as it is made:
+Side by side or Stacked moves the windows at once, and Keep positions leaves
+their current frames alone, including after trying another layout. It does
+not restore their original frames.
+
+Supporting copy initially reads **Choose a layout to move both windows now,
+or continue as they are.** After a move, confirm **Windows are side by side.
+Continue when you’re ready.** or the stacked equivalent. Keep keyboard focus
+on the chosen button and announce the result. There is no separate apply
+action; **Continue** is offered from the start and waits
+only while a move is in progress. A moving layout chosen while an app has no
+window to move applies once one appears. Arranging again and putting the
+windows back are the settings' **Arrange windows now** and **Restore window
+positions**.
 
 Preview the candidate windows before moving them. If there is more than one
 candidate for an app, make the target window explicit before arrangement.
 Arrangement and connection remain separate actions. Respect window minimum
-sizes and the display's usable frame. If a layout cannot fit, explain that and
-offer Keep positions; do not squeeze either app beyond its supported size.
+sizes and the display's usable frame. If a layout cannot fit, put both windows
+back, explain that, and leave Continue available; do not squeeze either app
+beyond its supported size.
 
 Save the specific windows and their original frames for a discoverable restore
 action. Reapplying a layout must not replace that original snapshot with an
@@ -264,8 +303,10 @@ and the exchange are not additional setup segments.
 
 Completed segments fill with the success color, the current segment uses the
 active accent and a slightly greater thickness, and remaining segments use the
-neutral track. A step completes only when its action succeeds; Keep positions
-counts as an intentional layout choice. All four fill at screen 06. Hide the
+neutral track. A step completes on its action: Continue on the prepare and
+arrange steps, a successful connection on each connect step. The arrangement
+itself does not complete the arrange step; going on with the windows as they
+are, moved or kept, does. All four fill at screen 06. Hide the
 setup meter once the run begins and in the ordinary returning flow.
 
 Expose a descriptive progress value to VoiceOver, including the current step.
@@ -382,14 +423,21 @@ layout restoration. These are not prerequisites for the agreed initial flow.
 
 ## Implementation status
 
-September 10, 2026. The first pass of stages 1–4 landed in the app; stage 5
-(real apps and recovery scenarios) has not been run. What is built:
+September 12, 2026. Screens 02–05 now follow the updated reference. The native
+Xcode previews for those four screens were inspected, the app built, and 30
+focused setup, arrangement, and window-hit tests passed. A check against the
+compiled native controller also covered immediate arrangement, Continue gating,
+Keep positions, coalesced pointer queries, cancellation, invalid drops, and
+fresh target resolution at release. Real-app and recovery validation remains
+incomplete. What is built:
 
 - **The shell.** One 860 × 156-point capsule for every phase, with the
   installed desktop app icons at the ends (`PerchParticipant`), the four-segment
   meter over the center through screens 02–06 (`PerchProgressMeter`), labeled
   capsule actions beside it (`PerchButtons`), and the settings entry point in
-  every state. Previews for all ten screens are in `PerchPreviews.swift`, on a
+  every console state, omitted from Accessibility. Configure uses only the
+  existing sliders icon, beside the progress meter, and opens the existing
+  native settings popover. Previews for all ten screens are in `PerchPreviews.swift`, on a
   preview engine that answers setup actions with canned windows.
 - **The state.** `Core/Setup.swift` holds the pure flow — presence per app,
   candidates per window, steps completing only on their actions, connections
@@ -412,27 +460,34 @@ September 10, 2026. The first pass of stages 1–4 landed in the app; stage 5
 - **Arrangement.** Side by side, Stacked, and Keep positions, applied to the
   specific windows; a window that will not take its frame puts both back and
   reports it. The original frames are kept from the first arrangement, and
-  restore skips windows moved by hand since. No automatic restoration.
+  restore skips windows moved by hand since. Separate icon-and-label action
+  buttons show the current choice with a checkmark. Choices apply immediately;
+  Continue completes the step. Keep positions preserves the current frames.
+  Completion is announced to VoiceOver. No automatic restoration.
 - **Connection.** The keyboard picker (Return starts, arrows move, Return
   connects, Escape cancels) with the accent highlight over the candidate
   window (`WindowHighlight`), pointer selection on the rows, a Code session
   offered as a deliberate choice with **Use this session** in the destination
   details, remembered destinations shown as **Last used** and pre-highlighted
   in the picker, never as live connections.
+- **Drag connection.** `PerchConnectionDragHandle` tracks the active icon's
+  pointer outside the capsule without creating a pasteboard item or external
+  file drop. The window server rejects obscured targets, and AX resolves the
+  exact registered window. Hover highlights an eligible candidate; release
+  rechecks the final point and calls the same binding as the picker. Escape
+  cancels outstanding results; invalid drops leave setup intact and explain
+  the next action. Screens 04 and 05 use the mirrored drag instruction, with
+  the click/keyboard alternative still available.
 - **Send, pause, ending, return.** **Send to ChatGPT** / **Send to Claude** by
   the starting-assistant setting, enabled only when both destinations read
   ready, with the reason beside it otherwise; the pause states worded as
   agreed; **Another topic here** revalidates both connections; **Set up fresh
   conversations…** returns to the connect steps.
 
-Not built, deliberately:
+Remaining validation and deferred work:
 
-- **The drag from the icon onto a window.** The picker and the icon click are
-  the connection gestures; both end in `SetupController.connect(_:to:)`, which
-  the drag will call too. The connect instruction reads "Connect ChatGPT to its
-  conversation" until the drag lands, since "Drag ChatGPT onto its conversation"
-  would not be true.
-- **Live validation** of the picker's keys inside the non-activating panel,
+- **Live validation** of drag tracking and target resolution across applications,
+  the picker's keys inside the non-activating panel,
   of `AXFocusedWindow` and `AXRaise` on the Electron windows, of the arrangement
   read-back, and of cross-display and cross-Space behavior. None of these has
   been exercised against the real apps yet.

@@ -11,24 +11,37 @@ struct PerchPanelView: View {
     var onCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: Perch.s(18)) {
+        HStack(spacing: Perch.s(14)) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
-            separator
-            VStack(alignment: .leading, spacing: Perch.s(8)) {
-                if showsMeter {
-                    PerchProgressMeter(controller: controller)
-                        .transition(.opacity)
+            // The center between its two hairlines, as the reference draws
+            // it: the meter at its top left and the settings at its top
+            // right in every state, the stage's content under them, and —
+            // outside the guided steps, whose actions sit under their own
+            // copy — the stage's actions beside it.
+            HStack(alignment: .center, spacing: Perch.s(10)) {
+                VStack(alignment: .leading, spacing: Perch.s(8)) {
+                    HStack(alignment: .center, spacing: Perch.s(8)) {
+                        if showsMeter {
+                            PerchProgressMeter(controller: controller)
+                                .transition(.opacity)
+                        }
+                        Spacer(minLength: 0)
+                        PerchWidgetSetup(controller: controller)
+                    }
+                    .animation(Perch.fade, value: showsMeter)
+                    PerchWidgetCenter(controller: controller)
                 }
-                PerchWidgetCenter(controller: controller)
+                .layoutPriority(1)
+                PerchWidgetActions(controller: controller)
             }
+            .padding(.horizontal, Perch.s(18))
+            .overlay(alignment: .leading) { hairline }
+            .overlay(alignment: .trailing) { hairline }
             .layoutPriority(1)
-            .animation(Perch.fade, value: showsMeter)
-            PerchWidgetActions(controller: controller)
-            separator
             PerchParticipant(controller: controller, speaker: .claude)
         }
-        .padding(.horizontal, Perch.s(24))
-        .padding(.vertical, Perch.s(18))
+        .padding(.horizontal, Perch.s(28))
+        .padding(.vertical, Perch.s(12))
         .frame(width: width)
         .frame(minHeight: Perch.widgetHeight)
         .fixedSize(horizontal: false, vertical: true)
@@ -44,8 +57,8 @@ struct PerchPanelView: View {
         (controller.stage == .setup || controller.stage == .compose) && controller.setup.state.meterVisible
     }
 
-    private var separator: some View {
-        Rectangle().fill(Perch.hairline)
-            .frame(width: 1, height: Perch.s(58))
+    /// The center's edges, the height of whatever the center holds.
+    private var hairline: some View {
+        Rectangle().fill(Perch.hairline).frame(width: 1)
     }
 }

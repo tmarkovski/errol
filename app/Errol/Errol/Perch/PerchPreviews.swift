@@ -27,8 +27,6 @@ private func stepped(to phase: SetupPhase, _ engine: PerchPreviewEngine = PerchP
     if phase == .prepareApps { return controller }
     setup.continueFromPrepare()
     if phase == .arrange { return controller }
-    setup.choose(.keepPositions)
-    setup.applyLayout()
     setup.continueFromArrange()
     if phase == .connect(.chatgpt) { return controller }
     setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)

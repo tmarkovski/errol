@@ -28,15 +28,26 @@ Four short progress segments replace the numbered setup labels: completed
 steps fill green, the current step is amber and slightly thicker, and all four
 fill when both conversations are connected.
 Use the screen navigation to explore the full setup and returning-user flow.
+The app's existing **sliders icon** sits at the upper trailing edge of the
+central content on the setup screens, with an anchored placeholder menu for
+content to follow. It has no visible label and is absent from Accessibility.
+On Arrange, separate icon-and-label buttons apply the chosen layout at once.
+**Keep positions** is the default and leaves the windows where they currently
+are; **Continue** is always available and completes the step. The progress
+meter advances when continuing, rather than when the windows move.
 Demo explanations are hidden by default. Necessary guidance stays inside the
 bar, with destination details available on demand. In Codex, the design controls
 also offer a rounded-corner alternative to the capsule at the same width.
 
-The preview uses HTML, CSS, and JavaScript. [The editable source](preview-source.html)
-is the original inline fragment; `preview.html` wraps it for use outside Codex.
-Regenerate the browser copy after changing the source. The browser copy loads
-its icon and tooltip libraries from a CDN, so those assets require internet
-access. Codex's optional design-tuning controls are not part of the export.
+The preview uses HTML, CSS, and JavaScript. `preview.html` is the single
+editable source and opens directly in a browser; there is no generated copy
+to keep in sync. Its icon library loads from a CDN and requires internet
+access. Codex's optional design-tuning controls appear only inside Codex.
+
+For design iterations, open or reload `preview.html` in the browser window
+and inspect the screens and controls directly. Reuse the existing preview tab
+when available. This is the default review workflow; use Playwright or other
+automated checks only when a specific verification need calls for them.
 
 ## The idea
 

@@ -29,8 +29,7 @@ final class ArrangementTests: XCTestCase {
     func testKeepPositionsMovesNothing() {
         XCTAssertNil(layoutFrames(.keepPositions, in: area))
         XCTAssertFalse(LayoutChoice.keepPositions.movesWindows)
-        XCTAssertEqual(LayoutChoice.keepPositions.applyTitle, "Use positions")
-        XCTAssertEqual(LayoutChoice.stacked.applyTitle, "Arrange")
+        XCTAssertTrue(LayoutChoice.stacked.movesWindows)
     }
 
     func testAWindowHeldLargerThanAskedDidNotTakeTheFrame() {

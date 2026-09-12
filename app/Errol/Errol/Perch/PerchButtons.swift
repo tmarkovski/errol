@@ -21,15 +21,15 @@ struct PerchCapsuleButton: View {
             HStack(spacing: Perch.s(6)) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(Perch.text(12, .semibold))
+                        .font(Perch.text(11, .semibold))
                 }
                 Text(title)
-                    .font(Perch.text(13, .semibold))
+                    .font(Perch.text(12, .medium))
                     .lineLimit(1)
             }
             .foregroundStyle(style == .filled ? Perch.onAccent : Perch.accentText)
-            .padding(.horizontal, Perch.s(16))
-            .frame(height: Perch.s(38))
+            .padding(.horizontal, Perch.s(14))
+            .frame(height: Perch.s(29))
             .background(Capsule().fill(style == .filled ? Perch.accent : .clear))
             .overlay(Capsule().stroke(style == .filled ? .clear : Perch.accent.opacity(0.8), lineWidth: 1.2))
             .perchHover(Capsule(), tint: style == .filled ? .white : Perch.ink)
@@ -49,7 +49,7 @@ struct PerchTextButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Perch.text(12, .medium))
+                .font(Perch.text(12))
                 .lineLimit(1)
                 .perchHoverInk(idle: Perch.secondary, active: Perch.ink)
                 .contentShape(Rectangle())

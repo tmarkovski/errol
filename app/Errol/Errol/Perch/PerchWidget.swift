@@ -243,8 +243,10 @@ struct PerchShapeMenu: View {
     }
 }
 
-/// One configuration entry point beside the primary action, in every state.
-/// Run options stay visible but locked while the relay owns the conversation.
+/// One configuration entry point at the center's top-right corner, in
+/// every state: the existing sliders icon in a quiet circular target.
+/// Run options stay visible but locked while
+/// the relay owns the conversation.
 struct PerchWidgetSetup: View {
     @Bindable var controller: RelayController
     @State private var showingSetup = false
@@ -253,15 +255,16 @@ struct PerchWidgetSetup: View {
         Button { showingSetup.toggle() } label: {
             Image(systemName: "slider.horizontal.3")
                 .font(Perch.text(15, .medium))
-                .foregroundStyle(Perch.secondary)
-                .frame(width: Perch.s(38), height: Perch.s(38))
+                .foregroundStyle(showingSetup ? Perch.ink : Perch.secondary)
+                .frame(width: Perch.s(29), height: Perch.s(29))
                 .background(Circle().fill(showingSetup ? Perch.well : .clear))
                 .perchHover(Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .help("Conversation, who starts, turn limit, windows, and appearance")
+        .fixedSize()
+        .accessibilityLabel("Configure")
+        .help("Configure")
         .popover(isPresented: $showingSetup, arrowEdge: .bottom) {
             PerchSettingsPopover(controller: controller) {
                 showingSetup = false
@@ -271,19 +274,18 @@ struct PerchWidgetSetup: View {
     }
 }
 
-/// The actions beside the center: the step's during setup, the named Send
-/// with the editor, Pause to steer and Stop during the exchange, the
-/// note's send and resume while paused, and the two next intentions at
-/// the end. The settings entry point stands beside them throughout.
+/// The actions beside the center: the named Send with the editor, Pause
+/// to steer and Stop during the exchange, the note's send and resume
+/// while paused, and the two next intentions at the end. The guided steps
+/// keep their actions under their own copy (PerchSetupCenter).
 struct PerchWidgetActions: View {
     let controller: RelayController
 
     var body: some View {
         HStack(alignment: .center, spacing: Perch.s(10)) {
-            PerchWidgetSetup(controller: controller)
             switch controller.stage {
             case .setup:
-                PerchSetupActions(controller: controller)
+                EmptyView()
             case .compose:
                 send
             case .running:

@@ -6,8 +6,8 @@
 // answers on the main thread.
 //
 // Connecting has one entry point, `connect(_:to:)`, whatever the gesture:
-// the picker's Return or click today, a drop from the icon onto the window
-// when that gesture lands. Both produce the same binding and the same
+// the picker's Return or click, or a drop from the icon onto the window.
+// Both produce the same binding and the same
 // connected state.
 
 import AppKit
@@ -30,8 +30,13 @@ struct WindowPicker: Equatable {
 final class SetupController {
     private(set) var state: SetupState
     private(set) var picker: WindowPicker?
+    private(set) var draggingSide: Speaker?
+    private(set) var dragCandidate: WindowCandidate?
     /// A bind is on the worker: a second Return or click waits for it.
     private(set) var isBinding = false
+    /// An arrangement is on the worker: Continue waits for its outcome, so
+    /// a move that fails is seen on the step it belongs to.
+    private(set) var isArranging = false
     /// Why the last connect or arrangement did not happen, beside the action.
     private(set) var problem: String?
     /// The apps' names as the panel shows them.
@@ -41,6 +46,14 @@ final class SetupController {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let highlight = WindowHighlight()
     @ObservationIgnored private var launchDeadlines: [Speaker: Timer] = [:]
+    @ObservationIgnored private var arrangementsInFlight = 0
+    /// The windows the last arrangement was asked to move, so a sweep
+    /// applies a moving layout only to windows it has not tried.
+    @ObservationIgnored private var arrangedTargets: [Speaker: WindowID]?
+    @ObservationIgnored private var dragGeneration = UUID()
+    @ObservationIgnored private var dragQueryInFlight = false
+    @ObservationIgnored private var dragPoint: CGPoint?
+    @ObservationIgnored private var dropping = false
 
     init(engine: RelayEngine, defaults: UserDefaults = .standard) {
         self.engine = engine
@@ -79,6 +92,7 @@ final class SetupController {
                 engine.unbind(side)
             }
         }
+        applyIfPending()
         if var picker {
             // The picker follows the sweep, keeping its place on the same
             // window where it is still offered.
@@ -111,9 +125,9 @@ final class SetupController {
         }
     }
 
+    /// Open whichever app is not open: the step's one action until both are.
     func launchBoth() {
-        for side in [Speaker.chatgpt, .claude] where !state[side].presence.isAvailable
-            && state[side].presence != .launching {
+        for side in [Speaker.chatgpt, .claude] where state[side].presence == .notRunning {
             launch(side)
         }
     }
@@ -135,13 +149,45 @@ final class SetupController {
 
     // MARK: Arrange
 
+    /// The layout as chosen. On the arrange step the choice applies at
+    /// once — the windows move, or stay — and Continue is there throughout;
+    /// from the settings later it is a preference, applied by its own
+    /// command.
     func choose(_ layout: LayoutChoice) {
+        guard state.layout != layout else { return }
         problem = nil
         state.choose(layout)
+        applyIfChosen()
+        if layout == .keepPositions { announce(layout.completionMessage) }
     }
 
+    /// The window to move, where a side has several: once named, the
+    /// chosen layout applies.
     func chooseArrangementWindow(_ side: Speaker, _ window: WindowID) {
         state.chooseArrangementWindow(side, window)
+        applyIfChosen()
+    }
+
+    private func applyIfChosen() {
+        guard state.phase == .arrange, state.layout.movesWindows, state.canArrange else { return }
+        applyLayout()
+    }
+
+    /// A moving layout chosen while a side had no window to move — none
+    /// open, or several and none named, or the one asked for gone —
+    /// applies once a sweep offers windows it has not tried: the choice
+    /// stands, and the step has no other way to say "now". A layout that
+    /// would not fit is not tried again on its own.
+    private func applyIfPending() {
+        guard state.phase == .arrange, state.layout.movesWindows, state.layoutProblem == nil,
+              !isArranging, let targets = arrangementTargets, targets != arrangedTargets else { return }
+        applyLayout()
+    }
+
+    private var arrangementTargets: [Speaker: WindowID]? {
+        guard let chatgpt = state.chatgpt.arrangementTarget,
+              let claude = state.claude.arrangementTarget else { return nil }
+        return [.chatgpt: chatgpt, .claude: claude]
     }
 
     /// Apply the chosen layout to the two windows. Keep positions applies
@@ -149,7 +195,7 @@ final class SetupController {
     func applyLayout() {
         problem = nil
         guard state.layout.movesWindows else {
-            state.layoutOutcome(.kept, names: names)
+            state.layoutOutcome(.kept)
             return
         }
         guard let chatgpt = state.chatgpt.arrangementTarget else {
@@ -164,9 +210,21 @@ final class SetupController {
                 : "Open a conversation in \(names.claude) first."
             return
         }
-        engine.arrange(state.layout, windows: [.chatgpt: chatgpt, .claude: claude]) { [weak self] outcome in
+        let layout = state.layout
+        let windows: [Speaker: WindowID] = [.chatgpt: chatgpt, .claude: claude]
+        arrangedTargets = windows
+        arrangementsInFlight += 1
+        isArranging = true
+        engine.arrange(layout, windows: windows) { [weak self] outcome in
             guard let self else { return }
-            state.layoutOutcome(outcome, names: names)
+            arrangementsInFlight -= 1
+            isArranging = arrangementsInFlight > 0
+            // The word on a layout no longer chosen says nothing about the
+            // one that is.
+            guard state.layout == layout else { return }
+            state.layoutOutcome(outcome)
+            announce(state.layoutProblem ?? (state.layoutApplied ? layout.completionMessage
+                : "A window is no longer available. Continue as they are, or choose another window."))
         }
     }
 
@@ -179,16 +237,89 @@ final class SetupController {
     }
 
     func continueFromArrange() {
+        guard !isArranging else { return }
         problem = nil
         state.continueFromArrange()
     }
 
     // MARK: Connect
 
+    /// Errol tracks the pointer itself: this never starts a file drag in
+    /// the destination app. Each drop is resolved again at its final point.
+    func beginDragging(_ side: Speaker) {
+        guard !isBinding, state.phase == .connect(side) else { return }
+        cancelPicking()
+        problem = nil
+        dragGeneration = UUID()
+        draggingSide = side
+        engine.requestSweep()
+    }
+
+    func updateDrag(at point: CGPoint) {
+        guard draggingSide != nil, !dropping else { return }
+        dragPoint = point
+        queryDragPoint()
+    }
+
+    func endDragging(at point: CGPoint) {
+        guard draggingSide != nil else { return }
+        dragPoint = point
+        dropping = true
+        queryDragPoint()
+    }
+
+    /// Coalesce mouse moves so slow AX answers cannot flood the worker.
+    /// A cancelled drag invalidates its outstanding answer as well.
+    private func queryDragPoint() {
+        guard !dragQueryInFlight, let side = draggingSide, let point = dragPoint else { return }
+        dragQueryInFlight = true
+        let generation = dragGeneration
+        let finalQuery = dropping
+        let ignored = Set(highlight.windowNumber.map { [$0] } ?? [])
+        engine.windowAtPoint(point, for: side, ignoring: ignored) { [weak self] id in
+            guard let self, generation == dragGeneration, draggingSide == side else { return }
+            dragQueryInFlight = false
+            guard dragPoint == point else {
+                queryDragPoint()
+                return
+            }
+            if dropping, !finalQuery {
+                queryDragPoint()
+                return
+            }
+            let candidate = state[side].candidates.first { $0.id == id && $0.isEligible && !$0.isMinimized }
+            dragCandidate = candidate
+            if dropping {
+                cancelDragging()
+                if let candidate {
+                    connect(side, to: candidate.id)
+                } else {
+                    problem = "Drop onto a visible \(name(side)) conversation, or click to choose a window."
+                    announce(problem!)
+                }
+            } else if let candidate, let frame = candidate.frame {
+                highlight.show(frame: frame, label: "\(name(side)) \u{00B7} \(candidate.name) \u{00B7} \(candidate.stateLine)")
+            } else {
+                highlight.hide()
+            }
+        }
+    }
+
+    func cancelDragging() {
+        dragGeneration = UUID()
+        draggingSide = nil
+        dragCandidate = nil
+        dragPoint = nil
+        dragQueryInFlight = false
+        dropping = false
+        highlight.hide()
+    }
+
     /// Open the picker for `side`: the candidates as last swept, the
     /// remembered window highlighted first.
     func beginPicking(_ side: Speaker) {
         guard !isBinding else { return }
+        cancelDragging()
         problem = nil
         let setup = state[side]
         engine.requestSweep()
@@ -223,7 +354,7 @@ final class SetupController {
     /// stands on, if a run could target it.
     func choosePick() {
         guard let picker, let candidate = picker.current else { return }
-        guard candidate.isEligible else {
+        guard candidate.isEligible, !candidate.isMinimized else {
             problem = candidate.hasComposer
                 ? "That window is minimized. Bring it back, or choose another."
                 : "That window has no message field to relay into. Choose another."
@@ -233,6 +364,7 @@ final class SetupController {
     }
 
     func cancelPicking() {
+        cancelDragging()
         picker = nil
         highlight.hide()
     }
@@ -242,6 +374,7 @@ final class SetupController {
     /// read; the state takes the connection from there.
     func connect(_ side: Speaker, to window: WindowID) {
         guard !isBinding else { return }
+        cancelDragging()
         isBinding = true
         problem = nil
         let candidate = state[side].candidates.first { $0.id == window }
@@ -258,6 +391,7 @@ final class SetupController {
             state.connected(side, window: window, identity: observation.identity,
                             model: candidate?.model, observation: observation)
             DestinationHints.save(state[side].hint, for: side, in: defaults)
+            announce("\(name(side)) connected to \(state[side].connection?.name ?? "its conversation").")
         }
     }
 
@@ -282,6 +416,10 @@ final class SetupController {
     /// the key was taken.
     func handleKey(_ event: NSEvent) -> Bool {
         let key = event.keyCode
+        if draggingSide != nil {
+            if key == 53 { cancelDragging() }
+            return true
+        }
         guard picker != nil else {
             if case .connect(let side) = state.phase, key == 36 || key == 76 {
                 beginPicking(side)
@@ -301,6 +439,10 @@ final class SetupController {
 
     /// Escape from the panel's cancel path: true when the picker took it.
     func cancelIfPicking() -> Bool {
+        if draggingSide != nil {
+            cancelDragging()
+            return true
+        }
         guard picker != nil else { return false }
         cancelPicking()
         return true
@@ -338,6 +480,7 @@ final class SetupController {
         problem = nil
         engine.unbind(.chatgpt)
         engine.unbind(.claude)
+        arrangedTargets = nil
         state.restart()
         engine.requestSweep()
     }
@@ -351,5 +494,11 @@ final class SetupController {
             return
         }
         highlight.show(frame: frame, label: "\(name(picker.side)) \u{00B7} \(candidate.name)")
+    }
+
+    private func announce(_ message: String) {
+        guard let app = NSApp else { return }
+        NSAccessibility.post(element: app, notification: .announcementRequested,
+                             userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
     }
 }

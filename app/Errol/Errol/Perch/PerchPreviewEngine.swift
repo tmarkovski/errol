@@ -166,6 +166,11 @@ final class PerchPreviewEngine: RelayEngine {
         return true
     }
 
+    func windowAtPoint(_ point: CGPoint, for side: Speaker, ignoring: Set<UInt32>,
+                       completion: @escaping (WindowID?) -> Void) {
+        completion(windows(side).first { !$0.isMinimized && $0.frame?.contains(point) == true }?.id)
+    }
+
     func bringForward(_ side: Speaker) {
         events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now."))
     }

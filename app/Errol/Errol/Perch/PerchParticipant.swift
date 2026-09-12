@@ -1,14 +1,13 @@
 // A participant's column at either end of the capsule: the installed
-// app's icon over what the side is now — the next thing to do for it, or
-// the conversation it is connected to — with the presence mark in the
-// icon's corner. ChatGPT stands left and Claude right whoever starts. The
+// app's icon, its name, and under that what the side is now — the next
+// thing to do for it, or the conversation it is connected to — with the
+// mark in the icon's corner once it is connected. ChatGPT stands left and Claude right whoever starts. The
 // icon is the side's control and changes with the step: it opens the app,
 // chooses its window, or shows the destination's details; it never
 // changes who starts, which the session settings do.
 //
-// The drag from this icon onto a window is the gesture the setup design
-// leads with and is not built yet; when it is, it ends in the same
-// `SetupController.connect(_:to:)` the picker uses.
+// Dragging the active icon selects a window through the same binding as
+// the picker; Errol owns the gesture and sends no file to the other app.
 
 import SwiftUI
 
@@ -53,7 +52,8 @@ struct PerchParticipant: View {
                 default: return .none
                 }
             case .arrange:
-                return side.needsArrangementChoice ? .chooseArrangement : (side.isConnected ? .details : .none)
+                return setup.state.needsArrangementChoice(speaker)
+                    ? .chooseArrangement : (side.isConnected ? .details : .none)
             case .connect(let target):
                 if target == speaker { return .chooseWindow }
                 return side.isConnected ? .details : .none
@@ -64,30 +64,28 @@ struct PerchParticipant: View {
     }
 
     var body: some View {
-        VStack(spacing: Perch.s(6)) {
+        VStack(spacing: Perch.s(4)) {
             icon
-            Text(primaryLine)
-                .font(Perch.text(11, .medium))
+            Text(name)
+                .font(Perch.text(12, .medium))
                 .foregroundStyle(Perch.ink)
                 .lineLimit(1)
-                .truncationMode(.middle)
-                .contentTransition(.opacity)
             Group {
                 if replying {
                     replyingDots
-                } else if let (text, isProblem) = secondaryLine {
+                } else if let (text, isProblem) = stateLine {
                     Text(text)
-                        .font(Perch.text(10))
-                        .foregroundStyle(isProblem ? Perch.red : Perch.muted)
+                        .font(Perch.text(11))
+                        .foregroundStyle(isProblem ? Perch.red : Perch.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .contentTransition(.opacity)
                 }
             }
-            .frame(height: Perch.s(12))
+            .frame(height: Perch.s(13))
         }
         .frame(width: Perch.participantWidth)
-        .animation(Perch.fade, value: primaryLine)
+        .animation(Perch.fade, value: stateLine?.0)
         .popover(isPresented: $showingDetails, arrowEdge: .bottom) {
             PerchDestinationDetails(controller: controller, speaker: speaker) { showingDetails = false }
         }
@@ -126,6 +124,12 @@ struct PerchParticipant: View {
             .buttonStyle(.plain)
             .disabled(role == .none)
             .accessibilityLabel(iconLabel)
+            .overlay {
+                if role == .chooseWindow {
+                    PerchConnectionDragHandle(setup: setup, side: speaker)
+                        .accessibilityHidden(true)
+                }
+            }
         }
     }
 
@@ -156,57 +160,51 @@ struct PerchParticipant: View {
         side.connection?.readiness.isReady == true
     }
 
-    private var presence: Color {
-        if let connection = side.connection {
-            switch connection.readiness {
-            case .ready: return Perch.presence
-            case .unverified: return Perch.path
-            default: return Perch.red
-            }
-        }
-        switch side.presence {
-        case .available: return Perch.presence
-        case .checking, .launching: return Perch.path
-        case .notInstalled, .notRunning, .noWindow, .noConversation: return Perch.red
+    /// The mark's color once the side is connected: how its conversation
+    /// reads. Before that the corner stays bare, as the reference has it.
+    private var presence: Color? {
+        guard let connection = side.connection else { return nil }
+        switch connection.readiness {
+        case .ready: return Perch.presence
+        case .unverified: return Perch.path
+        default: return Perch.red
         }
     }
 
-    private var primaryLine: String {
-        if let connection = side.connection { return connection.name }
+    /// The state under the app's name: the connected conversation and how
+    /// it reads, or the next thing to do for the app at this step. The
+    /// reference keeps the name on top and the state under it throughout.
+    private var stateLine: (String, Bool)? {
+        if let connection = side.connection {
+            switch connection.readiness {
+            case .ready: return (connection.name, false)
+            case .unverified: return ("Last used", false)
+            default: return (connection.readiness.status(name: name), true)
+            }
+        }
+        if side.presence == .notInstalled { return ("Not installed", true) }
         switch controller.stage {
         case .running, .finished, .compose:
-            return name
+            return nil
         case .setup:
             switch setup.state.phase {
             case .prepareApps:
-                return side.presence.action(name: name)
+                return (side.presence.openState, false)
             case .arrange:
-                if side.needsArrangementChoice { return "Choose a window" }
-                return side.eligible.first?.name ?? side.presence.action(name: name)
+                if setup.state.needsArrangementChoice(speaker) { return ("Choose a window", false) }
+                return (side.presence.openState, false)
             case .connect(let target):
-                if target == speaker { return setup.picker?.side == speaker ? "Choosing\u{2026}" : "Choose a window" }
-                return side.presence.isAvailable ? "Not connected" : side.presence.action(name: name)
+                if target == speaker {
+                    if setup.draggingSide == speaker {
+                        return (setup.dragCandidate == nil ? "Drag to a window" : "Release to connect", false)
+                    }
+                    return (setup.picker?.side == speaker ? "Choosing\u{2026}" : "Drag to connect", false)
+                }
+                return (side.presence.openState, false)
             case .compose:
-                return name
+                return nil
             }
         }
-    }
-
-    private var secondaryLine: (String, Bool)? {
-        if let connection = side.connection {
-            if !connection.readiness.isReady, connection.readiness != .unverified {
-                return (connection.readiness.status(name: name), true)
-            }
-            if connection.readiness == .unverified { return ("Last used", false) }
-            return (connection.context, false)
-        }
-        if case .connect(let target) = setup.state.phase, target == speaker, let hint = side.hint {
-            return ("Last used: \(hint.name)", false)
-        }
-        if case .setup = controller.stage, side.presence == .notInstalled {
-            return ("Not on this Mac", true)
-        }
-        return nil
     }
 
     private var replyingDots: some View {

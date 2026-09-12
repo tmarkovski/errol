@@ -129,6 +129,26 @@ enum AppPresence: Equatable {
         return false
     }
 
+    /// Running, whatever its windows show: all the prepare step asks.
+    var isOpen: Bool {
+        switch self {
+        case .noWindow, .noConversation, .available: return true
+        case .checking, .notInstalled, .notRunning, .launching: return false
+        }
+    }
+
+    /// The state under the app's name on the prepare step, which asks
+    /// only that the app be open.
+    var openState: String {
+        switch self {
+        case .checking: return "Checking\u{2026}"
+        case .notInstalled: return "Not installed"
+        case .notRunning: return "Click to open"
+        case .launching: return "Opening\u{2026}"
+        case .noWindow, .noConversation, .available: return "App open"
+        }
+    }
+
     /// The line under the icon: the next action, or the observed state.
     func action(name: String) -> String {
         switch self {
@@ -394,10 +414,11 @@ struct SetupState: Equatable {
     var phase = SetupPhase.prepareApps
     var chatgpt = SideSetup(side: .chatgpt)
     var claude = SideSetup(side: .claude)
-    var layout = LayoutChoice.sideBySide
-    /// The chosen layout has been applied, or the positions deliberately
-    /// kept. Reset by choosing another layout.
-    var layoutApplied = false
+    var layout = LayoutChoice.keepPositions
+    /// The chosen layout stands applied. Keep positions applies itself by
+    /// being chosen; a moving layout is applied as soon as it is chosen,
+    /// and stands applied once the engine says the windows took it.
+    var layoutApplied = true
     /// Why the last arrangement did not happen, beside the action.
     var layoutProblem: String?
     var completed = Set<SetupStep>()
@@ -426,9 +447,15 @@ struct SetupState: Equatable {
         return "Step \(step.rawValue + 1) of \(SetupStep.allCases.count): \(step.title(names: names))"
     }
 
-    var bothAvailable: Bool { chatgpt.presence.isAvailable && claude.presence.isAvailable }
+    /// Both apps are running; the prepare step asks nothing of their windows.
+    var bothOpen: Bool { chatgpt.presence.isOpen && claude.presence.isOpen }
     /// Both sides have a window a layout could move.
     var canArrange: Bool { chatgpt.arrangementTarget != nil && claude.arrangementTarget != nil }
+    /// A side with several windows and none named, while the layout would
+    /// move one; nothing to choose while nothing moves.
+    func needsArrangementChoice(_ side: Speaker) -> Bool {
+        layout.movesWindows && self[side].needsArrangementChoice
+    }
     var bothConnected: Bool { chatgpt.isConnected && claude.isConnected }
     var bothReady: Bool { chatgpt.isReady && claude.isReady }
 
@@ -489,10 +516,11 @@ struct SetupState: Equatable {
         self[side].presence = installed ? .notRunning : .notInstalled
     }
 
-    /// Continue is offered once both apps have a window a run could target.
+    /// Going on is offered once both apps are open. Whether a window shows
+    /// a conversation a run could target is the connect steps' concern.
     @discardableResult
     mutating func continueFromPrepare() -> Bool {
-        guard phase == .prepareApps, bothAvailable else { return false }
+        guard phase == .prepareApps, bothOpen else { return false }
         completed.insert(.prepareApps)
         phase = .arrange
         return true
@@ -500,45 +528,48 @@ struct SetupState: Equatable {
 
     // MARK: Arrange
 
-    /// Another layout, to be applied in its turn. Only the arrange step
-    /// itself is reopened by the change: from the settings later, the
-    /// layout is a preference and the step stays done.
+    /// Another layout. Keep positions is applied by the choice itself; a
+    /// moving layout waits for the engine's word. The step's completion is
+    /// untouched: it completes on Continue, and from the settings later
+    /// the layout is a preference.
     mutating func choose(_ layout: LayoutChoice) {
         guard self.layout != layout else { return }
         self.layout = layout
         layoutProblem = nil
-        if phase == .arrange {
-            layoutApplied = false
-            completed.remove(.arrange)
-        }
+        layoutApplied = !layout.movesWindows
     }
 
     mutating func chooseArrangementWindow(_ side: Speaker, _ window: WindowID) {
         self[side].arrangementChoice = window
     }
 
-    /// The engine's word on an arrangement: applied or kept completes the
-    /// step; a layout that could not be made, or a window gone, explains
-    /// itself beside the action.
-    mutating func layoutOutcome(_ outcome: ArrangeOutcome, names: (chatgpt: String, claude: String)) {
+    /// The engine's word on an arrangement. A layout that could not be
+    /// made explains itself beside the action; a window gone is the next
+    /// sweep's to report, and the layout applies again once there is a
+    /// window to move. Either way the windows are as they are, and
+    /// Continue stays offered.
+    mutating func layoutOutcome(_ outcome: ArrangeOutcome) {
         switch outcome {
         case .arranged, .kept:
             layoutApplied = true
             layoutProblem = nil
-            completed.insert(.arrange)
         case .cannotFit(_, let reason):
             layoutApplied = false
-            layoutProblem = reason + " Keep positions to continue as they are."
-        case .windowMissing(let side):
+            layoutProblem = reason + " Both windows stay where they were."
+        case .windowMissing:
             layoutApplied = false
-            let name = side == .chatgpt ? names.chatgpt : names.claude
-            layoutProblem = "\(name)'s window is gone. Open a conversation in \(name), then arrange again."
+            layoutProblem = nil
         }
     }
 
+    /// Continue is offered from the start: the windows are where the
+    /// layout put them or where the human had them, and either is
+    /// somewhere to go on from. The step completes here, not on the
+    /// arrangement.
     @discardableResult
     mutating func continueFromArrange() -> Bool {
-        guard phase == .arrange, layoutApplied else { return false }
+        guard phase == .arrange else { return false }
+        completed.insert(.arrange)
         advanceToConnection()
         return true
     }

@@ -40,8 +40,6 @@ final class SetupStateTests: XCTestCase {
     private func composed() throws -> SetupState {
         var (state, gpt, cld) = try prepared()
         XCTAssertTrue(state.continueFromPrepare())
-        state.choose(.keepPositions)
-        state.layoutOutcome(.kept, names: names)
         XCTAssertTrue(state.continueFromArrange())
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
         state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
@@ -73,6 +71,10 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(AppPresence.launching.action(name: "ChatGPT"), "Opening\u{2026}")
         XCTAssertEqual(AppPresence.noConversation.action(name: "Claude"), "Open a conversation")
         XCTAssertEqual(AppPresence.available(windows: 2).action(name: "Claude"), "Ready")
+        XCTAssertEqual(AppPresence.notRunning.openState, "Click to open")
+        XCTAssertEqual(AppPresence.noConversation.openState, "App open")
+        XCTAssertTrue(AppPresence.noWindow.isOpen, "open asks nothing of the windows")
+        XCTAssertFalse(AppPresence.launching.isOpen)
         XCTAssertNil(AppPresence.available(windows: 1).problem(name: "Claude"))
         XCTAssertTrue(AppPresence.notInstalled.problem(name: "ChatGPT")!.contains("isn't installed"))
     }
@@ -90,15 +92,17 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.claude.presence, .notInstalled)
     }
 
-    func testContinueNeedsBothAppsAvailableAndCompletesTheStep() throws {
+    func testContinueNeedsBothAppsOpenAndNothingOfTheirWindows() throws {
         var state = SetupState()
         let gpt = try candidate("chatgpt-chat-home", selectors: chatgpt)
         state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
-        state.observe(.claude, presence: .noConversation, candidates: [])
+        state.observe(.claude, presence: .notRunning, candidates: [])
         XCTAssertFalse(state.continueFromPrepare())
         XCTAssertEqual(state.phase, .prepareApps)
-        let cld = try candidate("claude-chat-home", id: 2, selectors: claude)
-        state.observe(.claude, presence: .available(windows: 1), candidates: [cld])
+        state.observe(.claude, presence: .launching, candidates: [])
+        XCTAssertFalse(state.continueFromPrepare(), "opening is not open yet")
+        state.observe(.claude, presence: .noConversation, candidates: [])
+        XCTAssertTrue(state.bothOpen, "a running app is open, whatever its windows show")
         XCTAssertTrue(state.continueFromPrepare())
         XCTAssertEqual(state.phase, .arrange)
         XCTAssertEqual(state.progress(of: .prepareApps), .done)
@@ -107,27 +111,42 @@ final class SetupStateTests: XCTestCase {
 
     // MARK: Arrange
 
-    func testArrangementCompletesOnlyWhenAppliedOrDeliberatelyKept() throws {
+    func testTheLayoutAppliesAsChosenAndTheStepCompletesOnContinue() throws {
         var (state, _, _) = try prepared()
         state.continueFromPrepare()
+        XCTAssertEqual(state.layout, .keepPositions, "the windows stay where they are unless a layout is chosen")
+        XCTAssertTrue(state.layoutApplied, "keep positions applies itself")
         XCTAssertTrue(state.canArrange, "one eligible window each is the window to move")
-        XCTAssertFalse(state.continueFromArrange(), "nothing applied yet")
-        state.layoutOutcome(.cannotFit(.chatgpt, "ChatGPT's window can't be made 640\u{00D7}900 on this display."),
-                            names: names)
+        state.choose(.sideBySide)
+        XCTAssertFalse(state.layoutApplied, "a moving layout waits for the engine's word")
+        state.layoutOutcome(.cannotFit(.chatgpt, "ChatGPT's window can't be made 640\u{00D7}900 on this display."))
         XCTAssertFalse(state.layoutApplied)
-        XCTAssertTrue(state.layoutProblem!.contains("Keep positions"))
-        XCTAssertEqual(state.progress(of: .arrange), .current)
-        state.layoutOutcome(.arranged, names: names)
+        XCTAssertTrue(state.layoutProblem!.hasSuffix("Both windows stay where they were."))
+        state.layoutOutcome(.arranged)
         XCTAssertTrue(state.layoutApplied)
         XCTAssertNil(state.layoutProblem)
-        XCTAssertEqual(state.progress(of: .arrange), .done)
-        state.choose(.stacked)
-        XCTAssertFalse(state.layoutApplied, "another layout must be applied in its turn")
-        XCTAssertEqual(state.progress(of: .arrange), .current)
+        XCTAssertEqual(state.progress(of: .arrange), .current, "arranging does not complete the step; continuing does")
         state.choose(.keepPositions)
-        state.layoutOutcome(.kept, names: names)
+        XCTAssertTrue(state.layoutApplied)
         XCTAssertTrue(state.continueFromArrange())
+        XCTAssertEqual(state.progress(of: .arrange), .done)
         XCTAssertEqual(state.phase, .connect(.chatgpt), "ChatGPT connects first, whoever starts")
+        XCTAssertFalse(state.continueFromArrange(), "only from the arrange step")
+    }
+
+    func testContinueIsOfferedWhateverTheArrangementDid() throws {
+        var (state, _, _) = try prepared()
+        state.continueFromPrepare()
+        state.choose(.stacked)
+        XCTAssertTrue(state.continueFromArrange(), "a move still in flight is the controller's to wait on")
+        var (again, _, _) = try prepared()
+        again.continueFromPrepare()
+        again.choose(.stacked)
+        again.layoutOutcome(.windowMissing(.claude))
+        XCTAssertFalse(again.layoutApplied)
+        XCTAssertNil(again.layoutProblem, "the sweep says what to open; the layout applies again once it is there")
+        XCTAssertTrue(again.continueFromArrange(), "the windows are as they are, which is somewhere to go on from")
+        XCTAssertEqual(again.progress(of: .arrange), .done)
     }
 
     func testSeveralWindowsNeedAnExplicitOneBeforeArranging() throws {
@@ -137,14 +156,15 @@ final class SetupStateTests: XCTestCase {
         state.observe(.claude, presence: .available(windows: 2), candidates: [one, two])
         XCTAssertNil(state.claude.arrangementTarget)
         XCTAssertTrue(state.claude.needsArrangementChoice)
+        XCTAssertFalse(state.needsArrangementChoice(.claude), "nothing to choose while nothing moves")
+        state.choose(.stacked)
+        XCTAssertTrue(state.needsArrangementChoice(.claude))
         state.chooseArrangementWindow(.claude, two.id)
         XCTAssertEqual(state.claude.arrangementTarget, two.id)
         XCTAssertFalse(state.claude.needsArrangementChoice)
         // A connection outranks the choice.
         state.connected(.claude, window: one.id, identity: one.identity, model: nil, observation: observation(one))
         XCTAssertEqual(state.claude.arrangementTarget, one.id)
-        state.layoutOutcome(.windowMissing(.claude), names: names)
-        XCTAssertTrue(state.layoutProblem!.hasPrefix("Claude's window is gone."))
     }
 
     // MARK: Connect
@@ -167,8 +187,6 @@ final class SetupStateTests: XCTestCase {
     func testConnectingTheSecondSideFirstStillAsksForTheFirst() throws {
         var (state, gpt, cld) = try prepared()
         state.continueFromPrepare()
-        state.choose(.keepPositions)
-        state.layoutOutcome(.kept, names: names)
         state.continueFromArrange()
         state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
         XCTAssertEqual(state.phase, .connect(.chatgpt))
@@ -238,8 +256,6 @@ final class SetupStateTests: XCTestCase {
     func testDisconnectingWhileConnectingTheOtherSideWaitsItsTurn() throws {
         var (state, gpt, cld) = try prepared()
         state.continueFromPrepare()
-        state.choose(.keepPositions)
-        state.layoutOutcome(.kept, names: names)
         state.continueFromArrange()
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
         XCTAssertEqual(state.phase, .connect(.claude))
@@ -284,8 +300,8 @@ final class SetupStateTests: XCTestCase {
         var state = try composed()
         state.choose(.stacked)
         XCTAssertEqual(state.layout, .stacked)
-        XCTAssertTrue(state.layoutApplied, "from the settings, the step stays done")
-        XCTAssertEqual(state.progress(of: .arrange), .done)
+        XCTAssertFalse(state.layoutApplied, "applied by its own command, from the settings")
+        XCTAssertEqual(state.progress(of: .arrange), .done, "the step stays done")
         XCTAssertEqual(state.phase, .compose)
     }
 

@@ -62,8 +62,8 @@ func currentFrame(_ window: AXUIElement) -> CGRect {
 
 // MARK: - Layouts
 
-/// The layouts setup offers. Keep positions is a choice too: it completes
-/// the step without moving anything.
+/// The layouts setup offers. Keep positions is a choice too, and the one
+/// setup starts on: it moves nothing.
 enum LayoutChoice: String, CaseIterable, Equatable {
     case sideBySide
     case stacked
@@ -77,10 +77,15 @@ enum LayoutChoice: String, CaseIterable, Equatable {
         }
     }
 
-    /// The action that applies it.
-    var applyTitle: String { self == .keepPositions ? "Use positions" : "Arrange" }
-
     var movesWindows: Bool { self != .keepPositions }
+
+    var completionMessage: String {
+        switch self {
+        case .sideBySide: return "Windows are side by side. Continue when you\u{2019}re ready."
+        case .stacked: return "Windows are stacked. Continue when you\u{2019}re ready."
+        case .keepPositions: return "Window positions kept. Continue when you\u{2019}re ready."
+        }
+    }
 }
 
 /// The frames a layout gives the two windows in `area` (AX coordinates):
