@@ -181,19 +181,29 @@ The primary visual gesture starts at the desktop app icon. Place a left-pointing
 arrow beside the instruction, nudging toward that icon three times, then staying
 still. The reference uses about 7 points of movement and 0.9 seconds per nudge.
 Hide the cue when dragging or picking begins. Respect Reduce Motion with a
-static arrow. The arrow identifies what to pick up; the window highlight
-identifies where to drop it.
+static arrow. The arrow identifies what to pick up. As the drag begins, bring
+the app forward beneath the console and draw a drop area over each showing
+conversation's message field, the way the transfer outline marks the receiving
+composer during a run; the drop area identifies where to drop it, and where
+Errol will write. A field whose geometry cannot be read gets the whole window
+as its area. Say what the drop does on the area itself ("Drop here", "Errol
+pastes messages here and sends them"), so the gesture teaches how Errol drives
+the app.
 
 Provide **Click to choose a window** beside the drag instruction. The picker
 supports pointer selection and keyboard navigation: Return starts selection,
 arrows move among eligible windows, Return chooses, and Escape cancels.
 An invalid drop preserves setup and explains the next useful action.
 
-While targeting a candidate, show its highlight and observed destination card.
-For an ordinary eligible chat, dropping on that candidate or choosing it in the
-picker confirms the connection; do not require an additional identical modal
-confirmation. Show the connected destination beneath the app icon and continue
-to screen 05. Special work surfaces require the deliberate choice described
+While the pointer is over a drop area, it reads as ready to take the drop and
+names the conversation and its observed state. The drop resolves against the
+drawn areas, not against whatever window is under the pointer: releasing over
+an area connects its window; releasing elsewhere leaves setup intact and says
+where to drop; releasing back over the console puts the icon back and says
+nothing. For an ordinary eligible chat, dropping on its area or choosing it in
+the picker confirms the connection; do not require an additional identical
+modal confirmation. Show the connected destination beneath the app icon and
+continue to screen 05. Special work surfaces require the deliberate choice described
 under recovery states.
 
 Errol owns this drag interaction. It is selecting a window, not transferring an
@@ -472,12 +482,18 @@ incomplete. What is built:
   in the picker, never as live connections.
 - **Drag connection.** `PerchConnectionDragHandle` tracks the active icon's
   pointer outside the capsule without creating a pasteboard item or external
-  file drop. The window server rejects obscured targets, and AX resolves the
-  exact registered window. Hover highlights an eligible candidate; release
-  rechecks the final point and calls the same binding as the picker. Escape
-  cancels outstanding results; invalid drops leave setup intact and explain
-  the next action. Screens 04 and 05 use the mirrored drag instruction, with
-  the click/keyboard alternative still available.
+  file drop. As the drag begins the engine brings the app forward beneath the
+  console (`connectionDropZones`), waits for the window server to show its
+  windows, and reads each eligible window's message field the way the transfer
+  outline does; `ConnectionDropOverlay` draws an area over each field, saying
+  what the drop does. The areas are the drop targets: the pure geometry in
+  `Core/WindowHitTesting.swift` (`WindowHitTestingTests`) gives a window no
+  area while the server does not show it or another window covers its field,
+  so an area never floats over something else. The pointer over an area arms
+  it; release there calls the same binding as the picker. Escape cancels; a
+  release elsewhere leaves setup intact and says where to drop; a release over
+  the console puts the icon back. Screens 04 and 05 use the mirrored drag
+  instruction, with the click/keyboard alternative still available.
 - **Send, pause, ending, return.** **Send to ChatGPT** / **Send to Claude** by
   the starting-assistant setting, enabled only when both destinations read
   ready, with the reason beside it otherwise; the pause states worded as

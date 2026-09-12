@@ -7,7 +7,9 @@
 // changes who starts, which the session settings do.
 //
 // Dragging the active icon selects a window through the same binding as
-// the picker; Errol owns the gesture and sends no file to the other app.
+// the picker: the app comes forward under the console with an area drawn
+// over each message field, and the drop lands on one of those. Errol owns
+// the gesture and sends no file to the other app.
 
 import SwiftUI
 
@@ -196,7 +198,7 @@ struct PerchParticipant: View {
             case .connect(let target):
                 if target == speaker {
                     if setup.draggingSide == speaker {
-                        return (setup.dragCandidate == nil ? "Drag to a window" : "Release to connect", false)
+                        return (setup.dragCandidate == nil ? "Drag to the field" : "Release to connect", false)
                     }
                     return (setup.picker?.side == speaker ? "Choosing\u{2026}" : "Drag to connect", false)
                 }

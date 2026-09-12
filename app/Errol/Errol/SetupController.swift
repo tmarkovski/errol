@@ -6,9 +6,9 @@
 // answers on the main thread.
 //
 // Connecting has one entry point, `connect(_:to:)`, whatever the gesture:
-// the picker's Return or click, or a drop from the icon onto the window.
-// Both produce the same binding and the same
-// connected state.
+// the picker's Return or click, or a drop from the icon onto the area
+// drawn over a window's message field. Both produce the same binding and
+// the same connected state.
 
 import AppKit
 import Foundation
@@ -31,7 +31,11 @@ final class SetupController {
     private(set) var state: SetupState
     private(set) var picker: WindowPicker?
     private(set) var draggingSide: Speaker?
+    /// The window under the dragged icon: the one whose area is armed.
     private(set) var dragCandidate: WindowCandidate?
+    /// The areas drawn for the drag, once the engine has brought the app
+    /// forward and read them; nil while it is being asked.
+    private(set) var dropZones: [ConnectionDropZone]?
     /// A bind is on the worker: a second Return or click waits for it.
     private(set) var isBinding = false
     /// An arrangement is on the worker: Continue waits for its outcome, so
@@ -50,10 +54,12 @@ final class SetupController {
     /// The windows the last arrangement was asked to move, so a sweep
     /// applies a moving layout only to windows it has not tried.
     @ObservationIgnored private var arrangedTargets: [Speaker: WindowID]?
+    @ObservationIgnored private let dropOverlay = ConnectionDropOverlay()
     @ObservationIgnored private var dragGeneration = UUID()
-    @ObservationIgnored private var dragQueryInFlight = false
     @ObservationIgnored private var dragPoint: CGPoint?
-    @ObservationIgnored private var dropping = false
+    @ObservationIgnored private var dragOverConsole = false
+    /// Where the icon was released while the areas were still being read.
+    @ObservationIgnored private var dropPoint: CGPoint?
 
     init(engine: RelayEngine, defaults: UserDefaults = .standard) {
         self.engine = engine
@@ -244,75 +250,102 @@ final class SetupController {
 
     // MARK: Connect
 
-    /// Errol tracks the pointer itself: this never starts a file drag in
-    /// the destination app. Each drop is resolved again at its final point.
+    /// The drag from the icon. Errol tracks the pointer itself, so no file
+    /// drag reaches the destination app. The engine brings the app forward
+    /// under the console and answers with an area over each of its message
+    /// fields, drawn as soon as it does; the drop resolves against those
+    /// areas as drawn — the pointer over one arms it, releasing there
+    /// connects its window — never against whatever window happens to be
+    /// under the pointer.
     func beginDragging(_ side: Speaker) {
         guard !isBinding, state.phase == .connect(side) else { return }
         cancelPicking()
         problem = nil
         dragGeneration = UUID()
-        draggingSide = side
-        engine.requestSweep()
-    }
-
-    func updateDrag(at point: CGPoint) {
-        guard draggingSide != nil, !dropping else { return }
-        dragPoint = point
-        queryDragPoint()
-    }
-
-    func endDragging(at point: CGPoint) {
-        guard draggingSide != nil else { return }
-        dragPoint = point
-        dropping = true
-        queryDragPoint()
-    }
-
-    /// Coalesce mouse moves so slow AX answers cannot flood the worker.
-    /// A cancelled drag invalidates its outstanding answer as well.
-    private func queryDragPoint() {
-        guard !dragQueryInFlight, let side = draggingSide, let point = dragPoint else { return }
-        dragQueryInFlight = true
         let generation = dragGeneration
-        let finalQuery = dropping
-        let ignored = Set(highlight.windowNumber.map { [$0] } ?? [])
-        engine.windowAtPoint(point, for: side, ignoring: ignored) { [weak self] id in
+        draggingSide = side
+        dragCandidate = nil
+        dropZones = nil
+        dragPoint = nil
+        dragOverConsole = false
+        dropPoint = nil
+        let windows = state[side].candidates.filter { $0.isEligible && !$0.isMinimized }.map(\.id)
+        engine.connectionDropZones(for: side, windows: windows) { [weak self] zones in
             guard let self, generation == dragGeneration, draggingSide == side else { return }
-            dragQueryInFlight = false
-            guard dragPoint == point else {
-                queryDragPoint()
-                return
-            }
-            if dropping, !finalQuery {
-                queryDragPoint()
-                return
-            }
-            let candidate = state[side].candidates.first { $0.id == id && $0.isEligible && !$0.isMinimized }
-            dragCandidate = candidate
-            if dropping {
-                cancelDragging()
-                if let candidate {
-                    connect(side, to: candidate.id)
-                } else {
-                    problem = "Drop onto a visible \(name(side)) conversation, or click to choose a window."
-                    announce(problem!)
-                }
-            } else if let candidate, let frame = candidate.frame {
-                highlight.show(frame: frame, label: "\(name(side)) \u{00B7} \(candidate.name) \u{00B7} \(candidate.stateLine)")
-            } else {
-                highlight.hide()
+            dropZones = zones
+            dropOverlay.show(zones.map { self.dropArea($0, side: side) })
+            if let point = dropPoint {
+                finishDrop(at: point)
+            } else if let point = dragPoint {
+                updateDrag(at: point, overConsole: dragOverConsole)
             }
         }
+    }
+
+    /// The pointer moved (AX coordinates): the area under it, if any, is
+    /// armed. Over the console — the pointer back where it started —
+    /// nothing is, whatever the console covers.
+    func updateDrag(at point: CGPoint, overConsole: Bool = false) {
+        guard let side = draggingSide, dropPoint == nil else { return }
+        dragPoint = point
+        dragOverConsole = overConsole
+        guard let zones = dropZones else { return }
+        let zone = overConsole ? nil : dropZone(at: point, among: zones)
+        let candidate = zone.flatMap { zone in state[side].candidates.first { $0.id == zone.window } }
+        guard candidate?.id != dragCandidate?.id else { return }
+        dragCandidate = candidate
+        dropOverlay.arm(candidate?.id)
+    }
+
+    /// The release. Over the console it is the icon put back: nothing
+    /// happens and nothing is said. Elsewhere the drop resolves against
+    /// the areas — once they arrive, if the drag was quicker than the app
+    /// coming forward.
+    func endDragging(at point: CGPoint, overConsole: Bool = false) {
+        guard draggingSide != nil else { return }
+        if overConsole {
+            cancelDragging()
+            return
+        }
+        dropPoint = point
+        if dropZones != nil { finishDrop(at: point) }
+    }
+
+    private func finishDrop(at point: CGPoint) {
+        guard let side = draggingSide, let zones = dropZones else { return }
+        let zone = dropZone(at: point, among: zones)
+        cancelDragging()
+        if let zone {
+            connect(side, to: zone.window)
+            return
+        }
+        problem = zones.isEmpty
+            ? "No \(name(side)) conversation is showing. Open a chat in it and drag again, or click to choose a window."
+            : "Drop onto the marked message field in \(name(side)), or click to choose a window."
+        announce(problem!)
     }
 
     func cancelDragging() {
         dragGeneration = UUID()
         draggingSide = nil
         dragCandidate = nil
+        dropZones = nil
         dragPoint = nil
-        dragQueryInFlight = false
-        dropping = false
-        highlight.hide()
+        dragOverConsole = false
+        dropPoint = nil
+        dropOverlay.hide()
+    }
+
+    /// The words on an area: the invitation, and what releasing there does.
+    private func dropArea(_ zone: ConnectionDropZone, side: Speaker) -> ConnectionDropArea {
+        let candidate = state[side].candidates.first { $0.id == zone.window }
+        return ConnectionDropArea(
+            zone: zone,
+            invitation: "Drop here",
+            explanation: zone.marksPrompt ? "Errol pastes messages here and sends them"
+                                          : "Errol writes into this window's message field",
+            armedHeadline: "Release to connect",
+            armedDetail: candidate.map { "\($0.name) \u{00B7} \($0.stateLine)" } ?? name(side))
     }
 
     /// Open the picker for `side`: the candidates as last swept, the

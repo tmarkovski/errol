@@ -214,12 +214,12 @@ struct PerchSetupCenter: View {
                     .font(Perch.text(19, .medium))
                     .foregroundStyle(Perch.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(controller.firstSpeaker == side
-                     ? "Choose where your first message will go."
-                     : "Choose where \(name(other(than: side)))'s replies will land.")
+                Text(connectSupporting(side))
                     .font(Perch.text(12))
                     .foregroundStyle(Perch.secondary)
                     .lineLimit(2)
+                    .contentTransition(.opacity)
+                    .animation(Perch.fade, value: connectSupporting(side))
                 if let problem = setup.problem {
                     Text(problem)
                         .font(Perch.text(11))
@@ -239,6 +239,21 @@ struct PerchSetupCenter: View {
             if !leading { PerchArrowCue(pointsLeft: false).opacity(setup.draggingSide == nil ? 1 : 0) }
         }
         .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
+    }
+
+    /// Under the instruction: whose messages the field will take, and,
+    /// while the icon is being dragged, where to put it — the app has come
+    /// forward with its message fields marked, so the drop teaches where
+    /// Errol writes.
+    private func connectSupporting(_ side: Speaker) -> String {
+        if setup.draggingSide == side {
+            guard let zones = setup.dropZones else { return "Bringing \(name(side)) forward\u{2026}" }
+            if zones.isEmpty { return "No \(name(side)) conversation is showing. Open a chat in it first." }
+            return "Drop it on the marked message field. That is where Errol pastes and sends."
+        }
+        return controller.firstSpeaker == side
+            ? "Choose where your first message will go."
+            : "Choose where \(name(other(than: side)))'s replies will land."
     }
 
     // MARK: Furniture

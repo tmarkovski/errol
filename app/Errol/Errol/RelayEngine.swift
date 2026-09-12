@@ -59,10 +59,13 @@ protocol RelayEngine: AnyObject {
     /// Bind `window` as the side's destination. The observation arrives on
     /// the main thread; nil when the window is gone.
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void)
-    /// Resolve the visible window under the pointer, without activating it
-    /// or sending a file drop to it. Points use AX screen coordinates.
-    func windowAtPoint(_ point: CGPoint, for side: Speaker, ignoring: Set<UInt32>,
-                       completion: @escaping (WindowID?) -> Void)
+    /// Bring the app forward — beneath the console, which floats — and,
+    /// once its windows are showing, answer with where a dragged icon can
+    /// be dropped: an area over each listed window's message field, front
+    /// to back, in AX coordinates (Core/WindowHitTesting.swift). Answered
+    /// on the main thread; empty when nothing of the app is on screen.
+    func connectionDropZones(for side: Speaker, windows: [WindowID],
+                             completion: @escaping ([ConnectionDropZone]) -> Void)
     func unbind(_ side: Speaker)
     /// Apply a layout to the two windows, ChatGPT first. Answered on the
     /// main thread.
@@ -247,12 +250,43 @@ final class LiveRelayEngine: RelayEngine {
         registry.unbind(side)
     }
 
-    func windowAtPoint(_ point: CGPoint, for side: Speaker, ignoring: Set<UInt32>,
-                       completion: @escaping (WindowID?) -> Void) {
+    func connectionDropZones(for side: Speaker, windows ids: [WindowID],
+                             completion: @escaping ([ConnectionDropZone]) -> Void) {
         runExclusively { [registry] in
-            let window = registry.windowAtPoint(point, for: side, ignoring: ignoring)
-            DispatchQueue.main.async { completion(window) }
+            guard let target = registry.target(side) else {
+                DispatchQueue.main.async { completion([]) }
+                return
+            }
+            let windows = ids.compactMap { id in registry.window(side, id).map { (id, $0.1) } }
+            let zones = Self.presentDropZones(target: target, windows: windows)
+            DispatchQueue.main.async { completion(zones) }
         }
+    }
+
+    /// On the worker. LaunchServices activation is the one that lands from
+    /// a background process (Activation.swift): the app's windows rise
+    /// above every other app's, and the console, a floating panel, stays
+    /// above them. The wait is for the window server to show them there —
+    /// a Space switch, an unhide — and is bounded, so an app that will not
+    /// come forward still gets areas wherever its fields are showing. Each
+    /// field is found the way the transfer outline finds it: the prompt
+    /// shell around the last text input, else the input itself.
+    private static func presentDropZones(target: TargetApp,
+                                         windows: [(id: WindowID, element: AXUIElement)]) -> [ConnectionDropZone] {
+        let pid = target.app.processIdentifier
+        if frontWindowOwnerPID() != pid {
+            activateViaLaunchServices(target)
+            let deadline = Date().addingTimeInterval(2)
+            while frontWindowOwnerPID() != pid, Date() < deadline { usleep(100_000) }
+        }
+        let candidates = windows.compactMap { id, element -> ConnectionDropCandidate? in
+            guard windowIsAlive(element), let frame = windowFrame(element) else { return nil }
+            let composer = composerElement(under: LiveElement(ax: element))?.ax
+            let anchor = transferAnchor(for: composer, in: target)
+            return ConnectionDropCandidate(window: id, frame: frame,
+                                           prompt: anchor.map { $0.promptFrame ?? $0.frame })
+        }
+        return dropZones(for: candidates, owner: pid, onScreen: onScreenWindowRegions())
     }
 
     func arrange(_ layout: LayoutChoice, windows: [Speaker: WindowID],
@@ -368,40 +402,11 @@ final class WindowRegistry {
         return (target, element)
     }
 
-    /// Runs on the engine worker. The window server guards against a
-    /// different app covering the candidate; AX identifies the exact
-    /// registered window, including overlapping windows of the same app.
-    func windowAtPoint(_ point: CGPoint, for side: Speaker, ignoring: Set<UInt32>) -> WindowID? {
+    /// The side's app as the last sweep found it.
+    func target(_ side: Speaker) -> TargetApp? {
         lock.lock()
-        let target = targets[side]
-        lock.unlock()
-        guard AXIsProcessTrusted(), let target,
-              let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                                    kCGNullWindowID) as? [[String: Any]] else { return nil }
-        let regions = info.compactMap { item -> WindowHitRegion? in
-            guard let number = item[kCGWindowNumber as String] as? UInt32,
-                  let owner = item[kCGWindowOwnerPID as String] as? Int32,
-                  let bounds = item[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
-            return WindowHitRegion(number: number, owner: owner, frame: frame)
-        }
-        guard frontmostWindow(at: point, among: regions, ignoring: ignoring)?.owner
-                == target.app.processIdentifier else { return nil }
-        var hit: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(target.ax, Float(point.x), Float(point.y), &hit) == .success,
-              let hit else { return nil }
-        let element: AXUIElement
-        if axAttribute(hit, kAXRoleAttribute) as? String == kAXWindowRole {
-            element = hit
-        } else if let value = axAttribute(hit, kAXWindowAttribute),
-                  CFGetTypeID(value) == AXUIElementGetTypeID() {
-            element = value as! AXUIElement
-        } else {
-            return nil
-        }
-        let id = windowID(of: element)
-        guard let (_, registered) = window(side, id), CFEqual(registered, element) else { return nil }
-        return id
+        defer { lock.unlock() }
+        return targets[side]
     }
 
     func bind(_ side: Speaker, _ binding: BoundDestination) {

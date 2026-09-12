@@ -12,8 +12,6 @@ import AppKit
 final class WindowHighlight {
     private var panel: HighlightPanel?
 
-    var windowNumber: UInt32? { panel.map { UInt32($0.windowNumber) } }
-
     /// Outline `frame` (AX coordinates) and name it.
     func show(frame: CGRect, label: String) {
         let panel = self.panel ?? HighlightPanel.make()

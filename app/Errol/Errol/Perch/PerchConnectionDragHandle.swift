@@ -3,7 +3,9 @@ import SwiftUI
 
 /// Mouse tracking continues outside the panel, while a normal click still
 /// opens the picker. The SwiftUI button beneath retains keyboard and
-/// VoiceOver activation. No pasteboard item or external drop is created.
+/// VoiceOver activation. No pasteboard item or external drop is created:
+/// the drop resolves against the areas Errol draws over the message
+/// fields (SetupController), never against the app under the pointer.
 struct PerchConnectionDragHandle: NSViewRepresentable {
     let setup: SetupController
     let side: Speaker
@@ -54,7 +56,7 @@ final class ConnectionHandleView: NSView {
             NSCursor.closedHand.push()
             cursorPushed = true
         }
-        setup?.updateDrag(at: axRect(CGRect(origin: point, size: .zero)).origin)
+        setup?.updateDrag(at: axPoint(point), overConsole: isOverConsole(point))
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -63,7 +65,8 @@ final class ConnectionHandleView: NSView {
         if dragging {
             dragging = false
             releaseCursor()
-            setup?.endDragging(at: axRect(CGRect(origin: NSEvent.mouseLocation, size: .zero)).origin)
+            let point = NSEvent.mouseLocation
+            setup?.endDragging(at: axPoint(point), overConsole: isOverConsole(point))
         } else if bounds.contains(convert(event.locationInWindow, from: nil)) {
             setup?.beginPicking(side)
         }
@@ -74,6 +77,18 @@ final class ConnectionHandleView: NSView {
         origin = nil
         dragging = false
         releaseCursor()
+    }
+
+    /// The pointer in AX coordinates, which the drawn areas use.
+    private func axPoint(_ point: CGPoint) -> CGPoint {
+        axRect(CGRect(origin: point, size: .zero)).origin
+    }
+
+    /// Whether the pointer (Cocoa coordinates) is over the console. The
+    /// drawn areas sit a level under it, so a release there is the icon
+    /// put back, not a drop on whatever the console covers.
+    private func isOverConsole(_ point: CGPoint) -> Bool {
+        window?.frame.contains(point) ?? false
     }
 
     private func releaseCursor() {
