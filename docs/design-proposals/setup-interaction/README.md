@@ -22,8 +22,60 @@ compact controls, and the permission-symbol / explanation / action arrangement
 from [the existing Accessibility view](../../../app/Errol/Errol/PermissionOnboardingView.swift).
 Narrow layouts can grow to keep instructions readable.
 
+On **02 · Open apps**, clicking a closed app's icon (or **Open both apps**)
+plays a Dock-style bounce while its status reads **Opening…**. Closed and
+opening icons are faded; they fade up to full opacity when the app opens. Only the icon
+moves; its label and click target stay still. The preview simulates a short
+launch, then settles the icon and restores its name. **App open** is omitted.
+The single label beneath a closed icon briefly swaps its name for **Click to
+open** on hover or keyboard focus: the name slides down, the hint stays for
+one second, then the name returns. **Opening…** uses the same slot during
+launch. Reduce Motion keeps the icon still and swaps text without sliding. Hover subtly darkens only the icon artwork, with no surrounding
+background or container; the name and status are outside the hover target.
+
+Once both apps are detected, **Continue · 5** counts down for five seconds
+with a soft fill moving across the button. Click Continue to go immediately,
+or use an earlier segment of the progress bar to go back afterward. Returning
+to Open apps leaves an ordinary Continue button and suppresses its countdown
+for the rest of that setup. If an app closes during the initial countdown, it
+stops and starts fresh when both are detected again.
+At the end, Open apps fades into Arrange over about 0.3 seconds. Only the step
+content fades; the capsule and app icons stay in place. Reduce Motion keeps
+the countdown number and changes screens without the fill or fade. The amber
+progress marker slides from the first segment to the second during that same
+0.3-second handoff, leaving the completed first segment green. Reduce Motion
+updates the marker's position immediately.
+
+Earlier progress segments are buttons, with step-name tooltips and keyboard
+access. Current and future segments are unavailable. Going back preserves the
+layout, connections, and draft; a connected step offers Continue without
+requiring another connection. The tracks stay thin, with taller click targets
+inside the existing toolbar.
+
+The native app loads artwork from each installed application. ChatGPT's
+selected ChatGPT/Codex icon is respected, including the Codex system
+light/dark variants; Claude uses its installed macOS icon. Changes refresh
+existing participants without restarting setup. The installed bundles contain
+1024–2048 px artwork, ample for these icons. The HTML preview keeps fixed
+sample artwork; use native previews to check the user's selected icon.
+
 During connection, the arrow nudges toward the active logo; Claude's step mirrors
-the arrow and right-aligns the instructions.
+the arrow and right-aligns the instructions. Dragging draws a curved line from
+the icon's edge to the pointer, with a small round plug at the end. The app's
+message field is marked **Drop here** with **Errol pastes messages here and
+sends them**. Over that field, the outline strengthens, the plug grows, and
+the label becomes **Release to connect**. Release there to connect; Escape or
+a release back over the capsule cancels. The icon stays in place, and the line
+and field marker disappear when the gesture ends.
+
+On screens **04** and **05**, the **Connection preview** controls above the
+mock desktop show **Ready**, **Dragging**, and **Over message field** without
+holding the mouse down. These are review controls, outside the product UI.
+You can also drag either active icon to its marked field to try the gesture.
+Clicking the icon or **Click to choose a window** opens the alternative picker.
+The ordinary drag view leaves the conversation visible; a destination card
+appears only when choosing through the picker.
+
 Four short progress segments replace the numbered setup labels: completed
 steps fill green, the current step is amber and slightly thicker, and all four
 fill when both conversations are connected.
@@ -56,9 +108,9 @@ button to set up a session. Errol then walks the user through preparing the
 run rather than doing it silently: open each assistant if it is not running,
 arrange the two windows, connect each assistant's logo to the conversation
 that will receive messages, type the topic, and start. The connection step is
-a physical gesture, dragging the logo from Errol onto the window, so that
-choosing where messages go is something the user does and sees, not something
-Errol infers. By the time the first message is sent, the user has touched
+a physical gesture, drawing a line from the logo in Errol to the app's
+message field, so that choosing where messages go is something the user does
+and sees, not something Errol infers. By the time the first message is sent, the user has touched
 every part of what is about to happen automatically.
 
 ## What it answers from the earlier findings
@@ -97,12 +149,14 @@ transcript export, and the website corrections remain separate work.
    connecting works wherever the windows sit.
 
 3. **Connect each conversation.** The primary gesture is the human's:
-   drag the logo from its perch onto the window. **Click to choose a window**
-   sits beside it, and the picker supports keyboard navigation (Return to
-   start picking, arrow keys to cycle eligible windows, Return to bind, Escape
-   to cancel). Both gestures produce the same highlight on the window, the
-   same destination card, and the same connected state, so the prototype can
-   compare them without changing anything downstream.
+   drag from the logo to the marked message field. A curved line follows the
+   pointer, and the field changes from **Drop here** to **Release to connect**
+   as the pointer enters it. Releasing there connects that conversation.
+   **Click to choose a window** sits beside the instruction, and the native
+   picker supports keyboard navigation (Return to start picking, arrow keys
+   to cycle eligible windows, Return to bind, Escape to cancel). The picker
+   highlights a candidate window; the drag marks its message field. Both
+   select the same destination and arrive at the same connected state.
 
 4. **Resolve destination details in place.** The card shows what Errol can
    observe: app, surface (Chat, Work, Codex, Cowork, Code), the
@@ -217,9 +271,9 @@ above works with any outcome.
 
 | Experiment | What it tests | Status |
 | --- | --- | --- |
-| Drag logo to window versus click to choose a window | Which gesture users find and remember; which fails on small screens | Prototype both; drag prominent |
+| Drag line to message field versus click to choose a window | Which gesture users find and remember; which fails on small screens | Both in the reference; drag prominent |
 | Frontmost shortcut ("bring the conversation to the front, then press ⌘⇧E") | Keyboard-only and power-user connection; shortcut conflicts and behavior across displays and Spaces need validation | Candidate third method; key combination illustrative |
-| Drop hints ("Drop onto a Claude conversation", "Open a conversation here first") | Whether a failed drop teaches the gesture | With the drag prototype |
+| Message-field hints ("Drop here", "Release to connect") | Whether the marked field teaches where Errol writes | Included in the drag reference |
 | First-run countdown ("Errol takes the keyboard and clipboard in 3, 2, 1", Escape cancels) | Whether the hands-off warning lands at the right moment or feels like a stall | Optional teaching treatment |
 | Guided pause at the first handoff | Whether experiencing a real steering point teaches more than a caption | Optional teaching treatment |
 | "Take turns" layout: full-size windows, active side brought forward | Small laptop screens | Prototype |

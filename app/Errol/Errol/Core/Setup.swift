@@ -400,6 +400,8 @@ enum StepProgress: Equatable {
 
 struct SetupState: Equatable {
     var phase = SetupPhase.prepareApps
+    /// An intentional return to Open apps waits for Continue for this setup.
+    var automaticallyContinuePreparation = true
     var chatgpt = SideSetup(side: .chatgpt)
     var claude = SideSetup(side: .claude)
     var layout = LayoutChoice.keepPositions
@@ -425,8 +427,30 @@ struct SetupState: Equatable {
     var currentStep: SetupStep? { phase.step }
 
     func progress(of step: SetupStep) -> StepProgress {
+        if currentStep == step { return .current }
         if completed.contains(step) { return .done }
-        return currentStep == step ? .current : .remaining
+        return .remaining
+    }
+
+    /// The progress meter revisits earlier steps without discarding work or
+    /// bypassing a prerequisite. The editor follows all four guided steps.
+    func canRevisit(_ step: SetupStep) -> Bool {
+        guard meterVisible, step.rawValue < (currentStep?.rawValue ?? SetupStep.allCases.count) else { return false }
+        return step == .prepareApps || bothOpen
+    }
+
+    @discardableResult
+    mutating func revisit(_ step: SetupStep) -> Bool {
+        guard canRevisit(step) else { return false }
+        switch step {
+        case .prepareApps:
+            automaticallyContinuePreparation = false
+            phase = .prepareApps
+        case .arrange: phase = .arrange
+        case .connectChatGPT: phase = .connect(.chatgpt)
+        case .connectClaude: phase = .connect(.claude)
+        }
+        return true
     }
 
     /// The meter's spoken value.
@@ -561,6 +585,14 @@ struct SetupState: Equatable {
     }
 
     // MARK: Connect
+
+    /// A revisited destination remains bound until the user chooses another.
+    @discardableResult
+    mutating func continueFromConnection() -> Bool {
+        guard case .connect(let side) = phase, self[side].isConnected else { return false }
+        advanceToConnection()
+        return true
+    }
 
     /// The engine bound the chosen window: the step is done, and the flow
     /// moves to the other side or to the editor.

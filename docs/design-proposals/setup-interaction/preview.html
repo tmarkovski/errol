@@ -51,22 +51,47 @@
     #errol-setup-walkthrough .er-stage { position:relative; padding:22px 25px 24px; min-height:625px; }
     #errol-setup-walkthrough .er-widget { position:relative; z-index:12; margin:0 auto; width:min(100%,860px); background:var(--er-paper); border:1px solid var(--er-edge); border-radius:var(--er-shell-radius); box-shadow:0 12px 30px var(--er-shadow),0 2px 5px var(--er-shadow),inset 0 1px 0 color-mix(in srgb,var(--er-white) 70%,transparent); padding:12px 28px; display:grid; grid-template-columns:72px minmax(0,1fr) 72px; gap:14px; align-items:center; min-height:156px; }
     #errol-setup-walkthrough .er-participant { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
-    #errol-setup-walkthrough .er-perch { position:relative; display:grid; place-items:center; width:49px; height:49px; padding:0; border:1px solid transparent; border-radius:14px; background:transparent; color:var(--er-ink); transition:background .18s,border-color .18s; }
-    #errol-setup-walkthrough .er-perch:hover { background:var(--er-well); }
-    #errol-setup-walkthrough .er-perch[draggable="true"] { cursor:grab; border:1px dashed var(--er-gold); background:var(--er-gold-back); }
-    #errol-setup-walkthrough .er-perch[draggable="true"]:active { cursor:grabbing; }
-    #errol-setup-walkthrough .er-appicon { width:42px; height:42px; object-fit:contain; pointer-events:none; user-select:none; }
+    #errol-setup-walkthrough .er-perch { position:relative; display:grid; place-items:center; width:42px; height:42px; padding:0; border:0; background:transparent; color:var(--er-ink); }
+    #errol-setup-walkthrough .er-perch[data-interactive="true"]:not(:disabled):hover .er-appicon { filter:brightness(.92); }
+    #errol-setup-walkthrough .er-perch[data-draggable="true"] { cursor:grab; touch-action:none; }
+    #errol-setup-walkthrough .er-perch[data-draggable="true"]:active { cursor:grabbing; }
+    #errol-setup-walkthrough.er-is-dragging, #errol-setup-walkthrough.er-is-dragging * { cursor:grabbing!important; user-select:none; }
+    #errol-setup-walkthrough .er-appicon { width:42px; height:42px; object-fit:contain; pointer-events:none; user-select:none; transition:filter .12s ease-out; }
+    #errol-setup-walkthrough .er-perch[data-open="false"] .er-appicon { opacity:.45; }
+    #errol-setup-walkthrough .er-perch[data-revealing="true"] .er-appicon { animation:er-icon-reveal .22s ease-out both; }
+    @keyframes er-icon-reveal { from { opacity:.45; } to { opacity:1; } }
+    #errol-setup-walkthrough .er-perch[data-opening="true"]:disabled { opacity:1; }
+    #errol-setup-walkthrough .er-perch[data-opening="true"] .er-appicon { animation:er-launch-bounce 1s linear infinite; }
+    @keyframes er-launch-bounce {
+      0%,60%,84%,100% { transform:translateY(0); animation-timing-function:cubic-bezier(.333,.667,.667,1); }
+      30% { transform:translateY(-12px); animation-timing-function:cubic-bezier(.333,0,.667,.333); }
+      72% { transform:translateY(-4px); animation-timing-function:cubic-bezier(.333,0,.667,.333); }
+    }
     #errol-setup-walkthrough .er-miniicon { width:23px; height:23px; object-fit:contain; flex-shrink:0; }
     #errol-setup-walkthrough .er-presence { position:absolute; right:0; bottom:1px; display:grid; place-items:center; width:18px; height:18px; border-radius:50%; color:var(--er-on-accent); background:var(--er-accent); border:2px solid var(--er-paper); }
     #errol-setup-walkthrough .er-presence svg[data-lucide] { width:11px; height:11px; }
     #errol-setup-walkthrough .er-perchname { font-weight:500; font-size:12px; }
+    #errol-setup-walkthrough .er-name-slot { position:relative; display:block; width:100%; height:17px; overflow:hidden; text-align:center; }
+    #errol-setup-walkthrough .er-name-slot>span { position:absolute; inset:0; display:grid; place-items:center; white-space:nowrap; transition:transform .18s ease-in-out; }
+    #errol-setup-walkthrough .er-open-hint { font-size:11px; font-weight:400; color:var(--er-secondary); transform:translateY(-100%); }
+    #errol-setup-walkthrough .er-name-slot.er-show-open-hint .er-label-name { transform:translateY(100%); }
+    #errol-setup-walkthrough .er-name-slot.er-show-open-hint .er-open-hint { transform:translateY(0); }
     #errol-setup-walkthrough .er-perchstate { font-size:11px; color:var(--er-secondary); text-align:center; }
     #errol-setup-walkthrough .er-widget-center { min-width:0; border-left:1px solid var(--er-edge); border-right:1px solid var(--er-edge); padding:0 18px; }
     #errol-setup-walkthrough .er-eyebrow { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:var(--er-secondary); font-size:11px; margin-bottom:5px; letter-spacing:0; }
-    #errol-setup-walkthrough .er-setup-progress { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:center; gap:5px; width:124px; max-width:100%; height:6px; margin-bottom:12px; }
-    #errol-setup-walkthrough .er-progress-step { height:4px; border-radius:3px; background:var(--er-edge); }
+    #errol-setup-walkthrough .er-setup-progress { position:relative; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:center; gap:5px; width:124px; max-width:100%; height:6px; margin-bottom:12px; }
+    #errol-setup-walkthrough .er-progress-hit { display:grid; align-items:center; width:100%; height:24px; margin:-9px 0; padding:0; border:0; border-radius:4px; background:transparent; }
+    #errol-setup-walkthrough .er-progress-hit:disabled { opacity:1; }
+    #errol-setup-walkthrough .er-progress-hit:not(:disabled):hover .er-progress-step { filter:brightness(.85); }
+    #errol-setup-walkthrough .er-progress-step { display:block; width:100%; height:4px; border-radius:3px; background:var(--er-edge); transition:background .3s ease-in-out; }
     #errol-setup-walkthrough .er-progress-step.er-done { background:var(--er-accent); }
-    #errol-setup-walkthrough .er-progress-step.er-current { height:6px; background:var(--er-gold); }
+    #errol-setup-walkthrough .er-progress-current { position:absolute; top:0; left:calc(var(--er-current-step) * ((100% - 15px) / 4 + 5px)); width:calc((100% - 15px) / 4); height:6px; border-radius:3px; background:var(--er-gold); pointer-events:none; }
+    #errol-setup-walkthrough .er-progress-departing { animation:er-progress-depart .3s ease-in-out both; }
+    #errol-setup-walkthrough .er-progress-arriving { animation:er-progress-arrive .3s ease-in-out var(--er-progress-delay,-.15s) both; }
+    #errol-setup-walkthrough .er-progress-revisiting { animation:er-progress-revisit .3s ease-in-out both; }
+    @keyframes er-progress-depart { from { transform:translateX(0); } to { transform:translateX(calc(100% + 5px)); } }
+    @keyframes er-progress-arrive { from { transform:translateX(calc(-100% - 5px)); } to { transform:translateX(0); } }
+    @keyframes er-progress-revisit { from { transform:translateX(calc(var(--er-progress-distance) * (100% + 5px))); } to { transform:translateX(0); } }
     #errol-setup-walkthrough .er-setup-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:25px; margin-bottom:6px; }
     #errol-setup-walkthrough .er-setup-toolbar .er-setup-progress { margin:0; }
     #errol-setup-walkthrough .er-configure { position:relative; margin-left:auto; flex-shrink:0; text-align:left; }
@@ -96,6 +121,12 @@
     #errol-setup-walkthrough .er-textbutton { background:transparent; border:0; border-radius:6px; padding:5px 7px; min-height:29px; display:inline-flex; align-items:center; gap:5px; color:var(--er-secondary); font-size:12px; text-decoration:none; }
     #errol-setup-walkthrough .er-textbutton:hover { background:var(--er-well); }
     #errol-setup-walkthrough .er-widget .er-primary { border-radius:999px; padding-inline:14px; }
+    #errol-setup-walkthrough .er-countdown { position:relative; overflow:hidden; isolation:isolate; font-variant-numeric:tabular-nums; }
+    #errol-setup-walkthrough .er-countdown::before { content:''; position:absolute; inset:0; z-index:-1; background:color-mix(in srgb,var(--er-on-accent) 20%,transparent); transform:scaleX(var(--er-countdown-progress,0)); transform-origin:left; pointer-events:none; }
+    #errol-setup-walkthrough .er-step-out { animation:er-step-out .15s ease-in both; pointer-events:none; }
+    #errol-setup-walkthrough .er-step-in { animation:er-step-in .15s ease-out both; }
+    @keyframes er-step-out { to { opacity:0; } }
+    @keyframes er-step-in { from { opacity:0; } to { opacity:1; } }
     #errol-setup-walkthrough .er-status { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--er-accent); }
     #errol-setup-walkthrough .er-status svg[data-lucide] { width:13px; height:13px; }
     #errol-setup-walkthrough .er-setupdetail { position:relative; z-index:11; margin:13px auto 0; max-width:584px; border:1px solid var(--er-edge); border-radius:15px; padding:15px 19px; background:var(--er-paper); box-shadow:0 5px 16px var(--er-shadow); }
@@ -137,7 +168,6 @@
     #errol-setup-walkthrough .er-window { min-width:0; min-height:337px; border-radius:12px; border:1px solid color-mix(in srgb,var(--er-ink) 20%,transparent); background:var(--er-chat); box-shadow:0 10px 22px var(--er-shadow); position:relative; display:flex; flex-direction:column; transition:transform .25s,box-shadow .25s; }
     #errol-setup-walkthrough .er-window.er-claude { background:var(--er-claude); }
     #errol-setup-walkthrough .er-window.er-target { box-shadow:0 0 0 3px var(--er-gold),0 12px 30px var(--er-shadow); }
-    #errol-setup-walkthrough .er-window.er-dropover { box-shadow:0 0 0 5px var(--er-accent),0 12px 30px var(--er-shadow); }
     #errol-setup-walkthrough .er-window.er-connected:before { content:""; height:4px; background:var(--er-accent); border-radius:10px 10px 0 0; position:absolute; top:-1px; left:10px; right:10px; z-index:5; }
     #errol-setup-walkthrough .er-windowbar { height:43px; padding:0 13px; display:flex; align-items:center; gap:11px; border-bottom:1px solid color-mix(in srgb,var(--er-edge) 68%,transparent); flex-shrink:0; }
     #errol-setup-walkthrough .er-traffic { display:flex; gap:5px; }
@@ -157,7 +187,15 @@
     #errol-setup-walkthrough .er-appmessage.er-assistant { padding:3px 0; }
     #errol-setup-walkthrough .er-appmessage p+p { margin-top:8px; }
     #errol-setup-walkthrough .er-appmessage b { font-weight:500; }
-    #errol-setup-walkthrough .er-appcomposer { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:9px; padding:12px; min-height:48px; background:var(--er-white); border:1px solid var(--er-edge); border-radius:14px; font-size:11px; color:var(--er-secondary); }
+    #errol-setup-walkthrough .er-appcomposer { position:relative; margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:9px; padding:12px; min-height:48px; background:var(--er-white); border:1px solid var(--er-edge); border-radius:14px; font-size:11px; color:var(--er-secondary); }
+    #errol-setup-walkthrough .er-appcomposer[data-drop-zone] { min-height:76px; }
+    #errol-setup-walkthrough .er-drop-area { position:absolute; inset:-1px; z-index:9; display:none; align-items:center; justify-content:center; border:2px solid var(--er-accent); border-radius:14px; background:color-mix(in srgb,var(--er-accent) 12%,transparent); pointer-events:none; }
+    #errol-setup-walkthrough.er-is-dragging .er-drop-area { display:flex; }
+    #errol-setup-walkthrough .er-drop-area.er-armed { border-width:3px; background:color-mix(in srgb,var(--er-accent) 24%,transparent); }
+    #errol-setup-walkthrough .er-drop-chip { display:flex; flex-direction:column; align-items:center; gap:1px; max-width:calc(100% - 16px); padding:6px 12px; border-radius:8px; background:var(--er-accent); color:var(--er-on-accent); text-align:center; }
+    #errol-setup-walkthrough .er-drop-chip strong { font-size:13px; font-weight:600; }
+    #errol-setup-walkthrough .er-drop-chip small { max-width:100%; font-size:11px; line-height:1.35; opacity:.85; }
+    #errol-setup-walkthrough .er-connect-problem { color:var(--er-clay); }
     #errol-setup-walkthrough .er-appcomposer.er-draft { border-color:var(--er-clay); background:var(--er-clay-back); }
     #errol-setup-walkthrough .er-appcomposer span { min-width:0; }
     #errol-setup-walkthrough .er-appcomposer svg { flex-shrink:0; }
@@ -181,7 +219,12 @@
     #errol-setup-walkthrough .er-systemrow { padding:16px; display:flex; align-items:center; justify-content:space-between; border-radius:10px; background:var(--er-well); margin:18px 0; }
     #errol-setup-walkthrough .er-systemrow label { display:flex; gap:8px; align-items:center; }
     #errol-setup-walkthrough .er-systemrow input { width:20px; height:20px; accent-color:var(--er-accent); }
-    #errol-setup-walkthrough .er-connector-layer { position:absolute; inset:0; pointer-events:none; z-index:6; overflow:visible; }
+    #errol-setup-walkthrough .er-connector-layer { position:absolute; inset:0; pointer-events:none; z-index:13; overflow:visible; }
+    #errol-setup-walkthrough .er-gesture-review { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:12px; color:var(--er-secondary); font-size:11px; }
+    #errol-setup-walkthrough .er-gesture-review[hidden] { display:none; }
+    #errol-setup-walkthrough .er-gesture-review>span { margin-right:4px; }
+    #errol-setup-walkthrough .er-gesture-review button { border:1px solid var(--er-edge); border-radius:7px; padding:5px 9px; color:var(--er-secondary); background:var(--er-paper); }
+    #errol-setup-walkthrough .er-gesture-review button[aria-pressed="true"] { color:var(--er-accent); border-color:var(--er-accent); background:var(--er-soft); }
     #errol-setup-walkthrough .er-filmstrip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; margin-top:12px; }
     #errol-setup-walkthrough .er-scene { display:flex; align-items:center; gap:8px; text-align:left; color:var(--er-secondary); background:transparent; border:1px solid transparent; border-radius:9px; padding:9px 8px; font-size:11px; }
     #errol-setup-walkthrough .er-scene span { color:var(--er-secondary); font-size:11px; font-variant-numeric:tabular-nums; }
@@ -218,8 +261,9 @@
       #errol-setup-walkthrough .er-connect-claude .er-drag-cue { right:0; }
       #errol-setup-walkthrough .er-connect-claude .er-drag-cue svg[data-lucide] { transform:rotate(-45deg); }
       #errol-setup-walkthrough .er-participant { flex-direction:row; gap:6px; flex-wrap:wrap; justify-content:center; }
-      #errol-setup-walkthrough .er-perch { width:44px; height:44px; }
+      #errol-setup-walkthrough .er-perch { width:40px; height:40px; }
       #errol-setup-walkthrough .er-appicon { width:40px; height:40px; }
+      #errol-setup-walkthrough .er-name-slot { width:84px; }
       #errol-setup-walkthrough .er-perchstate { flex-basis:100%; }
       #errol-setup-walkthrough .er-windows { grid-template-columns:1fr; gap:19px; margin-top:24px; }
       #errol-setup-walkthrough .er-windows.er-keep .er-window:last-child { transform:none; }
@@ -227,13 +271,13 @@
       #errol-setup-walkthrough .er-emptywindow { min-height:155px; }
       #errol-setup-walkthrough .er-filmstrip { grid-template-columns:repeat(2,minmax(0,1fr)); }
       #errol-setup-walkthrough .er-destinations { grid-template-columns:1fr; gap:12px; }
-      #errol-setup-walkthrough .er-connector-layer { display:none; }
       #errol-setup-walkthrough .er-permission { padding:21px; margin-top:18px; }
       #errol-setup-walkthrough .er-compose { font-size:16px; }
       #errol-setup-walkthrough .er-storyhead span { display:none; }
     }
     @media(pointer:coarse) { #errol-setup-walkthrough button, #errol-setup-walkthrough .er-configure summary { min-height:44px; } #errol-setup-walkthrough .er-configure summary { width:44px; } #errol-setup-walkthrough textarea, #errol-setup-walkthrough select { font-size:16px; } }
     @media(prefers-reduced-motion:reduce) { #errol-setup-walkthrough * { transition:none!important; animation:none!important; } }
+    @media(prefers-reduced-motion:reduce) { #errol-setup-walkthrough .er-countdown::before { display:none; } }
   </style>
   <div class="er-storyhead">
     <div><strong id="er-scene-title">01 · Allow access</strong> <span>— Participatory setup</span></div>
@@ -241,6 +285,12 @@
       <button type="button" class="er-navbutton" data-story="prev" aria-label="Previous mock screen" disabled><i data-lucide="chevron-left" aria-hidden="true"></i></button>
       <button type="button" class="er-navbutton" data-story="next" aria-label="Next mock screen">Next <i data-lucide="chevron-right" aria-hidden="true"></i></button>
     </div>
+  </div>
+  <div class="er-gesture-review" role="group" aria-label="Connection preview state" hidden>
+    <span>Connection preview</span>
+    <button type="button" data-drag-preview="ready" aria-pressed="true">Ready</button>
+    <button type="button" data-drag-preview="dragging" aria-pressed="false">Dragging</button>
+    <button type="button" data-drag-preview="armed" aria-pressed="false">Over message field</button>
   </div>
   <div class="er-desktop">
     <div class="er-menubar"><div class="er-menu-left"><img class="er-symbol" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjI1MCAyMjUgNzc1IDU0NSIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIGRlc2MiPgogIDx0aXRsZSBpZD0idGl0bGUiPkVycm9sIENoYXQgc3ltYm9sPC90aXRsZT4KICA8ZGVzYyBpZD0iZGVzYyI+VmVjdG9yIHRyYWNlIG9mIHRoZSBzeW1ib2wgb25seSwgd2l0aG91dCB0aGUgZXJyb2wuY2hhdCB3b3JkbWFyay48L2Rlc2M+CgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJuYXZ5QXJjaCIgeDE9IjMxOCIgeTE9IjIzNSIgeDI9Ijc4MSIgeTI9IjcwNiIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDI5M2QiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIwLjQ4IiBzdG9wLWNvbG9yPSIjMTcyMzM4Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzEwMWEyYiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0ibmF2eUxlZnQiIGN4PSIwIiBjeT0iMCIgcj0iMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSg0NDMgNDU3KSByb3RhdGUoNjcpIHNjYWxlKDMyNCAyMjgpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIwMmQ0MyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTQiIHN0b3AtY29sb3I9IiMxNzIyMzYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTAxOTI4Ii8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJuYXZ5UmlnaHQiIGN4PSIwIiBjeT0iMCIgcj0iMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSg4MjEgNTY1KSByb3RhdGUoNjUpIHNjYWxlKDIxMiAxNTApIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIwMmQ0MyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTgiIHN0b3AtY29sb3I9IiMxNzIyMzYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTAxOTI4Ii8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSBTd2VlcGluZyB1cHBlciBzdHJva2UgLS0+CiAgPHBhdGggZmlsbD0idXJsKCNuYXZ5QXJjaCkiIGQ9Ik0zMDEgMjQ1LjFDMzc4LjIgMjM5LjQgNDU4LjcgMjU4LjcgNTI3LjUgMjk2LjZjODcuNiA0OC4zIDE1MS44IDEyOC45IDE5MC40IDIzNy42IDYxLjUtODAuMiAxNDIuNC0xMzkuMSAyNDAuNi0xNDMuMSAyNy42LTEuMSA0NS43IDguOCA0Ni4yIDI1LjMuNCAxMy40LTEwLjcgMTkuNS0zMC4zIDE5LjEtMTAzLjUtMi0xOTMuMiA2Ny42LTI1OC44IDIwNy45LTguOCAxOC44LTE4LjIgMjguMy0yNy4zIDI0LjMtOC40LTMuNy0xNC4xLTE3LjQtMjAuNC0zOS4yLTIyLjUtNzguNS00Mi41LTE0Ni42LTgzLjEtMTk4LjQtNjIuNy04MC0xNTYuOC0xMjcuOC0yODIuNy0xMjYuNS0xOS42LjItMzEuNy04LjYtMzIuMi0yMi40LS42LTE3LjYgMTMuMy0zMi45IDMxLjEtMzYuMVoiLz4KCiAgPCEtLSBMYXJnZSBsZWZ0IGZvcm0gLS0+CiAgPHBhdGggZmlsbD0idXJsKCNuYXZ5TGVmdCkiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNDc3LjIgMzg4LjVjLTY2LjgtLjQtMTE2LjMgNzcuNS0xMTYuMyAxODAuOCAwIDEwNC43IDQyLjggMTc3LjEgMTEzLjggMTc3LjEgNjkuMSAwIDExNS4yLTc2LjkgMTE1LjItMTc4LjQgMC05Ni43LTUzLjUtMTc5LjEtMTEyLjctMTc5LjVaTTQ2MS41MyA1MDIuNjhDNDUyLjQ0IDUzNS40NiA0MzEuMjIgNTU4LjIgNDE0LjE0IDU1My40NkMzOTcuMDUgNTQ4LjcyIDM5MC41OCA1MTguMzEgMzk5LjY3IDQ4NS41MkM0MDguNzYgNDUyLjc0IDQyOS45OCA0MzAgNDQ3LjA2IDQzNC43NEM0NjQuMTUgNDM5LjQ4IDQ3MC42MiA0NjkuODkgNDYxLjUzIDUwMi42OFoiLz4KCiAgPCEtLSBTbWFsbCByaWdodCBmb3JtIC0tPgogIDxwYXRoIGZpbGw9InVybCgjbmF2eVJpZ2h0KSIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04NTIuOCA1MTguM2MtNDIuMS0uNS03Mi4yIDU1LjItNzIuMiAxMjYuNSAwIDU4LjggMjAuMiA5OC4xIDU3LjggOTguMSA0My4xIDAgNzAtNDcuMiA3MC0xMTIuOCAwLTYzLjItMjMuNS0xMTEuNC01NS42LTExMS44Wk04NDYuNzggNTk0LjE4QzgzOS45OCA2MTUuODkgODI1LjkyIDYzMC44MiA4MTUuMzggNjI3LjUxQzgwNC44NCA2MjQuMjEgODAxLjgxIDYwMy45MyA4MDguNjIgNTgyLjIyQzgxNS40MiA1NjAuNTEgODI5LjQ4IDU0NS41OCA4NDAuMDIgNTQ4Ljg5Qzg1MC41NiA1NTIuMTkgODUzLjU5IDU3Mi40NyA4NDYuNzggNTk0LjE4WiIvPgo8L3N2Zz4K" alt=""><b>Errol</b><span>File</span><span>Edit</span><span>Window</span></div><div class="er-menu-right"><img class="er-symbol" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjI1MCAyMjUgNzc1IDU0NSIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIGRlc2MiPgogIDx0aXRsZSBpZD0idGl0bGUiPkVycm9sIENoYXQgc3ltYm9sPC90aXRsZT4KICA8ZGVzYyBpZD0iZGVzYyI+VmVjdG9yIHRyYWNlIG9mIHRoZSBzeW1ib2wgb25seSwgd2l0aG91dCB0aGUgZXJyb2wuY2hhdCB3b3JkbWFyay48L2Rlc2M+CgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJuYXZ5QXJjaCIgeDE9IjMxOCIgeTE9IjIzNSIgeDI9Ijc4MSIgeTI9IjcwNiIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxZDI5M2QiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIwLjQ4IiBzdG9wLWNvbG9yPSIjMTcyMzM4Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzEwMWEyYiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0ibmF2eUxlZnQiIGN4PSIwIiBjeT0iMCIgcj0iMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSg0NDMgNDU3KSByb3RhdGUoNjcpIHNjYWxlKDMyNCAyMjgpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIwMmQ0MyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTQiIHN0b3AtY29sb3I9IiMxNzIyMzYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTAxOTI4Ii8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJuYXZ5UmlnaHQiIGN4PSIwIiBjeT0iMCIgcj0iMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSg4MjEgNTY1KSByb3RhdGUoNjUpIHNjYWxlKDIxMiAxNTApIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIwMmQ0MyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTgiIHN0b3AtY29sb3I9IiMxNzIyMzYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTAxOTI4Ii8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSBTd2VlcGluZyB1cHBlciBzdHJva2UgLS0+CiAgPHBhdGggZmlsbD0idXJsKCNuYXZ5QXJjaCkiIGQ9Ik0zMDEgMjQ1LjFDMzc4LjIgMjM5LjQgNDU4LjcgMjU4LjcgNTI3LjUgMjk2LjZjODcuNiA0OC4zIDE1MS44IDEyOC45IDE5MC40IDIzNy42IDYxLjUtODAuMiAxNDIuNC0xMzkuMSAyNDAuNi0xNDMuMSAyNy42LTEuMSA0NS43IDguOCA0Ni4yIDI1LjMuNCAxMy40LTEwLjcgMTkuNS0zMC4zIDE5LjEtMTAzLjUtMi0xOTMuMiA2Ny42LTI1OC44IDIwNy45LTguOCAxOC44LTE4LjIgMjguMy0yNy4zIDI0LjMtOC40LTMuNy0xNC4xLTE3LjQtMjAuNC0zOS4yLTIyLjUtNzguNS00Mi41LTE0Ni42LTgzLjEtMTk4LjQtNjIuNy04MC0xNTYuOC0xMjcuOC0yODIuNy0xMjYuNS0xOS42LjItMzEuNy04LjYtMzIuMi0yMi40LS42LTE3LjYgMTMuMy0zMi45IDMxLjEtMzYuMVoiLz4KCiAgPCEtLSBMYXJnZSBsZWZ0IGZvcm0gLS0+CiAgPHBhdGggZmlsbD0idXJsKCNuYXZ5TGVmdCkiIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNDc3LjIgMzg4LjVjLTY2LjgtLjQtMTE2LjMgNzcuNS0xMTYuMyAxODAuOCAwIDEwNC43IDQyLjggMTc3LjEgMTEzLjggMTc3LjEgNjkuMSAwIDExNS4yLTc2LjkgMTE1LjItMTc4LjQgMC05Ni43LTUzLjUtMTc5LjEtMTEyLjctMTc5LjVaTTQ2MS41MyA1MDIuNjhDNDUyLjQ0IDUzNS40NiA0MzEuMjIgNTU4LjIgNDE0LjE0IDU1My40NkMzOTcuMDUgNTQ4LjcyIDM5MC41OCA1MTguMzEgMzk5LjY3IDQ4NS41MkM0MDguNzYgNDUyLjc0IDQyOS45OCA0MzAgNDQ3LjA2IDQzNC43NEM0NjQuMTUgNDM5LjQ4IDQ3MC42MiA0NjkuODkgNDYxLjUzIDUwMi42OFoiLz4KCiAgPCEtLSBTbWFsbCByaWdodCBmb3JtIC0tPgogIDxwYXRoIGZpbGw9InVybCgjbmF2eVJpZ2h0KSIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04NTIuOCA1MTguM2MtNDIuMS0uNS03Mi4yIDU1LjItNzIuMiAxMjYuNSAwIDU4LjggMjAuMiA5OC4xIDU3LjggOTguMSA0My4xIDAgNzAtNDcuMiA3MC0xMTIuOCAwLTYzLjItMjMuNS0xMTEuNC01NS42LTExMS44Wk04NDYuNzggNTk0LjE4QzgzOS45OCA2MTUuODkgODI1LjkyIDYzMC44MiA4MTUuMzggNjI3LjUxQzgwNC44NCA2MjQuMjEgODAxLjgxIDYwMy45MyA4MDguNjIgNTgyLjIyQzgxNS40MiA1NjAuNTEgODI5LjQ4IDU0NS41OCA4NDAuMDIgNTQ4Ljg5Qzg1MC41NiA1NTIuMTkgODUzLjU5IDU3Mi40NyA4NDYuNzggNTk0LjE4WiIvPgo8L3N2Zz4K" alt="Errol menu bar icon"><i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i><span>Thu 10 Sep &nbsp; 9:41</span></div></div>
@@ -259,7 +309,17 @@
       const names = ['Allow access','Open the apps','Arrange windows','Connect ChatGPT','Connect Claude','Ready to send','The conversation','Pause & steer','The ending','Next time'];
       const shortNames = ['Access','Open apps','Arrange','ChatGPT','Claude','Compose','Running','Pause','Finished','Return'];
       const design = { connection:'Drag first', claude:'Existing chat', narration:true, bouncingArrow:true, mirrorInstructions:true, shell:'Capsule', demoNotes:false };
-      const state = { scene:0, settings:false, openChat:false, openClaude:false, layout:'keep', appliedLayout:'keep', connectedChat:false, connectedClaude:false, picking:false, topic:'How could we make Errol’s first run feel effortless?', nextTopic:'', shape:'Brainstorm', note:'Focus on someone using Errol for the first time.', noteSent:false, speaker:'chatgpt', stopped:false, attention:false };
+      const state = { scene:0, settings:false, openChat:false, openClaude:false, openingChat:false, openingClaude:false, layout:'keep', appliedLayout:'keep', connectedChat:false, connectedClaude:false, picking:false, dragPreview:'ready', problem:'', topic:'How could we make Errol’s first run feel effortless?', nextTopic:'', shape:'Brainstorm', note:'Focus on someone using Errol for the first time.', noteSent:false, speaker:'chatgpt', stopped:false, attention:false };
+      const openHintTimers = new Map();
+      const openHints = new Set();
+      const launchTimers = new Map();
+      const launchStarted = new Map();
+      const launchRevealed = new Map();
+      state.completedPrepare=false; state.completedArrange=false;
+      const prepareDuration = 5000;
+      let prepareDeadline = null, prepareFrame = null, prepareTransition = null, prepareManual = false;
+      let pointerDrag = null;
+      let suppressIconClick = false;
       const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
       const button = (label,action,primary=false,iconName='',disabled=false) => `<button type="button" class="er-button ${primary?'er-primary':''}" data-action="${action}" ${disabled?'disabled':''}>${iconName?icon(iconName):''}${label}</button>`;
@@ -267,14 +327,25 @@
       const gName = () => 'New conversation';
       const cName = () => design.claude==='New chat'?'New conversation':design.claude==='Code session'?'errol · Code':'Naming ideas';
       const cMode = () => design.claude==='Code session'?'Code':'Chat';
-      function changeScene(next) {
+      function changeScene(next, preserveSetup=false) {
+        stopPrepareCountdown();
+        clearTimeout(prepareTransition); prepareTransition=null;
+        cancelPointerDrag();
+        clearOpenHints();
+        launchTimers.forEach(clearTimeout); launchTimers.clear(); launchStarted.clear(); launchRevealed.clear();
+        state.openingChat=false; state.openingClaude=false;
+        state.dragPreview = 'ready'; state.problem = '';
         state.scene = Math.max(0,Math.min(9,next));
+        if(state.scene===1) prepareManual=preserveSetup;
         state.picking = false; state.attention = false; state.details = false;
-        if(state.scene>=2) { state.openChat=true; state.openClaude=true; }
-        if(state.scene>=4) state.connectedChat=true;
-        if(state.scene>=5) state.connectedClaude=true;
-        if(state.scene===3) { state.connectedChat=false; state.connectedClaude=false; }
-        if(state.scene===4) state.connectedClaude=false;
+        if(!preserveSetup) {
+          state.completedPrepare=state.scene>=2; state.completedArrange=state.scene>=3;
+          if(state.scene>=2) { state.openChat=true; state.openClaude=true; }
+          if(state.scene>=4) state.connectedChat=true;
+          if(state.scene>=5) state.connectedClaude=true;
+          if(state.scene===3) { state.connectedChat=false; state.connectedClaude=false; }
+          if(state.scene===4) state.connectedClaude=false;
+        }
         if(state.scene===6) { state.speaker='chatgpt'; state.stopped=false; }
         if(state.scene===7) state.noteSent=false;
         render();
@@ -283,16 +354,22 @@
         const current=state.scene;
         const connected=(side==='chatgpt'?state.connectedChat:state.connectedClaude)&&current>=3;
         const opened=side==='chatgpt'?state.openChat:state.openClaude;
+        const opening=current===1&&(side==='chatgpt'?state.openingChat:state.openingClaude);
+        const launchElapsed=opening?(Date.now()-launchStarted.get(side))/1000:0;
+        const revealElapsed=(Date.now()-(launchRevealed.get(side)??0))/1000;
+        const revealing=current===1&&opened&&revealElapsed<0.22;
         const choosing=current===(side==='chatgpt'?3:4);
         const drag=choosing&&design.connection==='Drag first'&&!state.picking;
-        let status=current===0?'Desktop app':!opened?'Click to open':choosing?(drag?'Drag to connect':'Click to choose'):connected?'Connected':'App open';
+        let status=current===0?'Desktop app':current===1?'':choosing?(drag?'Drag to connect':'Click to choose'):connected?'Connected':'';
         if(current===6) status=state.speaker===side?'Replying…':'Waiting';
         if(current===7) status='Connected';
         if(current===8) status=state.stopped?'Relay stopped':'Signed off';
         if(current===5) status=side==='chatgpt'?'New chat':cName();
         if(current===9) status=side==='chatgpt'?'First-run ideas':cName();
         const label=side==='chatgpt'?'ChatGPT':'Claude';
-        return `<div class="er-participant"><button class="er-perch" type="button" data-side="${side}" draggable="${drag}" aria-label="${choosing?`Connect ${label} conversation`:!opened?`Open ${label}`:label}"><img class="er-appicon" src="${icons[side]}" alt="">${connected?`<span class="er-presence">${icon('check')}</span>`:''}</button><span class="er-perchname">${label}</span><span class="er-perchstate">${status}</span></div>`;
+        const canOpen=current===1&&!opened&&!opening;
+        const labelSlot=`<span class="er-perchname er-name-slot ${canOpen&&openHints.has(side)?'er-show-open-hint':''}" data-label-side="${side}" aria-label="${opening?`Opening ${label}`:label}"><span class="er-label-name" aria-hidden="true">${opening?'Opening…':label}</span>${canOpen?'<span class="er-open-hint" aria-hidden="true">Click to open</span>':''}</span>`;
+        return `<div class="er-participant"><button class="er-perch" type="button" data-side="${side}" data-can-open="${canOpen}" data-interactive="${canOpen||choosing}" data-draggable="${drag}" data-open="${current!==1||opened}" data-revealing="${revealing}" data-opening="${opening}" ${opening?'disabled aria-busy="true"':''} aria-label="${opening?`Opening ${label}`:choosing?`Connect ${label} conversation`:!opened?`Open ${label}`:label}"><img class="er-appicon" src="${icons[side]}" alt="" ${opening||revealing?`style="animation-delay:-${opening?launchElapsed:revealElapsed}s"`:''}>${connected?`<span class="er-presence">${icon('check')}</span>`:''}</button>${labelSlot}${status?`<span class="er-perchstate">${status}</span>`:''}</div>`;
       }
       function destinations(returning=false) {
         return `<div class="er-destinations"><div class="er-destination"><img class="er-miniicon" src="${icons.chatgpt}" alt=""><div><strong>ChatGPT · Chat</strong><span>${returning?'First-run ideas · continues here':'New conversation'}</span></div></div><div class="er-destination"><img class="er-miniicon" src="${icons.claude}" alt=""><div><strong>Claude · ${cMode()}</strong><span>${escape(cName())}${design.claude==='New chat'?'':' · continues here'}</span></div></div></div>`;
@@ -300,18 +377,35 @@
       function widget(center) {
         const connecting=state.scene===3?'er-connect-chatgpt':state.scene===4?'er-connect-claude':'';
         const toolbar=state.scene>=1&&state.scene<=4?`<div class="er-setup-toolbar">${setupProgress()}${configureMenu()}</div>`:'';
-        return `<div class="er-widget ${connecting} ${design.mirrorInstructions?'er-mirrored':''}">${participant('chatgpt')}<div class="er-widget-center">${toolbar}${center}</div>${participant('claude')}</div>`;
+        return `<div class="er-widget ${connecting} ${design.mirrorInstructions?'er-mirrored':''}">${participant('chatgpt')}<div class="er-widget-center">${toolbar}<div class="er-step-body">${center}</div></div>${participant('claude')}</div>`;
       }
       function configureMenu() { return `<details class="er-configure"><summary aria-label="Configure" data-tooltip="Configure">${icon('sliders-horizontal')}</summary><div class="er-configure-menu"><p>No options yet.</p></div></details>`; }
       function header(kicker,title,sub='') { return `<div class="er-eyebrow">${kicker}</div><h2>${title}</h2>${sub?`<p class="er-sub">${sub}</p>`:''}`; }
       function setupProgress() {
         const n=state.scene;
-        const completed=Math.min(4,Math.max(0,n-1));
+        const done=[state.completedPrepare,state.completedArrange,state.connectedChat,state.connectedClaude];
+        const completed=done.filter(Boolean).length;
         const current=n>=1&&n<=4?n-1:-1;
         const steps=['Open the apps','Arrange the windows','Connect ChatGPT','Connect Claude'];
-        const description=completed===4?'Setup complete':current>=0?`${completed} of 4 setup steps complete. Current step: ${steps[current]}`:`${completed} of 4 setup steps complete. Ready to continue`;
-        return `<div class="er-setup-progress" role="progressbar" aria-label="Session setup" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${completed}" aria-valuetext="${description}">${steps.map((_,index)=>`<span class="er-progress-step ${index<completed?'er-done':index===current?'er-current':''}" aria-hidden="true"></span>`).join('')}</div>`;
+        const description=current>=0?`${completed} of 4 setup steps complete. Current step: ${steps[current]}`:completed===4?'Setup complete':`${completed} of 4 setup steps complete. Ready to continue`;
+        return `<nav class="er-setup-progress" aria-label="Setup steps. ${description}">${steps.map((title,index)=>`<button type="button" class="er-progress-hit" data-setup-step="${index+1}" aria-label="Step ${index+1}: ${title}" title="${title}" ${index===current?'aria-current="step"':''} ${canRevisitStep(index+1)?'':'disabled'}><span class="er-progress-step ${done[index]?'er-done':''}" aria-hidden="true"></span></button>`).join('')}${current>=0?`<span class="er-progress-current" style="--er-current-step:${current}" aria-hidden="true"></span>`:''}</nav>`;
       }
+      function canRevisitStep(step) {
+        return Number.isInteger(step) && step>=1 && step<=4 && state.scene<=5 && step<state.scene
+          && (step===1 || (state.openChat&&state.openClaude));
+      }
+      function revisitStep(step) {
+        if(!canRevisitStep(step)) return;
+        const previous=state.scene;
+        changeScene(step,true);
+        if(previous<=4 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const marker=root.querySelector('.er-progress-current');
+          marker?.style.setProperty('--er-progress-distance',String(previous-step));
+          marker?.classList.add('er-progress-revisiting');
+        }
+        root.querySelector('#er-scene-announcement').textContent=`Back to ${names[step]}. Your setup is preserved.`;
+      }
+      function nextConnectionScene() { return !state.connectedChat?3:!state.connectedClaude?4:5; }
       function setupHeader(title,sub='') { return `<h2>${title}</h2>${sub?`<p class="er-sub">${sub}</p>`:''}`; }
       function permission() {
         const capsule=`<section class="er-widget er-permission-shell" aria-label="Errol Accessibility setup"><div class="er-access-badge" aria-hidden="true"><span class="er-access-symbol">${icon('hand')}</span><span class="er-access-dot"></span></div><div class="er-access-copy"><h2>Allow Accessibility access</h2><p class="er-sub">Errol needs it to read replies and send messages between your two desktop apps.</p><p class="er-inlinehint">System Settings › Privacy & Security › Accessibility. Turn on Errol.</p></div><div class="er-access-actions">${button('Open Accessibility Settings…','settings',true)}<span class="er-inlinehint">${icon('lock')} Checks access automatically</span></div></section>`;
@@ -321,7 +415,8 @@
       function windowView(side) {
         const opened=side==='chatgpt'?state.openChat:state.openClaude;
         const app=side==='chatgpt'?'ChatGPT':'Claude';
-        if(!opened) return `<div class="er-emptywindow"><img src="${icons[side]}" alt=""><span>${app} isn’t open yet</span>${button(`Open ${app}`,`open-${side}`,false,'arrow-up-right')}</div>`;
+        const opening=side==='chatgpt'?state.openingChat:state.openingClaude;
+        if(!opened) return `<div class="er-emptywindow"><img src="${icons[side]}" alt=""><span>${opening?`${app} is opening…`:`${app} isn’t open yet`}</span>${button(opening?'Opening…':`Open ${app}`,`open-${side}`,false,'arrow-up-right',opening)}</div>`;
         const target=state.scene===(side==='chatgpt'?3:4);
         const connected=(side==='chatgpt'?state.connectedChat:state.connectedClaude)&&state.scene>=3;
         const run=state.scene>=6;
@@ -341,20 +436,22 @@
         const draft=side==='claude'&&design.claude==='Unsent draft'&&state.scene===4;
         const composer=draft?'I like the rhythm direction. Can you…':side==='chatgpt'?'Message ChatGPT':'Reply to Claude…';
         let card='';
-        if(target) {
+        if(target && state.picking) {
           if(draft) card=`<div class="er-connectioncard er-issue"><span class="er-tag">${icon('pencil')} Finish preparing</span><h3>There’s an unsent draft here.</h3><p class="er-sub">Finish it in Claude, or choose another conversation. Your ChatGPT connection stays ready.</p><div class="er-actions">${button('Show draft','show-draft',true)}${textButton('Choose another conversation','different')}</div></div>`;
           else if(side==='claude'&&design.claude==='Code session') card=`<div class="er-connectioncard er-issue"><span class="er-tag">${icon('terminal')} Claude · Code</span><h3>You’re connecting a Code session.</h3><p class="er-sub">Messages can lead to actions using this session’s tools.</p><div class="er-connectionmeta"><span>${icon('folder')} errol</span><span>Existing session</span></div><div class="er-actions">${button('Use this session','connect-claude',true)}${textButton('Choose another','different')}</div></div>`;
-          else card=`<div class="er-connectioncard"><span class="er-tag">${icon(state.picking?'mouse-pointer-2':'move-down')} ${state.picking?'Choose this destination':'Drop the logo here'}</span><h3>${side==='chatgpt'?'Start in this new chat':design.claude==='New chat'?'Start in this new chat':'Continue “Naming ideas”'}</h3><div class="er-connectionmeta"><span>${app} · ${mode}</span><span>Model · App default</span></div><p class="er-sub">${side==='chatgpt'||design.claude==='New chat'?'Your topic will be the first message.':'Claude keeps the context already in this conversation.'}</p><div class="er-actions">${button('Use this conversation',`connect-${side}`,true,'check')}</div></div>`;
+          else card=`<div class="er-connectioncard"><span class="er-tag">${icon('mouse-pointer-2')} Choose this destination</span><h3>${side==='chatgpt'?'Start in this new chat':design.claude==='New chat'?'Start in this new chat':'Continue “Naming ideas”'}</h3><div class="er-connectionmeta"><span>${app} · ${mode}</span><span>Model · App default</span></div><p class="er-sub">${side==='chatgpt'||design.claude==='New chat'?'Your topic will be the first message.':'Claude keeps the context already in this conversation.'}</p><div class="er-actions">${button('Use this conversation',`connect-${side}`,true,'check')}</div></div>`;
         }
         if(draft&&state.attention) card=`<div class="er-connectioncard er-issue"><span class="er-tag">${icon('pencil')} Draft preserved</span><h3>Finish your draft in Claude.</h3><p class="er-sub">Or connect a new chat and leave this one as it is.</p><div class="er-actions">${button('Choose a new chat','different',true)}</div></div>`;
-        return `<section class="er-window ${side==='claude'?'er-claude':''} ${target?'er-target':''} ${connected?'er-connected':''}" data-window="${side}" aria-label="${app} ${mode} window: ${escape(title)}"><div class="er-windowbar"><div class="er-traffic" aria-hidden="true"><i></i><i></i><i></i></div><span class="er-windowtitle">${escape(title)}</span>${icon('panel-left')}</div><div class="er-appbody"><div class="er-appbrand"><img class="er-miniicon" src="${icons[side]}" alt="">${app}<span class="er-mode">${mode}</span></div>${content}<div class="er-appcomposer ${draft?'er-draft':''}"><span>${escape(composer)}</span>${icon(draft?'arrow-up':'plus')}</div></div>${card}</section>`;
+        return `<section class="er-window ${side==='claude'?'er-claude':''} ${target&&state.picking?'er-target':''} ${connected?'er-connected':''}" data-window="${side}" aria-label="${app} ${mode} window: ${escape(title)}"><div class="er-windowbar"><div class="er-traffic" aria-hidden="true"><i></i><i></i><i></i></div><span class="er-windowtitle">${escape(title)}</span>${icon('panel-left')}</div><div class="er-appbody"><div class="er-appbrand"><img class="er-miniicon" src="${icons[side]}" alt="">${app}<span class="er-mode">${mode}</span></div>${content}<div class="er-appcomposer ${draft?'er-draft':''}" ${target?`data-drop-zone="${side}"`:''}><span>${escape(composer)}</span>${icon(draft?'arrow-up':'plus')}${target?`<div class="er-drop-area" aria-hidden="true"><div class="er-drop-chip"><strong>Drop here</strong><small>Errol pastes messages here and sends them</small></div></div>`:''}</div></div>${card}</section>`;
       }
       function mainScene() {
         const n=state.scene; let center='',detail='',caption='';
         if(n===0) return permission();
         if(n===1) {
           const ready=state.openChat&&state.openClaude;
-          center=setupHeader(ready?'Both apps are open.':'Bring your assistants.','Click each app’s logo to open it. You’ll choose the conversations next.')+`<div class="er-actions">${button(ready?'Continue':'Open both apps','open-both',true,ready?'arrow-right':'arrow-up-right')}</div>`;
+          const opening=!ready&&(state.openChat||state.openingChat)&&(state.openClaude||state.openingClaude);
+          const proceed=prepareManual?button('Continue','prepare-continue',true,'arrow-right'):`<button type="button" class="er-button er-primary er-countdown" data-action="prepare-continue" aria-label="Continue to arrange windows now">${icon('arrow-right')}<span>Continue · <span data-countdown-seconds>5</span></span></button>`;
+          center=setupHeader(ready?'Both apps are open.':'Bring your assistants.',ready?'Next, choose how to arrange the windows.':'Click each app’s logo to open it. You’ll choose the conversations next.')+`<div class="er-actions">${ready?proceed:button(opening?'Opening…':'Open both apps','open-both',true,'arrow-up-right',opening)}</div>`;
         }
         if(n===2) {
           const choices=`<div class="er-layouts" role="group" aria-label="Window arrangement — choices apply immediately">${[['side','Side by side','columns-2'],['stack','Stacked','rows-2'],['keep','Keep positions','panels-top-left']].map(([key,label,ico])=>`<button type="button" class="er-layout" data-layout="${key}" aria-pressed="${state.layout===key}" data-tooltip="${key==='keep'?'Leave both windows where they are':`Move both windows ${key==='side'?'side by side':'into a stack'} now`}">${icon(ico)}${label}<span class="er-layout-check" aria-hidden="true">${icon('check')}</span></button>`).join('')}</div>`;
@@ -367,8 +464,9 @@
           const dragging=design.connection==='Drag first'&&!state.picking;
           const cue=dragging?`<span class="er-drag-cue ${design.bouncingArrow?'er-nudge':''}" aria-hidden="true">${icon(n===3?'arrow-left':'arrow-right')}</span>`:'';
           const connected=n===4?`<span class="er-status">${icon('check')} ChatGPT connected</span>`:'';
-          center=`<div class="er-connect-instructions">${cue}<div class="er-drag-copy">`+setupHeader(dragging?`Drag ${side} onto its conversation.`:`Choose the ${side} conversation.`,n===3?'Choose where your first message will go.':'Choose where ChatGPT’s replies will land.')+`<div class="er-actions">${connected}${textButton('Click to choose a window','pick')}</div></div></div>`;
-          caption=n===3?'A highlighted window is a candidate. Connecting it makes the destination explicit.':'Each assistant keeps the context already in its own conversation.';
+          const alreadyConnected=n===3?state.connectedChat:state.connectedClaude;
+          center=`<div class="er-connect-instructions">${cue}<div class="er-drag-copy">`+setupHeader(dragging?`Drag ${side} onto its conversation.`:`Choose the ${side} conversation.`,n===3?'Choose where your first message will go.':'Choose where ChatGPT’s replies will land.')+`<p class="er-sub er-connect-problem" role="status" ${state.problem?'':'hidden'}>${escape(state.problem)}</p><div class="er-actions">${connected}${textButton('Click to choose a window','pick')}${alreadyConnected?button('Continue','connection-continue',true):''}</div></div></div>`;
+          caption='Drag from the app icon to the marked message field. The line follows the pointer; releasing inside the field connects this conversation.';
         }
         if(n===5||n===9) {
           const returning=n===9;
@@ -389,27 +487,69 @@
         const layout=state.appliedLayout==='stack'?'er-stacked':state.appliedLayout==='keep'?'er-keep':'';
         return widget(center)+(detail?`<div class="er-setupdetail">${detail}</div>`:'')+`<div class="er-windows ${layout}">${windowView('chatgpt')}${windowView('claude')}</div>`+(caption&&design.demoNotes?`<div class="er-caption">Demo note · ${caption}</div>`:'');
       }
+      function connectionSide() { return state.scene===3?'chatgpt':state.scene===4?'claude':null; }
+      function containsPoint(rect, point) {
+        return point.x>=rect.left && point.x<=rect.right && point.y>=rect.top && point.y<=rect.bottom;
+      }
+      function dragPresentation() {
+        const side=connectionSide();
+        if(!side || state.picking || design.connection!=='Drag first') return null;
+        const source=root.querySelector(`[data-side="${side}"] .er-appicon`);
+        const field=root.querySelector(`[data-drop-zone="${side}"]`);
+        if(!source || !field) return null;
+        const iconRect=source.getBoundingClientRect(), fieldRect=field.getBoundingClientRect();
+        let point;
+        if(pointerDrag?.started) point=pointerDrag.point;
+        else if(state.dragPreview==='armed') point={x:fieldRect.right-22,y:fieldRect.top+fieldRect.height/2};
+        else if(state.dragPreview==='dragging') {
+          const win=field.closest('[data-window]').getBoundingClientRect();
+          point={x:fieldRect.left+fieldRect.width*.65,y:win.top-16};
+        } else return null;
+        const overConsole=containsPoint(root.querySelector('.er-widget').getBoundingClientRect(),point);
+        return {side,iconRect,point,armed:!overConsole&&containsPoint(fieldRect,point)};
+      }
+      function syncDragPresentation(drag) {
+        root.classList.toggle('er-is-dragging',!!drag);
+        root.querySelectorAll('.er-drop-area').forEach(area=>{
+          area.classList.toggle('er-armed',!!drag?.armed);
+          area.setAttribute('aria-hidden',String(!drag));
+          area.querySelector('strong').textContent=drag?.armed?'Release to connect':'Drop here';
+          area.querySelector('small').textContent=drag?.armed
+            ? `${drag.side==='chatgpt'?gName():cName()} · ${drag.side==='chatgpt'||design.claude==='New chat'?'New conversation':'Existing conversation'}`
+            : 'Errol pastes messages here and sends them';
+        });
+        const side=connectionSide();
+        if(!side) return;
+        const status=root.querySelector(`[data-side="${side}"]`).parentElement.querySelector('.er-perchstate');
+        status.textContent=drag?(drag.armed?'Release to connect':'Drag to the field'):state.picking?'Choosing…':design.connection==='Drag first'?'Drag to connect':'Click to choose';
+        const supporting=root.querySelector('.er-drag-copy>.er-sub');
+        supporting.textContent=drag?'Drop it on the marked message field. That is where Errol pastes and sends.':side==='chatgpt'?'Choose where your first message will go.':'Choose where ChatGPT’s replies will land.';
+      }
       function drawConnections() {
         layer.replaceChildren();
-        if(desktop.clientWidth<570||state.scene<3) return;
         const bounds=desktop.getBoundingClientRect();
         layer.setAttribute('width',bounds.width); layer.setAttribute('height',bounds.height); layer.setAttribute('viewBox',`0 0 ${bounds.width} ${bounds.height}`);
         const ns='http://www.w3.org/2000/svg';
-        ['chatgpt','claude'].forEach(side=>{
-          const connected=side==='chatgpt'?state.connectedChat:state.connectedClaude;
-          const choosing=state.scene===(side==='chatgpt'?3:4);
-          if(!connected&&!choosing) return;
-          const a=root.querySelector(`[data-side="${side}"]`),b=root.querySelector(`[data-window="${side}"]`);
-          if(!a||!b)return;
-          const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
-          const x=ar.left+ar.width/2-bounds.left,y=ar.bottom-bounds.top+37;
-          const xx=br.left+br.width/2-bounds.left,yy=br.top-bounds.top-2;
-          const path=document.createElementNS(ns,'path');
-          path.setAttribute('d',`M ${x} ${y} C ${x} ${y+35},${xx} ${yy-30},${xx} ${yy}`);
-          path.setAttribute('fill','none');path.setAttribute('stroke',choosing?'var(--er-gold)':'var(--er-accent)');path.setAttribute('stroke-width',choosing?'2':'1.5');path.setAttribute('opacity',choosing?'.8':'.35');
-          if(choosing) path.setAttribute('stroke-dasharray','4 5');
-          layer.append(path);
-        });
+        const drag=dragPresentation();
+        syncDragPresentation(drag);
+        if(drag) {
+          const {iconRect,point,armed}=drag;
+          const cx=iconRect.left+iconRect.width/2-bounds.left,cy=iconRect.top+iconRect.height/2-bounds.top;
+          const x=point.x-bounds.left,y=point.y-bounds.top,dx=x-cx,dy=y-cy;
+          const distance=Math.hypot(dx,dy),radius=Math.min(iconRect.width,iconRect.height)/2;
+          if(distance>radius) {
+            const sx=cx+dx/distance*radius,sy=cy+dy/distance*radius;
+            const path=document.createElementNS(ns,'path');
+            path.setAttribute('d',`M ${sx} ${sy} Q ${(sx+x)/2} ${(sy+y)/2+Math.min(36,distance*.12)},${x} ${y}`);
+            path.setAttribute('fill','none'); path.setAttribute('stroke','var(--er-accent)');
+            path.setAttribute('stroke-width',armed?'3':'2.5'); path.setAttribute('stroke-linecap','round');
+            path.style.filter='drop-shadow(0 0 5px color-mix(in srgb,var(--er-accent) 45%,transparent))';
+            const plug=document.createElementNS(ns,'circle');
+            plug.setAttribute('cx',x); plug.setAttribute('cy',y); plug.setAttribute('r',armed?'7':'5');
+            plug.setAttribute('fill','var(--er-accent)'); plug.setAttribute('stroke','var(--er-paper)'); plug.setAttribute('stroke-width','2');
+            layer.append(path,plug);
+          }
+        }
         if(state.scene===6&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&state.layout!=='stack') {
           const a=root.querySelector('[data-window="chatgpt"]').getBoundingClientRect(),b=root.querySelector('[data-window="claude"]').getBoundingClientRect();
           let x=a.right-bounds.left-12,xx=b.left-bounds.left+12;
@@ -420,7 +560,11 @@
         }
       }
       function render() {
+        cancelPointerDrag();
         root.classList.remove('er-is-dragging');
+        const review=root.querySelector('.er-gesture-review');
+        review.hidden=!connectionSide() || design.connection!=='Drag first';
+        review.querySelectorAll('[data-drag-preview]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.dragPreview===state.dragPreview)));
         root.style.setProperty('--er-shell-radius',design.shell==='Capsule'?'999px':'28px');
         stage.innerHTML=mainScene();
         root.querySelector('#er-scene-title').textContent=`${String(state.scene+1).padStart(2,'0')} · ${names[state.scene]}`;
@@ -430,11 +574,119 @@
         root.querySelector('#er-scene-announcement').textContent=`Screen ${state.scene+1} of 10: ${names[state.scene]}`;
         if(globalThis.lucide) lucide.createIcons({attrs:{width:17,height:17}});
         requestAnimationFrame(drawConnections);
+        syncPrepareCountdown();
+      }
+      function stopPrepareCountdown() {
+        cancelAnimationFrame(prepareFrame); prepareFrame=null; prepareDeadline=null;
+      }
+      function syncPrepareCountdown() {
+        cancelAnimationFrame(prepareFrame); prepareFrame=null;
+        if(state.scene!==1 || !state.openChat || !state.openClaude) {
+          stopPrepareCountdown();
+          clearTimeout(prepareTransition); prepareTransition=null;
+          return;
+        }
+        if(prepareManual || prepareTransition!==null || document.hidden) return;
+        if(prepareDeadline===null) {
+          prepareDeadline=performance.now()+prepareDuration;
+          root.querySelector('#er-scene-announcement').textContent='Both apps are open. Continuing to window arrangement in five seconds. Earlier steps are available in the progress bar.';
+        }
+        updatePrepareCountdown();
+      }
+      function updatePrepareCountdown() {
+        if(prepareDeadline===null || state.scene!==1 || !state.openChat || !state.openClaude || prepareManual) return;
+        const remaining=prepareDeadline-performance.now();
+        const button=root.querySelector('[data-action="prepare-continue"]');
+        button?.style.setProperty('--er-countdown-progress',String(Math.min(1,Math.max(0,1-remaining/prepareDuration))));
+        const seconds=button?.querySelector('[data-countdown-seconds]');
+        if(seconds) seconds.textContent=String(Math.max(1,Math.ceil(remaining/1000)));
+        if(remaining<=0) { continueFromPrepare(); return; }
+        prepareFrame=requestAnimationFrame(updatePrepareCountdown);
+      }
+      function continueFromPrepare() {
+        if(state.scene!==1 || !state.openChat || !state.openClaude || prepareTransition!==null) return;
+        stopPrepareCountdown();
+        const focusNext=!!root.querySelector('.er-step-body')?.contains(document.activeElement);
+        const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const transitionStarted=performance.now();
+        const finish=()=>{
+          prepareTransition=null;
+          if(state.scene!==1 || !state.openChat || !state.openClaude) { render(); return; }
+          state.completedPrepare=true; changeScene(2,true);
+          if(!reduced) {
+            root.querySelector('.er-step-body')?.classList.add('er-step-in');
+            // Continue the same 300 ms slide after replacing the scene DOM,
+            // so its midpoint lines up with the outgoing/incoming copy fade.
+            const marker=root.querySelector('.er-progress-current');
+            marker?.style.setProperty('--er-progress-delay',`-${(performance.now()-transitionStarted)/1000}s`);
+            marker?.classList.add('er-progress-arriving');
+          }
+          if(focusNext) root.querySelector('[data-layout="keep"]')?.focus({preventScroll:true});
+        };
+        if(reduced) { finish(); return; }
+        root.querySelector('.er-step-body')?.classList.add('er-step-out');
+        root.querySelector('.er-progress-current')?.classList.add('er-progress-departing');
+        root.querySelector('.er-progress-step')?.classList.add('er-done');
+        prepareTransition=setTimeout(finish,150);
+      }
+      document.addEventListener('visibilitychange',()=>{
+        if(state.scene!==1) return;
+        stopPrepareCountdown(); clearTimeout(prepareTransition); prepareTransition=null;
+        if(!document.hidden) render();
+      });
+      function stopOpenHint(side) {
+        clearTimeout(openHintTimers.get(side)); openHintTimers.delete(side); openHints.delete(side);
+        root.querySelector(`[data-label-side="${side}"]`)?.classList.remove('er-show-open-hint');
+      }
+      function clearOpenHints() { ['chatgpt','claude'].forEach(stopOpenHint); }
+      function startOpenHint(button) {
+        if(button?.dataset.canOpen!=='true') return;
+        const side=button.dataset.side;
+        if(openHints.has(side)) return;
+        openHints.add(side);
+        root.querySelector(`[data-label-side="${side}"]`)?.classList.add('er-show-open-hint');
+        const hold=matchMedia('(prefers-reduced-motion: reduce)').matches?1000:1180;
+        openHintTimers.set(side,setTimeout(()=>stopOpenHint(side),hold));
+      }
+      root.addEventListener('pointerover',event=>{
+        const button=event.target.closest('[data-can-open="true"]');
+        if(button&&!button.contains(event.relatedTarget)) startOpenHint(button);
+      });
+      root.addEventListener('pointerout',event=>{
+        const button=event.target.closest('[data-can-open="true"]');
+        if(button&&!button.contains(event.relatedTarget)&&!button.matches(':focus-visible')) stopOpenHint(button.dataset.side);
+      });
+      root.addEventListener('focusin',event=>startOpenHint(event.target.closest('[data-can-open="true"]')));
+      root.addEventListener('focusout',event=>{
+        const button=event.target.closest('[data-can-open="true"]');
+        if(button&&!button.matches(':hover')) stopOpenHint(button.dataset.side);
+      });
+      // A short simulated launch exposes the same Opening state as the app.
+      // Native launch timing follows readiness; this delay is preview-only.
+      function openApp(side) {
+        const openKey=side==='chatgpt'?'openChat':'openClaude';
+        const openingKey=side==='chatgpt'?'openingChat':'openingClaude';
+        if(state[openKey] || state[openingKey]) return;
+        stopOpenHint(side);
+        state[openingKey]=true; launchStarted.set(side,Date.now());
+        launchTimers.set(side,setTimeout(()=>{
+          launchTimers.delete(side); launchStarted.delete(side); state[openingKey]=false; state[openKey]=true; launchRevealed.set(side,Date.now());
+          render();
+          if(!state.openChat || !state.openClaude) root.querySelector('#er-scene-announcement').textContent=`${side==='chatgpt'?'ChatGPT':'Claude'} is open.`;
+        },1600));
       }
       root.addEventListener('click',event=>{
         const target=event.target.closest('button');if(!target)return;
+        if(suppressIconClick && target.dataset.side) { suppressIconClick=false; return; }
+        if(target.dataset.dragPreview) {
+          state.dragPreview=target.dataset.dragPreview; state.picking=false; state.problem=''; render();
+          root.querySelector(`[data-drag-preview="${state.dragPreview}"]`).focus({preventScroll:true});
+          root.querySelector('#er-scene-announcement').textContent=state.dragPreview==='armed'?'Release to connect. The marked message field is ready.':state.dragPreview==='dragging'?'A line runs from the app icon to the pointer. Drop on the marked message field.':'Ready to drag the app icon.';
+          return;
+        }
         if(target.dataset.story) return changeScene(state.scene+(target.dataset.story==='next'?1:-1));
         if(target.dataset.scene!==undefined) return changeScene(Number(target.dataset.scene));
+        if(target.dataset.setupStep!==undefined) return revisitStep(Number(target.dataset.setupStep));
         if(target.dataset.layout){
           state.layout=target.dataset.layout;
           // Keep positions never restores an earlier layout; it leaves the current frames alone.
@@ -445,19 +697,21 @@
           return;
         }
         if(target.dataset.side){
-          if(state.scene===1){if(target.dataset.side==='chatgpt')state.openChat=true;else state.openClaude=true;render();}
-          else if(state.scene===(target.dataset.side==='chatgpt'?3:4)){state.picking=true;render();}
+          if(state.scene===1){openApp(target.dataset.side);render();}
+          else if(state.scene===(target.dataset.side==='chatgpt'?3:4)){state.picking=true;state.dragPreview='ready';state.problem='';render();}
           return;
         }
         const action=target.dataset.action;
         if(action==='settings'){state.settings=true;render();}
         else if(action==='details'){state.details=!state.details;render();}
-        else if(action==='open-chatgpt'||action==='open-claude'){if(action==='open-chatgpt')state.openChat=true;else state.openClaude=true;render();}
-        else if(action==='open-both'){if(state.openChat&&state.openClaude)changeScene(2);else{state.openChat=true;state.openClaude=true;render();}}
-        else if(action==='next')changeScene(state.scene+1);
-        else if(action==='pick'){state.picking=true;render();}
-        else if(action==='connect-chatgpt'){state.connectedChat=true;changeScene(4);}
-        else if(action==='connect-claude'){state.connectedClaude=true;changeScene(5);}
+        else if(action==='open-chatgpt'||action==='open-claude'){openApp(action==='open-chatgpt'?'chatgpt':'claude');render();}
+        else if(action==='open-both'){if(state.openChat&&state.openClaude)continueFromPrepare();else{openApp('chatgpt');openApp('claude');render();}}
+        else if(action==='prepare-continue')continueFromPrepare();
+        else if(action==='next'){if(state.scene===2){state.completedArrange=true;changeScene(nextConnectionScene(),true);}else changeScene(state.scene+1);}
+        else if(action==='connection-continue'){if((state.scene===3&&state.connectedChat)||(state.scene===4&&state.connectedClaude))changeScene(nextConnectionScene(),true);}
+        else if(action==='pick'){state.picking=true;state.dragPreview='ready';state.problem='';render();}
+        else if(action==='connect-chatgpt'){state.connectedChat=true;changeScene(nextConnectionScene(),true);}
+        else if(action==='connect-claude'){state.connectedClaude=true;changeScene(nextConnectionScene(),true);}
         else if(action==='show-draft'){state.attention=true;render();}
         else if(action==='different'){design.claude='New chat';state.attention=false;render();}
         else if(action==='send'){const text=root.querySelector('.er-compose');if(text&&text.value.trim())state.topic=text.value.trim();changeScene(6);}
@@ -488,29 +742,62 @@
           else {if(state.scene===9)state.nextTopic=event.target.value;else state.topic=event.target.value;const send=root.querySelector('[data-action="send"]');if(send)send.disabled=!event.target.value.trim();}
         }
       });
-      root.addEventListener('dragstart',event=>{
-        const source=event.target.closest('[data-side]');if(!source)return;
-        root.classList.add('er-is-dragging');
-        event.dataTransfer.setData('text/plain',source.dataset.side);event.dataTransfer.effectAllowed='link';
+      // Pointer tracking leaves the icon in place: no browser image or text drag.
+      function cancelPointerDrag() {
+        const previous=pointerDrag;
+        pointerDrag=null;
+        if(previous?.source.hasPointerCapture(previous.id)) previous.source.releasePointerCapture(previous.id);
+      }
+      function finishConnection(side) {
+        if(side==='chatgpt') { state.connectedChat=true; changeScene(nextConnectionScene(),true); }
+        else if(design.claude==='Unsent draft') { state.picking=true; render(); }
+        else { state.connectedClaude=true; changeScene(nextConnectionScene(),true); }
+      }
+      root.addEventListener('dragstart',event=>{if(event.target.closest('[data-side]'))event.preventDefault();});
+      root.addEventListener('pointerdown',event=>{
+        const source=event.target.closest('[data-draggable="true"]');
+        if(!source || event.button!==0 || !event.isPrimary) return;
+        cancelPointerDrag();
+        pointerDrag={source,id:event.pointerId,side:source.dataset.side,origin:{x:event.clientX,y:event.clientY},point:{x:event.clientX,y:event.clientY},started:false};
+        source.setPointerCapture(event.pointerId);
       });
-      root.addEventListener('dragend',()=>{
-        root.classList.remove('er-is-dragging');
-        root.querySelectorAll('.er-dropover').forEach(win=>win.classList.remove('er-dropover'));
+      root.addEventListener('pointermove',event=>{
+        if(!pointerDrag || event.pointerId!==pointerDrag.id) return;
+        const point={x:event.clientX,y:event.clientY};
+        if(!pointerDrag.started && Math.hypot(point.x-pointerDrag.origin.x,point.y-pointerDrag.origin.y)<4) return;
+        event.preventDefault();
+        pointerDrag.started=true; pointerDrag.point=point; state.dragPreview='ready'; state.problem='';
+        root.querySelector('.er-connect-problem').hidden=true;
+        root.querySelectorAll('[data-drag-preview]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.dragPreview==='ready')));
+        drawConnections();
       });
-      root.addEventListener('dragover',event=>{
-        const win=event.target.closest('[data-window]');if(!win)return;
-        const expected=state.scene===3?'chatgpt':state.scene===4?'claude':null;
-        if(win.dataset.window===expected){event.preventDefault();event.dataTransfer.dropEffect='link';win.classList.add('er-dropover');}
+      root.addEventListener('pointerup',event=>{
+        if(!pointerDrag || event.pointerId!==pointerDrag.id) return;
+        const {started,side}=pointerDrag;
+        pointerDrag.point={x:event.clientX,y:event.clientY};
+        const drag=started?dragPresentation():null;
+        const overConsole=containsPoint(root.querySelector('.er-widget').getBoundingClientRect(),pointerDrag.point);
+        cancelPointerDrag();
+        if(!started) return;
+        event.preventDefault();
+        suppressIconClick=true; setTimeout(()=>{suppressIconClick=false;},0);
+        state.dragPreview='ready';
+        if(drag?.armed) finishConnection(side);
+        else {
+          state.problem=overConsole?'':`Drop onto the marked message field in ${side==='chatgpt'?'ChatGPT':'Claude'}, or click to choose a window.`;
+          render();
+        }
       });
-      root.addEventListener('dragleave',event=>{const win=event.target.closest('[data-window]');if(win&&!win.contains(event.relatedTarget))win.classList.remove('er-dropover');});
-      root.addEventListener('drop',event=>{
-        const win=event.target.closest('[data-window]');if(!win)return;event.preventDefault();
-        const side=event.dataTransfer.getData('text/plain');
-        if(side!==win.dataset.window)return;
-        if(side==='chatgpt'&&state.scene===3){state.connectedChat=true;changeScene(4);}
-        else if(side==='claude'&&state.scene===4){if(design.claude==='Unsent draft'||design.claude==='Code session'){state.picking=true;render();}else{state.connectedClaude=true;changeScene(5);}}
+      root.addEventListener('pointercancel',()=>{if(pointerDrag){cancelPointerDrag();state.dragPreview='ready';render();}});
+      root.addEventListener('lostpointercapture',()=>{if(pointerDrag){cancelPointerDrag();state.dragPreview='ready';render();}});
+      window.addEventListener('blur',()=>{if(pointerDrag){cancelPointerDrag();state.dragPreview='ready';render();}});
+      root.addEventListener('keydown',event=>{
+        if(event.key==='Escape' && (pointerDrag || state.dragPreview!=='ready' || state.picking)) {
+          event.preventDefault(); cancelPointerDrag(); state.dragPreview='ready'; state.picking=false; state.problem=''; render();
+          root.querySelector(`[data-side="${connectionSide()}"]`)?.focus({preventScroll:true});
+        }
       });
-      root.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.picking){state.picking=false;render();}});
+      window.addEventListener('scroll',()=>{if(pointerDrag || state.dragPreview!=='ready')drawConnections();},{passive:true});
       changeScene(0);
       const observer=new ResizeObserver(()=>requestAnimationFrame(drawConnections));observer.observe(desktop);
       if(globalThis.Tweak){

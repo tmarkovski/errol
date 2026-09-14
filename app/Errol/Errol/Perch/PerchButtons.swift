@@ -13,6 +13,8 @@ struct PerchCapsuleButton: View {
     let title: String
     var style = Style.filled
     var icon: String? = nil
+    /// Optional elapsed countdown fill, under the label and inside the pill.
+    var progress: Double? = nil
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
 
@@ -30,7 +32,19 @@ struct PerchCapsuleButton: View {
             .foregroundStyle(style == .filled ? Perch.onAccent : Perch.accentText)
             .padding(.horizontal, Perch.s(14))
             .frame(height: Perch.s(29))
-            .background(Capsule().fill(style == .filled ? Perch.accent : .clear))
+            .background {
+                Capsule().fill(style == .filled ? Perch.accent : .clear)
+                    .overlay(alignment: .leading) {
+                        if let progress {
+                            GeometryReader { geometry in
+                                Rectangle().fill(Perch.onAccent.opacity(0.2))
+                                    .frame(width: geometry.size.width * min(1, max(0, progress)))
+                            }
+                            .clipShape(Capsule())
+                            .allowsHitTesting(false)
+                        }
+                    }
+            }
             .overlay(Capsule().stroke(style == .filled ? .clear : Perch.accent.opacity(0.8), lineWidth: 1.2))
             .perchHover(Capsule(), tint: style == .filled ? .white : Perch.ink)
             .contentShape(Capsule())

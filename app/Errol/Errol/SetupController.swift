@@ -78,6 +78,24 @@ final class SetupController {
     /// Whether the guided screens are showing, as against the editor.
     var isGuiding: Bool { state.phase != .compose }
 
+    func canRevisit(_ step: SetupStep) -> Bool {
+        !isBinding && !isArranging && state.canRevisit(step)
+    }
+
+    func revisit(_ step: SetupStep) {
+        guard canRevisit(step) else { return }
+        cancelPicking()
+        problem = nil
+        state.revisit(step)
+    }
+
+    func continueFromConnection() {
+        guard !isBinding else { return }
+        cancelPicking()
+        problem = nil
+        state.continueFromConnection()
+    }
+
     // MARK: Observations
 
     /// Each sweep's word on the apps, their windows, and the bindings.
@@ -443,8 +461,8 @@ final class SetupController {
 
     /// The picker's keys, from the panel: arrows move among the windows,
     /// Return connects the one stood on, Escape cancels. Outside the
-    /// picker, Return on a connect screen starts picking. Returns whether
-    /// the key was taken.
+    /// picker, Return starts picking, or continues a revisited connection
+    /// that is already bound. Returns whether the key was taken.
     func handleKey(_ event: NSEvent) -> Bool {
         let key = event.keyCode
         if draggingSide != nil {
@@ -453,7 +471,8 @@ final class SetupController {
         }
         guard picker != nil else {
             if case .connect(let side) = state.phase, key == 36 || key == 76 {
-                beginPicking(side)
+                if state[side].isConnected { continueFromConnection() }
+                else { beginPicking(side) }
                 return true
             }
             return false

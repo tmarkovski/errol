@@ -267,6 +267,52 @@ final class SetupStateTests: XCTestCase {
 
     // MARK: Return and restart
 
+    func testProgressNavigationPreservesSetupAndStopsAutomaticReturn() throws {
+        var state = try composed()
+        let original = state
+        XCTAssertTrue(state.revisit(.prepareApps))
+        XCTAssertFalse(state.automaticallyContinuePreparation)
+        XCTAssertEqual(state.progress(of: .prepareApps), .current)
+        XCTAssertEqual(state.completed, original.completed)
+        XCTAssertEqual(state.chatgpt, original.chatgpt)
+        XCTAssertEqual(state.claude, original.claude)
+        XCTAssertEqual(state.layout, original.layout)
+        XCTAssertTrue(state.continueFromPrepare())
+        XCTAssertTrue(state.continueFromArrange())
+        XCTAssertEqual(state.phase, .compose, "existing connections do not need rebinding")
+        state.restart()
+        XCTAssertTrue(state.automaticallyContinuePreparation, "fresh setup restores its countdown")
+    }
+
+    func testProgressNavigationOnlyOffersEarlierAvailableSteps() throws {
+        var (state, _, _) = try prepared()
+        XCTAssertFalse(state.revisit(.prepareApps), "the current segment is not a cancel button")
+        XCTAssertFalse(state.revisit(.arrange), "the bar cannot skip ahead")
+        state.continueFromPrepare()
+        state.continueFromArrange()
+        XCTAssertTrue(state.canRevisit(.arrange))
+        XCTAssertFalse(state.canRevisit(.connectClaude))
+        state.observe(.claude, presence: .notRunning, candidates: [])
+        XCTAssertFalse(state.revisit(.arrange), "later screens still require both apps open")
+        XCTAssertTrue(state.revisit(.prepareApps))
+        var running = try composed()
+        XCTAssertTrue(running.canRevisit(.prepareApps))
+        running.runStarted()
+        XCTAssertFalse(running.canRevisit(.prepareApps), "a run's hidden meter cannot reopen setup")
+    }
+
+    func testRevisitedConnectionCanContinueWithItsExistingBinding() throws {
+        var state = try composed()
+        let connection = state.chatgpt.connection
+        XCTAssertTrue(state.revisit(.connectChatGPT))
+        XCTAssertEqual(state.progress(of: .connectChatGPT), .current)
+        XCTAssertEqual(state.chatgpt.connection, connection)
+        XCTAssertTrue(state.continueFromConnection())
+        XCTAssertEqual(state.phase, .compose)
+        state.disconnect(.chatgpt)
+        XCTAssertFalse(state.continueFromConnection(), "a lost connection must be chosen again")
+    }
+
     func testReturningMarksBothConnectionsUnverifiedUntilObserved() throws {
         var state = try composed()
         state.runStarted()

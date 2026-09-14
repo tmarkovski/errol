@@ -1,17 +1,12 @@
 // The perch avatar: the app's own icon, as installed on this Mac, with the
 // initial in a feather-colored circle standing in when the app is not here.
 //
-// Why the installed icon rather than a bundled logo. Both vendors gate their
-// marks: OpenAI's Blossom may only appear black or white, under its Marks
-// usage terms, and Anthropic's trademark guidelines allow its marks only in
-// materials Anthropic approves beforehand — so a Claude starburst shipped
-// inside Errol would need written permission. Showing an installed app's
-// icon is what the Dock, Finder, and the app switcher do for every app:
-// nothing of either brand lives in this bundle, and the avatar follows
-// whichever app the bundle ID in Settings names (Codex or classic ChatGPT
-// alike), which the initial could not.
+// Artwork stays in the installed app's bundle. ChatGPT's optional Codex
+// artwork follows its Dock preference; other apps use their macOS icon.
 
 import AppKit
+import Combine
+import Observation
 import SwiftUI
 
 struct PerchAvatar: View {
@@ -32,7 +27,7 @@ struct PerchAvatar: View {
 
     var body: some View {
         Group {
-            if let icon = AppIcons.icon(forBundleID: bundleID) {
+            if let icon = AppIcons.shared.icon(forBundleID: bundleID) {
                 // A macOS app icon keeps a transparent margin around its
                 // squircle — the squircle spans about 81% of the canvas
                 // (measured on both apps' icons) — so the image is drawn
@@ -76,11 +71,36 @@ struct PerchAvatar: View {
 
 /// Icons of the apps the relay targets, looked up by bundle ID through
 /// LaunchServices so an app that is installed but not running still has a
-/// face. Hits are cached for the process; misses are not, so installing an
-/// app while Errol runs shows its icon on the next head refresh.
-enum AppIcons {
-    private static var cache: [String: NSImage] = [:]
+/// face. Changes to the installed apps, Dock preference, or system appearance
+/// invalidate the cache and redraw existing avatars without restarting setup.
+@MainActor
+@Observable
+final class AppIcons {
+    static let shared = AppIcons()
+
+    private var revision = 0
+    @ObservationIgnored private var cache: [String: NSImage] = [:]
+    @ObservationIgnored private var subscriptions: [AnyCancellable] = []
     private static var markCache: [String: NSImage] = [:]
+
+    private init() {
+        let distributed = DistributedNotificationCenter.default()
+        let workspace = NSWorkspace.shared.notificationCenter
+        let notifications = [
+            distributed.publisher(for: Notification.Name("com.openai.codex.DockIconPreferenceChanged")),
+            distributed.publisher(for: Notification.Name("AppleInterfaceThemeChangedNotification")),
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification),
+            workspace.publisher(for: NSWorkspace.didLaunchApplicationNotification),
+            workspace.publisher(for: NSWorkspace.didTerminateApplicationNotification),
+        ]
+        for publisher in notifications {
+            publisher.receive(on: RunLoop.main).sink { [weak self] _ in
+                self?.cache.removeAll()
+                Self.markCache.removeAll()
+                self?.revision &+= 1
+            }.store(in: &subscriptions)
+        }
+    }
 
     /// Where each app keeps a flat rendition of its own mark, best first.
     /// The catalog assets are the sharp ones: Claude's spark is a PDF vector,
@@ -217,12 +237,54 @@ enum AppIcons {
     }
 
     @MainActor
-    static func icon(forBundleID bundleID: String) -> NSImage? {
+    func icon(forBundleID bundleID: String) -> NSImage? {
+        // Register an observation even on a cache hit. The cache itself is
+        // ignored so loading an image during rendering does not publish.
+        _ = revision
         if let hit = cache[bundleID] { return hit }
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
         else { return nil }
-        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        let icon = Self.selectedDockIcon(bundleID: bundleID, appURL: url)
+            ?? NSWorkspace.shared.icon(forFile: url.path)
         cache[bundleID] = icon
         return icon
+    }
+
+    /// ChatGPT's Dock plug-in changes its tile without changing the Finder
+    /// icon. These optional vendor keys are read only; an unknown preference
+    /// or missing asset falls back to the ordinary installed icon above.
+    private static func selectedDockIcon(bundleID: String, appURL: URL) -> NSImage? {
+        guard bundleID == "com.openai.codex" else { return nil }
+        CFPreferencesAppSynchronize(bundleID as CFString)
+        let preference = CFPreferencesCopyAppValue("DockIconPreference" as CFString,
+                                                   bundleID as CFString) as? String
+        let resourceName = CFPreferencesCopyAppValue("DockIconResourceName" as CFString,
+                                                     bundleID as CFString) as? String
+        // Match the Dock's system appearance, independently of Errol's theme.
+        let dark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        guard let filename = codexIconResource(preference: preference, resourceName: resourceName,
+                                              dark: dark),
+              let resources = Bundle(url: appURL)?.resourceURL else { return nil }
+        return NSImage(contentsOf: resources.appendingPathComponent(filename))
+    }
+
+    /// Keep this mapping separate from preference I/O so fallback and light/
+    /// dark selection can be checked without changing another app's settings.
+    static func codexIconResource(preference: String?, resourceName: String?, dark: Bool) -> String? {
+        let useDark: Bool
+        switch preference {
+        case "codex-system": useDark = dark
+        case "codex-light": useDark = false
+        case "codex-dark": useDark = true
+        default: return nil
+        }
+        let light = resourceName ?? "icon-codex-light.png"
+        // Only accept a file in this bundle's Resources folder. Keep optional
+        // build-flavor suffixes while following the vendor's paired filenames.
+        guard light.hasPrefix("icon-codex-light"), light.hasSuffix(".png"),
+              !light.contains("/"), !light.contains("\\"), !light.contains("..") else { return nil }
+        return useDark
+            ? "icon-codex-dark-color" + light.dropFirst("icon-codex-light".count)
+            : light
     }
 }

@@ -8,36 +8,61 @@ import SwiftUI
 
 // MARK: - Progress
 
-/// Four short segments for the four steps: done in the success color, the
-/// current one in the accent and a hair thicker, the rest on the track.
+/// Four fixed tracks and one thicker accent marker that slides between
+/// them. Completed tracks turn green as the marker moves to the next step.
 /// Color alone carries nothing: the meter speaks its step to VoiceOver.
 struct PerchProgressMeter: View {
     let controller: RelayController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let state = controller.setup.state
-        HStack(spacing: Perch.s(5)) {
-            ForEach(SetupStep.allCases, id: \.rawValue) { step in
-                let progress = state.progress(of: step)
-                Capsule()
-                    .fill(color(progress))
-                    .frame(height: progress == .current ? Perch.s(6) : Perch.s(4))
-                    .frame(height: Perch.s(6))
-                    .animation(Perch.fade, value: progress)
+        let steps = SetupStep.allCases
+        let current = steps.firstIndex { state.progress(of: $0) == .current }
+        let gap = Perch.s(5)
+        ZStack(alignment: .leading) {
+            HStack(spacing: gap) {
+                ForEach(steps, id: \.rawValue) { step in
+                    Capsule()
+                        .fill(state.progress(of: step) == .done ? Perch.green : Perch.track)
+                        .frame(height: Perch.s(4))
+                }
+            }
+            if let current {
+                GeometryReader { geometry in
+                    let segment = max(0, (geometry.size.width - gap * CGFloat(steps.count - 1)) / CGFloat(steps.count))
+                    Capsule()
+                        .fill(Perch.setupCurrent)
+                        .frame(width: segment, height: Perch.s(6))
+                        .offset(x: CGFloat(current) * (segment + gap))
+                }
+                .transition(.opacity)
             }
         }
+        .frame(height: Perch.s(6))
+        .frame(height: Perch.s(24))
         .frame(maxWidth: Perch.s(124), alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Setup progress")
-        .accessibilityValue(state.progressDescription(names: controller.names))
-    }
-
-    private func color(_ progress: StepProgress) -> Color {
-        switch progress {
-        case .done: return Perch.green
-        case .current: return Perch.setupCurrent
-        case .remaining: return Perch.track
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: current)
+        .overlay {
+            // A comfortable target inside the existing toolbar height. The
+            // thin tracks retain their visual size and the marker stays clear.
+            HStack(spacing: gap) {
+                ForEach(steps, id: \.rawValue) { step in
+                    Button { controller.setup.revisit(step) } label: {
+                        Color.clear.frame(height: Perch.s(24)).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!controller.setup.canRevisit(step))
+                    .help(step.title(names: controller.names))
+                    .accessibilityLabel("Step \(step.rawValue + 1): \(step.title(names: controller.names))")
+                    .accessibilityValue(state.currentStep == step ? "Current step"
+                                        : controller.setup.canRevisit(step) ? "Go back" : "Unavailable")
+                }
+            }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Setup steps")
+        .accessibilityValue(state.progressDescription(names: controller.names))
     }
 }
 
@@ -48,17 +73,24 @@ struct PerchProgressMeter: View {
 struct PerchSetupCenter: View {
     let controller: RelayController
     @FocusState private var focusedLayout: LayoutChoice?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var setup: SetupController { controller.setup }
     private var names: (chatgpt: String, claude: String) { controller.names }
 
     var body: some View {
-        switch setup.state.phase {
-        case .prepareApps: prepare
-        case .arrange: arrange
-        case .connect(let side): connect(side)
-        case .compose: EmptyView()
+        ZStack(alignment: .leading) {
+            switch setup.state.phase {
+            case .prepareApps: prepare.transition(.opacity)
+            case .arrange: arrange.transition(.opacity)
+            case .connect(let side): connect(side)
+            case .compose: EmptyView()
+            }
         }
+        // Fade only the Open apps / Arrange handoff. The capsule, meter,
+        // participant identities, and later editor keep their own lifetimes.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3),
+                   value: setup.state.phase == .prepareApps)
     }
 
     // MARK: Prepare
@@ -72,12 +104,13 @@ struct PerchSetupCenter: View {
         let closed = [Speaker.chatgpt, .claude].contains { state[$0].presence == .notRunning }
         return VStack(alignment: .leading, spacing: Perch.s(8)) {
             copy(headline: state.bothOpen ? "Both apps are open." : "Bring your assistants.",
-                 supporting: "Click each app\u{2019}s logo to open it. You\u{2019}ll choose the conversations next.",
+                 supporting: state.bothOpen ? "Next, choose how to arrange the windows."
+                    : "Click each app\u{2019}s logo to open it. You\u{2019}ll choose the conversations next.",
                  problem: setup.problem ?? missing.flatMap { state[$0].presence.problem(name: name($0)) })
             if state.bothOpen {
-                PerchCapsuleButton(title: "Continue", icon: "arrow.right") { setup.continueFromPrepare() }
-                    .keyboardShortcut(.defaultAction)
-                    .help("Go on to arranging the windows")
+                PerchPrepareContinue(automatically: state.automaticallyContinuePreparation) {
+                    setup.continueFromPrepare()
+                }
             } else {
                 PerchCapsuleButton(title: "Open both apps", icon: "arrow.up.right") { setup.launchBoth() }
                     .disabled(!closed)
@@ -197,6 +230,11 @@ struct PerchSetupCenter: View {
                 PerchTextButton(title: "Click to choose a window") { setup.beginPicking(side) }
                     .disabled(setup.isBinding || setup.state[side].candidates.isEmpty)
                     .help("Pick the \(setup.name(side)) window to relay into")
+                if setup.state[side].isConnected {
+                    PerchCapsuleButton(title: "Continue") { setup.continueFromConnection() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(setup.isBinding)
+                }
             }
         }
     }
@@ -287,6 +325,42 @@ struct PerchSetupCenter: View {
 
     private func other(than side: Speaker) -> Speaker {
         side == .chatgpt ? .claude : .chatgpt
+    }
+}
+
+/// Mounted only while both apps are open. Readiness loss or leaving the
+/// screen removes it and cancels its task; repeated readiness sweeps do not
+/// restart the countdown. The state still rechecks readiness when advancing.
+private struct PerchPrepareContinue: View {
+    let automatically: Bool
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var startedAt: Date?
+    private let duration: TimeInterval = 5
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1 / 30,
+                                paused: startedAt == nil)) { timeline in
+            let elapsed = startedAt.map { max(0, timeline.date.timeIntervalSince($0)) } ?? 0
+            let seconds = max(1, Int(ceil(duration - elapsed)))
+            PerchCapsuleButton(title: automatically ? "Continue · \(seconds)" : "Continue",
+                               icon: "arrow.right",
+                               progress: !automatically || reduceMotion ? nil : elapsed / duration,
+                               action: action)
+                .monospacedDigit()
+                .keyboardShortcut(.defaultAction)
+                .help("Go on to arranging the windows now")
+                .accessibilityLabel("Continue to arrange windows")
+                .accessibilityValue(automatically ? "Automatically continues in \(seconds) seconds" : "")
+        }
+        .task(id: automatically) {
+            guard automatically else { startedAt = nil; return }
+            startedAt = .now
+            do { try await Task.sleep(for: .seconds(duration)) }
+            catch { return }
+            guard !Task.isCancelled, automatically else { return }
+            action()
+        }
     }
 }
 

@@ -55,10 +55,36 @@ popovers retain their own native shapes.
 | Status | Text plus an unobtrusive presence/check indicator. Motion or color alone must not carry readiness, selection, or failure. |
 | Temporary details | An anchored native popover or a destination overlay when needed. These do not become permanent panels beneath the capsule. |
 
-Use `AppIcons.icon(forBundleID:)` for the main participants. The current
-`PerchWidgetParticipant` prefers `AppIcons.mark`; change that preference for
-this experience. Preserve the same app icons after setup rather than switching
-to bare marks when the run starts.
+Use `AppIcons.shared.icon(forBundleID:)` for the main participants. Preserve
+the same app icons after setup rather than switching to bare marks when the
+run starts. Load artwork from the installed applications; do not ship copies
+of their icons inside Errol.
+
+ChatGPT's optional Codex icon is a Dock preference, separate from the default
+Finder icon. For `com.openai.codex`, read its `DockIconPreference` and
+`DockIconResourceName` values and load the matching PNG from that app's
+Resources folder. The Codex system choice follows the Mac's light/dark
+appearance independently of Errol's theme. Unknown preferences or missing
+files fall back to the ordinary macOS installed icon. Claude and other target
+apps use the macOS installed icon directly. Never change another app's settings.
+
+Refresh existing avatars when ChatGPT announces an icon preference change,
+when the system appearance changes, when apps launch or quit, and when Errol
+becomes active. Do not retain an obsolete icon until Errol restarts. The
+installed versions inspected on September 13 include a 2048 × 2048 ChatGPT
+PNG, 1024 × 1024 Codex light/dark PNGs, and Claude icon renditions up to
+1024 × 1024, comfortably above the participant's display size. These vendor
+preference keys and filenames are an optional compatibility path, not a
+public cross-app Dock-icon API. The HTML preview uses fixed sample artwork;
+native previews resolve the installed app and its current preference.
+
+Participant hover feedback belongs to the icon artwork itself: darken the
+image slightly while an actionable icon is hovered, with a short 0.12-second
+transition. Draw no background tile, circle, border, or halo around it. Keep
+the pointer target within the icon's layout slot, excluding the participant's
+name and status. Opening or otherwise inactive icons have no hover treatment.
+Preserve the closed/open opacity distinction and the launch bounce. Keyboard
+focus remains visible independently of hover.
 
 Keep existing run options, app configuration, appearance, and log access
 available through the existing settings entry point. The setup reference now
@@ -82,10 +108,10 @@ capabilities.
 | Preview screen | Product phase | Primary content and action |
 | --- | --- | --- |
 | [01 · Access](#screen-01-access) | Permission needed | Accessibility request in the capsule; Open Accessibility Settings… |
-| [02 · Open apps](#screen-02-open-apps) | Prepare apps | Click each app's logo to open it; Continue once both are open. |
+| [02 · Open apps](#screen-02-open-apps) | Prepare apps | Click each app's logo to open it; a five-second countdown on Continue advances once both are open. |
 | [03 · Arrange](#screen-03-arrange) | Choose layout | Keep positions (the default), Side by side, or Stacked; a choice applies at once, and Continue is offered from the start. |
-| [04 · ChatGPT](#screen-04-connect-chatgpt) | Connect first destination | Drag the left app icon, or click to choose a window. |
-| [05 · Claude](#screen-05-connect-claude) | Connect second destination | Mirrored right-hand instruction and arrow. |
+| [04 · ChatGPT](#screen-04-connect-chatgpt) | Connect first destination | Draw a line from the left app icon to the marked message field, or click to choose a window. |
+| [05 · Claude](#screen-05-connect-claude) | Connect second destination | Mirrored right-hand instruction, arrow, and drag line to Claude’s message field. |
 | [06 · Compose](#screen-06-compose) | Ready to start | Shape, topic, visible destination summaries; Send to the named first assistant. |
 | [07 · Running](#screen-07-running) | Exchange in progress | Current activity, next recipient, Pause to steer, Stop. |
 | [08 · Pause](#screen-08-pause) | Paused at a safe boundary | Steering editor inside the same capsule; send, resume, or stop. |
@@ -93,8 +119,8 @@ capabilities.
 | [10 · Return](#screen-10-return) | Prepare another topic | Revalidated destinations and a new topic in the compact capsule. |
 
 Across the guided screens the capsule keeps one structure: the participant
-columns at the ends, each the app's icon over its name and, under that, its
-state; the center between two hairlines, with the progress meter at its top
+columns at the ends, each the app's icon over a compact label, with a second
+line only for useful destination or recovery information; the center between two hairlines, with the progress meter at its top
 left and the settings entry point at its top right; the step's copy under
 them; and the step's actions under the copy, in the compact pill buttons of
 the reference, never in a column of their own.
@@ -121,11 +147,45 @@ running content and prevents further automation until resolved.
 
 ### Screen 02: Open apps
 
-Check the configured applications and show each side's state under its name:
-**Click to open**, **Opening…**, **App open**, or **Not installed**. Launch only
-in response to the corresponding user action. The step asks only that both
+Use a single 17-point-high label slot beneath each app icon. An open app shows
+only its name; remove **App open** everywhere in setup and do not reserve an
+empty status row. For a closed app, hovering its icon or focusing it by
+keyboard slides the name downward out of the slot and brings **Click to
+open** in from above, over 0.18 seconds. Hold the hint for one full second,
+then reverse the transition to restore the name, even if the pointer stays.
+Repeat only on a new hover/focus entry. Leaving the icon, launching the app,
+or changing screens cancels the hint. The label itself is not a hover target.
+
+**Opening…** or **Checking…** temporarily uses that same label slot. Restore
+the app name once open. Preserve essential recovery text such as **Not
+installed**, and destination details in later steps, as a second line when
+needed. Keep the icon's accessible app name and **Open [app]** action stable;
+with Reduce Motion, swap the label instantly while keeping the one-second
+hold. Launch only in response to the corresponding user action. The step asks only that both
 apps be open: a running app is not necessarily signed in or showing a usable
 conversation, and that is the connect steps' concern, not this one's.
+
+An app that is not open has a faded icon at 45% opacity. Keep it faded while
+**Opening…**; once the app is observed running, bring it to full opacity over
+0.22 seconds. A failed launch stays faded. Labels remain at normal opacity,
+so the icon still reads as an available action. With Reduce Motion, update
+opacity immediately.
+
+While a user-requested launch is pending, the corresponding app icon makes a
+Dock-style vertical hop: 12 points up and back over 0.6 seconds, a smaller
+4-point rebound over 0.24 seconds, then 0.16 seconds at rest. Repeat this
+one-second cycle only while that side reads **Opening…**. Move only the icon;
+keep the label slot, button target, and the capsule's geometry fixed. Both the
+individual icon and **Open both apps** trigger this feedback, independently
+for each app that actually needs to launch. An already-running app does not
+bounce when brought forward. Stop when launch succeeds, fails, or setup is
+left, and return the icon to its resting position. With Reduce Motion, keep
+the icon still and retain **Opening…** as the progress feedback. This is an
+animation of Errol's icon, following the familiar Dock behavior.
+
+The browser reference simulates a 1.6-second launch so the opening state can
+be reviewed; the native app follows observed launch state without adding a
+delay. Duplicate clicks while opening do not start another launch.
 
 Keep the other side's progress if one application needs installation or
 opening. Show the reason in the capsule. Do not imply that clicking an
@@ -133,8 +193,33 @@ unavailable icon installs an application. **Open both apps** calls the same
 launch action for whichever app is not open.
 
 The one primary action sits under the copy: **Open both apps** until both are
-open, then **Continue**. Going on does not yet connect or authorize a
-destination for a run.
+open, then **Continue · 5**. Once both are detected, including when they were
+already open on entry, count down for five seconds. A soft fill moves left to
+right inside Continue, beneath its readable label, while the number counts
+down. Keep the control's size stable as the digits change. Ready copy reads
+**Both apps are open.** and **Next, choose how to arrange the windows.**
+
+Clicking Continue or pressing Return advances immediately. There is no
+secondary countdown action. Users return through earlier segments in the
+progress bar. Returning to Open apps leaves an ordinary Continue button and
+suppresses automatic continuation for the rest of that setup, even after
+another readiness check or app launch. Fresh setup restores the countdown.
+Repeated readiness checks must not restart an active countdown. If either
+app stops being open during the initial countdown, cancel it; detecting both
+again starts a fresh five seconds.
+Leaving the step cancels its pending work. Recheck the phase and both apps'
+presence when advancing, so a late callback cannot skip another step.
+
+At timeout or on Continue, fade the Open apps instructions and controls out
+and the Arrange content in over about 0.3 seconds. Keep the capsule, icons,
+settings entry point, and layout anchors in place; the progress meter updates
+to Arrange with its amber marker sliding from segment one to segment two
+over the same 0.3 seconds, leaving the completed segment green. Keep the four
+tracks fixed while the single thicker marker moves between their positions.
+Do not fade or recreate the later prompt editor. Reduce Motion
+keeps the numeric countdown but removes the moving fill and transition.
+Going on does not yet connect or authorize a destination for a run, and does
+not arrange any windows until a layout is chosen.
 
 ### Screen 03: Arrange
 
@@ -191,6 +276,36 @@ Errol will write. A field whose geometry cannot be read gets the whole window
 as its area. Say what the drop does on the area itself ("Drop here", "Errol
 pastes messages here and sends them"), so the gesture teaches how Errol drives
 the app.
+
+The lead uses the current theme's accent, a continuous rounded stroke and a
+slight downward curve, anchored at the icon's edge. It follows the pointer
+without easing; the icon stays in its perch. Use a 2.5-point stroke and a
+5-point-radius round plug with a 2-point paper-colored edge. Over a valid
+field, increase the stroke to 3 points and the plug radius to 7 points. The
+line sits above the capsule; the field marker sits beneath it. There is no
+idle line to the window title bar or persistent connection line after release.
+
+| Gesture state | Capsule and icon | Message field and line |
+| --- | --- | --- |
+| Ready | Original instruction, arrow and **Drag to connect**; click alternative available. | No line or field marker. |
+| Dragging | Hide the arrow; icon status **Drag to the field**. Supporting copy becomes **Drop it on the marked message field. That is where Errol pastes and sends.** | Line follows the pointer. Mark each eligible field with a 2-point accent outline and 12% accent tint. Center an accent chip with **Drop here** and **Errol pastes messages here and sends them**. |
+| Over a field | Icon status **Release to connect**. | Increase the outline to 3 points and tint to 24%; enlarge the plug. Chip reads **Release to connect**, with the conversation's name and observed state underneath. |
+| Released on a field | Show the connected destination and advance to the other app, or Compose. | Remove the line and marker. No extra confirmation for an ordinary eligible conversation. |
+| Cancelled | Escape or release over the capsule returns to Ready without an error. A release elsewhere explains **Drop onto the marked message field in [app], or click to choose a window.** | Remove the line and marker; preserve the other connection. |
+
+The chip uses 13-point semibold headline and 11-point detail, a rounded
+8-point background, and the theme's on-accent text. Omit the detail when the
+actual field is less than 64 points tall. The reference shows a taller field
+to expose both lines. Keep the conversation itself visible during the drag;
+the full destination card belongs to the picker. Color changes supplement
+text and geometry. Reduce Motion removes the introductory nudge; the line
+still follows the user's pointer directly without autonomous animation.
+
+The saved reference provides **Ready**, **Dragging**, and **Over message
+field** review controls above the mock desktop on screens 04 and 05. They
+hold a gesture state for inspection without requiring an active drag; they
+are not part of the application. Dragging the icon also exercises the local
+preview: only its own marked message field accepts the release.
 
 Provide **Click to choose a window** beside the drag instruction. The picker
 supports pointer selection and keyboard navigation: Return starts selection,
@@ -315,8 +430,23 @@ and the exchange are not additional setup segments.
 
 Completed segments fill with the success color, the current segment uses the
 active accent and a slightly greater thickness, and remaining segments use the
-neutral track. A step completes on its action: Continue on the prepare and
-arrange steps, a successful connection on each connect step. The arrangement
+neutral track. In the native meter, a single active marker slides to the next
+segment over 0.3 seconds while the completed track changes to green. The
+Open apps → Arrange reference synchronizes this movement with the content
+fade, for both timeout and immediate Continue. Reduce Motion updates the
+position and colors immediately. The meter's bounds and spacing stay fixed.
+Each earlier segment is a button with a 24-point-high target within the
+existing toolbar, a step-name tooltip, a keyboard focus indication, and a
+spoken step label. Current and future segments are unavailable. Later steps
+still require both apps to be open; navigation waits for a pending window
+move or connection to finish. Navigating closes any temporary picker or drag
+overlay and preserves the selected layout, bound conversations, and draft.
+Keep the active marker on the revisited step even if it was completed before.
+A revisited connection offers Continue with its existing binding, so inspecting
+an earlier screen never forces the user to reconnect. The meter is hidden
+during a run and cannot reopen setup then.
+A step completes on its action: Continue or its countdown on
+prepare, Continue on arrange, and a successful connection on each connect step. The arrangement
 itself does not complete the arrange step; going on with the windows as they
 are, moved or kept, does. All four fill at screen 06. Hide the
 setup meter once the run begins and in the ordinary returning flow.
@@ -368,8 +498,11 @@ simulated System Settings window. Optional **Demo note** captions are review
 annotations. Product instructions belong in the capsule or a contextual detail
 surface when the user needs them.
 
-The HTML drag is a local demonstration, not validation of AppKit drag tracking,
-Electron hit testing, window identity, clipboard behavior, or accessibility.
+The HTML pointer-tracked drag is a local demonstration, not validation of AppKit
+drag tracking, native message-field discovery, window identity, clipboard
+behavior, or accessibility. It creates no browser image/file drop. The mock
+desktop contains one field per app; the native whole-window fallback when
+field geometry is unavailable is described above but not simulated.
 Its keyboard picker and live readiness transitions are not fully implemented.
 Its examples always use ChatGPT first; production must support both directions.
 
@@ -412,9 +545,11 @@ on turn count or elapsed time.
 | Review | Pass condition |
 | --- | --- |
 | Native visual pass | Screens 01–10 use system type and the same normal desktop capsule footprint, including 08. App icons stay recognizable and consistent. |
+| Installed artwork | ChatGPT's default/Codex choice and the Codex system light/dark variant match the selected Dock artwork. Preference changes refresh existing avatars. Missing assets or unknown preferences retain the installed macOS icon; missing applications retain the initial fallback. |
 | Permission | Initial grant, return from Settings, and revocation behave in the shared panel without a second Errol onboarding window. |
 | Setup progression | Closed apps, sign-in, multiple windows, layout failure, cancellation, and retry preserve unrelated setup work. Progress follows successful actions. |
-| Connection gestures | Drag and pointer/keyboard pick select the same observed window. Wrong-app drops do nothing destructive. Escape cancels. No icon image is pasted into an assistant. |
+| Automatic prepare continuation | Detecting both apps starts one five-second fill on Continue. Continue skips the wait. The progress bar returns to earlier steps; returning to Open apps suppresses its countdown. Readiness loss or leaving the screen prevents stale advancement. The handoff fades only the step content, with a still alternative for Reduce Motion. |
+| Connection gestures | A line follows the pointer from the icon to the marked message field; the field label and plug change when armed. Release connects the same window as pointer/keyboard pick. Release over the capsule or Escape cancels; wrong-field drops preserve setup. Line and markers disappear on completion or cancellation. No icon image is pasted into an assistant. |
 | Accessibility | Keyboard-only setup is complete; VoiceOver reads progress, identity, readiness, and recovery; Reduce Motion removes bouncing and transfer motion. |
 | First send | Both starting-assistant choices name the correct recipient. A changed destination or new draft between Ready and Send blocks delivery without losing the topic. |
 | Bound operations | With multiple windows open, capture, composer checks, paste, and submit all use the selected windows; general candidate discovery cannot substitute another one. |
@@ -451,6 +586,53 @@ incomplete. What is built:
   existing sliders icon, beside the progress meter, and opens the existing
   native settings popover. Previews for all ten screens are in `PerchPreviews.swift`, on a
   preview engine that answers setup actions with canned windows.
+- **Selected app artwork (September 13).** The shared observable `AppIcons`
+  loader reads ChatGPT's optional Dock preference and loads its selected
+  Codex artwork from the installed bundle, with the macOS icon as fallback.
+  Claude continues to use its installed icon. App and appearance notifications
+  invalidate cached images and redraw the existing participants. The app build
+  passed, and native closed/ready previews showed the user's selected Codex
+  icon. A read-only check resolved both 1024 px variants from the installed
+  preference and checked default/unknown preference fallback. Live switching
+  in ChatGPT and a system appearance change have not been manually exercised.
+- **Open-app feedback (September 13).** The production `PerchParticipant`
+  uses one name/action label during preparation. Hover or keyboard focus
+  briefly reveals **Click to open**, returning to the app name after a
+  one-second hold. **Opening…** occupies the same slot; **App open** and
+  its empty status row are removed. Closed icons are faded, bounce while
+  the real launch is pending, and reach full opacity once observed running.
+  Hover darkens only the icon artwork. A custom icon button style preserves
+  full opacity for open apps even when their icons have no action. The native
+  closed and ready appearances were inspected and the app build passed; live
+  hover timing and launch motion remain unverified. Reduce Motion keeps the bounce and
+  label slide still, while retaining the status and timed hint. Connection
+  details and recovery messages keep their second line when needed.
+- **Automatic prepare continuation (September 13).** Both detected apps mount
+  a five-second countdown on Continue, with an elapsed fill inside the button
+  and immediate manual continuation. Its view-owned task cancels when
+  readiness is lost or the step disappears; the existing state guard checks
+  presence and phase again before advancing. The shared setup center fades
+  from Open apps to Arrange over 0.3 seconds. Reduce Motion retains the
+  countdown digits without the fill or fade. The HTML reference mirrors this
+  flow and restarts an initial countdown when a hidden preview becomes visible.
+  Progress segments now return to earlier screens while preserving setup;
+  an intentional return to Open apps waits for Continue. The current and
+  future segments are disabled, and in-flight moves or binding block navigation.
+  The native build passed and the Open apps preview advanced to Arrange.
+  Offline checks against the preview's actual script covered five-second
+  timing, repeat renders, immediate Continue, readiness loss,
+  redetection, navigation, and Reduce Motion. The short native fade has not
+  been visually reviewed in motion.
+- **Progress navigation (September 13).** Earlier segments have mouse and
+  keyboard actions, with the original thin tracks inside taller hit targets.
+  Navigation preserves setup and closes temporary selection UI. Open apps
+  waits for manual Continue after returning through the meter. A revisited
+  bound connection also supports Continue/Return without rebinding. Native
+  build and preview-script checks passed. The setup state suite passes all
+  23 tests against the compiled app, including back navigation, preserved
+  connections, prerequisite guards, and countdown suppression. Fresh native
+  click inspection is blocked by Xcode's "Failed to launch app in reasonable
+  time" preview error; the displayed cached canvas is not current validation.
 - **The state.** `Core/Setup.swift` holds the pure flow — presence per app,
   candidates per window, steps completing only on their actions, connections
   judged by the same evidence the preflight uses, a lost conversation
