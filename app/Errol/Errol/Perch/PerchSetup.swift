@@ -1,6 +1,7 @@
 // The guided setup inside the capsule: the meter over the center, the
-// center's instruction for each step with the step's actions under it,
-// and the window picker with its keyboard. Screens 02–05 of the reference
+// center's instruction for each step with the step's actions along the
+// capsule's bottom band, and the arrow that says which icon to drag.
+// Screens 02–05 of the reference
 // (docs/design-proposals/setup-interaction/SPEC.md); the participants'
 // columns and the destination details are in PerchAvatar.swift.
 
@@ -68,11 +69,11 @@ struct PerchProgressMeter: View {
 
 // MARK: - The center
 
-/// The instruction for the current step with the step's actions under
-/// it, where the editor sits later.
+/// The instruction for the current step: the copy that flows down from
+/// under the meter. The step's actions stand along the capsule's bottom
+/// band instead (PerchSetupActions), where the editor's Send sits later.
 struct PerchSetupCenter: View {
     let controller: RelayController
-    @FocusState private var focusedLayout: LayoutChoice?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var setup: SetupController { controller.setup }
@@ -83,7 +84,7 @@ struct PerchSetupCenter: View {
             switch setup.state.phase {
             case .prepareApps: prepare.transition(.opacity)
             case .arrange: arrange.transition(.opacity)
-            case .connect(let side): connect(side)
+            case .connect(let side): connectInstruction(side)
             case .compose: EmptyView()
             }
         }
@@ -96,37 +97,20 @@ struct PerchSetupCenter: View {
     // MARK: Prepare
 
     /// The step asks only that both apps be open; their conversations are
-    /// the connect steps' concern. One primary action under the copy, as
-    /// the reference has it: open what is not open, then go on.
+    /// the connect steps' concern.
     private var prepare: some View {
         let state = setup.state
         let missing = [Speaker.chatgpt, .claude].first { state[$0].presence == .notInstalled }
-        let closed = [Speaker.chatgpt, .claude].contains { state[$0].presence == .notRunning }
-        return VStack(alignment: .leading, spacing: Perch.s(8)) {
-            copy(headline: state.bothOpen ? "Both apps are open." : "Bring your assistants.",
-                 supporting: state.bothOpen ? "Next, choose how to arrange the windows."
-                    : "Click each app\u{2019}s logo to open it. You\u{2019}ll choose the conversations next.",
-                 problem: setup.problem ?? missing.flatMap { state[$0].presence.problem(name: name($0)) })
-            if state.bothOpen {
-                PerchPrepareContinue(automatically: state.automaticallyContinuePreparation) {
-                    setup.continueFromPrepare()
-                }
-            } else {
-                PerchCapsuleButton(title: "Open both apps", icon: "arrow.up.right") { setup.launchBoth() }
-                    .disabled(!closed)
-                    .keyboardShortcut(.defaultAction)
-                    .help(closed ? "Open whichever app isn\u{2019}t open yet" : "Waiting for the apps to open")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        return copy(headline: state.bothOpen ? "Both apps are open." : "Bring your assistants.",
+                    supporting: state.bothOpen ? "Next, choose how to arrange the windows."
+                        : "Click each app\u{2019}s logo to open it. You\u{2019}ll choose the conversations next.",
+                    problem: setup.problem ?? missing.flatMap { state[$0].presence.problem(name: name($0)) })
     }
 
     // MARK: Arrange
 
-    /// The layout applies as it is chosen, so Continue is the only action,
-    /// at the end of the choices' row as the reference has it; it waits
-    /// only on a move in flight. Arranging again and putting the windows
-    /// back live in the settings.
+    /// The layout applies as it is chosen, so the line follows the
+    /// arrangement; the choices and Continue are the bottom band's.
     private var arrange: some View {
         let state = setup.state
         return VStack(alignment: .leading, spacing: Perch.s(7)) {
@@ -135,50 +119,8 @@ struct PerchSetupCenter: View {
                 .foregroundStyle(Perch.ink)
                 .fixedSize(horizontal: false, vertical: true)
             supportingLine(arrangeSupporting(state), problem: setup.problem ?? state.layoutProblem)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Perch.s(10)) {
-                    layoutChoices
-                    Spacer(minLength: 0)
-                    arrangeContinue
-                }
-                VStack(alignment: .leading, spacing: Perch.s(8)) {
-                    ViewThatFits(in: .horizontal) {
-                        layoutChoices
-                        VStack(alignment: .leading, spacing: Perch.s(7)) {
-                            ForEach(LayoutChoice.allCases, id: \.self) { layoutButton($0) }
-                        }
-                    }
-                    arrangeContinue.frame(maxWidth: .infinity, alignment: .trailing)
-                }
-            }
-            .padding(.top, Perch.s(4))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var layoutChoices: some View {
-        HStack(spacing: Perch.s(7)) {
-            ForEach(LayoutChoice.allCases, id: \.self) { layoutButton($0) }
-        }
-        .fixedSize()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Window arrangement. Choices apply immediately.")
-    }
-
-    private func layoutButton(_ layout: LayoutChoice) -> some View {
-        PerchLayoutButton(layout: layout, selected: setup.state.layout == layout) {
-            focusedLayout = layout
-            setup.choose(layout)
-        }
-        .focused($focusedLayout, equals: layout)
-    }
-
-    private var arrangeContinue: some View {
-        PerchCapsuleButton(title: "Continue") { setup.continueFromArrange() }
-            .fixedSize()
-            .disabled(setup.isArranging)
-            .keyboardShortcut(.defaultAction)
-            .help(setup.isArranging ? "Arranging the windows" : "Go on to connecting the conversations")
     }
 
     /// What the choice did, or waits on. A moving layout applies as it is
@@ -199,52 +141,11 @@ struct PerchSetupCenter: View {
 
     // MARK: Connect
 
-    private func connect(_ side: Speaker) -> some View {
-        Group {
-            if let picker = setup.picker, picker.side == side {
-                VStack(alignment: .leading, spacing: Perch.s(8)) {
-                    PerchWindowPickerList(controller: controller, picker: picker)
-                    connectActions(side)
-                }
-            } else {
-                connectInstruction(side)
-            }
-        }
-    }
-
-    /// The step's actions, under its copy: Choose a window, then Connect
-    /// and Cancel while the picker is open.
-    private func connectActions(_ side: Speaker) -> some View {
-        HStack(spacing: Perch.s(8)) {
-            if setup.picker?.side == side {
-                PerchCapsuleButton(title: "Connect") { setup.choosePick() }
-                    .disabled(setup.isBinding || setup.picker?.current?.isEligible != true
-                              || setup.picker?.current?.isMinimized == true)
-                PerchTextButton(title: "Cancel") { setup.cancelPicking() }
-            } else {
-                if side == .claude, setup.state.chatgpt.isConnected {
-                    Label("\(name(.chatgpt)) connected", systemImage: "checkmark")
-                        .font(Perch.text(11))
-                        .foregroundStyle(Perch.green)
-                }
-                PerchTextButton(title: "Click to choose a window") { setup.beginPicking(side) }
-                    .disabled(setup.isBinding || setup.state[side].candidates.isEmpty)
-                    .help("Pick the \(setup.name(side)) window to relay into")
-                if setup.state[side].isConnected {
-                    PerchCapsuleButton(title: "Continue") { setup.continueFromConnection() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(setup.isBinding)
-                }
-            }
-        }
-    }
-
     /// The instruction block, with the arrow at the edge nearest the icon
     /// it points at: leading and left-pointing for ChatGPT, trailing and
     /// right-pointing for Claude, whose block is right-aligned to match.
     private func connectInstruction(_ side: Speaker) -> some View {
         let leading = side == .chatgpt
-        let state = setup.state
         return HStack(spacing: Perch.s(12)) {
             if leading { PerchArrowCue(pointsLeft: true).opacity(setup.draggingSide == nil ? 1 : 0) }
             VStack(alignment: leading ? .leading : .trailing, spacing: Perch.s(5)) {
@@ -263,15 +164,7 @@ struct PerchSetupCenter: View {
                         .font(Perch.text(11))
                         .foregroundStyle(Perch.red)
                         .lineLimit(2)
-                } else if let hint = state[side].hint {
-                    Text("Last used: \(hint.name)")
-                        .font(Perch.text(11))
-                        .foregroundStyle(Perch.muted)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
                 }
-                connectActions(side)
-                    .padding(.top, Perch.s(3))
             }
             .multilineTextAlignment(leading ? .leading : .trailing)
             if !leading { PerchArrowCue(pointsLeft: false).opacity(setup.draggingSide == nil ? 1 : 0) }
@@ -280,13 +173,14 @@ struct PerchSetupCenter: View {
     }
 
     /// Under the instruction: whose messages the field will take, and,
-    /// while the icon is being dragged, where to put it — the app has come
-    /// forward with its message fields marked, so the drop teaches where
-    /// Errol writes.
+    /// while an icon is being dragged — this step's, or the other side's
+    /// connected already and dragged again — where to put it: the app has
+    /// come forward with its message fields marked, so the drop teaches
+    /// where Errol writes.
     private func connectSupporting(_ side: Speaker) -> String {
-        if setup.draggingSide == side {
-            guard let zones = setup.dropZones else { return "Bringing \(name(side)) forward\u{2026}" }
-            if zones.isEmpty { return "No \(name(side)) conversation is showing. Open a chat in it first." }
+        if let dragging = setup.draggingSide {
+            guard let zones = setup.dropZones else { return "Bringing \(name(dragging)) forward\u{2026}" }
+            if zones.isEmpty { return "No \(name(dragging)) conversation is showing. Open a chat in it first." }
             return "Drop it on the marked message field. That is where Errol pastes and sends."
         }
         return controller.firstSpeaker == side
@@ -325,6 +219,132 @@ struct PerchSetupCenter: View {
 
     private func other(than side: Speaker) -> Speaker {
         side == .chatgpt ? .claude : .chatgpt
+    }
+}
+
+// MARK: - The actions
+
+/// The guided step's actions, along the capsule's bottom band: Open both
+/// apps or Continue while preparing, at the leading edge; on Arrange,
+/// Continue at the leading edge with the layout choices at the trailing
+/// one; on the connect steps, the first side's connected mark and — on a
+/// revisited step whose side is still bound — Continue, at the trailing
+/// edge. The drag itself has no button: the icon is the control.
+struct PerchSetupActions: View {
+    let controller: RelayController
+    @FocusState private var focusedLayout: LayoutChoice?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var setup: SetupController { controller.setup }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            switch setup.state.phase {
+            case .prepareApps: prepare.transition(.opacity)
+            case .arrange: arrange.transition(.opacity)
+            case .connect(let side):
+                if hasConnectActions(side) { connect(side) }
+            case .compose: EmptyView()
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3),
+                   value: setup.state.phase == .prepareApps)
+    }
+
+    // MARK: Prepare
+
+    /// One primary action: open what is not open, then go on.
+    private var prepare: some View {
+        let state = setup.state
+        let closed = [Speaker.chatgpt, .claude].contains { state[$0].presence == .notRunning }
+        return Group {
+            if state.bothOpen {
+                PerchPrepareContinue(automatically: state.automaticallyContinuePreparation) {
+                    setup.continueFromPrepare()
+                }
+            } else {
+                PerchCapsuleButton(title: "Open both apps", icon: "arrow.up.right") { setup.launchBoth() }
+                    .disabled(!closed)
+                    .keyboardShortcut(.defaultAction)
+                    .help(closed ? "Open whichever app isn\u{2019}t open yet" : "Waiting for the apps to open")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Arrange
+
+    /// Continue leads the row and the layout choices close it. Continue
+    /// waits only on a move in flight; arranging again and putting the
+    /// windows back live in the settings.
+    private var arrange: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Perch.s(10)) {
+                arrangeContinue
+                Spacer(minLength: 0)
+                layoutChoices
+            }
+            VStack(alignment: .leading, spacing: Perch.s(8)) {
+                ViewThatFits(in: .horizontal) {
+                    layoutChoices
+                    VStack(alignment: .leading, spacing: Perch.s(7)) {
+                        ForEach(LayoutChoice.allCases, id: \.self) { layoutButton($0) }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                arrangeContinue
+            }
+        }
+    }
+
+    private var layoutChoices: some View {
+        HStack(spacing: Perch.s(7)) {
+            ForEach(LayoutChoice.allCases, id: \.self) { layoutButton($0) }
+        }
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Window arrangement. Choices apply immediately.")
+    }
+
+    private func layoutButton(_ layout: LayoutChoice) -> some View {
+        PerchLayoutButton(layout: layout, selected: setup.state.layout == layout) {
+            focusedLayout = layout
+            setup.choose(layout)
+        }
+        .focused($focusedLayout, equals: layout)
+    }
+
+    private var arrangeContinue: some View {
+        PerchCapsuleButton(title: "Continue") { setup.continueFromArrange() }
+            .fixedSize()
+            .disabled(setup.isArranging)
+            .keyboardShortcut(.defaultAction)
+            .help(setup.isArranging ? "Arranging the windows" : "Go on to connecting the conversations")
+    }
+
+    // MARK: Connect
+
+    /// Whether the step has anything in the band: the first side's
+    /// connected mark on the second step, or Continue on a revisited step
+    /// whose side is still bound.
+    private func hasConnectActions(_ side: Speaker) -> Bool {
+        (side == .claude && setup.state.chatgpt.isConnected) || setup.state[side].isConnected
+    }
+
+    private func connect(_ side: Speaker) -> some View {
+        HStack(spacing: Perch.s(10)) {
+            Spacer(minLength: 0)
+            if side == .claude, setup.state.chatgpt.isConnected {
+                Label("\(setup.name(.chatgpt)) connected", systemImage: "checkmark")
+                    .font(Perch.text(11))
+                    .foregroundStyle(Perch.green)
+            }
+            if setup.state[side].isConnected {
+                PerchCapsuleButton(title: "Continue") { setup.continueFromConnection() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(setup.isBinding)
+            }
+        }
     }
 }
 
@@ -440,75 +460,6 @@ struct PerchArrowCue: View {
             withAnimation(.easeInOut(duration: 0.45)) { nudged = false }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { nudge() }
         }
-    }
-}
-
-// MARK: - The picker
-
-/// The side's windows, one row each, with the arrow keys' place marked.
-/// The pointer resting on a row stands on it too; a click connects it;
-/// the highlight over the window on screen follows either.
-struct PerchWindowPickerList: View {
-    let controller: RelayController
-    let picker: WindowPicker
-
-    private var setup: SetupController { controller.setup }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(3)) {
-            Text("Choose a \(setup.name(picker.side)) window")
-                .font(Perch.text(12, .medium))
-                .foregroundStyle(Perch.muted)
-            ScrollView(.vertical) {
-                VStack(spacing: 1) {
-                    ForEach(Array(picker.candidates.enumerated()), id: \.element.id) { index, candidate in
-                        row(candidate, highlighted: index == picker.highlighted)
-                    }
-                }
-            }
-            .frame(maxHeight: Perch.s(96))
-            Text(setup.problem ?? "\u{2191}\u{2193} move \u{00B7} Return connects \u{00B7} Esc cancels")
-                .font(Perch.text(11))
-                .foregroundStyle(setup.problem == nil ? Perch.placeholder : Perch.red)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Windows")
-    }
-
-    private func row(_ candidate: WindowCandidate, highlighted: Bool) -> some View {
-        Button {
-            setup.highlightPick(candidate.id)
-            setup.choosePick()
-        } label: {
-            HStack(spacing: Perch.s(8)) {
-                Text(candidate.name)
-                    .font(Perch.text(12, .medium))
-                    .foregroundStyle(Perch.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(candidate.identity.surface.map { "\($0) \u{00B7} \(candidate.context)" } ?? candidate.context)
-                    .font(Perch.text(11))
-                    .foregroundStyle(Perch.muted)
-                    .lineLimit(1)
-                Spacer(minLength: Perch.s(6))
-                Text(candidate.stateLine)
-                    .font(Perch.text(11))
-                    .foregroundStyle(candidate.isEligible && candidate.composer.isEmpty ? Perch.green : Perch.red)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, Perch.s(8))
-            .frame(height: Perch.s(24))
-            .background(RoundedRectangle(cornerRadius: Perch.s(6)).fill(highlighted ? Perch.well : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering { setup.highlightPick(candidate.id) }
-        }
-        .accessibilityLabel("\(candidate.name), \(candidate.context), \(candidate.stateLine)")
-        .accessibilityAddTraits(highlighted ? .isSelected : [])
     }
 }
 

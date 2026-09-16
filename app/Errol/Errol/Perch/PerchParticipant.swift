@@ -3,13 +3,15 @@
 // destination or recovery details add a second line; a corner mark shows
 // the connection. ChatGPT stands left and Claude right whoever starts. The
 // icon is the side's control and changes with the step: it opens the app,
-// chooses its window, or shows the destination's details; it never
-// changes who starts, which the session settings do.
+// is dragged to connect its conversation, or shows the destination's
+// details; it never changes who starts, which the session settings do.
 //
-// Dragging the active icon selects a window through the same binding as
-// the picker: the app comes forward under the console with an area drawn
-// over each message field, and the drop lands on one of those. Errol owns
-// the gesture and sends no file to the other app.
+// Dragging an icon connects a window: the app comes forward under the
+// console with an area drawn over each message field, and the drop lands
+// on one of those. Errol owns the gesture and sends no file to the other
+// app. Through both connect steps either open app's icon can be dragged,
+// a connected one again — the step names one side, but the gesture is the
+// lesson in where Errol writes, and repeating it costs nothing.
 
 import SwiftUI
 
@@ -36,9 +38,11 @@ struct PerchParticipant: View {
     private var feather: Color { speaker == .claude ? Perch.claudeFeather : Perch.chatgptFeather }
     private var replying: Bool { controller.isRunning && conversation == .chatting }
 
-    /// What the icon does now.
+    /// What a click on the icon does now. Dragging is `draggable`'s
+    /// concern and outlives the role: a connected side shows its details
+    /// on a click and connects again on a drag.
     private enum Role {
-        case launch, openConversation, chooseWindow, chooseArrangement, details, none
+        case launch, openConversation, connect, chooseArrangement, details, none
     }
 
     private var role: Role {
@@ -59,12 +63,19 @@ struct PerchParticipant: View {
                 return setup.state.needsArrangementChoice(speaker)
                     ? .chooseArrangement : (side.isConnected ? .details : .none)
             case .connect(let target):
-                if target == speaker { return .chooseWindow }
+                if target == speaker { return .connect }
                 return side.isConnected ? .details : .none
             case .compose:
                 return .details
             }
         }
+    }
+
+    /// Whether the icon can be dragged onto a conversation: through the
+    /// connect steps, for either side whose app is open.
+    private var draggable: Bool {
+        guard controller.stage == .setup, setup.state.phase.isConnecting else { return false }
+        return side.presence.isOpen
     }
 
     var body: some View {
@@ -141,12 +152,14 @@ struct PerchParticipant: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(PerchIconButtonStyle())
-            .disabled(role == .none)
+            .disabled(role == .none || role == .connect)
             .focused($iconFocused)
             .accessibilityLabel(iconLabel)
             .overlay {
-                if role == .chooseWindow {
-                    PerchConnectionDragHandle(setup: setup, side: speaker)
+                if draggable {
+                    // The handle takes the mouse over the icon, so a plain
+                    // click comes back through it to do what the role says.
+                    PerchConnectionDragHandle(setup: setup, side: speaker, onClick: act)
                         .accessibilityHidden(true)
                 }
             }
@@ -157,9 +170,8 @@ struct PerchParticipant: View {
         switch role {
         case .launch: setup.launch(speaker)
         case .openConversation: setup.openConversation(speaker)
-        case .chooseWindow: setup.beginPicking(speaker)
         case .details: showingDetails = true
-        case .chooseArrangement, .none: break
+        case .connect, .chooseArrangement, .none: break
         }
     }
 
@@ -167,7 +179,7 @@ struct PerchParticipant: View {
         switch role {
         case .launch: return "Open \(name)"
         case .openConversation: return "Bring \(name) forward"
-        case .chooseWindow: return "Choose \(name)'s window"
+        case .connect: return "Drag \(name) onto its conversation"
         case .details: return "\(name) destination details"
         case .chooseArrangement: return "Choose which \(name) window to move"
         case .none: return name
@@ -191,11 +203,15 @@ struct PerchParticipant: View {
         }
     }
 
-    /// The state under the app's name: the connected conversation and how
-    /// it reads, or the next thing to do for the app at this step. The
-    /// preparation step shares a single name/action slot; only useful
-    /// destination or recovery information needs a second line.
+    /// The state under the app's name: a drag in progress first, then the
+    /// connected conversation and how it reads, or the next thing to do
+    /// for the app at this step. The preparation step shares a single
+    /// name/action slot; only useful destination or recovery information
+    /// needs a second line.
     private var stateLine: (String, Bool)? {
+        if controller.stage == .setup, setup.draggingSide == speaker {
+            return (setup.dragCandidate == nil ? "Drag to the field" : "Release to connect", false)
+        }
         if let connection = side.connection {
             switch connection.readiness {
             case .ready: return (connection.name, false)
@@ -215,12 +231,7 @@ struct PerchParticipant: View {
                 if setup.state.needsArrangementChoice(speaker) { return ("Choose a window", false) }
                 return side.presence.isOpen ? nil : (side.presence.openState, false)
             case .connect(let target):
-                if target == speaker {
-                    if setup.draggingSide == speaker {
-                        return (setup.dragCandidate == nil ? "Drag to the field" : "Release to connect", false)
-                    }
-                    return (setup.picker?.side == speaker ? "Choosing\u{2026}" : "Drag to connect", false)
-                }
+                if target == speaker { return ("Drag to connect", false) }
                 return side.presence.isOpen ? nil : (side.presence.openState, false)
             case .compose:
                 return nil

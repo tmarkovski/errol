@@ -1,7 +1,8 @@
 // The settings card: the console's own idiom — the panel's glass, system
 // type, soft wells, capsule buttons — as a screen inside the main panel.
 // The native header provides Back. Appearance preferences sit above the
-// conversation shapes behind the composer's pills.
+// conversation shapes, which the composer does not offer for now
+// (RelayController.conversation).
 
 import SwiftUI
 

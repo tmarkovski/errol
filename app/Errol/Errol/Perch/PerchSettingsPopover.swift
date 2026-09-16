@@ -8,10 +8,8 @@ struct PerchSettingsPopover: View {
     }
 
     @Bindable var controller: RelayController
-    var onEditShapes: () -> Void
     @State private var tab = Tab.conversation
     @State private var turnFocusRequest = 0
-    @ObservedObject private var settings = SettingsStore.shared
     @Bindable private var appearance = AppearanceStore.shared
 
     var body: some View {
@@ -65,9 +63,11 @@ struct PerchSettingsPopover: View {
         .accessibilityLabel("Settings tabs")
     }
 
+    /// The session's options. The shape row and the command to edit the
+    /// shapes are off for now: every opening is the bare topic
+    /// (RelayController.conversation).
     private var conversation: some View {
         VStack(spacing: Perch.s(12)) {
-            row("Shape") { shapeMenu }
             row("Starts") {
                 SettingsSegments(label: "Starts the conversation", selection: $controller.firstSpeaker,
                                  options: [(controller.chatgptStatus.appName, .chatgpt),
@@ -108,8 +108,6 @@ struct PerchSettingsPopover: View {
                     controller.setup.restart()
                 }
                 .help("Open the apps, arrange, and connect the conversations step by step")
-                command("Edit conversation shapes", icon: "square.and.pencil",
-                        opensPage: true, action: onEditShapes)
             }
         }
         .disabled(controller.isRunning)
@@ -117,39 +115,6 @@ struct PerchSettingsPopover: View {
         .onChange(of: controller.limitTurns) { _, limited in
             if limited { turnFocusRequest += 1 }
         }
-    }
-
-    private var shapeMenu: some View {
-        Menu {
-            Picker("Conversation shape", selection: Binding(
-                get: { controller.conversation }, set: { controller.selectConversation($0) })) {
-                Text(RelayController.freeConversation).tag(RelayController.freeConversation)
-                ForEach(settings.templates) { template in Text(template.name).tag(template.name) }
-                Text("Write from scratch").tag(RelayController.customConversation)
-            }
-        } label: {
-            HStack {
-                Text(controller.conversation == RelayController.customConversation
-                     ? "Write from scratch" : controller.conversation)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: Perch.s(6))
-                Image(systemName: "chevron.down")
-                    .font(Perch.text(9, .semibold))
-                    .foregroundStyle(Perch.muted)
-            }
-            .font(Perch.text(12, .medium))
-            .padding(.horizontal, Perch.s(11))
-            .frame(height: Perch.s(34))
-            .background(RoundedRectangle(cornerRadius: Perch.s(8)).fill(Perch.well))
-            .perchHover(RoundedRectangle(cornerRadius: Perch.s(8)))
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .accessibilityLabel("Conversation shape")
-        .accessibilityValue(controller.conversation)
     }
 
     /// The number stays mounted and in place in Auto mode; only its availability changes.

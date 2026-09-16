@@ -29,11 +29,10 @@ final class RunReportTests: XCTestCase {
     }
 
     func testAStopDuringAHoldKeepsTheHoldAsContext() {
-        let block = RunBlock.destinationChanged(side: .claude, bound: "\u{201C}Onboarding ideas\u{201D}",
-                                                seen: "showing \u{201C}Quarterly report\u{201D}")
+        let block = RunBlock.windowHidden(side: .claude, seen: "minimized")
         let report = RunReport(outcome: .stopped, repliesCaptured: 3, block: block)
         XCTAssertEqual(report.headline(names: names), "Run stopped")
-        XCTAssertEqual(detail(report), "3 replies relayed \u{00B7} ran 4:32 \u{00B7} while paused: Claude's conversation had changed")
+        XCTAssertEqual(detail(report), "3 replies relayed \u{00B7} ran 4:32 \u{00B7} while paused: Claude's window was hidden")
     }
 
     func testAOneSidedSignOffIsContextNotACause() {

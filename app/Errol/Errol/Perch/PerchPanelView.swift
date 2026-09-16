@@ -13,27 +13,29 @@ struct PerchPanelView: View {
     var body: some View {
         HStack(spacing: Perch.s(14)) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
-            // The center between its two hairlines, as the reference draws
-            // it: the meter at its top left and the settings at its top
-            // right in every state, the stage's content under them, and —
-            // outside the guided steps, whose actions sit under their own
-            // copy — the stage's actions beside it.
-            HStack(alignment: .center, spacing: Perch.s(10)) {
-                VStack(alignment: .leading, spacing: Perch.s(8)) {
-                    HStack(alignment: .center, spacing: Perch.s(8)) {
-                        if showsMeter {
-                            PerchProgressMeter(controller: controller)
-                                .transition(.opacity)
-                        }
-                        Spacer(minLength: 0)
-                        PerchWidgetSetup(controller: controller)
+            // The center between its two hairlines, in three bands that keep
+            // their places whatever the stage: the meter and the settings
+            // along the top, the stage's actions along the bottom, and the
+            // stage's content flowing down from under the top band. The
+            // column fills the capsule's height, so the top band never
+            // drifts with the content; content past the room there is
+            // grows the capsule downward.
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: Perch.s(8)) {
+                    if showsMeter {
+                        PerchProgressMeter(controller: controller)
+                            .transition(.opacity)
                     }
-                    .animation(Perch.fade, value: showsMeter)
-                    PerchWidgetCenter(controller: controller)
+                    Spacer(minLength: 0)
+                    PerchWidgetSetup(controller: controller)
                 }
-                .layoutPriority(1)
+                .animation(Perch.fade, value: showsMeter)
+                PerchWidgetCenter(controller: controller)
+                    .padding(.top, Perch.s(8))
+                Spacer(minLength: Perch.s(8))
                 PerchWidgetActions(controller: controller)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, Perch.s(18))
             .overlay(alignment: .leading) { hairline }
             .overlay(alignment: .trailing) { hairline }
@@ -57,7 +59,8 @@ struct PerchPanelView: View {
         (controller.stage == .setup || controller.stage == .compose) && controller.setup.state.meterVisible
     }
 
-    /// The center's edges, the height of whatever the center holds.
+    /// The center's edges, the height of the column — which is the
+    /// capsule's, now that the column fills it.
     private var hairline: some View {
         Rectangle().fill(Perch.hairline).frame(width: 1)
     }

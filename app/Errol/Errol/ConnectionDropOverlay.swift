@@ -1,7 +1,7 @@
 // What the connection drag draws: a lead out of the icon to the pointer,
 // and an area over each message field the icon can be dropped on. Both
-// are click-through panels of Errol's own, the way the picker's highlight
-// and the veil are drawn — Errol's windows over another app's, needing no
+// are click-through panels of Errol's own, the way the veil and the
+// transfer overlay are drawn — Errol's windows over another app's, needing no
 // permission and touching nothing in the app. The areas sit a level under
 // the console; the lead a level over it, so it leaves the icon itself and
 // the gesture reads as running a cable from the app's perch to its field.

@@ -1,35 +1,35 @@
 // The setup flow's observable face: the pure SetupState (Core/Setup.swift)
 // driven by the engine's readiness sweeps and the human's actions, plus the
-// two things that are the app's rather than the state's — the window
-// picker, with its keyboard and its highlight over the candidate, and the
-// remembered destinations in the defaults. Main thread only; the engine
+// two things that are the app's rather than the state's — the drag from an
+// icon, with the areas drawn over the message fields it can land on, and
+// the remembered destinations in the defaults. Main thread only; the engine
 // answers on the main thread.
 //
-// Connecting has one entry point, `connect(_:to:)`, whatever the gesture:
-// the picker's Return or click, or a drop from the icon onto the area
-// drawn over a window's message field. Both produce the same binding and
-// the same connected state.
+// Connecting has one entry point, `connect(_:to:)`, and one gesture: a
+// drop from the icon onto the area drawn over a window's message field.
+// The window picker that stood beside it — click to choose, with its
+// keyboard and its highlight over the candidate — came out in Sep 2026 to
+// keep the screen to that one gesture. A side can be dragged again once
+// connected: the drop is what teaches where Errol writes, and a repeat just
+// binds that side afresh.
 
 import AppKit
 import Foundation
 import Observation
 
-/// A side's window being chosen: the candidates as the last sweep offered
-/// them, and the one the arrow keys stand on.
-struct WindowPicker: Equatable {
-    let side: Speaker
-    var candidates: [WindowCandidate]
-    var highlighted: Int
-
-    var current: WindowCandidate? {
-        candidates.indices.contains(highlighted) ? candidates[highlighted] : nil
-    }
-}
-
 @Observable
 final class SetupController {
-    private(set) var state: SetupState
-    private(set) var picker: WindowPicker?
+    private(set) var state: SetupState {
+        didSet {
+            if state.phase == .compose, oldValue.phase != .compose { onReachCompose?() }
+        }
+    }
+    /// Told once each time the phase reaches the editor from a guided step,
+    /// whatever brought it there — the last connection binding, Continue on
+    /// a revisited step, a sweep confirming a binding — so the shell can
+    /// bring the console forward and hand the editor the keyboard. Silent
+    /// while the phase is already the editor's. Main thread, like the rest.
+    @ObservationIgnored var onReachCompose: (() -> Void)?
     private(set) var draggingSide: Speaker?
     /// The window under the dragged icon: the one whose area is armed.
     private(set) var dragCandidate: WindowCandidate?
@@ -48,7 +48,6 @@ final class SetupController {
 
     @ObservationIgnored private let engine: RelayEngine
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private let highlight = WindowHighlight()
     @ObservationIgnored private var launchDeadlines: [Speaker: Timer] = [:]
     @ObservationIgnored private var arrangementsInFlight = 0
     /// The windows the last arrangement was asked to move, so a sweep
@@ -84,14 +83,14 @@ final class SetupController {
 
     func revisit(_ step: SetupStep) {
         guard canRevisit(step) else { return }
-        cancelPicking()
+        cancelDragging()
         problem = nil
         state.revisit(step)
     }
 
     func continueFromConnection() {
         guard !isBinding else { return }
-        cancelPicking()
+        cancelDragging()
         problem = nil
         state.continueFromConnection()
     }
@@ -117,19 +116,6 @@ final class SetupController {
             }
         }
         applyIfPending()
-        if var picker {
-            // The picker follows the sweep, keeping its place on the same
-            // window where it is still offered.
-            let current = picker.current?.id
-            picker.candidates = state[picker.side].candidates
-            if let current, let index = picker.candidates.firstIndex(where: { $0.id == current }) {
-                picker.highlighted = index
-            } else {
-                picker.highlighted = min(picker.highlighted, max(0, picker.candidates.count - 1))
-            }
-            self.picker = picker
-            updateHighlight()
-        }
     }
 
     // MARK: Prepare the apps
@@ -275,10 +261,14 @@ final class SetupController {
     /// area over each of its message fields, drawn as soon as it does; the
     /// drop resolves against those areas as drawn — the pointer over one
     /// arms it, releasing there connects its window — never against
-    /// whatever window happens to be under the pointer.
+    /// whatever window happens to be under the pointer. Either icon can be
+    /// dragged through both connect steps, a connected one again: the step
+    /// names one side, but the gesture is the lesson, and a repeat just
+    /// binds that side afresh (SetupState.connected keeps the phase on the
+    /// first side still unconnected).
     func beginDragging(_ side: Speaker, from icon: CGRect) {
-        guard !isBinding, state.phase == .connect(side) else { return }
-        cancelPicking()
+        guard !isBinding, state.phase.isConnecting else { return }
+        cancelDragging()
         problem = nil
         dragGeneration = UUID()
         let generation = dragGeneration
@@ -341,8 +331,8 @@ final class SetupController {
             return
         }
         problem = zones.isEmpty
-            ? "No \(name(side)) conversation is showing. Open a chat in it and drag again, or click to choose a window."
-            : "Drop onto the marked message field in \(name(side)), or click to choose a window."
+            ? "No \(name(side)) conversation is showing. Open a chat in it and drag again."
+            : "Drop onto the marked message field in \(name(side))."
         announce(problem!)
     }
 
@@ -369,71 +359,15 @@ final class SetupController {
             armedDetail: candidate.map { "\($0.name) \u{00B7} \($0.stateLine)" } ?? name(side))
     }
 
-    /// Open the picker for `side`: the candidates as last swept, the
-    /// remembered window highlighted first.
-    func beginPicking(_ side: Speaker) {
-        guard !isBinding else { return }
-        cancelDragging()
-        problem = nil
-        let setup = state[side]
-        engine.requestSweep()
-        guard !setup.candidates.isEmpty else {
-            problem = "\(name(side)) has no window to connect. Open a conversation in it first."
-            return
-        }
-        let first = setup.preferredCandidate.flatMap { preferred in
-            setup.candidates.firstIndex(where: { $0.id == preferred.id })
-        } ?? 0
-        picker = WindowPicker(side: side, candidates: setup.candidates, highlighted: first)
-        updateHighlight()
-    }
-
-    func movePick(by delta: Int) {
-        guard var picker, !picker.candidates.isEmpty else { return }
-        picker.highlighted = (picker.highlighted + delta + picker.candidates.count) % picker.candidates.count
-        self.picker = picker
-        updateHighlight()
-    }
-
-    /// Stand on a candidate: the pointer resting on its row.
-    func highlightPick(_ id: WindowID) {
-        guard var picker, let index = picker.candidates.firstIndex(where: { $0.id == id }),
-              index != picker.highlighted else { return }
-        picker.highlighted = index
-        self.picker = picker
-        updateHighlight()
-    }
-
-    /// Return, or a click on the highlighted row: connect the window it
-    /// stands on, if a run could target it.
-    func choosePick() {
-        guard let picker, let candidate = picker.current else { return }
-        guard candidate.isEligible, !candidate.isMinimized else {
-            problem = candidate.hasComposer
-                ? "That window is minimized. Bring it back, or choose another."
-                : "That window has no message field to relay into. Choose another."
-            return
-        }
-        connect(picker.side, to: candidate.id)
-    }
-
-    func cancelPicking() {
-        cancelDragging()
-        picker = nil
-        highlight.hide()
-    }
-
-    /// The one way a side gets connected, whatever gesture chose the
-    /// window. The engine binds it on its worker and answers with what it
-    /// read; the state takes the connection from there.
+    /// The one way a side gets connected. The engine binds the window on
+    /// its worker and answers with what it read; the state takes the
+    /// connection from there.
     func connect(_ side: Speaker, to window: WindowID) {
         guard !isBinding else { return }
         cancelDragging()
         isBinding = true
         problem = nil
         let candidate = state[side].candidates.first { $0.id == window }
-        picker = nil
-        highlight.hide()
         engine.bind(side, to: window) { [weak self] observation in
             guard let self else { return }
             isBinding = false
@@ -450,58 +384,29 @@ final class SetupController {
     }
 
     /// Choose another conversation for a connected side: the connection is
-    /// dropped and the picker opens for that side alone.
+    /// dropped and the flow stands on that side's connect step, asking for
+    /// the drag again.
     func chooseAnother(_ side: Speaker) {
+        cancelDragging()
+        problem = nil
         engine.unbind(side)
         state.disconnect(side)
-        beginPicking(side)
+        engine.requestSweep()
     }
 
     // MARK: Keys
 
-    /// The picker's keys, from the panel: arrows move among the windows,
-    /// Return connects the one stood on, Escape cancels. Outside the
-    /// picker, Return starts picking, or continues a revisited connection
-    /// that is already bound. Returns whether the key was taken.
-    func handleKey(_ event: NSEvent) -> Bool {
-        let key = event.keyCode
-        if draggingSide != nil {
-            if key == 53 { cancelDragging() }
-            return true
-        }
-        guard picker != nil else {
-            if case .connect(let side) = state.phase, key == 36 || key == 76 {
-                if state[side].isConnected { continueFromConnection() }
-                else { beginPicking(side) }
-                return true
-            }
-            return false
-        }
-        switch key {
-        case 126: movePick(by: -1)      // up
-        case 125: movePick(by: 1)       // down
-        case 36, 76: choosePick()       // Return, keypad Enter
-        case 53: cancelPicking()        // Escape
-        default: return false
-        }
-        return true
-    }
-
-    /// Escape from the panel's cancel path: true when the picker took it.
-    func cancelIfPicking() -> Bool {
-        if draggingSide != nil {
-            cancelDragging()
-            return true
-        }
-        guard picker != nil else { return false }
-        cancelPicking()
+    /// Escape from the panel's cancel path: true when it called a drag off.
+    func cancelIfDragging() -> Bool {
+        guard draggingSide != nil else { return false }
+        cancelDragging()
         return true
     }
 
     // MARK: Runs, returns, restarts
 
     func runStarted() {
-        cancelPicking()
+        cancelDragging()
         problem = nil
         state.runStarted()
     }
@@ -516,7 +421,7 @@ final class SetupController {
 
     /// Set up fresh conversations: both sides connect anew.
     func setUpFresh() {
-        cancelPicking()
+        cancelDragging()
         problem = nil
         engine.unbind(.chatgpt)
         engine.unbind(.claude)
@@ -526,24 +431,13 @@ final class SetupController {
 
     /// Guided setup from the top.
     func restart() {
-        cancelPicking()
+        cancelDragging()
         problem = nil
         engine.unbind(.chatgpt)
         engine.unbind(.claude)
         arrangedTargets = nil
         state.restart()
         engine.requestSweep()
-    }
-
-    // MARK: The highlight
-
-    private func updateHighlight() {
-        guard let picker, let candidate = picker.current, let frame = candidate.frame,
-              !candidate.isMinimized else {
-            highlight.hide()
-            return
-        }
-        highlight.show(frame: frame, label: "\(name(picker.side)) \u{00B7} \(candidate.name)")
     }
 
     private func announce(_ message: String) {

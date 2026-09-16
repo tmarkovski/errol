@@ -1,8 +1,8 @@
 // Every canvas the panel is worked on in, kept out of the view files so
 // each of those stays about its view. Each runs on PerchPreviewEngine, so
-// the controls do what they do in the app — Open opens an app, Choose a
-// window offers the engine's canned windows, Connect binds one, Send
-// starts a run, Stop ends it at the next handoff and leaves the summary,
+// the controls do what they do in the app — Open opens an app, a drop
+// from an icon binds one of the engine's canned windows, Send starts a
+// run, Stop ends it at the next handoff and leaves the summary,
 // Pause to steer holds it and opens the field, Return sends the note —
 // and nothing reaches either app. The ten reference screens are here in
 // order (docs/design-proposals/setup-interaction/SPEC.md); the first,
@@ -70,12 +70,6 @@ private func canvas(_ controller: RelayController) -> some View {
     canvas(stepped(to: .connect(.chatgpt)))
 }
 
-#Preview("04 · Connect ChatGPT (picking)") {
-    let controller = stepped(to: .connect(.chatgpt))
-    controller.setup.beginPicking(.chatgpt)
-    return canvas(controller)
-}
-
 #Preview("05 · Connect Claude") {
     canvas(stepped(to: .connect(.claude)))
 }
@@ -92,12 +86,6 @@ private func canvas(_ controller: RelayController) -> some View {
 
 #Preview("06 · Compose") {
     canvas(stepped(to: .compose))
-}
-
-#Preview("06 · Compose (Free chat)") {
-    let controller = stepped(to: .compose)
-    controller.selectConversation(RelayController.freeConversation)
-    return canvas(controller)
 }
 
 #Preview("06 · Compose (long topic)") {

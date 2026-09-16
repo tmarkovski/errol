@@ -1,25 +1,30 @@
 import AppKit
 import SwiftUI
 
-/// Mouse tracking continues outside the panel, while a normal click still
-/// opens the picker. The SwiftUI button beneath retains keyboard and
-/// VoiceOver activation. No pasteboard item or external drop is created:
-/// the drop resolves against the areas Errol draws over the message
-/// fields (SetupController), never against the app under the pointer.
+/// Mouse tracking continues outside the panel, while a plain click is
+/// handed back through `onClick` — the icon's own action, since this view
+/// covers the icon and takes the mouse it would have had. The SwiftUI
+/// button beneath retains keyboard and VoiceOver activation. No pasteboard
+/// item or external drop is created: the drop resolves against the areas
+/// Errol draws over the message fields (SetupController), never against
+/// the app under the pointer.
 struct PerchConnectionDragHandle: NSViewRepresentable {
     let setup: SetupController
     let side: Speaker
+    var onClick: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> ConnectionHandleView {
         let view = ConnectionHandleView()
         view.setup = setup
         view.side = side
+        view.onClick = onClick
         return view
     }
 
     func updateNSView(_ view: ConnectionHandleView, context: Context) {
         view.setup = setup
         view.side = side
+        view.onClick = onClick
     }
 
     static func dismantleNSView(_ view: ConnectionHandleView, coordinator: ()) {
@@ -30,6 +35,7 @@ struct PerchConnectionDragHandle: NSViewRepresentable {
 final class ConnectionHandleView: NSView {
     weak var setup: SetupController?
     var side = Speaker.chatgpt
+    var onClick: (() -> Void)?
     private var origin: CGPoint?
     private var dragging = false
     private var cursorPushed = false
@@ -68,7 +74,7 @@ final class ConnectionHandleView: NSView {
             let point = NSEvent.mouseLocation
             setup?.endDragging(at: axPoint(point), overConsole: isOverConsole(point))
         } else if bounds.contains(convert(event.locationInWindow, from: nil)) {
-            setup?.beginPicking(side)
+            onClick?()
         }
     }
 

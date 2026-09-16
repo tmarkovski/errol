@@ -72,7 +72,11 @@ final class RelayController {
     /// and Settings should not offer its body for editing.
     static let freeConversation = "Free chat"
     /// The selected template's name, customConversation, or freeConversation.
-    var conversation = conversationTemplates[0].name
+    /// Free chat for now (Sep 2026): the shape choice is off the composer
+    /// and the session settings, so every opening is the bare topic. The
+    /// templates, their Settings editor, and selectConversation stay for
+    /// when the choice comes back.
+    var conversation = RelayController.freeConversation
     /// Completes the selected template ("What to brainstorm about").
     var topic = ""
     /// The opening message written from scratch under Custom (More → Write
@@ -172,8 +176,10 @@ final class RelayController {
     /// Set by the AppKit shell; the panel's Settings… item routes here to
     /// navigate to Settings inside the panel.
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
-    /// Set by the AppKit shell; a finished run routes here so the console
-    /// takes the keyboard back from the chat app that replied last.
+    /// Set by the AppKit shell. A finished run routes here so the console
+    /// takes the keyboard back from the chat app that replied last, and so
+    /// does the guided setup on reaching the editor, so the topic can be
+    /// typed at once.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
@@ -183,6 +189,10 @@ final class RelayController {
         self.veils = veils
         self.transferOverlay = transferOverlay
         setup = SetupController(engine: engine)
+        // Reaching the editor is the moment to type: the console comes
+        // forward and key through the shell's handler, and the editor takes
+        // the keyboard as it appears (PerchWidgetCenter.openingEditor).
+        setup.onReachCompose = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only

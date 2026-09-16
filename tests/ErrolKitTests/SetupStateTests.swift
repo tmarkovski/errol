@@ -226,14 +226,14 @@ final class SetupStateTests: XCTestCase {
         XCTAssertNil(state.sendBlocker(names: names))
     }
 
-    func testAChangedConversationBlocksSendingAndKeepsTheTopicSide() throws {
+    func testAHiddenWindowBlocksSendingAndKeepsTheOtherSide() throws {
         var state = try composed()
         let claudeHome = try candidate("claude-chat-home", id: 2, selectors: claude)
-        state.observe(.claude, binding: observation(claudeHome, check: .changed("showing a new chat")))
-        XCTAssertEqual(state.phase, .compose)
-        XCTAssertEqual(state.claude.connection?.readiness, .changed("showing a new chat"))
-        XCTAssertEqual(state.sendBlocker(names: names),
-                       "Claude is showing a new chat. Show the connected conversation again, or choose another.")
+        state.observe(.claude, binding: observation(claudeHome, check: .hidden("minimized")))
+        XCTAssertEqual(state.phase, .compose, "the connection stands; the window is the human's to bring back")
+        XCTAssertEqual(state.claude.connection?.readiness, .hidden("minimized"))
+        XCTAssertEqual(state.claude.connection?.readiness.status(name: "Claude"), "Hidden")
+        XCTAssertEqual(state.sendBlocker(names: names), "Claude's window is minimized. Bring it back to send.")
         XCTAssertTrue(state.chatgpt.isReady, "the other side is untouched")
     }
 

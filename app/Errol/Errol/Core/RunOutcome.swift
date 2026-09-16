@@ -122,7 +122,7 @@ extension RunBlock {
     func contextClause(names: (chatgpt: String, claude: String)) -> String {
         let name = side == .chatgpt ? names.chatgpt : names.claude
         switch self {
-        case .destinationChanged: return "\(name)'s conversation had changed"
+        case .windowHidden: return "\(name)'s window was hidden"
         case .draft: return "\(name) had an unsent draft"
         case .attachments: return "\(name) had an unsent attachment"
         case .replying: return "\(name) was replying to something else"

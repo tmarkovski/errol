@@ -200,8 +200,8 @@ enum DestinationReadiness: Equatable {
     /// The composer holds unsent work, or the app is replying, or the
     /// composer cannot be read: something to finish in the app first.
     case finishPreparing(RunBlock)
-    /// The window no longer shows the connected conversation.
-    case changed(String)
+    /// The window is minimized: there, but out of reach.
+    case hidden(String)
     /// The app quit or the window closed.
     case lost(String)
 
@@ -213,7 +213,7 @@ enum DestinationReadiness: Equatable {
         case .unverified: return "Last used"
         case .ready: return "Connected"
         case .finishPreparing: return "Finish preparing"
-        case .changed: return "Changed"
+        case .hidden: return "Hidden"
         case .lost: return "Lost"
         }
     }
@@ -224,8 +224,8 @@ enum DestinationReadiness: Equatable {
         case .unverified: return "Checking \(name)'s conversation\u{2026}"
         case .ready: return nil
         case .finishPreparing(let block): return block.startRefusal(name: name)
-        case .changed(let seen):
-            return "\(name) is \(seen). Show the connected conversation again, or choose another."
+        case .hidden(let seen):
+            return "\(name)'s window is \(seen). Bring it back to send."
         case .lost(let detail):
             return "\(detail.prefix(1).uppercased())\(detail.dropFirst()). Connect \(name) again."
         }
@@ -245,7 +245,7 @@ struct BindingObservation: Equatable {
 func destinationReadiness(_ observation: BindingObservation, side: Speaker) -> DestinationReadiness {
     switch observation.check {
     case .lost(let detail): return .lost(detail)
-    case .changed(let seen): return .changed(seen)
+    case .hidden(let seen): return .hidden(seen)
     case .same: break
     }
     if let block = deliveryBlock(for: observation.composer, side: side) {

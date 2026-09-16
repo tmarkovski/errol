@@ -48,20 +48,12 @@ struct PerchWidgetCenter: View {
 
     // MARK: Compose
 
-    /// The topic, the shape it completes, the one sentence about what
-    /// happens next, and — when a destination is not ready — why Send
-    /// waits.
+    /// The topic alone, and — when a destination is not ready — why Send
+    /// waits. The shape choice is off the composer for now: the topic is
+    /// the whole opening message (RelayController.conversation).
     private var composer: some View {
         VStack(alignment: .leading, spacing: Perch.s(6)) {
             openingEditor
-            HStack(spacing: Perch.s(8)) {
-                PerchShapeMenu(controller: controller)
-                Text("Errol exchanges replies automatically. Pause before typing in either app.")
-                    .font(Perch.text(11))
-                    .foregroundStyle(Perch.muted)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
             if let (problem, isProblem) = composeProblem {
                 Text(problem)
                     .font(Perch.text(11))
@@ -87,6 +79,9 @@ struct PerchWidgetCenter: View {
         return (blocker, !verifying)
     }
 
+    /// The editor takes the keyboard as it appears: reaching this screen is
+    /// the moment to type, and the shell has already made the console key
+    /// (SetupController.onReachCompose).
     @ViewBuilder private var openingEditor: some View {
         if controller.showsFullInstructionsEditor {
             GrowingTextEditor(text: $controller.customInstructions,
@@ -94,7 +89,8 @@ struct PerchWidgetCenter: View {
                               minimumFontSize: Perch.promptMinimumFontSize,
                               textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
                               placeholder: controller.promptEditorPlaceholder,
-                              minimumLines: 1, maximumLines: Perch.promptMaximumLines)
+                              minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                              takesFocusOnAppear: true)
         } else {
             GrowingTextEditor(text: $controller.topic,
                               font: Perch.promptFont,
@@ -102,6 +98,7 @@ struct PerchWidgetCenter: View {
                               textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
                               placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                              takesFocusOnAppear: true,
                               onSubmit: { controller.start() })
         }
     }
@@ -199,50 +196,6 @@ struct PerchWidgetCenter: View {
     }
 }
 
-/// The conversation shape, in the editor's own line: the name to read,
-/// the menu to change it. Locked with the rest of the options during a run.
-struct PerchShapeMenu: View {
-    let controller: RelayController
-    @ObservedObject private var settings = SettingsStore.shared
-
-    var body: some View {
-        Menu {
-            Picker("Conversation shape", selection: Binding(
-                get: { controller.conversation }, set: { controller.selectConversation($0) })) {
-                Text(RelayController.freeConversation).tag(RelayController.freeConversation)
-                ForEach(settings.templates) { template in Text(template.name).tag(template.name) }
-                Text("Write from scratch").tag(RelayController.customConversation)
-            }
-        } label: {
-            HStack(spacing: Perch.s(4)) {
-                Image(systemName: PerchShapeIcons.icon(for: controller.conversation))
-                    .font(Perch.text(10, .medium))
-                Text(controller.conversation == RelayController.customConversation
-                     ? "Write from scratch" : controller.conversation)
-                    .font(Perch.text(11, .medium))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(Perch.text(8, .semibold))
-                    .foregroundStyle(Perch.muted)
-            }
-            .foregroundStyle(Perch.secondary)
-            .padding(.horizontal, Perch.s(7))
-            .frame(height: Perch.s(22))
-            .background(Capsule().fill(Perch.well))
-            .perchHover(Capsule())
-            .contentShape(Capsule())
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .disabled(controller.isRunning)
-        .accessibilityLabel("Conversation shape")
-        .accessibilityValue(controller.conversation)
-        .help("The conversation's shape; the topic completes it")
-    }
-}
-
 /// One configuration entry point at the center's top-right corner, in
 /// every state: the existing sliders icon in a quiet circular target.
 /// Run options stay visible but locked while
@@ -266,35 +219,36 @@ struct PerchWidgetSetup: View {
         .accessibilityLabel("Configure")
         .help("Configure")
         .popover(isPresented: $showingSetup, arrowEdge: .bottom) {
-            PerchSettingsPopover(controller: controller) {
-                showingSetup = false
-                controller.openSettings()
-            }
+            PerchSettingsPopover(controller: controller)
         }
     }
 }
 
-/// The actions beside the center: the named Send with the editor, Pause
-/// to steer and Stop during the exchange, the note's send and resume
-/// while paused, and the two next intentions at the end. The guided steps
-/// keep their actions under their own copy (PerchSetupCenter).
+/// The center's bottom band, in every stage: the guided step's actions
+/// (PerchSetupActions), the named Send under the editor, Pause to steer
+/// and Stop during the exchange, the note's send and resume while paused,
+/// and the two next intentions at the end. The actions stand at the
+/// leading edge, at their own size, as the guided steps' primaries do.
 struct PerchWidgetActions: View {
     let controller: RelayController
 
     var body: some View {
-        HStack(alignment: .center, spacing: Perch.s(10)) {
-            switch controller.stage {
-            case .setup:
-                EmptyView()
-            case .compose:
-                send
-            case .running:
-                if controller.isSteering { paused } else { running }
-            case .finished:
-                finished
-            }
+        switch controller.stage {
+        case .setup:
+            PerchSetupActions(controller: controller)
+        case .compose:
+            leading { send }
+        case .running:
+            leading { if controller.isSteering { paused } else { running } }
+        case .finished:
+            leading { finished }
         }
-        .fixedSize()
+    }
+
+    private func leading<Actions: View>(@ViewBuilder _ actions: () -> Actions) -> some View {
+        actions()
+            .fixedSize()
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var send: some View {
@@ -317,7 +271,7 @@ struct PerchWidgetActions: View {
     }
 
     private var paused: some View {
-        VStack(alignment: .trailing, spacing: Perch.s(6)) {
+        VStack(alignment: .leading, spacing: Perch.s(6)) {
             HStack(spacing: Perch.s(8)) {
                 PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }
                     .disabled(!controller.steeringHasText)
@@ -335,15 +289,20 @@ struct PerchWidgetActions: View {
             .help("Stop at the next safe point")
     }
 
+    /// The two next intentions side by side, the filled one first: the
+    /// same conversations again, or new ones — an outlined secondary, as
+    /// Stop is beside Pause.
     private var finished: some View {
-        VStack(alignment: .trailing, spacing: Perch.s(6)) {
+        HStack(spacing: Perch.s(8)) {
             PerchCapsuleButton(title: "Another topic here", icon: "arrow.counterclockwise") {
                 controller.anotherTopicHere()
             }
             .keyboardShortcut(.defaultAction)
             .help("A new topic in these same conversations; their context carries on")
-            PerchTextButton(title: "Set up fresh conversations\u{2026}") { controller.setUpFreshConversations() }
-                .help("Open new chats in the apps, then connect them")
+            PerchCapsuleButton(title: "Set up fresh conversations\u{2026}", style: .outlined, icon: "plus.bubble") {
+                controller.setUpFreshConversations()
+            }
+            .help("Open new chats in the apps, then connect them")
         }
     }
 }

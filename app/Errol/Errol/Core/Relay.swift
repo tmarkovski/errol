@@ -226,14 +226,15 @@ struct RelayInspection {
 ///
 /// Every operation that touches an app passes a gate. The steering hold
 /// (RelayControl) is the human's; the blocks here are the apps': a side's
-/// window no longer showing the bound conversation, unsent work in the
-/// composer about to be pasted into, a conversation that moved on since the
-/// reply the relay waited for. A block is checked before the control's gate
-/// is taken — so a blocked run owns no focus operation and the steering
-/// editor can open over it — and once more after, since the human can switch
-/// conversations in the gap. Nothing is typed, copied, or activated while
+/// window minimized or behind another of the app's windows, unsent work in
+/// the composer about to be pasted into, a conversation that moved on since
+/// the reply the relay waited for. A block is checked before the control's
+/// gate is taken — so a blocked run owns no focus operation and the
+/// steering editor can open over it — and once more after, since the apps
+/// can change in the gap. Nothing is typed, copied, or activated while
 /// blocked; the run waits for the apps to come back, and Stop is answered
-/// at every poll.
+/// at every poll. What a bound window shows is not checked: the connection
+/// is the window, and a conversation switched inside it is written into.
 ///
 /// `bindings` are the destinations the human connected in setup, one per
 /// side: they are checked again here, at the click, and never re-found. A
@@ -310,15 +311,14 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     for target in [chatgpt, claude] {
         let bound: BoundDestination
         if let chosen = prebound[side(target)] {
-            // The human's choice, checked again now. A window that no longer
-            // shows the chosen conversation is a refusal with the reason,
-            // not a search for another.
+            // The human's choice, checked again now: still there and
+            // reachable. A window minimized or gone is a refusal with the
+            // reason, not a search for another.
             switch chosen.check() {
             case .same:
                 bound = chosen
-            case .changed(let seen):
-                let block = RunBlock.destinationChanged(side: side(target), bound: chosen.identity.displayName, seen: seen)
-                return failedStart(block.startRefusal(name: target.name))
+            case .hidden(let seen):
+                return failedStart(RunBlock.windowHidden(side: side(target), seen: seen).startRefusal(name: target.name))
             case .lost(let detail):
                 return failedStart("\(detail.prefix(1).uppercased())\(detail.dropFirst()). Connect \(target.name)'s conversation again.")
             }
@@ -386,8 +386,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         let destination = bound(target)
         switch destination.check() {
         case .same: return .clear
-        case .changed(let seen):
-            return .block(.destinationChanged(side: side(target), bound: destination.identity.displayName, seen: seen))
+        case .hidden(let seen): return .block(.windowHidden(side: side(target), seen: seen))
         case .lost(let detail): return .lost(detail)
         }
     }
@@ -632,9 +631,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             }
             guard let reply else { return .copyFailed(side: side(speaker)) }
             captured += 1
-            // A reply in this conversation settles its identity: from here a
-            // new route or name in the window is navigation.
-            bound(speaker).closeAdoption()
 
             if inspection?.reply(speaker, turn, reply) == false {
                 log("Verification stopped the relay after inspecting turn \(turn).")

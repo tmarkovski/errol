@@ -32,8 +32,8 @@ protocol RelayEngine: AnyObject {
     /// Whether to sweep at all: only while someone can see the strip, and
     /// never while a run owns the apps.
     func setScanning(_ scanning: Bool)
-    /// Ask for a prompt sweep — the picker opening, a return to the editor
-    /// — rather than waiting out the interval.
+    /// Ask for a prompt sweep — a side to connect again, a return to the
+    /// editor — rather than waiting out the interval.
     func requestSweep()
     /// Whether a run can start now: the permission is granted and both
     /// sides are bound. What is missing is reported as a failed start on

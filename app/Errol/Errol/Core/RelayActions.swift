@@ -486,7 +486,7 @@ func send(_ text: String, to target: TargetApp,
     }
 
     // The two checks made right before every keystroke, after any
-    // activation or wait: the window still shows the bound conversation,
+    // activation or wait: the bound window is still there and reachable,
     // and the clipboard still holds the payload. Either failing before
     // the first paste withholds the send with the composer untouched;
     // after typing began, it abandons it.
@@ -494,8 +494,8 @@ func send(_ text: String, to target: TargetApp,
         guard let destination else { return true }
         switch destination.check() {
         case .same: break
-        case .changed(let seen):
-            log("\(target.name): the conversation changed before the keystroke (\(seen)); not typing")
+        case .hidden(let seen):
+            log("\(target.name): the window is \(seen) before the keystroke; not typing")
             return false
         case .lost(let detail):
             log("\(target.name): the destination is gone (\(detail)); not typing")

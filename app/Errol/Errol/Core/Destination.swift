@@ -1,16 +1,19 @@
-// Where a run's messages go, and whether that is still what the window is
-// showing. A relay run binds one destination per side at Start — the
-// window, and whatever identifies the conversation in it — and checks it
-// again before every operation that touches the app, so a conversation the
-// human switched away from is waited for rather than written into.
+// Where a run's messages go: the window bound per side at connection, and
+// whether it is still there and reachable before every operation that
+// touches the app. What the window shows is not compared — the connection
+// is the window, not the conversation in it, so a chat the human switches
+// to inside that window is written into all the same. (The identity
+// comparison that held a run on a switched conversation came out in Sep
+// 2026: the drag that connects a window is there to teach where Errol
+// writes, and the binding was never meant to police the conversation.)
 //
-// The evidence is uneven across surfaces (docs/design-proposals/
-// first-run-usability): a Claude chat exposes /chat/<uuid>, a Claude Code
-// session /epitaxy/<id>, a fresh chat and a Cowork task only /new, and the
-// ChatGPT desktop app no conversation URL at all. So identity comes in
-// grades — a route, a title, or nothing — and the comparison says how
-// sure it is. The pure parts here run over recorded fixtures in the tests;
-// BoundDestination is the live face.
+// The identity is still read, to name the destination under the icon and
+// in the log. The evidence is uneven across surfaces (docs/design-
+// proposals/first-run-usability): a Claude chat exposes /chat/<uuid>, a
+// Claude Code session /epitaxy/<id>, a fresh chat and a Cowork task only
+// /new, and the ChatGPT desktop app no conversation URL at all. The pure
+// parts here run over recorded fixtures in the tests; BoundDestination is
+// the live face.
 
 import AppKit
 import ApplicationServices
@@ -52,9 +55,9 @@ struct DestinationIdentity: Equatable {
         self.excluded = excluded
     }
 
-    /// Whether anything here tells this conversation from another in the
-    /// same window and surface. Without it, a switch to another unnamed
-    /// conversation cannot be seen, and the run says so at binding.
+    /// Whether anything here names this conversation as against another:
+    /// what the details call "Continues here" rather than "New chat", and
+    /// what a remembered destination is matched by.
     var isDistinct: Bool { route != nil || !titleIsGeneric }
 
     /// How the conversation is named to the human: its title, or the
@@ -64,63 +67,6 @@ struct DestinationIdentity: Equatable {
         if let surface { return "the \(surface) conversation" }
         return "the original conversation"
     }
-}
-
-/// What comparing the bound identity with the window's current one found.
-enum DestinationVerdict: Equatable {
-    /// The window shows the bound conversation.
-    case same
-    /// The window shows what is the bound conversation now: a fresh chat
-    /// that gained its route or its name after the opening message. The
-    /// binding takes the new identity.
-    case adopted(DestinationIdentity)
-    /// The window shows something else, described for the hold message.
-    case changed(String)
-}
-
-/// The comparison, pure. `adoptionOpen` is whether the side is still
-/// between its first message and its first captured reply — the interval
-/// in which a fresh chat acquires a route (Claude) and a name. A route,
-/// once bound, is binding; a specific title is a hint that holds until
-/// the route says otherwise; a generic title is nothing to compare.
-func compareDestination(bound: DestinationIdentity, now: DestinationIdentity,
-                        adoptionOpen: Bool, selectors: AppSelectors) -> DestinationVerdict {
-    if now.excluded != bound.excluded {
-        if now.excluded {
-            return .changed("now showing a \(selectors.excludedSurfaceName ?? "non-chat") session")
-        }
-        return .changed("no longer showing the \(selectors.excludedSurfaceName ?? "non-chat") session")
-    }
-    // Surface names flap on their own between a chat's tab pair and its
-    // URL ("Chat" from the tab, "New chat" from /new once the tabs unmount),
-    // so only two named, settled surfaces are compared.
-    let newChat = selectors.surfacePathNames["new"]
-    if let before = bound.surface, let after = now.surface,
-       before != newChat, after != newChat, before != after {
-        return .changed("switched to \(after)")
-    }
-    if let boundRoute = bound.route {
-        if now.route == boundRoute { return .same }
-        if now.route == nil { return .changed("showing a new chat") }
-        return .changed(now.titleIsGeneric ? "showing another conversation"
-                                           : "showing \u{201C}\(now.title)\u{201D}")
-    }
-    if now.route != nil {
-        guard adoptionOpen else {
-            return .changed(now.titleIsGeneric ? "showing another conversation"
-                                               : "showing \u{201C}\(now.title)\u{201D}")
-        }
-        return .adopted(now)
-    }
-    // Neither has a route: titles are all there is.
-    if bound.titleIsGeneric {
-        // An unnamed chat being named is expected progress at any time —
-        // naming lags the first exchange by an unpredictable while.
-        return now.titleIsGeneric ? .same : .adopted(now)
-    }
-    if now.title == bound.title { return .same }
-    return .changed(now.titleIsGeneric ? "showing a new chat"
-                                       : "showing \u{201C}\(now.title)\u{201D}")
 }
 
 // MARK: - The composer
@@ -174,8 +120,9 @@ func composerState(in target: TargetApp) -> ComposerState {
 /// run ends with: a block is a condition observed in the apps, cleared by
 /// the apps, and a run can stand in one while the steering editor is open.
 enum RunBlock: Equatable {
-    /// The side's window no longer shows the bound conversation.
-    case destinationChanged(side: Speaker, bound: String, seen: String)
+    /// The side's window is minimized or behind another of the app's
+    /// windows: nothing can be read from or typed into it until it shows.
+    case windowHidden(side: Speaker, seen: String)
     /// The side's composer holds unsent work.
     case draft(side: Speaker, characters: Int)
     case attachments(side: Speaker, count: Int)
@@ -189,7 +136,7 @@ enum RunBlock: Equatable {
 
     var side: Speaker {
         switch self {
-        case .destinationChanged(let side, _, _), .draft(let side, _), .attachments(let side, _),
+        case .windowHidden(let side, _), .draft(let side, _), .attachments(let side, _),
              .replying(let side), .composerUnreadable(let side), .historyChanged(let side):
             return side
         }
@@ -199,7 +146,7 @@ enum RunBlock: Equatable {
     func headline(names: (chatgpt: String, claude: String)) -> String {
         let name = side == .chatgpt ? names.chatgpt : names.claude
         switch self {
-        case .destinationChanged: return "Paused: \(name)'s conversation changed"
+        case .windowHidden: return "Paused: \(name)'s window isn't showing"
         case .draft: return "Paused: \(name) has an unsent draft"
         case .attachments: return "Paused: \(name) has an unsent attachment"
         case .replying: return "Paused: \(name) is replying to something else"
@@ -212,8 +159,8 @@ enum RunBlock: Equatable {
     func recovery(names: (chatgpt: String, claude: String)) -> String {
         let name = side == .chatgpt ? names.chatgpt : names.claude
         switch self {
-        case .destinationChanged(_, let bound, let seen):
-            return "It is \(seen). Return to \(bound) to continue, or Stop. Errol resumes when it is showing again."
+        case .windowHidden(_, let seen):
+            return "It is \(seen). Bring it back to continue, or Stop. Errol resumes when it is showing again."
         case .draft(_, let characters):
             return "Finish or clear the \(characters)-character draft in \(name) to continue, or Stop."
         case .attachments(_, let count):
@@ -231,8 +178,8 @@ enum RunBlock: Equatable {
     /// condition and what to do before pressing Send again.
     func startRefusal(name: String) -> String {
         switch self {
-        case .destinationChanged(_, _, let seen):
-            return "\(name) is \(seen). Show the conversation to relay into, then send again."
+        case .windowHidden(_, let seen):
+            return "\(name)'s window is \(seen). Bring it back, then send again."
         case .draft(_, let characters):
             return "\(name) has an unsent draft (\(characters) characters). Finish or clear it, then send again."
         case .attachments(_, let count):
@@ -249,8 +196,8 @@ enum RunBlock: Equatable {
     /// The log line, with the apps' own names.
     func logLine(name: String) -> String {
         switch self {
-        case .destinationChanged(_, let bound, let seen):
-            return "Paused — \(name)'s conversation changed: \(seen). Return to \(bound) to continue, or Stop."
+        case .windowHidden(_, let seen):
+            return "Paused — \(name)'s window is \(seen). Bring it back to continue, or Stop."
         case .draft(_, let characters):
             return "Paused — \(name) has an unsent draft (\(characters) characters). Finish or clear it to continue, or Stop."
         case .attachments(_, let count):
@@ -280,39 +227,25 @@ func deliveryBlock(for state: ComposerState, side: Speaker) -> RunBlock? {
 // MARK: - The live binding
 
 /// One side's destination for the length of a run: the window chosen at
-/// Start and the identity read from it, checked again on demand. A check
-/// is one window-list read and one scan of the bound window — the same
-/// walk the readiness strip makes — so callers poll it at the pace of the
-/// operation they guard, not in a tight loop.
+/// connection, checked again on demand for being there and reachable, and
+/// the identity read from it then, which names it under the icon and in
+/// the log. A check is a few attribute reads on the bound window, so
+/// callers poll it at the pace of the operation they guard, not in a
+/// tight loop.
 final class BoundDestination {
     /// The app, with every finder scoped to the bound window.
     let target: TargetApp
     let window: AXUIElement
-    // The identity is read by the readiness sweep between setup and a
-    // run and by the run itself, and adoption rewrites it; one lock
-    // covers both fields.
-    private let lock = NSLock()
-    private var boundIdentity: DestinationIdentity
-    private var adoptionIsOpen = true
+    /// What the window showed when it was connected. Never compared
+    /// against the window since: the connection is the window.
+    let identity: DestinationIdentity
 
-    var identity: DestinationIdentity {
-        lock.lock()
-        defer { lock.unlock() }
-        return boundIdentity
-    }
-
-    /// Open until the side's first reply has been captured: the interval
-    /// in which a fresh chat acquires its route and its name.
-    var adoptionOpen: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return adoptionIsOpen
-    }
-
-    /// What a check found beyond the pure verdict: the window itself gone.
+    /// What a check found. Minimized is waited for; gone ends the run.
     enum Check: Equatable {
         case same
-        case changed(String)
+        /// The window is there but not where a copy or a paste can reach
+        /// it, described for the hold line ("minimized").
+        case hidden(String)
         /// The app quit or the bound window closed: nothing to return to.
         case lost(String)
     }
@@ -321,8 +254,8 @@ final class BoundDestination {
     init(target: TargetApp, window: AXUIElement) {
         self.target = target.bound(to: window)
         self.window = window
-        boundIdentity = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
-                                            selectors: target.selectors)
+        identity = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
+                                       selectors: target.selectors)
     }
 
     /// Bind the window the finders would pick: the path for a run started
@@ -332,16 +265,8 @@ final class BoundDestination {
         self.init(target: target, window: window)
     }
 
-    /// The side has produced a reply in this conversation: from here a new
-    /// route or name is navigation, not naming.
-    func closeAdoption() {
-        lock.lock()
-        adoptionIsOpen = false
-        lock.unlock()
-    }
-
-    /// Whether the bound window is still the one the relay would target,
-    /// showing the bound conversation. Adoption updates `identity`.
+    /// Whether the bound window is still there and reachable. What it
+    /// shows is not looked at.
     func check() -> Check {
         if target.app.isTerminated { return .lost("\(target.name) quit") }
         // A window the app has torn down answers invalidUIElement to every
@@ -349,30 +274,9 @@ final class BoundDestination {
         let role = axAttributeResult(window, kAXRoleAttribute)
         if role.error == .invalidUIElement { return .lost("the \(target.name) window closed") }
         if (axAttribute(window, kAXMinimizedAttribute) as? Bool) == true {
-            return .changed("minimized")
+            return .hidden("minimized")
         }
-        guard let current = chatWindow(in: target) else {
-            return .changed("no chat window can be found")
-        }
-        guard CFEqual(current, window) else {
-            return .changed("another \(target.name) window is in front")
-        }
-        let now = DestinationIdentity(scan: scanWindow(LiveElement(ax: window), selectors: target.selectors),
-                                      selectors: target.selectors)
-        lock.lock()
-        defer { lock.unlock() }
-        switch compareDestination(bound: boundIdentity, now: now, adoptionOpen: adoptionIsOpen,
-                                  selectors: target.selectors) {
-        case .same:
-            return .same
-        case .adopted(let adopted):
-            log("\(target.name): the conversation is now \(adopted.displayName)"
-                + (adopted.route.map { " (\($0))" } ?? ""))
-            boundIdentity = adopted
-            return .same
-        case .changed(let seen):
-            return .changed(seen)
-        }
+        return .same
     }
 
     /// Whether the app's focused window is this one — the window a
@@ -397,31 +301,27 @@ final class BoundDestination {
         return false
     }
 
-    /// The check as a hold on `side`, nil while the destination holds.
-    /// A lost destination is not a hold; the caller ends the run on it.
-    /// With `raising`, the window must also be the app's front window,
-    /// raised where it can be: the delivery gate's version, since a paste
-    /// follows the key window.
+    /// The check as a hold on `side`, nil while the window is reachable.
+    /// A lost window is not a hold; the caller ends the run on it. With
+    /// `raising`, the window must also be the app's front window, raised
+    /// where it can be: the delivery gate's version, since a paste follows
+    /// the key window.
     func block(side: Speaker, raising: Bool = false) -> RunBlock? {
-        if case .changed(let seen) = check() {
-            return .destinationChanged(side: side, bound: identity.displayName, seen: seen)
+        if case .hidden(let seen) = check() {
+            return .windowHidden(side: side, seen: seen)
         }
         if raising, !isFrontWindow(raising: true) {
-            return .destinationChanged(side: side, bound: identity.displayName,
-                                       seen: "behind another \(target.name) window")
+            return .windowHidden(side: side, seen: "behind another \(target.name) window")
         }
         return nil
     }
 
-    /// The log line at binding: what is being targeted, and whether it can
-    /// be told from another conversation at all.
+    /// The log line at binding: which window is being written into, named
+    /// by what it showed when it was connected.
     var bindingReport: String {
         var line = "\(target.name): targeting \(identity.displayName)"
         if let surface = identity.surface { line += " (\(surface))" }
         if let route = identity.route { line += ", \(route)" }
-        if !identity.isDistinct {
-            line += " — this conversation exposes no name or route yet, so a switch to another unnamed one cannot be seen until it is named"
-        }
         return line
     }
 }
