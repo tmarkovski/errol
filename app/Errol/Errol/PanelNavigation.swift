@@ -56,15 +56,33 @@ struct PanelScreenPresentation: ViewModifier {
 
 /// Fill and clip to the current native frame throughout a resize, while the
 /// card inside continues to measure its destination size independently.
+///
+/// The fill is regular Liquid Glass in the surface's own shape. The window
+/// behind it is transparent (MenuBarController.buildPanel), so what shows
+/// through is the desktop and the chat windows, blurred; AppKit's native
+/// shadow sits around the silhouette, thin rim and all. Regular rather
+/// than clear glass, tried and rejected: the panel floats over mostly white
+/// chat windows, where clear glass all but disappears and dark-appearance
+/// text loses its ground. The bare surface still drags the window.
+///
+/// The glass goes on the background layer, not on the content. Wrapping the
+/// content in `.glassEffect` made AppKit treat every drag inside the panel
+/// as a window move (isMovableByWindowBackground), including a drag that
+/// started on the connection handle, whose NSView opts out of moving the
+/// window and still received the events. Glass behind the content leaves
+/// the handle's opt-out in force, while the same layer carries the drag
+/// gesture for the bare surface.
 struct PanelWindowSurface: ViewModifier {
     var navigation: PanelNavigation? = nil
 
     func body(content: Content) -> some View {
+        let shape = PanelSurfaceShape(isCard: navigation?.screen == .settings)
         content
             .frame(minWidth: 0, maxWidth: .infinity,
                    minHeight: 0, maxHeight: .infinity, alignment: .top)
-            .background(Perch.paper.gesture(WindowDragGesture()))
-            .clipShape(PanelSurfaceShape(isCard: navigation?.screen == .settings))
+            .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture())
+                .glassEffect(.regular, in: shape))
+            .clipShape(shape)
             .ignoresSafeArea()
     }
 }
@@ -113,7 +131,7 @@ struct PanelRootView: View {
         }
         .frame(width: screen == .settings ? Perch.cardWidth : navigation.consoleWidth)
         .fixedSize(horizontal: false, vertical: true)
-        .background(Perch.paper.gesture(WindowDragGesture()))
+        .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .overlay(alignment: .top) {
             if screen == .settings {
               PerchChrome(controller: controller, screen: screen) {
@@ -137,12 +155,14 @@ struct PanelRootView: View {
     navigation.showsSettings = true
     return PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                          navigation: navigation)
+        .background(Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: Perch.shellCorner)))
         .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
 }
 
 #Preview("Accessibility setup") {
     PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                   navigation: PanelNavigation(accessibilityGranted: false))
+        .background(Color.clear.glassEffect(.regular, in: Capsule()))
         .clipShape(Capsule())
 }
 #endif

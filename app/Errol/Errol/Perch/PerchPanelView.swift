@@ -46,7 +46,7 @@ struct PerchPanelView: View {
         .frame(minHeight: Perch.widgetHeight)
         .fixedSize(horizontal: false, vertical: true)
         .tint(Perch.accent)
-        .background(Perch.paper.gesture(WindowDragGesture()))
+        .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .clipShape(Capsule())
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onCardResize?($0) }
     }

@@ -1,6 +1,6 @@
-// The settings card: the console's own idiom — paper, system type, soft
-// wells, capsule buttons — as a screen inside the main panel. The native
-// header provides Back. Appearance preferences sit above the
+// The settings card: the console's own idiom — the panel's glass, system
+// type, soft wells, capsule buttons — as a screen inside the main panel.
+// The native header provides Back. Appearance preferences sit above the
 // conversation shapes behind the composer's pills.
 
 import SwiftUI
@@ -37,7 +37,6 @@ struct SettingsView: View {
         .padding(.bottom, Perch.s(18))
         .padding(.top, Perch.chromeInset)
         .frame(width: Perch.cardWidth, height: Perch.s(490))
-        .background(Perch.paper)
         .tint(Perch.accent)
         // The title stays centered in the header, as on the console.
         .overlay(alignment: .top) {

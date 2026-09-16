@@ -225,16 +225,26 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     // MARK: Panel
 
     /// A borderless panel removes AppKit's title bar and window buttons.
-    /// SwiftUI provides the rounded surface and header controls; AppKit
-    /// still casts its native shadow, including the thin outer rim.
+    /// SwiftUI provides the glass surface (PanelWindowSurface) and the
+    /// header controls; AppKit casts the native shadow around the content's
+    /// alpha silhouette. That shadow is also the thin rim along the edge:
+    /// the window server draws a dark contact line just outside the alpha
+    /// edge and a one-point highlight just inside it, and over a
+    /// translucent surface the pair reads as a border. Accepted for now in
+    /// exchange for the separation the shadow gives over white chat
+    /// windows; turning `hasShadow` off removes the rim along with it.
+    /// Nothing else draws that line, the style mask included.
     ///
-    /// Esc hides it; the bare paper drags it; the frame follows the card
+    /// Esc hides it; the bare surface drags it; the frame follows the card
     /// (fitPanel).
     private func buildPanel() {
         panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: PerchMetrics.initialPanel),
                              styleMask: [.borderless, .nonactivatingPanel],
                              backing: .buffered, defer: false)
-        // Keep the native shadow around the content's alpha silhouette.
+        // Transparent, so the glass refracts what lies behind the window.
+        // The shadow follows the content's alpha silhouette, so it has to
+        // be invalidated whenever that silhouette changes (order-front,
+        // every frame of a resize).
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
