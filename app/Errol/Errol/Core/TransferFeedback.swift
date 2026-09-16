@@ -87,10 +87,11 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
         // An unrecognized group is not sufficient clipping evidence. Continue
         // looking for a scroll viewport or a group with its own visible toolbar.
         guard bounds.contains(editor) else { continue }
-        guard editor.minX - bounds.minX <= 80,
-              bounds.maxX - editor.maxX <= 120,
-              editor.minY - bounds.minY <= 200,
-              bounds.maxY - editor.maxY <= 120 else { break }
+        let row = editorRow(editor, under: ancestor, selectors: selectors, frame: frame)
+        guard row.minX - bounds.minX <= 80,
+              bounds.maxX - row.maxX <= 120,
+              row.minY - bounds.minY <= 200,
+              bounds.maxY - row.maxY <= 120 else { break }
         // An editor wrapper can have exactly the text area's bounds. It
         // cannot be the visible shell enclosing padding and action controls.
         guard bounds != editor else { continue }
@@ -102,6 +103,37 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
     }
     guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
     return PromptTransferGeometry(editor: editor, shell: nil)
+}
+
+/// The editor widened through the controls seated beside it. ChatGPT's Chat
+/// composer is one row while the prompt is short (live Sep 16 2026): the
+/// attach button left of the text area, then the model popup, Dictate, and
+/// voice chat, ending 158 px past the editor's right edge, all 8 px inside
+/// the pill the app draws. Measured from the editor alone that pill is too
+/// wide to be the field; measured from the row it is. Controls on a line of
+/// their own, like a Send button under the text, leave the row alone, and
+/// so does anything unframed.
+private func editorRow<Node: ElementNode>(_ editor: CGRect, under node: Node,
+                                          selectors: AppSelectors,
+                                          frame: (Node) -> CGRect?) -> CGRect {
+    var row = editor
+    var budget = 40
+    func visit(_ node: Node, depth: Int) {
+        guard depth <= 2, budget > 0 else { return }
+        budget -= 1
+        let role = node.role
+        if role == "AXTextArea" || role == "AXTextField" { return }
+        if isPromptControl(node, selectors: selectors) {
+            if let rect = frame(node), rect.width > 0, rect.height > 0,
+               rect.minY < editor.maxY, rect.maxY > editor.minY {
+                row = row.union(rect)
+            }
+            return
+        }
+        for child in node.children { visit(child, depth: depth + 1) }
+    }
+    for child in node.children { visit(child, depth: 1) }
+    return row
 }
 
 /// The border an app draws around its composer is often one level out from

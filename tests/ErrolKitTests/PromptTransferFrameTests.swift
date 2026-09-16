@@ -112,6 +112,52 @@ final class PromptTransferFrameTests: XCTestCase {
         }
     }
 
+    func testChatGPTChatSeatsItsControlsBesideAShortPrompt() throws {
+        // Live Sep 16 2026: while the prompt is a line, ChatGPT's Chat
+        // composer is one row: the attach button, the text area, then the
+        // model popup, Dictate, and voice chat, 158 px past the editor's
+        // right edge. The pill the app draws is the group holding them, 8 px
+        // around the row; the band outside it spans the pane.
+        let chatWindow = CGRect(x: 0, y: 30, width: 1280, height: 1348)
+        let input = Node(role: "AXTextArea", label: "Message ChatGPT",
+                         bounds: CGRect(x: 537, y: 608, width: 441, height: 21))
+        let pill = CGRect(x: 496, y: 596, width: 640, height: 45)
+        let composer = Node(bounds: pill, children: [
+            Node(role: "AXButton", label: "Add files and more",
+                 bounds: CGRect(x: 504, y: 604, width: 28, height: 29)),
+            input,
+            Node(role: "AXPopUpButton", label: "Select ChatGPT model",
+                 bounds: CGRect(x: 983, y: 604, width: 81, height: 29)),
+            Node(role: "AXButton", label: "Dictate",
+                 bounds: CGRect(x: 1064, y: 604, width: 28, height: 29)),
+            Node(role: "AXButton", label: "Start new voice chat",
+                 bounds: CGRect(x: 1100, y: 604, width: 28, height: 29)),
+        ])
+        let twins = Node(bounds: pill, children: [Node(bounds: pill, children: [composer])])
+        let band = Node(bounds: CGRect(x: 352, y: 596, width: 928, height: 69), children: [
+            Node(bounds: CGRect(x: 496, y: 648, width: 640, height: 0)), twins,
+        ])
+        let pane = Node(bounds: CGRect(x: 352, y: 76, width: 928, height: 1302), children: [band])
+        try withExtendedLifetime(pane) {
+            let geometry = try XCTUnwrap(promptTransferGeometry(
+                around: input, window: chatWindow, selectors: Config().chatgptSelectors,
+                parent: { $0.parent }, frame: { $0.bounds }))
+            XCTAssertEqual(geometry.shell, pill)
+            XCTAssertEqual(geometry.editor, input.bounds)
+        }
+    }
+
+    func testControlsUnderTheTextRowDoNotWidenIt() {
+        // A Send button on its own line under a narrow text area is not
+        // beside the editor, so a wrapper far wider than the text still
+        // reads as layout, not the field.
+        let input = Node(role: "AXTextArea", bounds: CGRect(x: 400, y: 700, width: 200, height: 40))
+        let wide = Node(bounds: CGRect(x: 110, y: 680, width: 780, height: 100), children: [
+            input, Node(role: "AXButton", label: "Send", bounds: CGRect(x: 850, y: 750, width: 28, height: 28)),
+        ])
+        XCTAssertNil(resolve(input, in: wide))
+    }
+
     func testOutlineTracksGrowthAndCollapseIncludingAttachmentRow() {
         let input = Node(role: "AXTextArea", bounds: editor)
         let composer = Node(bounds: shell, children: [input, Node(role: "AXButton", label: "Send")])
