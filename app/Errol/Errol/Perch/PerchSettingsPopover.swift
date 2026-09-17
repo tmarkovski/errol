@@ -1,6 +1,10 @@
 import SwiftUI
 
 /// A compact, stable surface: changing tabs or ending mode never moves the menu.
+///
+/// No fill of its own, here or in the other popovers: the system's popover
+/// chrome is already Liquid Glass, arrow and rim included, and an opaque
+/// background is all it takes to hide it.
 struct PerchSettingsPopover: View {
     enum Tab: String, CaseIterable {
         case conversation = "Conversation"
@@ -25,7 +29,6 @@ struct PerchSettingsPopover: View {
         }
         .padding(Perch.s(18))
         .frame(width: Perch.s(360))
-        .background(Perch.paper)
         .foregroundStyle(Perch.ink)
         .tint(Perch.accent)
     }

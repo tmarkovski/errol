@@ -243,6 +243,5 @@ struct PerchNotePopover: View {
         .padding(Perch.s(14))
         .frame(width: Perch.s(320))
         .frame(maxHeight: Perch.s(280))
-        .background(Perch.paper)
     }
 }

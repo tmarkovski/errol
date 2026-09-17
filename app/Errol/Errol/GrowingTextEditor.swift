@@ -59,6 +59,9 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// Shrink to this size before soft wrapping. Nil keeps a fixed font.
     var minimumFontSize: CGFloat?
     var textColor: NSColor = .labelColor
+    /// Nil keeps the caret in the text's color, where it reads as one more
+    /// stem among the letters; a color of its own is what sets it apart.
+    var caretColor: NSColor?
     var placeholderColor: NSColor = .placeholderTextColor
     var placeholder: String?
     var minimumLines = 8
@@ -118,7 +121,7 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.textContainer?.lineFragmentPadding = 0
         textView.font = font
         textView.textColor = textColor
-        textView.insertionPointColor = textColor
+        textView.insertionPointColor = caretColor ?? textColor
         textView.placeholderColor = placeholderColor
         textView.string = text
         textView.trailingPlaceholder = placeholder
@@ -148,7 +151,8 @@ struct GrowingTextEditor: NSViewRepresentable {
             return
         }
         if textView.textColor != textColor { textView.textColor = textColor }
-        if textView.insertionPointColor != textColor { textView.insertionPointColor = textColor }
+        let caretColor = caretColor ?? textColor
+        if textView.insertionPointColor != caretColor { textView.insertionPointColor = caretColor }
         textView.placeholderColor = placeholderColor
         textView.trailingPlaceholder = placeholder
         // A retained composer is disabled while Settings or permission

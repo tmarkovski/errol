@@ -73,23 +73,13 @@ struct PermissionOnboardingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The trailing end, where Run sits: the one action, filled like Run and
+    /// The trailing end, where Run sits: the one action, prominent like Run and
     /// labeled because a first-time user has nothing to guess an icon from.
     /// The line beneath says the shell is polling, so nobody relaunches.
     private var action: some View {
         VStack(alignment: .trailing, spacing: Perch.s(7)) {
-            Button(action: requestAccess) {
-                Text("Open Accessibility Settings…")
-                    .font(Perch.text(13, .semibold))
-                    .foregroundStyle(Perch.onAccent)
-                    .padding(.horizontal, Perch.s(18))
-                    .frame(height: Perch.s(42))
-                    .background(Capsule().fill(Perch.accent))
-                    .perchHover(Capsule(), tint: .white)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.defaultAction)
+            PerchCapsuleButton(title: "Open Accessibility Settings…", size: .large, action: requestAccess)
+                .keyboardShortcut(.defaultAction)
             Label("Checks access automatically", systemImage: "lock")
                 .font(Perch.text(11))
                 .foregroundStyle(Perch.muted)

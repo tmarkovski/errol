@@ -488,7 +488,7 @@ struct PerchDestinationDetails: View {
                 detail("Surface", connection.identity.surface ?? "Not observed")
                 detail("Model", connection.model ?? "Not observed")
                 detail("Status", connection.readiness.problem(name: name) ?? "Ready to relay into")
-                PerchCapsuleButton(title: "Choose another conversation", style: .outlined) {
+                PerchCapsuleButton(title: "Choose another conversation", style: .glass) {
                     dismiss()
                     controller.chooseAnotherConversation(speaker)
                 }
@@ -500,7 +500,6 @@ struct PerchDestinationDetails: View {
         }
         .padding(Perch.s(14))
         .frame(width: Perch.s(340), alignment: .leading)
-        .background(Perch.paper)
         .foregroundStyle(Perch.ink)
         .tint(Perch.accent)
     }

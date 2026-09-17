@@ -1,56 +1,107 @@
-// The capsule's labeled actions: one filled primary — Send, Continue,
-// Arrange, Pause to steer — and outlined or bare secondaries beside or
-// under it, in the panel's own idiom rather than the system's bezels.
-// Labeled, because a first-time user has nothing to guess an icon from.
+// The capsule's labeled actions: one prominent primary — Send, Continue,
+// Arrange, Pause to steer — and glass or bare secondaries beside or under
+// it. The pills are the system's Liquid Glass buttons in the palette's
+// accent. Labeled, because a first-time user has nothing to guess an icon
+// from.
 
 import SwiftUI
 
 struct PerchCapsuleButton: View {
     enum Style {
-        case filled, outlined
+        case prominent, glass
+    }
+
+    enum Size {
+        /// The console's bands.
+        case regular
+        /// The permission screen's one action.
+        case large
     }
 
     let title: String
-    var style = Style.filled
+    var style = Style.prominent
+    var size = Size.regular
     var icon: String? = nil
-    /// Optional elapsed countdown fill, under the label and inside the pill.
+    /// Optional elapsed countdown fill, over the pill and clipped to it.
     var progress: Double? = nil
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: Perch.s(6)) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(Perch.text(11, .semibold))
+                        .font(Perch.text(size == .large ? 12 : 11, .semibold))
                 }
                 Text(title)
-                    .font(Perch.text(12, .medium))
+                    .font(size == .large ? Perch.text(13, .semibold) : Perch.text(12, .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(style == .filled ? Perch.onAccent : Perch.accentText)
-            .padding(.horizontal, Perch.s(14))
-            .frame(height: Perch.s(29))
-            .background {
-                Capsule().fill(style == .filled ? Perch.accent : .clear)
-                    .overlay(alignment: .leading) {
-                        if let progress {
-                            GeometryReader { geometry in
-                                Rectangle().fill(Perch.onAccent.opacity(0.2))
-                                    .frame(width: geometry.size.width * min(1, max(0, progress)))
-                            }
-                            .clipShape(Capsule())
-                            .allowsHitTesting(false)
-                        }
-                    }
-            }
-            .overlay(Capsule().stroke(style == .filled ? .clear : Perch.accent.opacity(0.8), lineWidth: 1.2))
-            .perchHover(Capsule(), tint: style == .filled ? .white : Perch.ink)
-            .contentShape(Capsule())
-            .opacity(isEnabled ? 1 : 0.45)
+            .foregroundStyle(ink)
+            .frame(height: PerchGlassButton.labelHeight(pill: Perch.s(size == .large ? 42 : 29),
+                                                        size: controlSize))
         }
-        .buttonStyle(.plain)
+        .modifier(PerchGlassButton(prominent: style == .prominent, size: controlSize))
+        // The glass styles interpolate their tint, and the ink crosses with
+        // it, so an action coming into reach fades in like the text does.
+        .animation(Perch.fade, value: isEnabled)
+        // The wash is the label's own color, so it passes over the label
+        // without changing it.
+        .overlay(alignment: .leading) {
+            if let progress {
+                GeometryReader { geometry in
+                    Rectangle().fill(Perch.onAccent.opacity(0.2))
+                        .frame(width: geometry.size.width * min(1, max(0, progress)))
+                }
+                .clipShape(Capsule())
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var controlSize: ControlSize { size == .large ? .extraLarge : .large }
+
+    /// The prominent pill gives up its tint when it is disabled and when
+    /// the console is not key, and the ink chosen to sit on the accent then
+    /// has nothing to sit on: white on pale glass, in a light theme. The
+    /// neutral inks read on bare glass, and the system dims a disabled one.
+    private var ink: Color {
+        guard isEnabled else { return Perch.secondary }
+        guard style == .prominent else { return Perch.accentText }
+        return appearsActive ? Perch.onAccent : Perch.ink
+    }
+}
+
+/// The system's glass button styles in the console's shape. They bring the
+/// material, the rim, the press response, and the disabled look, and they
+/// follow the window: in a console that is not key the tint and the rim
+/// fade, as every control does in an inactive window.
+private struct PerchGlassButton: ViewModifier {
+    let prominent: Bool
+    let size: ControlSize
+
+    func body(content: Content) -> some View {
+        Group {
+            if prominent {
+                content.buttonStyle(.glassProminent).tint(Perch.accent)
+            } else {
+                // The console tints all it holds with the accent, and a
+                // tinted glass pill would be accent text on accent glass.
+                content.buttonStyle(.glass).tint(nil)
+            }
+        }
+        .buttonBorderShape(.capsule)
+        .controlSize(size)
+    }
+
+    /// The styles pad their label and take their height from it, so a pill
+    /// of a given height asks for a label this tall. The padding is what
+    /// macOS 27 measures — 6 points on each side at large, 10 at extra
+    /// large; a system that pads differently moves the pill by that much.
+    static func labelHeight(pill: CGFloat, size: ControlSize) -> CGFloat {
+        pill - (size == .extraLarge ? 20 : 12)
     }
 }
 

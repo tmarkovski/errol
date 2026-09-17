@@ -87,7 +87,8 @@ struct PerchWidgetCenter: View {
             GrowingTextEditor(text: $controller.customInstructions,
                               font: Perch.promptFont,
                               minimumFontSize: Perch.promptMinimumFontSize,
-                              textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
+                              textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
+                              placeholderColor: Perch.placeholderNS,
                               placeholder: controller.promptEditorPlaceholder,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
                               takesFocusOnAppear: true)
@@ -95,7 +96,8 @@ struct PerchWidgetCenter: View {
             GrowingTextEditor(text: $controller.topic,
                               font: Perch.promptFont,
                               minimumFontSize: Perch.promptMinimumFontSize,
-                              textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
+                              textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
+                              placeholderColor: Perch.placeholderNS,
                               placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
                               takesFocusOnAppear: true,
@@ -116,7 +118,8 @@ struct PerchWidgetCenter: View {
                                        set: { controller.setSteeringText($0) }),
                           font: Perch.promptFont,
                           minimumFontSize: Perch.promptMinimumFontSize,
-                          textColor: Perch.inkNS, placeholderColor: Perch.placeholderNS,
+                          textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
+                          placeholderColor: Perch.placeholderNS,
                           placeholder: controller.steeringText.isEmpty
                               ? "A note for the next handoff\u{2026}" : nil,
                           minimumLines: 1, maximumLines: Perch.promptMaximumLines, takesFocusOnAppear: true,
@@ -284,14 +287,14 @@ struct PerchWidgetActions: View {
     }
 
     private var stop: some View {
-        PerchCapsuleButton(title: "Stop", style: .outlined, icon: "stop.fill") { controller.stop() }
+        PerchCapsuleButton(title: "Stop", style: .glass, icon: "stop.fill") { controller.stop() }
             .disabled(controller.stopRequested)
             .help("Stop at the next safe point")
     }
 
     /// The two next intentions side by side, the filled one first: the
-    /// same conversations again, or new ones — an outlined secondary, as
-    /// Stop is beside Pause.
+    /// same conversations again, or new ones — a glass secondary, as Stop
+    /// is beside Pause.
     private var finished: some View {
         HStack(spacing: Perch.s(8)) {
             PerchCapsuleButton(title: "Another topic here", icon: "arrow.counterclockwise") {
@@ -299,7 +302,7 @@ struct PerchWidgetActions: View {
             }
             .keyboardShortcut(.defaultAction)
             .help("A new topic in these same conversations; their context carries on")
-            PerchCapsuleButton(title: "Set up fresh conversations\u{2026}", style: .outlined, icon: "plus.bubble") {
+            PerchCapsuleButton(title: "Set up fresh conversations\u{2026}", style: .glass, icon: "plus.bubble") {
                 controller.setUpFreshConversations()
             }
             .help("Open new chats in the apps, then connect them")
