@@ -17,7 +17,10 @@ final class TransferOverlay {
     private var panels: [TransferPanel] = []
     private var timer: Timer?
     private var lastVisibilityCheck: TimeInterval = 0
+    /// The two places a flight sets off from, both in the console
+    /// (TransferSource): the prompt, and each side's icon.
     var promptSource: PromptTransferSource?
+    var iconSource: ((Speaker) -> PromptTransferSource?)?
 
     func handle(_ event: TransferFeedback) {
         switch event {
@@ -25,14 +28,10 @@ final class TransferOverlay {
             stop()
             let windows = visibleWindows()
             guard isVisible(destination, in: windows) else { return }
-            let screens = NSScreen.screens.map { axRect($0.frame) }
             let origins = sources.compactMap { source -> TransferAnchor? in
                 let anchor: TransferAnchor?
                 switch source {
-                case .captured(let captured):
-                    anchor = replyTransferAnchor(copyFrame: captured.frame,
-                                                 window: captured.window, pid: captured.pid,
-                                                 screens: screens)
+                case .reply(let sender): anchor = iconSource?(sender)?.anchor()
                 case .userPrompt: anchor = promptSource?.anchor()
                 }
                 return anchor.flatMap { isVisible($0, in: windows) ? $0 : nil }

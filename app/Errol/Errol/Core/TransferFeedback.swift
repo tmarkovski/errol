@@ -249,50 +249,43 @@ func transferAnchor(for element: AXUIElement?, in target: TargetApp) -> Transfer
                           promptFrame: geometry.shell)
 }
 
-/// A copied reply still gets a flight when its copy control has scrolled out
-/// of view or exposes no geometry. Only the source may use this approximation;
-/// the destination continues to identify the actual receiving prompt.
-func replyTransferAnchor(copyFrame: CGRect?, window: CGRect, pid: pid_t,
-                         screens: [CGRect]? = nil) -> TransferAnchor? {
-    // Validate before taking intersections or computing a fallback center.
-    guard TransferAnchor(frame: window, window: window, pid: pid) != nil else { return nil }
-    if let copyFrame,
-       let exact = TransferAnchor(frame: copyFrame, window: window, pid: pid),
-       screens?.contains(where: { $0.contains(copyFrame) }) ?? true {
-        return exact
+/// Whether the window server shows the anchor's window where AX says it
+/// stands. Stage Manager makes the two disagree (live Sep 17 2026, macOS
+/// 27): AX goes on reporting the frame a window has on its stage, while
+/// the window server has a parked window as its thumbnail off the screen's
+/// edge — 205 × 156 at x −307, for a window of 2560 × 1348 — and a window
+/// changing places at every size in between.
+func isShowing(_ anchor: TransferAnchor, among windows: [WindowHitRegion]) -> Bool {
+    windows.contains { anchor.matchesWindow(id: $0.number, pid: $0.owner, frame: $0.frame) }
+}
+
+/// Wait for the receiving window to stand where its anchor says before a
+/// flight is launched at it. Bringing an app forward under Stage Manager
+/// swaps the stages over about two thirds of a second, and the overlay
+/// draws only over a window that is in its place, so a flight begun inside
+/// the swap was dropped whole, light and all. A window already in place
+/// answers at once. One that never arrives — another Space, a frame the
+/// two sides disagree on — costs the bound, and the send goes on with no
+/// decoration, which is what the overlay would have made of it anyway.
+func awaitArrival(of anchor: TransferAnchor, within seconds: TimeInterval = 1,
+                  onScreen: () -> [WindowHitRegion] = onScreenWindowRegions,
+                  isCancelled: () -> Bool = { relayControl.isCancelled }) -> Bool {
+    let deadline = ProcessInfo.processInfo.systemUptime + seconds
+    while !isShowing(anchor, among: onScreen()) {
+        guard ProcessInfo.processInfo.systemUptime < deadline, !isCancelled() else { return false }
+        Thread.sleep(forTimeInterval: 0.03)
     }
-    // Avoid launching outside a display when the window straddles a screen
-    // edge or a gap between monitors. Prefer its largest visible portion.
-    let visible = screens.map { frames in
-        frames.map { window.intersection($0) }
-            .filter { !$0.isNull && !$0.isEmpty }
-            .max { $0.width * $0.height < $1.width * $1.height }
-    } ?? window
-    guard let visible else { return nil }
-    let width = min(18, visible.width)
-    let height = min(18, visible.height)
-    let source = CGRect(x: visible.midX - width / 2, y: visible.midY - height / 2,
-                        width: width, height: height)
-    return TransferAnchor(frame: source, window: window, pid: pid)
+    return true
 }
 
-/// Capture the window while the source app is active; the copy button itself
-/// can be off screen and may unmount when focus moves to the recipient.
-func replyTransferAnchor(for element: AXUIElement?, in target: TargetApp) -> TransferAnchor? {
-    let elementWindow = element.flatMap { axAttribute($0, kAXWindowAttribute) }
-        .flatMap { value -> AXUIElement? in
-            CFGetTypeID(value) == AXUIElementGetTypeID() ? (value as! AXUIElement) : nil
-        }
-    guard let windowElement = elementWindow ?? chatWindow(in: target),
-          let window = windowFrame(windowElement) else { return nil }
-    return replyTransferAnchor(copyFrame: element.flatMap(windowFrame), window: window,
-                               pid: target.app.processIdentifier)
-}
-
+/// Where a flight sets off. Both are in Errol's console, which carries
+/// every message: a reply leaves its sender's icon there, whatever the
+/// sender's own window is doing — under Stage Manager it is parked in the
+/// strip by the time the receiver is forward — and the human's words leave
+/// the prompt they were typed in. Each is resolved on the main thread at
+/// launch, so no UI references or stale panel coordinates cross threads.
 enum TransferSource: Equatable {
-    case captured(TransferAnchor)
-    /// Resolve the prompt on the main thread at launch, after its editor
-    /// has closed. No UI references or stale panel coordinates cross threads.
+    case reply(Speaker)
     case userPrompt
 }
 

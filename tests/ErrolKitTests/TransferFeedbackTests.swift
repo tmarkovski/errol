@@ -2,18 +2,17 @@ import XCTest
 @testable import ErrolKit
 
 final class TransferFeedbackTests: XCTestCase {
-    private var replyAnchor: TransferAnchor {
+    private var chatAnchor: TransferAnchor {
         TransferAnchor(frame: CGRect(x: 150, y: 200, width: 30, height: 20),
                        window: CGRect(x: 100, y: 100, width: 600, height: 800), pid: 1)!
     }
 
-    func testFreshSteeringAddsSecondSourceButEchoDoesNot() {
+    func testTheReplyLeavesItsSendersIconAndFreshSteeringAddsASecondSourceButEchoDoesNot() {
         var payload = HandoffPayload(from: "Claude", intro: false, echo: "Earlier note", note: nil)
-        XCTAssertEqual(payload.transferSources(reply: replyAnchor), [.captured(replyAnchor)])
+        XCTAssertEqual(payload.transferSources(from: .claude), [.reply(.claude)])
+        XCTAssertEqual(payload.transferSources(from: .chatgpt), [.reply(.chatgpt)])
         payload.note = "New direction"
-        XCTAssertEqual(payload.transferSources(reply: replyAnchor), [.captured(replyAnchor), .userPrompt])
-        XCTAssertEqual(payload.transferSources(reply: nil), [.userPrompt],
-                       "A missing copy-button frame must not hide the human note's flight")
+        XCTAssertEqual(payload.transferSources(from: .claude), [.reply(.claude), .userPrompt])
     }
 
     func testRejectedOrWithdrawnNoteHasNoHumanFlight() {
@@ -25,7 +24,7 @@ final class TransferFeedbackTests: XCTestCase {
                 return XCTFail("The handoff should proceed without the note")
             }
             let payload = HandoffPayload(from: "Claude", intro: false, echo: nil, note: note)
-            XCTAssertEqual(payload.transferSources(reply: replyAnchor), [.captured(replyAnchor)])
+            XCTAssertEqual(payload.transferSources(from: .claude), [.reply(.claude)])
         }
     }
 
@@ -43,13 +42,13 @@ final class TransferFeedbackTests: XCTestCase {
     }
 
     func testNativePromptWindowCanResizeDuringFlightWithoutMatchingAnotherWindow() {
-        let native = TransferAnchor(frame: replyAnchor.frame, window: replyAnchor.window,
+        let native = TransferAnchor(frame: chatAnchor.frame, window: chatAnchor.window,
                                     pid: 7, windowID: 42)!
         let resized = CGRect(x: 100, y: 130, width: 600, height: 770)
         XCTAssertTrue(native.matchesWindow(id: 42, pid: 7, frame: resized))
         XCTAssertFalse(native.matchesWindow(id: 43, pid: 7, frame: resized))
         XCTAssertFalse(native.matchesWindow(id: 42, pid: 8, frame: resized))
-        XCTAssertFalse(replyAnchor.matchesWindow(id: 42, pid: 1, frame: resized),
+        XCTAssertFalse(chatAnchor.matchesWindow(id: 42, pid: 1, frame: resized),
                        "External windows still require the captured frame to match")
     }
 
@@ -84,57 +83,43 @@ final class TransferFeedbackTests: XCTestCase {
         }
     }
 
-    func testVisibleCopyButtonKeepsItsExactSource() {
-        XCTAssertEqual(replyTransferAnchor(copyFrame: replyAnchor.frame,
-                                            window: replyAnchor.window, pid: replyAnchor.pid,
-                                            screens: [CGRect(x: 0, y: 0, width: 1440, height: 1000)]),
-                       replyAnchor)
-    }
-
-    func testMissingOrScrolledCopyGeometryLaunchesFromWindowCenter() throws {
-        let window = replyAnchor.window
-        for copyFrame in [nil, CGRect.zero,
-                          CGRect(x: 150, y: 1100, width: 30, height: 20),
-                          CGRect(x: 150, y: 890, width: 30, height: 20),
-                          CGRect(x: CGFloat.infinity, y: 200, width: 30, height: 20)] {
-            let source = try XCTUnwrap(replyTransferAnchor(copyFrame: copyFrame, window: window, pid: 1))
-            XCTAssertEqual(source.frame.midX, window.midX)
-            XCTAssertEqual(source.frame.midY, window.midY)
-            XCTAssertTrue(window.contains(source.frame))
-            let payload = HandoffPayload(from: "Claude", intro: false, echo: nil, note: nil)
-            XCTAssertEqual(payload.transferSources(reply: source), [.captured(source)],
-                           "Missing button geometry must still produce the reply's flight")
+    /// The window server's account of a 2560 × 1348 window under Stage
+    /// Manager (live Sep 17 2026): parked in the strip, on its way to the
+    /// stage, and there. AX reports the last of these throughout.
+    func testAWindowParkedOrChangingPlacesUnderStageManagerIsNotShowing() throws {
+        let window = CGRect(x: 0, y: 30, width: 2560, height: 1348)
+        let anchor = try XCTUnwrap(TransferAnchor(frame: CGRect(x: 900, y: 1200, width: 700, height: 60),
+                                                  window: window, pid: 7))
+        func listed(_ frame: CGRect, owner: Int32 = 7) -> [WindowHitRegion] {
+            [WindowHitRegion(number: 3, owner: 9, frame: window),
+             WindowHitRegion(number: 1011, owner: owner, frame: frame)]
         }
+        XCTAssertFalse(isShowing(anchor, among: listed(CGRect(x: -307, y: 747, width: 205, height: 156))))
+        XCTAssertFalse(isShowing(anchor, among: listed(CGRect(x: 23, y: 73, width: 2306, height: 1287))))
+        XCTAssertTrue(isShowing(anchor, among: listed(CGRect(x: -1, y: 30, width: 2561, height: 1348))),
+                      "The swap's last frames land within the rounding between AX and the window server")
+        XCTAssertFalse(isShowing(anchor, among: listed(window, owner: 8)),
+                       "Another app's window at the same frame is not this one")
     }
 
-    func testOffDisplayCopyFallsBackToVisibleWindowPortion() throws {
-        let screen = CGRect(x: 0, y: 0, width: 1440, height: 1000)
-        let window = CGRect(x: -700, y: 100, width: 1000, height: 800)
-        let copyFrame = CGRect(x: -600, y: 200, width: 30, height: 20)
-        // The copy button is inside its window but outside the display.
-        let source = try XCTUnwrap(replyTransferAnchor(copyFrame: copyFrame, window: window,
-                                                        pid: 1, screens: [screen]))
-        XCTAssertEqual(source.frame.midX, 150)
-        XCTAssertEqual(source.frame.midY, 500)
-        XCTAssertTrue(screen.contains(source.frame))
-        XCTAssertEqual(source.window, window, "Keep the real window identity for visibility checks")
-    }
+    func testTheFlightWaitsForItsWindowToArriveAndGivesUpOnOneThatDoesNot() throws {
+        let window = CGRect(x: 0, y: 30, width: 2560, height: 1348)
+        let anchor = try XCTUnwrap(TransferAnchor(frame: CGRect(x: 900, y: 1200, width: 700, height: 60),
+                                                  window: window, pid: 7))
+        var swap = [CGRect(x: -55, y: 602, width: 555, height: 403),
+                    CGRect(x: 58, y: 127, width: 2050, height: 1203), window]
+        var reads = 0
+        XCTAssertTrue(awaitArrival(of: anchor, onScreen: {
+            reads += 1
+            return [WindowHitRegion(number: 1011, owner: 7, frame: swap.count > 1 ? swap.removeFirst() : swap[0])]
+        }, isCancelled: { false }))
+        XCTAssertEqual(reads, 3)
 
-    func testFallbackHandlesNegativeDisplaysAndMonitorGaps() throws {
-        let left = CGRect(x: -1000, y: -200, width: 800, height: 1000)
-        let right = CGRect(x: 0, y: 0, width: 1440, height: 1000)
-        let window = CGRect(x: -400, y: 100, width: 500, height: 500)
-        let source = try XCTUnwrap(replyTransferAnchor(copyFrame: nil, window: window,
-                                                        pid: 1, screens: [left, right]))
-        XCTAssertEqual(source.frame.midX, -300, "Choose the largest visible portion, not the monitor gap")
-        XCTAssertEqual(source.frame.midY, 350)
-        XCTAssertTrue(left.contains(source.frame))
-    }
-
-    func testMissingVisibleWindowDoesNotInventAnAnimationSource() {
-        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: .zero, pid: 1))
-        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: replyAnchor.window, pid: 1, screens: []))
-        XCTAssertNil(replyTransferAnchor(copyFrame: nil, window: replyAnchor.window, pid: 1,
-                                         screens: [CGRect(x: 2000, y: 0, width: 1440, height: 1000)]))
+        let parked = [WindowHitRegion(number: 1011, owner: 7, frame: CGRect(x: -307, y: 747, width: 205, height: 156))]
+        XCTAssertFalse(awaitArrival(of: anchor, within: 0.1, onScreen: { parked }, isCancelled: { false }))
+        var asked = 0
+        XCTAssertFalse(awaitArrival(of: anchor, within: 5, onScreen: { asked += 1; return parked },
+                                    isCancelled: { true }), "Stop ends the wait")
+        XCTAssertEqual(asked, 1)
     }
 }

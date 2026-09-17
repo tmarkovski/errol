@@ -129,12 +129,11 @@ struct HandoffPayload {
     /// The note taken at this handoff, read after the reply.
     var note: String?
 
-    /// A fresh human note joins the reply in this handoff. An echo is
-    /// already carried by the preceding actor, so it adds no second dot.
-    func transferSources(reply: TransferAnchor?) -> [TransferSource] {
-        var sources = reply.map { [TransferSource.captured($0)] } ?? []
-        if note != nil { sources.append(.userPrompt) }
-        return sources
+    /// The reply leaves its sender's icon in the console, and a fresh
+    /// human note joins it from the prompt. An echo is already carried by
+    /// the preceding actor, so it adds no second dot.
+    func transferSources(from sender: Speaker) -> [TransferSource] {
+        note == nil ? [.reply(sender)] : [.reply(sender), .userPrompt]
     }
 
     /// The whole thing around `reply`, cap or no cap.
@@ -603,7 +602,6 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             // the conversation went out of view inside the operation, ended
             // when the copy failed with the conversation in view.
             var reply: String?
-            var copiedAnchor: TransferAnchor?
             while reply == nil {
                 switch openGate(speaker, kind: .capture,
                                 holdLine: "Paused — \(speaker.name)'s reply is ready; waiting to copy it.",
@@ -615,8 +613,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 }
                 guard inspection?.mayContinue(speaker) != false else { return .stopped }
                 reply = copyLastResponse(from: speaker,
-                                         mayContinue: { bound(speaker).check() == .same },
-                                         onCopy: showTransfers ? { copiedAnchor = $0 } : nil)
+                                         mayContinue: { bound(speaker).check() == .same })
                 if reply == nil {
                     switch destinationGuard(speaker) {
                     case .clear:
@@ -720,7 +717,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 }
                 baseline = responseBaseline(in: listener)
                 outcome = send(payload.text(reply: reply, cap: config.maxChars), to: listener,
-                               sources: payload.transferSources(reply: copiedAnchor), showTransfer: showTransfers,
+                               sources: payload.transferSources(from: side(speaker)), showTransfer: showTransfers,
                                destination: bound(listener),
                                inspection: inspection?.sendInspection(listener))
                 if outcome == .withheld {

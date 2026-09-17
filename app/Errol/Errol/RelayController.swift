@@ -169,6 +169,10 @@ final class RelayController {
     @ObservationIgnored private let veils: SideVeils?
     @ObservationIgnored private let transferOverlay: TransferOverlay?
     @ObservationIgnored let promptTransferSource = PromptTransferSource()
+    /// Each side's icon in the console, where its replies set off from
+    /// (TransferSource).
+    @ObservationIgnored let iconTransferSources = [Speaker.chatgpt: PromptTransferSource(),
+                                                   .claude: PromptTransferSource()]
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
@@ -194,6 +198,7 @@ final class RelayController {
         // the keyboard as it appears (PerchWidgetCenter.openingEditor).
         setup.onReachCompose = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
+        transferOverlay?.iconSource = { [iconTransferSources] in iconTransferSources[$0] }
         // Most sweeps see the same picture as the last one; publishing them
         // anyway would re-render the status views each poll, so only
         // changed statuses reach the observable properties. The setup

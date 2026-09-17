@@ -81,6 +81,15 @@ struct PerchParticipant: View {
     var body: some View {
         VStack(spacing: Perch.s(4)) {
             icon
+                // Where this side's replies set off from
+                // (RelayController.iconTransferSources).
+                .background {
+                    if let source = controller.iconTransferSources[speaker] {
+                        PromptTransferProbe(source: source)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
             PerchAppLabel(name: name, status: preparationLabel,
                           hintActive: role == .launch && (hoveringIcon || iconFocused))
             if replying {

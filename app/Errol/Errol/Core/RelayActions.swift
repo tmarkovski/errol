@@ -35,8 +35,7 @@ func expandLastMessageActions(in target: TargetApp) {
 /// activation — the one call that moves key status too, which is what the
 /// renderer actually reads.
 func copyLastResponse(from target: TargetApp,
-                      mayContinue: () -> Bool = { true },
-                      onCopy: ((TransferAnchor?) -> Void)? = nil) -> String? {
+                      mayContinue: () -> Bool = { true }) -> String? {
     for attempt in 0..<2 {
         // The destination is the caller's to judge; a press into a
         // conversation the human switched to would copy their message.
@@ -49,7 +48,7 @@ func copyLastResponse(from target: TargetApp,
             log("\(target.name): could not bring app to front before copying; pressing anyway")
             log("\(target.name): \(focusReport(target))")
         }
-        if let text = pressCopyButton(in: target, onCopy: onCopy) {
+        if let text = pressCopyButton(in: target) {
             trace("copied \(text.count) chars from \(target.name) on attempt \(attempt + 1)")
             return text
         }
@@ -65,8 +64,7 @@ func copyLastResponse(from target: TargetApp,
 /// One press of the newest message's copy button, confirmed by the pasteboard
 /// moving. nil when no button could be found, the press failed, or it
 /// produced no clipboard write.
-func pressCopyButton(in target: TargetApp,
-                     onCopy: ((TransferAnchor?) -> Void)? = nil) -> String? {
+func pressCopyButton(in target: TargetApp) -> String? {
     expandLastMessageActions(in: target)
     let buttons = copyButtons(in: target)
     guard let button = buttons.last else {
@@ -74,9 +72,6 @@ func pressCopyButton(in target: TargetApp,
         return nil
     }
     let pasteboard = NSPasteboard.general
-    // Copy controls can unmount as soon as focus moves to the recipient.
-    // Remember their position while the actual button is still present.
-    let origin = onCopy == nil ? nil : replyTransferAnchor(for: button, in: target)
     // Whatever the human had on the clipboard goes back the moment the
     // reply is in memory: the clipboard is not held across the wait for
     // the delivery gate (ClipboardLease).
@@ -97,10 +92,8 @@ func pressCopyButton(in target: TargetApp,
         usleep(50_000)
     }
     lease.claim()
-    let text = pasteboard.string(forType: .string)?
+    return pasteboard.string(forType: .string)?
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    if text != nil { onCopy?(origin) }
-    return text
 }
 
 /// What became of the clipboard at the end of an operation, to the debug
@@ -569,10 +562,26 @@ func send(_ text: String, to target: TargetApp,
             + (expectation.needleIsDistinctive ? "" : " (already in the composer, so not counted)")
             + ", or a new attachment, or growth of \(expectation.growthRequired)+ chars over a baseline of "
             + "\(expectation.baselineCount)" + (valueBefore.map { " (composer holds \($0.count))" } ?? ""))
-        let destination = showTransfer ? transferAnchor(for: input, in: target) : nil
+        var destination = showTransfer ? transferAnchor(for: input, in: target) : nil
         if showTransfer {
             trace(destination.map { "transfer destination: \(describeAnchor($0))" }
                 ?? "transfer destination: none (no usable geometry for the composer, so no dot and no outline)")
+        }
+        // The app is frontmost, but under Stage Manager its window may
+        // still be on the way to its place (awaitArrival). One that does
+        // not get there has nothing drawn over it, and no light to wait for.
+        if let anchor = destination {
+            let asked = ProcessInfo.processInfo.systemUptime
+            let arrived = awaitArrival(of: anchor)
+            let waited = ProcessInfo.processInfo.systemUptime - asked
+            if !arrived {
+                trace("transfer destination: the window is not showing at that frame after "
+                    + String(format: "%.2f", waited) + " s, so no dot and no outline")
+                destination = nil
+            } else if waited > 0.05 {
+                trace("transfer destination: waited " + String(format: "%.2f", waited)
+                    + " s for the window to reach its place")
+            }
         }
         if let destination {
             let startedAt = ProcessInfo.processInfo.systemUptime

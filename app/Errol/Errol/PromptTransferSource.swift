@@ -3,6 +3,8 @@ import SwiftUI
 
 /// The same prompt region survives topic, custom-prompt, and steering states.
 /// Read its current screen position at launch, without replacing the editor.
+/// A side's icon is read the same way, for the replies that set off from
+/// it (RelayController.iconTransferSources).
 final class PromptTransferSource {
     weak var view: NSView?
 
