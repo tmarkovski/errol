@@ -23,9 +23,7 @@ struct PermissionOnboardingView: View {
         }
         .padding(.horizontal, Perch.s(24))
         .padding(.vertical, Perch.s(22))
-        .frame(width: width)
-        .frame(minHeight: Perch.widgetHeight)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: width, height: Perch.widgetHeight)
         .tint(Perch.accent)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .clipShape(Capsule())
@@ -52,8 +50,8 @@ struct PermissionOnboardingView: View {
     /// and where to do it. The last line is the whole path, so nobody has to
     /// find Accessibility inside System Settings on their own. Each line fits
     /// the full-width console on one line, keeping this row the console's
-    /// height so the crossfade into it moves nothing; a narrower screen wraps
-    /// and grows the capsule instead of truncating an instruction.
+    /// height so the crossfade into it moves nothing. Supporting text wraps
+    /// within the same fixed capsule.
     private var explanation: some View {
         VStack(alignment: .leading, spacing: Perch.s(5)) {
             Text("Allow Accessibility access")

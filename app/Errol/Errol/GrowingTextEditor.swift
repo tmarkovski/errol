@@ -70,6 +70,9 @@ struct GrowingTextEditor: NSViewRepresentable {
     /// hands it when a row above is absent, so the card keeps one height
     /// whether or not that row is showing (Perch.previewZoneHeight).
     var extraMinimumHeight: CGFloat = 0
+    /// Console editors scroll within the fixed capsule instead of increasing
+    /// its height. Other editors retain their content-driven sizing.
+    var fitsAvailableHeight = false
     /// When set, the editor takes the keyboard as soon as it is in a window
     /// — for a field that opens on a click elsewhere, so the next thing
     /// typed lands in it.
@@ -189,7 +192,10 @@ struct GrowingTextEditor: NSViewRepresentable {
                                   range: NSRange(location: 0, length: measuredText.length))
         let contentHeight = ceil(context.coordinator.textLayout.textHeight(
             measuredText, width: width) + insets)
-        let height = min(max(contentHeight, minimumHeight), maximumHeight)
+        var height = min(max(contentHeight, minimumHeight), maximumHeight)
+        if fitsAvailableHeight, let available = proposal.height, available.isFinite {
+            height = min(height, max(minimumHeight, available))
+        }
         return CGSize(width: width, height: height)
     }
 

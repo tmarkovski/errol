@@ -79,13 +79,13 @@ enum Perch {
     /// One inset for the head and the full-width composer's contents.
     static let contentInset = s(12)
     static let primaryDiameter = s(36)
+    /// Configure and the actions below it share one fixed horizontal anchor.
+    static let actionDiameter = s(32)
     /// A step tighter than the card, for a well set inside a window: the
     /// log window's text area.
     static let insetCorner = s(10)
 
-    /// The fixed card width, which is also the window's. Height is nobody's
-    /// constant — the card is content-sized and the shell fits the window to
-    /// what it reports (PerchPanelView, MenuBarController.fitPanel).
+    /// Settings keeps its separate content-sized card.
     static let cardWidth = s(464)
     /// The capsule's footprint: the reference is 860 × 156 CSS pixels at
     /// full desktop width (docs/design-proposals/setup-interaction/SPEC.md),
@@ -96,7 +96,7 @@ enum Perch {
     static let widgetHeight: CGFloat = 156
     /// A participant's column: the app's icon over a destination name,
     /// kept to one line and truncated in the middle.
-    static let participantWidth = s(92)
+    static let participantWidth = s(72)
     /// The content header keeps the familiar 52pt height of a unified
     /// toolbar. The borderless panel draws its controls here (PerchChrome).
     static let chromeBand: CGFloat = 52
@@ -140,11 +140,8 @@ enum Perch {
     static let previewZoneHeight = previewHeight + 2 * cardGap + 1
 }
 
-/// The one window frame the panel names: what it opens at before the card's
-/// first size report lands. Every real size comes from the card itself —
-/// content-sized in every state, the shell fitting the window to what it
-/// reports (MenuBarController.fitPanel) — so this is a first-frame stand-in,
-/// corrected the moment the card lays out.
+/// The console and permission screen keep this height through every state.
+/// Settings reports its own content size to MenuBarController.fitPanel.
 enum PerchMetrics {
     static let initialPanel = CGSize(width: Perch.widgetWidth, height: Perch.widgetHeight)
 }

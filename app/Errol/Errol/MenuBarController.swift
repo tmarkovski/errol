@@ -289,9 +289,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.contentView = host
     }
 
-    /// Follow the card: it is content-sized, and each size it reports
-    /// (PanelRootView.onCardResize) becomes the window's, through an
-    /// anchored, animated frame change.
+    /// Console and permission report the same fixed footprint. Settings
+    /// reports its own content size, applied through an anchored resize.
     private func fitPanel(to size: CGSize) {
         guard size.width.isFinite, size.height.isFinite,
               size.width > 0, size.height > 0 else { return }

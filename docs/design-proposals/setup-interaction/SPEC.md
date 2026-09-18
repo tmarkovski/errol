@@ -4,6 +4,11 @@ September 10, 2026. Implementation baseline from the reviewed interactive
 preview and the subsequent design discussion. This document records the
 experience to build; it does not report that the application implements it.
 
+**September 18 revision:** trailing setup/run actions reveal their labels to
+the left, with their icons fixed beneath Configure. Arrange has no routine
+status sentence: its title sits over the layout choices and Continue. The
+native console keeps a fixed height across states. See [the visual revision](README.md#september-18-compact-actions-and-a-fixed-capsule).
+
 ## Reference and precedence
 
 - [Interactive screen reference](preview.html): open in a browser and select
@@ -34,9 +39,11 @@ approximately that footprint in native points as the initial implementation
 target, then compare optically at standard text size. Define the native width
 and base height once in `Perch`; do not multiply the reference values by the
 existing scale a second time. All ten normal-content views should share those
-dimensions. Clamp width to the available display. Longer text, localization,
-and accessibility take precedence over an exact height: wrap and grow downward
-when needed, keeping the top and horizontal center anchored.
+dimensions. Clamp width to the available display, keeping height fixed at
+156 points. Editors scroll within the available height; additional run and
+ending details scroll in their own content region. Exceptional arrangement
+guidance opens from an attention icon, without inserting a status row.
+Settings retains its separate card size.
 
 Use a true `Capsule` outline with fully rounded ends. The preview's 28-pixel
 rounded rectangle remains a comparison option, not a product setting or a
@@ -122,8 +129,11 @@ Across the guided screens the capsule keeps one structure: the participant
 columns at the ends, each the app's icon over a compact label, with a second
 line only for useful destination or recovery information; the center between two hairlines, with the progress meter at its top
 left and the settings entry point at its top right; the step's copy under
-them; and the step's actions under the copy, in the compact pill buttons of
-the reference, never in a column of their own.
+them; and the secondary copy beside a trailing icon action. The icon occupies
+a fixed 32-point reference slot beneath Configure; hover or keyboard focus
+reveals its label to the left over 0.22 seconds without moving that icon or
+the copy. Reduce Motion reveals the label instantly. Its accessible name is
+always available. On Arrange, the choices replace the secondary copy.
 
 ### Screen 01: Access
 
@@ -192,8 +202,9 @@ opening. Show the reason in the capsule. Do not imply that clicking an
 unavailable icon installs an application. **Open both apps** calls the same
 launch action for whichever app is not open.
 
-The one primary action sits under the copy: **Open both apps** until both are
-open, then **Continue · 5**. Once both are detected, including when they were
+The one primary action sits at the right of the supporting copy: **Open both
+apps** until both are open, then **Continue**, with its countdown in a visible
+badge beside the arrow. Once both are detected, including when they were
 already open on entry, count down for five seconds. A soft fill moves left to
 right inside Continue, beneath its readable label, while the number counts
 down. Keep the control's size stable as the digits change. Ready copy reads
@@ -233,10 +244,12 @@ Side by side or Stacked moves the windows at once, and Keep positions leaves
 their current frames alone, including after trying another layout. It does
 not restore their original frames.
 
-Supporting copy initially reads **Choose a layout to move both windows now,
-or continue as they are.** After a move, confirm **Windows are side by side.
-Continue when you’re ready.** or the stacked equivalent. Keep keyboard focus
-on the chosen button and announce the result. There is no separate apply
+The title is followed directly by the three choices, with the icon-only
+**Continue** at the right of the same row. Omit routine supporting and status
+copy: the selected option and the moved windows show the result. Keep keyboard
+focus on the chosen button and announce the result. Show an attention icon
+beside the title only when arrangement fails or needs a window choice; its
+popover contains the complete recovery guidance. There is no separate apply
 action; **Continue** is offered from the start and waits
 only while a move is in progress. A moving layout chosen while an app has no
 window to move applies once one appears. Arranging again and putting the
@@ -390,7 +403,7 @@ Actions: **Send note & continue**, **Resume without note**, **Stop**. State the
 actual recipient order for a submitted note. Preserve a pending note through
 holds and withheld deliveries; never resubmit a note just because a UI phase
 was re-rendered. Long notes remain editable within the native editor's existing
-growth/scroll behavior without widening the capsule.
+scroll behavior within the fixed capsule.
 
 ### Screen 09: Finished
 
@@ -515,7 +528,7 @@ destinations through setup into those operations and exposing their state.
 
 | Work | Existing home | Required change |
 | --- | --- | --- |
-| Shared capsule and geometry | [PerchPanelView](../../../app/Errol/Errol/Perch/PerchPanelView.swift), [PerchStyle](../../../app/Errol/Errol/Perch/PerchStyle.swift), [PanelNavigation](../../../app/Errol/Errol/PanelNavigation.swift), [MenuBarController](../../../app/Errol/Errol/MenuBarController.swift) | Keep a common base size and frame anchoring across the new phases; preserve native text growth. |
+| Shared capsule and geometry | [PerchPanelView](../../../app/Errol/Errol/Perch/PerchPanelView.swift), [PerchStyle](../../../app/Errol/Errol/Perch/PerchStyle.swift), [PanelNavigation](../../../app/Errol/Errol/PanelNavigation.swift), [MenuBarController](../../../app/Errol/Errol/MenuBarController.swift) | Keep a fixed console height across phases; scroll long editor content and additional details internally. |
 | Permission and participants | [PermissionOnboardingView](../../../app/Errol/Errol/PermissionOnboardingView.swift), [PerchAvatar](../../../app/Errol/Errol/Perch/PerchAvatar.swift) | Reuse the permission lifecycle; prefer desktop app icons and phase-appropriate actions. |
 | Session/setup model | [RelayController](../../../app/Errol/Errol/RelayController.swift), [RelayEngine](../../../app/Errol/Errol/RelayEngine.swift) | Add explicit setup phases, per-side selection/readiness, launch actions, and independent recovery. Keep it separate from running/steering state. |
 | Window selection | [Readiness](../../../app/Errol/Errol/Core/Readiness.swift), [Elements](../../../app/Errol/Errol/Core/Elements.swift), [Destination](../../../app/Errol/Errol/Core/Destination.swift), [Veil](../../../app/Errol/Errol/Veil.swift) | Enumerate candidates, implement drag/picker and its overlay, and bind the selected element with the available identity evidence. |

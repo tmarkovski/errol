@@ -3,8 +3,8 @@ import SwiftUI
 /// The one capsule every phase shares — permission aside, which has its
 /// own view in the same shape: the participants at opposite ends, the
 /// content between them changing with the stage (guided setup, the editor,
-/// the exchange, the ending), the actions beside it. Its natural content
-/// height drives the native window; longer text grows it downward.
+/// the exchange, the ending), the actions beside it. Its footprint stays
+/// fixed; editors and additional run details scroll inside the content area.
 struct PerchPanelView: View {
     let controller: RelayController
     var width: CGFloat = Perch.widgetWidth
@@ -13,18 +13,15 @@ struct PerchPanelView: View {
     var body: some View {
         HStack(spacing: Perch.s(14)) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
-            // The center between its two hairlines, in three bands that keep
-            // their places whatever the stage: the meter and the settings
-            // along the top, the stage's actions along the bottom, and the
-            // stage's content flowing down from under the top band. The
-            // column fills the capsule's height, so the top band never
-            // drifts with the content; content past the room there is
-            // grows the capsule downward.
+            // The toolbar and trailing action share an x-coordinate. Setup
+            // and the running state put their actions beside supporting copy.
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: Perch.s(8)) {
                     if showsMeter {
                         PerchProgressMeter(controller: controller)
                             .transition(.opacity)
+                    } else if controller.stage == .running {
+                        PerchRunMetadata(controller: controller)
                     }
                     Spacer(minLength: 0)
                     PerchWidgetSetup(controller: controller)
@@ -32,8 +29,12 @@ struct PerchPanelView: View {
                 .animation(Perch.fade, value: showsMeter)
                 PerchWidgetCenter(controller: controller)
                     .padding(.top, Perch.s(8))
-                Spacer(minLength: Perch.s(8))
-                PerchWidgetActions(controller: controller)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                if controller.stage == .compose || controller.stage == .finished
+                    || (controller.stage == .running && controller.isSteering) {
+                    PerchWidgetActions(controller: controller)
+                        .padding(.top, Perch.s(6))
+                }
             }
             .frame(maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, Perch.s(18))
@@ -44,9 +45,7 @@ struct PerchPanelView: View {
         }
         .padding(.horizontal, Perch.s(28))
         .padding(.vertical, Perch.s(12))
-        .frame(width: width)
-        .frame(minHeight: Perch.widgetHeight)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: width, height: Perch.widgetHeight)
         .tint(Perch.accent)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .clipShape(Capsule())

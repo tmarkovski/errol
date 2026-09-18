@@ -88,8 +88,8 @@ struct PanelWindowSurface: ViewModifier {
 }
 
 /// The console and permission setup share one capsule, whose corners follow
-/// the current animated frame, including while a growing editor changes
-/// height. Settings retains its conventional corners.
+/// the current frame. Editors scroll inside that fixed height; Settings
+/// retains its conventional corners and separate content size.
 struct PanelSurfaceShape: Shape {
     var isCard: Bool
 

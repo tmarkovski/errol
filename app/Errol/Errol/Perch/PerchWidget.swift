@@ -9,7 +9,7 @@ struct PerchWidgetCenter: View {
     @Bindable var controller: RelayController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(8)) {
+        VStack(alignment: .leading, spacing: Perch.s(6)) {
             ZStack(alignment: .leading) {
                 switch controller.stage {
                 case .setup:
@@ -29,7 +29,9 @@ struct PerchWidgetCenter: View {
                                                   && controller.block == nil)
                     }
                 case .finished:
-                    PerchRunSummary(controller: controller)
+                    ScrollView(.vertical) {
+                        PerchRunSummary(controller: controller)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -40,7 +42,17 @@ struct PerchWidgetCenter: View {
             }
 
             if controller.stage == .running {
-                runningDetails
+                if controller.isSteering {
+                    PerchRunLine(controller: controller)
+                } else {
+                    HStack(spacing: Perch.s(14)) {
+                        ScrollView(.vertical) { runningDetails }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        PerchWidgetActions(controller: controller)
+                    }
+                    .padding(.top, Perch.s(6))
+                    .frame(minHeight: Perch.actionDiameter)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,7 +70,7 @@ struct PerchWidgetCenter: View {
                 Text(problem)
                     .font(Perch.text(11))
                     .foregroundStyle(isProblem ? Perch.red : Perch.muted)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .help(problem)
                     .contentTransition(.opacity)
             }
@@ -91,6 +103,7 @@ struct PerchWidgetCenter: View {
                               placeholderColor: Perch.placeholderNS,
                               placeholder: controller.promptEditorPlaceholder,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                              fitsAvailableHeight: true,
                               takesFocusOnAppear: true)
         } else {
             GrowingTextEditor(text: $controller.topic,
@@ -100,6 +113,7 @@ struct PerchWidgetCenter: View {
                               placeholderColor: Perch.placeholderNS,
                               placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
                               minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                              fitsAvailableHeight: true,
                               takesFocusOnAppear: true,
                               onSubmit: { controller.start() })
         }
@@ -122,7 +136,8 @@ struct PerchWidgetCenter: View {
                           placeholderColor: Perch.placeholderNS,
                           placeholder: controller.steeringText.isEmpty
                               ? "A note for the next handoff\u{2026}" : nil,
-                          minimumLines: 1, maximumLines: Perch.promptMaximumLines, takesFocusOnAppear: true,
+                          minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                          fitsAvailableHeight: true, takesFocusOnAppear: true,
                           onSubmit: { controller.sendSteering() },
                           onEscape: { _ in controller.escapeSteering() },
                           session: controller.steeringEditor)
@@ -154,20 +169,6 @@ struct PerchWidgetCenter: View {
 
     private var runningDetails: some View {
         VStack(alignment: .leading, spacing: Perch.s(5)) {
-            if controller.isSteering {
-                Text("Paused \u{00B7} Nothing is being copied or sent")
-                    .font(Perch.text(11, .medium))
-                    .foregroundStyle(Perch.accentText)
-                    .lineLimit(1)
-            }
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text("\(controller.conversation) \u{00B7} \(turnText) \u{00B7} \(clock(at: context.date))")
-                    .font(Perch.text(11))
-                    .foregroundStyle(Perch.muted)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
             if let block = controller.block, !controller.stopRequested {
                 Text(block.recovery(names: controller.names))
                     .font(Perch.text(11))
@@ -175,6 +176,10 @@ struct PerchWidgetCenter: View {
                     .lineLimit(2)
                     .help(block.recovery(names: controller.names))
                     .transition(.opacity)
+            } else if !hasNoteFeedback {
+                Text("Pause before typing in either conversation.")
+                    .font(Perch.text(12))
+                    .foregroundStyle(Perch.secondary)
             }
             if hasNoteFeedback {
                 PerchRunLine(controller: controller)
@@ -187,15 +192,27 @@ struct PerchWidgetCenter: View {
                     .help(controller.steeringText)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private var turnText: String {
-        controller.limitTurns ? "Turn \(controller.currentTurn) of \(controller.turns)"
-            : "Turn \(controller.currentTurn)"
-    }
+/// Run metadata takes the progress meter's toolbar slot, leaving room for
+/// the large activity title and the copy beside Pause and Stop.
+struct PerchRunMetadata: View {
+    let controller: RelayController
 
-    private func clock(at date: Date) -> String {
-        runClock(controller.elapsedRunDuration(at: date))
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let turn = controller.limitTurns ? "Turn \(controller.currentTurn) of \(controller.turns)"
+                : "Turn \(controller.currentTurn)"
+            let phase = controller.isSteering ? "Paused" : controller.conversation
+            Text("\(phase) · \(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))")
+                .font(Perch.text(11))
+                .foregroundStyle(Perch.muted)
+                .monospacedDigit()
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
     }
 }
 
@@ -212,7 +229,7 @@ struct PerchWidgetSetup: View {
             Image(systemName: "slider.horizontal.3")
                 .font(Perch.text(15, .medium))
                 .foregroundStyle(showingSetup ? Perch.ink : Perch.secondary)
-                .frame(width: Perch.s(29), height: Perch.s(29))
+                .frame(width: Perch.actionDiameter, height: Perch.actionDiameter)
                 .background(Circle().fill(showingSetup ? Perch.well : .clear))
                 .perchHover(Circle())
                 .contentShape(Circle())
@@ -227,11 +244,8 @@ struct PerchWidgetSetup: View {
     }
 }
 
-/// The center's bottom band, in every stage: the guided step's actions
-/// (PerchSetupActions), the named Send under the editor, Pause to steer
-/// and Stop during the exchange, the note's send and resume while paused,
-/// and the two next intentions at the end. The actions stand at the
-/// leading edge, at their own size, as the guided steps' primaries do.
+/// Named actions stay below editors and the ending. During a run, the
+/// fixed Pause/Stop icons sit beside the supporting copy instead.
 struct PerchWidgetActions: View {
     let controller: RelayController
 
@@ -242,7 +256,7 @@ struct PerchWidgetActions: View {
         case .compose:
             leading { send }
         case .running:
-            leading { if controller.isSteering { paused } else { running } }
+            if controller.isSteering { leading { paused } } else { running }
         case .finished:
             leading { finished }
         }
@@ -263,25 +277,26 @@ struct PerchWidgetActions: View {
 
     private var running: some View {
         HStack(spacing: Perch.s(8)) {
-            PerchCapsuleButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
-                               icon: "pause.fill") { controller.beginSteering() }
+            PerchRevealButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
+                              icon: "pause.fill") { controller.beginSteering() }
                 .disabled(controller.isSteeringPending || controller.stopRequested)
                 .help(controller.isSteeringPending
                       ? "Pausing after the current handoff"
                       : "Pause at a safe handoff and write a note for the next side")
-            stop
+            PerchRevealButton(title: "Stop", icon: "stop.fill", prominent: false,
+                              labelClearance: 1.5 * Perch.actionDiameter + Perch.s(16)) { controller.stop() }
+                .disabled(controller.stopRequested)
+                .help("Stop at the next safe point")
         }
     }
 
     private var paused: some View {
-        VStack(alignment: .leading, spacing: Perch.s(6)) {
-            HStack(spacing: Perch.s(8)) {
-                PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }
-                    .disabled(!controller.steeringHasText)
-                    .help(controller.nextRecipient.map { "The note goes to \($0) with the next handoff" }
-                          ?? "The note goes with the next handoff")
-                stop
-            }
+        HStack(spacing: Perch.s(8)) {
+            PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }
+                .disabled(!controller.steeringHasText)
+                .help(controller.nextRecipient.map { "The note goes to \($0) with the next handoff" }
+                      ?? "The note goes with the next handoff")
+            stop
             PerchTextButton(title: "Resume without note") { controller.resumeWithoutNote() }
         }
     }

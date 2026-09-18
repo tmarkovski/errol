@@ -1,10 +1,87 @@
-// The capsule's labeled actions: one prominent primary — Send, Continue,
-// Arrange, Pause to steer — and glass or bare secondaries beside or under
-// it. The pills are the system's Liquid Glass buttons in the palette's
-// accent. Labeled, because a first-time user has nothing to guess an icon
-// from.
+// Setup and running actions reveal labels beside stationary icons. Editors,
+// permission setup, and the ending retain their labeled Liquid Glass pills.
 
 import SwiftUI
+
+/// Only the circular control participates in layout. The label is revealed
+/// behind it towards the left, so neither the icon nor adjacent content moves.
+struct PerchRevealButton: View {
+    let title: String
+    let icon: String
+    var prominent = true
+    var progress: Double? = nil
+    var countdown: Int? = nil
+    /// A secondary in a pair reveals its label before the other control.
+    var labelClearance: CGFloat = 0
+    let action: () -> Void
+    @State private var hovering = false
+    @State private var labelWidth: CGFloat = 0
+    @FocusState private var focused: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var revealed: Bool { isEnabled && (hovering || focused) }
+    private var ink: Color { prominent ? Perch.onAccent : Perch.ink }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(Perch.text(13, .semibold))
+                .foregroundStyle(ink)
+                .frame(width: Perch.actionDiameter, height: Perch.actionDiameter)
+                .background(Circle().fill(prominent ? Perch.accent : Perch.paper))
+                .overlay(Circle().stroke(prominent ? Perch.accent : Perch.chipEdge, lineWidth: 1))
+                .overlay {
+                    if let progress {
+                        GeometryReader { geometry in
+                            Rectangle().fill(ink.opacity(0.2))
+                                .frame(width: geometry.size.width * min(1, max(0, progress)))
+                        }
+                        .clipShape(Circle())
+                        .allowsHitTesting(false)
+                    }
+                }
+                .background(alignment: .trailing) {
+                    Text(title)
+                        .font(Perch.text(12, .medium))
+                        .foregroundStyle(ink)
+                        .padding(.leading, Perch.s(12))
+                        .padding(.trailing, labelClearance == 0 ? Perch.actionDiameter / 2 + Perch.s(6) : Perch.s(12))
+                        .frame(height: Perch.actionDiameter)
+                        .fixedSize()
+                        .background(Capsule().fill(prominent ? Perch.accent : Perch.paper))
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { labelWidth = $0 }
+                        .mask(alignment: .trailing) {
+                            Rectangle().frame(width: revealed ? labelWidth : 0)
+                        }
+                        .offset(x: -(Perch.actionDiameter / 2 + labelClearance))
+                        .opacity(revealed ? 1 : 0)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .focused($focused)
+        .onHover { hovering = $0 }
+        .opacity(isEnabled ? 1 : 0.45)
+        .overlay(alignment: .topTrailing) {
+            if let countdown {
+                Text("\(countdown)")
+                    .font(Perch.text(9, .semibold)).monospacedDigit()
+                    .foregroundStyle(Perch.ink)
+                    .frame(width: Perch.s(16), height: Perch.s(16))
+                    .background(Circle().fill(Perch.paper))
+                    .overlay(Circle().stroke(Perch.chipEdge, lineWidth: 1))
+                    .offset(x: Perch.s(4), y: -Perch.s(4))
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: revealed)
+        .accessibilityLabel(title)
+    }
+}
 
 struct PerchCapsuleButton: View {
     enum Style {

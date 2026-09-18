@@ -11,7 +11,43 @@ actions.
 **Implementation reference:** [Participatory setup and session UI spec](SPEC.md)
 records the subsequent screen-by-screen decisions, native appearance, desktop
 app icons, implementation sequence, and acceptance criteria. Use it for the
-current build direction; the discussion below retains the earlier alternatives.
+current build direction, including the September 18 visual revision below.
+The discussion retains the earlier alternatives.
+
+## September 18: compact actions and a fixed capsule
+
+The [interactive preview](preview.html) now keeps the large setup title beneath
+the progress/Configure row and gives the secondary copy 12 pixels of breathing
+room below it. The action sits at that copy's trailing edge, directly beneath
+Configure, in a fixed 32-pixel icon slot. Its label reveals to the left over
+0.22 seconds on hover or keyboard focus and retracts on exit. The icon, copy,
+and surrounding controls stay in place; only the label is revealed. Full
+accessible names remain available while labels are hidden. Reduce Motion
+swaps the label instantly, and touch targets grow to 44 pixels.
+
+- **02 · Open apps:** Open both apps / Continue uses the trailing icon. During
+  automatic continuation, a small visible badge keeps the five-second count
+  readable without hovering; the soft fill stays inside the circular button.
+- **03 · Arrange:** the three labeled layout choices sit immediately below
+  **Arrange the windows.**, with Continue at the right of that same row.
+  There is no routine supporting/status text. Keep positions is selected
+  initially, and Continue is available without choosing another layout.
+  Native arrangement failures or missing-window guidance remain available
+  from an attention icon beside the title.
+- **04–05 · Connect:** the picker action uses the same trailing position;
+  a previously connected step offers Continue there and retains a separate
+  **Choose another window** action in the supporting copy. The drag cues and
+  mirrored Claude instructions remain.
+- **07 · Running:** Pause and Stop sit together at the right of the supporting
+  copy. Stop reveals its label to the left of the pair so neither icon moves
+  or gets covered by the label.
+
+The native console and permission screen keep the same 860 × 156 footprint
+through setup, composition, running, pausing, and completion. Longer prompts
+scroll in the editor, and additional run/ending details scroll within their
+reserved area. Paused actions share one row to keep the editor usable.
+Settings retains its separate card. The implementation uses the existing
+setup, relay, and editor lifetimes.
 
 ## Interactive preview
 
@@ -33,8 +69,8 @@ one second, then the name returns. **Opening…** uses the same slot during
 launch. Reduce Motion keeps the icon still and swaps text without sliding. Hover subtly darkens only the icon artwork, with no surrounding
 background or container; the name and status are outside the hover target.
 
-Once both apps are detected, **Continue · 5** counts down for five seconds
-with a soft fill moving across the button. Click Continue to go immediately,
+Once both apps are detected, the **Continue** arrow's visible countdown badge
+counts down from five, with a soft fill moving across the button. Click Continue to go immediately,
 or use an earlier segment of the progress bar to go back afterward. Returning
 to Open apps leaves an ordinary Continue button and suppresses its countdown
 for the rest of that setup. If an app closes during the initial countdown, it
