@@ -9,6 +9,13 @@ the left, with their icons fixed beneath Configure. Arrange has no routine
 status sentence: its title sits over the layout choices and Continue. The
 native console keeps a fixed height across states. See [the visual revision](README.md#september-18-compact-actions-and-a-fixed-capsule).
 
+**September 20 revision:** the four progress segments become one bar filled
+through the current step; the automatic Continue on Open apps counts down as a
+ring that empties around the button, with no number; and the trailing action
+holds one position on all four guided screens. The interactive preview has not
+been redrawn for this and still shows the earlier tracks, badge, and fill. See
+[the note](README.md#september-20-one-bar-a-ring-and-a-fixed-action).
+
 ## Reference and precedence
 
 - [Interactive screen reference](preview.html): open in a browser and select
@@ -203,12 +210,15 @@ unavailable icon installs an application. **Open both apps** calls the same
 launch action for whichever app is not open.
 
 The one primary action sits at the right of the supporting copy: **Open both
-apps** until both are open, then **Continue**, with its countdown in a visible
-badge beside the arrow. Once both are detected, including when they were
-already open on entry, count down for five seconds. A soft fill moves left to
-right inside Continue, beneath its readable label, while the number counts
-down. Keep the control's size stable as the digits change. Ready copy reads
-**Both apps are open.** and **Next, choose how to arrange the windows.**
+apps** until both are open, then **Continue**. Once both are detected,
+including when they were already open on entry, count down for five seconds.
+Show the wait as a ring standing just outside the Continue circle: whole at
+the start, its used part erased clockwise from twelve o'clock, a faint track
+left where it was. There is no number and no fill inside the button. The ring
+is drawn over the button without taking room, so the control's size and
+position do not change while it runs. The seconds left are spoken to
+VoiceOver as the button's value. Ready copy reads **Both apps are open.** and
+**Next, choose how to arrange the windows.**
 
 Clicking Continue or pressing Return advances immediately. There is no
 secondary countdown action. Users return through earlier segments in the
@@ -223,12 +233,10 @@ presence when advancing, so a late callback cannot skip another step.
 
 At timeout or on Continue, fade the Open apps instructions and controls out
 and the Arrange content in over about 0.3 seconds. Keep the capsule, icons,
-settings entry point, and layout anchors in place; the progress meter updates
-to Arrange with its amber marker sliding from segment one to segment two
-over the same 0.3 seconds, leaving the completed segment green. Keep the four
-tracks fixed while the single thicker marker moves between their positions.
-Do not fade or recreate the later prompt editor. Reduce Motion
-keeps the numeric countdown but removes the moving fill and transition.
+settings entry point, and layout anchors in place; the progress bar lengthens
+to take in Arrange over the same 0.3 seconds, its first quarter turning green
+behind the amber end. Do not fade or recreate the later prompt editor. Reduce
+Motion removes the fade and the sweep: the ring loses a fifth each second.
 Going on does not yet connect or authorize a destination for a run, and does
 not arrange any windows until a layout is chosen.
 
@@ -245,7 +253,9 @@ their current frames alone, including after trying another layout. It does
 not restore their original frames.
 
 The title is followed directly by the three choices, with the icon-only
-**Continue** at the right of the same row. Omit routine supporting and status
+**Continue** at the right of the same row, exactly where the action sits on
+Open apps and on each connection. The choices center on it; their height never
+moves it. Omit routine supporting and status
 copy: the selected option and the moved windows show the result. Keep keyboard
 focus on the chosen button and announce the result. Show an attention icon
 beside the title only when arrangement fails or needs a window choice; its
@@ -437,24 +447,26 @@ must never persist an Accessibility element as a live connection.
 
 ## Progress and motion
 
-The four progress segments represent screens 02–05: prepare apps, arrange,
-connect ChatGPT, connect Claude. Accessibility precedes that progress; composing
-and the exchange are not additional setup segments.
+The progress bar is one bar in four quarters, representing screens 02–05:
+prepare apps, arrange, connect ChatGPT, connect Claude. Accessibility precedes
+that progress; composing and the exchange are not additional setup steps.
 
-Completed segments fill with the success color, the current segment uses the
-active accent and a slightly greater thickness, and remaining segments use the
-neutral track. In the native meter, a single active marker slides to the next
-segment over 0.3 seconds while the completed track changes to green. The
-Open apps → Arrange reference synchronizes this movement with the content
-fade, for both timeout and immediate Continue. Reduce Motion updates the
-position and colors immediately. The meter's bounds and spacing stay fixed.
-Each earlier segment is a button with a 24-point-high target within the
-existing toolbar, a step-name tooltip, a keyboard focus indication, and a
-spoken step label. Current and future segments are unavailable. Later steps
-still require both apps to be open; navigation waits for a pending window
+The bar is filled through the current step. The steps behind it are green, the
+current step at the leading end uses the active accent, and the rest is the
+neutral track. At the editor the whole bar is green. Moving between steps
+lengthens or shortens the fill over 0.3 seconds, and the current quarter turns
+green as the fill moves past it. The Open apps → Arrange reference synchronizes
+this movement with the content fade, for both timeout and immediate Continue.
+Reduce Motion updates the fill and colors immediately. The bar's bounds stay
+fixed.
+Each quarter behind the current step is a button with a 24-point-high target
+within the existing toolbar, a step-name tooltip, a keyboard focus indication,
+and a spoken step label. The current and later quarters are unavailable. Later
+steps still require both apps to be open; navigation waits for a pending window
 move or connection to finish. Navigating closes any temporary picker or drag
 overlay and preserves the selected layout, bound conversations, and draft.
-Keep the active marker on the revisited step even if it was completed before.
+The bar shows where the person is, not how far they have been: keep the amber
+end on the revisited step even if a later step was completed before.
 A revisited connection offers Continue with its existing binding, so inspecting
 an earlier screen never forces the user to reconnect. The meter is hidden
 during a run and cannot reopen setup then.

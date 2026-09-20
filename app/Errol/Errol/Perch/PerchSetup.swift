@@ -9,8 +9,10 @@ import SwiftUI
 
 // MARK: - Progress
 
-/// Four fixed tracks and one thicker accent marker that slides between
-/// them. Completed tracks turn green as the marker moves to the next step.
+/// One bar for the four steps. It is filled through the current step: the
+/// steps behind it in green and the current one, at the leading edge, in
+/// amber; at the editor all of it is green. The steps stay quarters of the
+/// bar, so an earlier quarter is still the target for going back to it.
 /// Color alone carries nothing: the meter speaks its step to VoiceOver.
 struct PerchProgressMeter: View {
     let controller: RelayController
@@ -19,58 +21,60 @@ struct PerchProgressMeter: View {
     var body: some View {
         let state = controller.setup.state
         let steps = SetupStep.allCases
-        let current = steps.firstIndex { state.progress(of: $0) == .current }
-        let gap = Perch.s(5)
-        ZStack(alignment: .leading) {
-            HStack(spacing: gap) {
-                ForEach(steps, id: \.rawValue) { step in
-                    Capsule()
-                        .fill(state.progress(of: step) == .done ? Perch.green : Perch.track)
-                        .frame(height: Perch.s(4))
-                }
-            }
-            if let current {
+        let total = CGFloat(steps.count)
+        let behind = CGFloat(state.currentStep?.rawValue ?? steps.count)
+        let reached = min(total, behind + 1)
+        Capsule()
+            .fill(Perch.track)
+            .frame(height: Perch.s(6))
+            .overlay(alignment: .leading) {
                 GeometryReader { geometry in
-                    let segment = max(0, (geometry.size.width - gap * CGFloat(steps.count - 1)) / CGFloat(steps.count))
-                    Capsule()
-                        .fill(Perch.setupCurrent)
-                        .frame(width: segment, height: Perch.s(6))
-                        .offset(x: CGFloat(current) * (segment + gap))
-                }
-                .transition(.opacity)
-            }
-        }
-        .frame(height: Perch.s(6))
-        .frame(height: Perch.s(24))
-        .frame(maxWidth: Perch.s(124), alignment: .leading)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: current)
-        .overlay {
-            // A comfortable target inside the existing toolbar height. The
-            // thin tracks retain their visual size and the marker stays clear.
-            HStack(spacing: gap) {
-                ForEach(steps, id: \.rawValue) { step in
-                    Button { controller.setup.revisit(step) } label: {
-                        Color.clear.frame(height: Perch.s(24)).contentShape(Rectangle())
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Perch.setupCurrent)
+                            .frame(width: geometry.size.width * reached / total)
+                        Rectangle()
+                            .fill(Perch.green)
+                            .frame(width: geometry.size.width * behind / total)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!controller.setup.canRevisit(step))
-                    .help(step.title(names: controller.names))
-                    .accessibilityLabel("Step \(step.rawValue + 1): \(step.title(names: controller.names))")
-                    .accessibilityValue(state.currentStep == step ? "Current step"
-                                        : controller.setup.canRevisit(step) ? "Go back" : "Unavailable")
+                }
+                .clipShape(Capsule())
+            }
+            .frame(height: Perch.s(24))
+            .frame(maxWidth: Perch.s(124), alignment: .leading)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: behind)
+            .overlay {
+                // A comfortable target inside the existing toolbar height. The
+                // bar keeps its visual size, and each quarter of it is a step.
+                HStack(spacing: 0) {
+                    ForEach(steps, id: \.rawValue) { step in
+                        Button { controller.setup.revisit(step) } label: {
+                            Color.clear.frame(height: Perch.s(24)).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!controller.setup.canRevisit(step))
+                        .help(step.title(names: controller.names))
+                        .accessibilityLabel("Step \(step.rawValue + 1): \(step.title(names: controller.names))")
+                        .accessibilityValue(state.currentStep == step ? "Current step"
+                                            : controller.setup.canRevisit(step) ? "Go back" : "Unavailable")
+                    }
                 }
             }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Setup steps")
-        .accessibilityValue(state.progressDescription(names: controller.names))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Setup steps")
+            .accessibilityValue(state.progressDescription(names: controller.names))
     }
 }
 
 // MARK: - The center
 
 /// The title stays immediately below the toolbar. Supporting copy shares
-/// the next row with its trailing action; Arrange needs only its choices.
+/// the next row with the step's action; Arrange needs only its choices.
+///
+/// All four screens are laid out on one skeleton: a title row of fixed
+/// height, then a row that starts with the action at its trailing end. The
+/// action is placed here once, never inside a screen, so it stays where it
+/// is however much the copy or the choices beside it need.
 struct PerchSetupCenter: View {
     let controller: RelayController
     @State private var showingArrangementProblem = false
@@ -79,12 +83,30 @@ struct PerchSetupCenter: View {
     private var setup: SetupController { controller.setup }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            switch setup.state.phase {
-            case .prepareApps: prepare.transition(.opacity)
-            case .arrange: arrange.transition(.opacity)
-            case .connect(let side): connectInstruction(side)
-            case .compose: EmptyView()
+        VStack(alignment: .leading, spacing: Perch.s(10)) {
+            ZStack(alignment: .leading) {
+                switch setup.state.phase {
+                case .prepareApps: prepareTitle.transition(.opacity)
+                case .arrange: arrangeTitle.transition(.opacity)
+                case .connect(let side): connectTitle(side)
+                case .compose: EmptyView()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: Perch.s(28))
+            // Top-aligned: the action keeps the row's top edge, and the copy
+            // or the choices center on it while they are no taller than it.
+            HStack(alignment: .top, spacing: Perch.s(14)) {
+                ZStack(alignment: .leading) {
+                    switch setup.state.phase {
+                    case .prepareApps: prepareDetail.transition(.opacity)
+                    case .arrange: arrangeDetail.transition(.opacity)
+                    case .connect(let side): connectDetail(side)
+                    case .compose: EmptyView()
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: Perch.actionDiameter, alignment: .leading)
+                PerchSetupActions(controller: controller)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -92,49 +114,51 @@ struct PerchSetupCenter: View {
                    value: setup.state.phase == .prepareApps)
     }
 
-    private var prepare: some View {
+    // MARK: Prepare the apps
+
+    private var prepareTitle: some View {
+        title(setup.state.bothOpen ? "Both apps are open." : "Bring your assistants.")
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var prepareDetail: some View {
         let state = setup.state
         let missing = [Speaker.chatgpt, .claude].first { state[$0].presence == .notInstalled }
         let problem = setup.problem ?? missing.flatMap { state[$0].presence.problem(name: setup.name($0)) }
         let supporting = state.bothOpen ? "Next, choose how to arrange the windows."
             : "Click each app’s logo to open it. You’ll choose the conversations next."
-        return VStack(alignment: .leading, spacing: Perch.s(12)) {
-            title(state.bothOpen ? "Both apps are open." : "Bring your assistants.")
-            HStack(spacing: Perch.s(14)) {
-                supportingLine(supporting, problem: problem)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                PerchSetupActions(controller: controller)
-            }
-        }
+        return supportingLine(supporting, problem: problem)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var arrange: some View {
-        VStack(alignment: .leading, spacing: Perch.s(8)) {
-            HStack(spacing: Perch.s(8)) {
-                title("Arrange the windows.")
-                if let problem = arrangementProblem {
-                    Button { showingArrangementProblem.toggle() } label: {
-                        Image(systemName: "exclamationmark.circle")
-                            .foregroundStyle(Perch.red)
-                    }
-                    .buttonStyle(.plain)
-                    .help(problem)
-                    .accessibilityLabel("Window arrangement needs attention: \(problem)")
-                    .popover(isPresented: $showingArrangementProblem) {
-                        Text(problem)
-                            .font(Perch.text(12))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(Perch.s(14))
-                            .frame(width: Perch.s(300))
-                    }
+    // MARK: Arrange
+
+    private var arrangeTitle: some View {
+        HStack(spacing: Perch.s(8)) {
+            title("Arrange the windows.")
+            if let problem = arrangementProblem {
+                Button { showingArrangementProblem.toggle() } label: {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(Perch.red)
+                }
+                .buttonStyle(.plain)
+                .help(problem)
+                .accessibilityLabel("Window arrangement needs attention: \(problem)")
+                .popover(isPresented: $showingArrangementProblem) {
+                    Text(problem)
+                        .font(Perch.text(12))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(Perch.s(14))
+                        .frame(width: Perch.s(300))
                 }
             }
-            HStack(spacing: Perch.s(12)) {
-                PerchLayoutChoices(controller: controller)
-                Spacer(minLength: 0)
-                PerchSetupActions(controller: controller)
-            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var arrangeDetail: some View {
+        PerchLayoutChoices(controller: controller)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Normal layout selection needs no narration. Preserve actionable
@@ -150,34 +174,37 @@ struct PerchSetupCenter: View {
             : "Open a conversation in \(setup.name(side)) to move its window, or continue as things are."
     }
 
-    private func connectInstruction(_ side: Speaker) -> some View {
+    // MARK: Connect
+
+    /// The title row's height is fixed, so the arrow beside the title, whatever
+    /// height it lays out at, changes nothing below it.
+    private func connectTitle(_ side: Speaker) -> some View {
         let leading = side == .chatgpt
-        return VStack(alignment: .leading, spacing: Perch.s(12)) {
-            HStack(spacing: Perch.s(10)) {
-                if leading { PerchArrowCue(pointsLeft: true).opacity(setup.draggingSide == nil ? 1 : 0) }
-                ViewThatFits(in: .horizontal) {
-                    title("Drag \(setup.name(side)) onto its conversation.").fixedSize()
-                    title("Connect \(setup.name(side)).")
-                }
-                    .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
-                    .multilineTextAlignment(leading ? .leading : .trailing)
-                    .help("Drag \(setup.name(side)) onto its conversation, or choose a window.")
-                if !leading { PerchArrowCue(pointsLeft: false).opacity(setup.draggingSide == nil ? 1 : 0) }
+        return HStack(spacing: Perch.s(10)) {
+            if leading { PerchArrowCue(pointsLeft: true).opacity(setup.draggingSide == nil ? 1 : 0) }
+            ViewThatFits(in: .horizontal) {
+                title("Drag \(setup.name(side)) onto its conversation.").fixedSize()
+                title("Connect \(setup.name(side)).")
             }
-            HStack(spacing: Perch.s(14)) {
-                VStack(alignment: leading ? .leading : .trailing, spacing: Perch.s(3)) {
-                    supportingLine(connectSupporting(side), problem: setup.problem)
-                    if side == .claude, setup.state.chatgpt.isConnected, setup.problem == nil {
-                        Label("\(setup.name(.chatgpt)) connected", systemImage: "checkmark")
-                            .font(Perch.text(11)).foregroundStyle(Perch.green)
-                            .lineLimit(1)
-                    }
-                }
                 .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
                 .multilineTextAlignment(leading ? .leading : .trailing)
-                PerchSetupActions(controller: controller)
+                .help("Drag \(setup.name(side)) onto its conversation, or choose a window.")
+            if !leading { PerchArrowCue(pointsLeft: false).opacity(setup.draggingSide == nil ? 1 : 0) }
+        }
+    }
+
+    private func connectDetail(_ side: Speaker) -> some View {
+        let leading = side == .chatgpt
+        return VStack(alignment: leading ? .leading : .trailing, spacing: Perch.s(3)) {
+            supportingLine(connectSupporting(side), problem: setup.problem)
+            if side == .claude, setup.state.chatgpt.isConnected, setup.problem == nil {
+                Label("\(setup.name(.chatgpt)) connected", systemImage: "checkmark")
+                    .font(Perch.text(11)).foregroundStyle(Perch.green)
+                    .lineLimit(1)
             }
         }
+        .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
+        .multilineTextAlignment(leading ? .leading : .trailing)
     }
 
     private func connectSupporting(_ side: Speaker) -> String {
@@ -212,7 +239,8 @@ struct PerchSetupCenter: View {
 }
 
 /// The guided step's one action occupies the same trailing slot beneath
-/// Configure. The setup center owns its title, copy, and layout choices.
+/// Configure, placed there once by the setup center, which also owns the
+/// title, the copy, and the layout choices.
 struct PerchSetupActions: View {
     let controller: RelayController
     @State private var showingWindows = false
@@ -318,6 +346,9 @@ private struct PerchLayoutChoices: View {
 /// Mounted only while both apps are open. Readiness loss or leaving the
 /// screen removes it and cancels its task; repeated readiness sweeps do not
 /// restart the countdown. The state still rechecks readiness when advancing.
+/// The wait shows as a ring around the button that empties over the five
+/// seconds; under Reduce Motion it loses a fifth each second instead of
+/// sweeping. The seconds left go to VoiceOver, not to the screen.
 private struct PerchPrepareContinue: View {
     let automatically: Bool
     let action: () -> Void
@@ -330,10 +361,9 @@ private struct PerchPrepareContinue: View {
                                 paused: startedAt == nil)) { timeline in
             let elapsed = startedAt.map { max(0, timeline.date.timeIntervalSince($0)) } ?? 0
             let seconds = max(1, Int(ceil(duration - elapsed)))
+            let shown = reduceMotion ? elapsed.rounded(.down) : elapsed
             PerchRevealButton(title: "Continue", icon: "arrow.right",
-                              progress: !automatically || reduceMotion ? nil : elapsed / duration,
-                              countdown: automatically ? seconds : nil, action: action)
-                .monospacedDigit()
+                              expiring: automatically ? min(1, shown / duration) : nil, action: action)
                 .keyboardShortcut(.defaultAction)
                 .help("Go on to arranging the windows now")
                 .accessibilityLabel("Continue to arrange windows")

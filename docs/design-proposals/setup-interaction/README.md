@@ -14,6 +14,26 @@ app icons, implementation sequence, and acceptance criteria. Use it for the
 current build direction, including the September 18 visual revision below.
 The discussion retains the earlier alternatives.
 
+## September 20: one bar, a ring, and a fixed action
+
+Three changes to the native console, which the [interactive preview](preview.html)
+does not yet show (it still draws the four tracks, the number badge, and the
+fill described below):
+
+- **One progress bar.** The four tracks and the sliding marker become a single
+  bar, filled through the current step: green behind it, amber at the current
+  step, all green at the editor. Its quarters are still the targets for going
+  back to an earlier step.
+- **A ring for the countdown.** On Open apps the five-second wait to continue is
+  a ring around the Continue circle that empties clockwise from the top. The
+  number and the fill inside the button are gone; VoiceOver still hears the
+  seconds left, and Reduce Motion steps the ring down a fifth a second.
+- **The action holds still.** The four guided screens share one layout: a title
+  row of fixed height, then a row with the action at its trailing end. The
+  action used to sit wherever its own screen put it, and moved by several
+  points with the height of the arrow cue, the layout choices, or a wrapped
+  message; now it is placed once and none of them can move it.
+
 ## September 18: compact actions and a fixed capsule
 
 The [interactive preview](preview.html) now keeps the large setup title beneath
