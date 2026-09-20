@@ -691,6 +691,9 @@ func send(_ text: String, to target: TargetApp,
        AXUIElementPerformAction(button, kAXPressAction as CFString) == .success {
         hadSendButton = true
         log("\(target.name): sent via send button")
+        // The first "send" button in the window, which a press that does
+        // nothing may show to be some other control than the composer's.
+        trace("the send button pressed: \(describeElement(button))")
     } else {
         hadSendButton = false
         guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else { return .abandoned }

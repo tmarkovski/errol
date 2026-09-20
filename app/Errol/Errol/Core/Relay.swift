@@ -416,6 +416,10 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             return .block(obstruction)
         }
         if let found = deliveryBlock(for: composerState(in: target), side: side(target)) {
+            // Once per hold, not per poll: the gate asks again every second.
+            if found != block {
+                trace("\(target.name): the composer judged is \(composerDescription(in: target))")
+            }
             return .block(found)
         }
         return .clear

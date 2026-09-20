@@ -113,6 +113,15 @@ func composerState(in target: TargetApp) -> ComposerState {
                             replying: hasStopButton(in: target))
 }
 
+/// What `composerState` judged, for the debug log: the element and the way
+/// it was found. A hold on a draft the human cannot see in the composer is
+/// the fallback having picked some other text input, and only this line
+/// says which.
+func composerDescription(in target: TargetApp) -> String {
+    guard let resolved = resolveInputArea(in: target) else { return "no text input in the window" }
+    return "\(resolved.source.rawValue): \(describeElement(resolved.element))"
+}
+
 // MARK: - Holds
 
 /// Why a run is standing still while it stays recoverable. Distinct from
