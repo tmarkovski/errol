@@ -111,7 +111,7 @@ struct PanelRootView: View {
             // Keep every screen mounted: navigating, changing appearance, or
             // losing the grant must not discard the native editor, its
             // selection, or drafts.
-            PerchPanelView(controller: controller, width: navigation.consoleWidth)
+            PerchConsoleView(controller: controller, width: navigation.consoleWidth)
                 // Settings slides the console aside as it comes in. Setup
                 // shares the console's capsule, so the two only crossfade.
                 .modifier(PanelScreenPresentation(

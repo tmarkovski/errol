@@ -12,6 +12,13 @@
 // keep the screen to that one gesture. A side can be dragged again once
 // connected: the drop is what teaches where Errol writes, and a repeat just
 // binds that side afresh.
+//
+// The console the app shows now is direct (SetupState.direct): the editor
+// from the start, and no drag. A side with one window a run could target
+// is connected to it as a sweep sees it; a side with several waits for the
+// human to choose one from its icon. Both come through `connect(_:to:)`
+// like the drop does. The guided steps and the drag stay here for the
+// screens that still use them, behind `guided`.
 
 import AppKit
 import Foundation
@@ -59,11 +66,17 @@ final class SetupController {
     @ObservationIgnored private var dragOverConsole = false
     /// Where the icon was released while the areas were still being read.
     @ObservationIgnored private var dropPoint: CGPoint?
+    /// A window the direct console tried to connect on its own and could
+    /// not, so the next sweep does not try the same one again.
+    @ObservationIgnored private var refusedAutomatically: [Speaker: WindowID] = [:]
+    /// A run owns the bound windows. One that loses its window ends saying
+    /// so; it is never handed another window in the meantime.
+    @ObservationIgnored private var runInProgress = false
 
-    init(engine: RelayEngine, defaults: UserDefaults = .standard) {
+    init(engine: RelayEngine, defaults: UserDefaults = .standard, guided: Bool = false) {
         self.engine = engine
         self.defaults = defaults
-        var state = SetupState()
+        var state = guided ? SetupState() : SetupState.direct()
         for (side, hint) in DestinationHints.load(from: defaults) { state[side].hint = hint }
         self.state = state
     }
@@ -76,6 +89,16 @@ final class SetupController {
 
     /// Whether the guided screens are showing, as against the editor.
     var isGuiding: Bool { state.phase != .compose }
+
+    /// The direct console: no guided steps, and no drag to connect.
+    var isDirect: Bool { !state.guided }
+
+    /// The line above the direct console's prompt: why the last action did
+    /// not happen, then what the sides still need.
+    var notice: SetupNotice? {
+        if let problem = problem ?? state.layoutProblem { return SetupNotice(text: problem, isProblem: true) }
+        return state.notice(names: names)
+    }
 
     func canRevisit(_ step: SetupStep) -> Bool {
         !isBinding && !isArranging && state.canRevisit(step)
@@ -116,6 +139,7 @@ final class SetupController {
             }
         }
         applyIfPending()
+        connectIfUnambiguous()
     }
 
     // MARK: Prepare the apps
@@ -168,7 +192,7 @@ final class SetupController {
         problem = nil
         state.choose(layout)
         applyIfChosen()
-        if layout == .keepPositions { announce(layout.completionMessage) }
+        if layout == .keepPositions { announce(layoutMessage(layout)) }
     }
 
     /// The window to move, where a side has several: once named, the
@@ -178,8 +202,12 @@ final class SetupController {
         applyIfChosen()
     }
 
+    /// The arrange step applies a choice at once, and so does the direct
+    /// console, whose layout control stands beside the prompt.
+    private var appliesLayoutChoices: Bool { state.phase == .arrange || isDirect }
+
     private func applyIfChosen() {
-        guard state.phase == .arrange, state.layout.movesWindows, state.canArrange else { return }
+        guard appliesLayoutChoices, state.layout.movesWindows, state.canArrange else { return }
         applyLayout()
     }
 
@@ -189,7 +217,7 @@ final class SetupController {
     /// stands, and the step has no other way to say "now". A layout that
     /// would not fit is not tried again on its own.
     private func applyIfPending() {
-        guard state.phase == .arrange, state.layout.movesWindows, state.layoutProblem == nil,
+        guard appliesLayoutChoices, state.layout.movesWindows, state.layoutProblem == nil,
               !isArranging, let targets = arrangementTargets, targets != arrangedTargets else { return }
         applyLayout()
     }
@@ -233,9 +261,13 @@ final class SetupController {
             // one that is.
             guard state.layout == layout else { return }
             state.layoutOutcome(outcome)
-            announce(state.layoutProblem ?? (state.layoutApplied ? layout.completionMessage
+            announce(state.layoutProblem ?? (state.layoutApplied ? layoutMessage(layout)
                 : "A window is no longer available. Continue as they are, or choose another window."))
         }
+    }
+
+    private func layoutMessage(_ layout: LayoutChoice) -> String {
+        isDirect ? layout.outcomeMessage : layout.completionMessage
     }
 
     /// Put the arranged windows back where they were.
@@ -372,14 +404,34 @@ final class SetupController {
             guard let self else { return }
             isBinding = false
             guard let observation else {
+                refusedAutomatically[side] = window
                 problem = "That \(name(side)) window is gone. Choose another."
                 engine.requestSweep()
                 return
             }
+            refusedAutomatically[side] = nil
             state.connected(side, window: window, identity: observation.identity,
                             model: candidate?.model, observation: observation)
             DestinationHints.save(state[side].hint, for: side, in: defaults)
             announce("\(name(side)) connected to \(state[side].connection?.name ?? "its conversation").")
+            // One bind at a time: the other side's turn comes now, not a
+            // sweep later.
+            connectIfUnambiguous()
+        }
+    }
+
+    /// The direct console's connection: a side whose app shows one window a
+    /// run could target is connected to it, here, when a sweep first sees
+    /// it, and the binding is held from then on. Nothing is searched for at
+    /// Send, and a side with several windows is never chosen for
+    /// (SetupState.automaticConnection).
+    private func connectIfUnambiguous() {
+        guard isDirect, !runInProgress, !isBinding, draggingSide == nil else { return }
+        for side in [Speaker.chatgpt, .claude] {
+            guard let window = state.automaticConnection(for: side),
+                  refusedAutomatically[side] != window else { continue }
+            connect(side, to: window)
+            return
         }
     }
 
@@ -408,7 +460,12 @@ final class SetupController {
     func runStarted() {
         cancelDragging()
         problem = nil
+        runInProgress = true
         state.runStarted()
+    }
+
+    func runEnded() {
+        runInProgress = false
     }
 
     /// Another topic in these conversations: both are verified again

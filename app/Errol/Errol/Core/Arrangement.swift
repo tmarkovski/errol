@@ -79,13 +79,17 @@ enum LayoutChoice: String, CaseIterable, Equatable {
 
     var movesWindows: Bool { self != .keepPositions }
 
-    var completionMessage: String {
+    /// What VoiceOver hears once the layout stands.
+    var outcomeMessage: String {
         switch self {
-        case .sideBySide: return "Windows are side by side. Continue when you\u{2019}re ready."
-        case .stacked: return "Windows are stacked. Continue when you\u{2019}re ready."
-        case .keepPositions: return "Window positions kept. Continue when you\u{2019}re ready."
+        case .sideBySide: return "Windows are side by side."
+        case .stacked: return "Windows are stacked."
+        case .keepPositions: return "Window positions kept."
         }
     }
+
+    /// The same on the guided arrange step, which has a Continue to point to.
+    var completionMessage: String { outcomeMessage + " Continue when you\u{2019}re ready." }
 }
 
 /// The frames a layout gives the two windows in `area` (AX coordinates):

@@ -20,7 +20,7 @@ struct PerchWidgetCenter: View {
                     if controller.isSteering {
                         steeringEditor
                     } else {
-                        Text(runHeadline)
+                        Text(controller.runHeadline)
                             .font(Perch.text(19))
                             .foregroundStyle(Perch.ink)
                             .lineLimit(2)
@@ -143,25 +143,6 @@ struct PerchWidgetCenter: View {
                           session: controller.steeringEditor)
     }
 
-    /// The one running sentence: what is happening in the apps now.
-    private var runHeadline: String {
-        let names = controller.names
-        if controller.stopRequested { return "Ending at the next safe point\u{2026}" }
-        if let block = controller.block { return block.headline(names: names) }
-        if controller.isSteeringPending { return "Pausing after the current handoff\u{2026}" }
-        if controller.isHolding { return "Paused \u{00B7} Nothing is being copied or sent" }
-        switch (controller.chatgptConversation, controller.claudeConversation) {
-        case (.chatting, _): return "\(names.chatgpt) is replying\u{2026}"
-        case (_, .chatting): return "\(names.claude) is replying\u{2026}"
-        case (.replied, _): return "Sending \(names.chatgpt)'s reply to \(names.claude)"
-        case (_, .replied): return "Sending \(names.claude)'s reply to \(names.chatgpt)"
-        default:
-            return controller.currentTurn == 0
-                ? "Sending the topic to \(controller.appName(controller.firstSpeaker))\u{2026}"
-                : "Relaying the reply\u{2026}"
-        }
-    }
-
     private var hasNoteFeedback: Bool {
         controller.isSteering || controller.steeringQueued
             || controller.steeringInFlight != nil || controller.lastReceipt != nil
@@ -193,6 +174,28 @@ struct PerchWidgetCenter: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension RelayController {
+    /// The one running sentence: what is happening in the apps now. The
+    /// guided capsule sets it large in its center; the console has it as
+    /// the status line above the prompt (PerchConsoleStatus).
+    var runHeadline: String {
+        if stopRequested { return "Ending at the next safe point\u{2026}" }
+        if let block { return block.headline(names: names) }
+        if isSteeringPending { return "Pausing after the current handoff\u{2026}" }
+        if isHolding { return "Paused \u{00B7} Nothing is being copied or sent" }
+        switch (chatgptConversation, claudeConversation) {
+        case (.chatting, _): return "\(names.chatgpt) is replying\u{2026}"
+        case (_, .chatting): return "\(names.claude) is replying\u{2026}"
+        case (.replied, _): return "Sending \(names.chatgpt)'s reply to \(names.claude)"
+        case (_, .replied): return "Sending \(names.claude)'s reply to \(names.chatgpt)"
+        default:
+            return currentTurn == 0
+                ? "Sending the topic to \(appName(firstSpeaker))\u{2026}"
+                : "Relaying the reply\u{2026}"
+        }
     }
 }
 

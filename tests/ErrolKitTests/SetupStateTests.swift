@@ -381,4 +381,71 @@ final class SetupStateTests: XCTestCase {
         DestinationHints.save(nil, for: .chatgpt, in: defaults)
         XCTAssertNil(DestinationHints.load(from: defaults)[.chatgpt])
     }
+
+    // MARK: The direct console
+
+    func testTheDirectConsoleStartsAtTheEditorAndAsksForTheApps() {
+        var state = SetupState.direct()
+        XCTAssertEqual(state.phase, .compose)
+        XCTAssertFalse(state.meterVisible)
+        XCTAssertEqual(state.notice(names: names), SetupNotice(text: "Checking ChatGPT\u{2026}", isProblem: false))
+        state.observe(.chatgpt, presence: .notRunning, candidates: [])
+        state.observe(.claude, presence: .notRunning, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.text, "Open ChatGPT and Claude to begin.")
+        XCTAssertEqual(state.sendBlocker(names: names), "Open ChatGPT and Claude to begin.")
+        state.observe(.chatgpt, presence: .noConversation, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.text, "Open Claude to begin.")
+        state.observe(.claude, presence: .notInstalled, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.isProblem, true, "a missing app is the human's to fix")
+    }
+
+    func testOnlyASideWithOneUsableWindowIsConnectedForIt() throws {
+        var state = SetupState.direct()
+        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
+        let named = try candidate("claude-chat-conversation", id: 2, selectors: claude)
+        let fresh = try candidate("claude-chat-home", id: 3, selectors: claude)
+        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
+        state.observe(.claude, presence: .available(windows: 2), candidates: [named, fresh])
+        state.claude.hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
+
+        XCTAssertEqual(state.automaticConnection(for: .chatgpt), gpt.id)
+        XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among, hint or not")
+        XCTAssertTrue(state.needsConversationChoice(.claude))
+        XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
+
+        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
+        XCTAssertEqual(state.phase, .compose, "the editor stays while the other side is unconnected")
+        XCTAssertNil(state.automaticConnection(for: .chatgpt), "a connected side is left alone")
+        XCTAssertEqual(state.notice(names: names)?.text,
+                       "Claude has 2 conversations open. Click its icon to choose one.")
+
+        state.connected(.claude, window: named.id, identity: named.identity, model: nil,
+                        observation: observation(named))
+        XCTAssertNil(state.notice(names: names))
+        XCTAssertNil(state.sendBlocker(names: names))
+
+        var guided = SetupState()
+        guided.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
+        XCTAssertNil(guided.automaticConnection(for: .chatgpt), "the guided flow connects by the drag alone")
+    }
+
+    func testALostConversationKeepsTheDirectConsoleOnTheEditor() throws {
+        var state = SetupState.direct()
+        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
+        let cld = try candidate("claude-chat-conversation", id: 2, selectors: claude)
+        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
+        state.observe(.claude, presence: .available(windows: 1), candidates: [cld])
+        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
+        state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
+
+        state.observe(.claude, binding: observation(cld, check: .lost("the window closed")))
+        XCTAssertEqual(state.phase, .compose)
+        XCTAssertNil(state.claude.connection)
+        XCTAssertNotNil(state.chatgpt.connection, "the other side keeps its conversation")
+        XCTAssertEqual(state.automaticConnection(for: .claude), cld.id)
+
+        state.restart()
+        XCTAssertFalse(state.guided, "starting over stays in the flow it was in")
+        XCTAssertEqual(state.phase, .compose)
+    }
 }

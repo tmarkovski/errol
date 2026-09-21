@@ -399,6 +399,12 @@ enum StepProgress: Equatable {
 // MARK: - The state
 
 struct SetupState: Equatable {
+    /// Whether the four guided steps lead to the editor. The console the app
+    /// shows now is direct: the editor from the start, the phase always
+    /// `.compose`, each side connected for it where that takes no guess
+    /// (see "The direct console" below). The guided flow is kept whole for
+    /// the screens that still use it.
+    var guided = true
     var phase = SetupPhase.prepareApps
     /// An intentional return to Open apps waits for Continue for this setup.
     var automaticallyContinuePreparation = true
@@ -480,6 +486,7 @@ struct SetupState: Equatable {
 
     /// Why Send is unavailable, or nil when both destinations are ready.
     func sendBlocker(names: (chatgpt: String, claude: String)) -> String? {
+        guard guided else { return notice(names: names)?.text }
         guard phase == .compose else { return "Finish connecting both conversations first." }
         for side in [Speaker.chatgpt, .claude] {
             let name = side == .chatgpt ? names.chatgpt : names.claude
@@ -611,6 +618,8 @@ struct SetupState: Equatable {
     mutating func disconnect(_ side: Speaker) {
         self[side].connection = nil
         completed.remove(.connect(side))
+        // The direct console stays on the editor and says what the side needs.
+        guard guided else { return }
         switch phase {
         case .compose, .connect: phase = .connect(firstUnconnected ?? side)
         case .prepareApps, .arrange: break
@@ -623,6 +632,7 @@ struct SetupState: Equatable {
         chatgpt.connection = nil
         claude.connection = nil
         completed.subtract([.connectChatGPT, .connectClaude])
+        guard guided else { return }
         phase = .connect(.chatgpt)
         meterVisible = true
     }
@@ -639,20 +649,99 @@ struct SetupState: Equatable {
         meterVisible = false
     }
 
-    /// Guided setup from the top, with only the remembered destinations kept.
+    /// Setup from the top, in the flow it was in, with only the remembered
+    /// destinations kept.
     mutating func restart() {
         let hints = (chatgpt.hint, claude.hint)
-        self = SetupState()
+        self = guided ? SetupState() : .direct()
         chatgpt.hint = hints.0
         claude.hint = hints.1
     }
 
     private mutating func advanceToConnection() {
+        guard guided else { return }
         if let next = firstUnconnected {
             phase = .connect(next)
         } else {
             phase = .compose
         }
+    }
+}
+
+// MARK: - The direct console
+
+/// The line above the prompt on the direct console: the next thing a side
+/// needs, or what is wrong with it.
+struct SetupNotice: Equatable {
+    var text: String
+    var isProblem: Bool
+}
+
+extension SetupState {
+    /// The state the app starts in now: the editor at once, with no steps
+    /// before it and no meter over it.
+    static func direct() -> SetupState {
+        var state = SetupState()
+        state.guided = false
+        state.phase = .compose
+        state.meterVisible = false
+        return state
+    }
+
+    /// The window a side is connected to without being asked: the only one
+    /// a run could target. With several, which one is the human's to say,
+    /// and nothing is guessed from their order or from the last one used.
+    func automaticConnection(for side: Speaker) -> WindowID? {
+        guard !guided, !self[side].isConnected, self[side].eligible.count == 1 else { return nil }
+        return self[side].eligible[0].id
+    }
+
+    /// Several windows could be connected and none has been named.
+    func needsConversationChoice(_ side: Speaker) -> Bool {
+        !guided && !self[side].isConnected && self[side].eligible.count > 1
+    }
+
+    /// What stands between the console and Send, the first thing first: an
+    /// app missing, the apps closed, then each side's windows and its
+    /// connection, ChatGPT before Claude. Nil when both destinations read
+    /// ready. A wait is not a problem; something the human must fix is.
+    func notice(names: (chatgpt: String, claude: String)) -> SetupNotice? {
+        let sides = [Speaker.chatgpt, .claude]
+        func name(_ side: Speaker) -> String { side == .chatgpt ? names.chatgpt : names.claude }
+
+        if let missing = sides.first(where: { self[$0].presence == .notInstalled }) {
+            return SetupNotice(text: "\(name(missing)) isn't installed on this Mac. Install it, then come back here.",
+                               isProblem: true)
+        }
+        let closed = sides.filter { self[$0].presence == .notRunning }
+        if !closed.isEmpty {
+            return SetupNotice(text: "Open \(closed.map(name).joined(separator: " and ")) to begin.",
+                               isProblem: false)
+        }
+        for side in sides {
+            let setup = self[side]
+            if let connection = setup.connection {
+                guard let problem = connection.readiness.problem(name: name(side)) else { continue }
+                return SetupNotice(text: problem, isProblem: connection.readiness != .unverified)
+            }
+            switch setup.presence {
+            case .checking:
+                return SetupNotice(text: "Checking \(name(side))\u{2026}", isProblem: false)
+            case .launching:
+                return SetupNotice(text: "Opening \(name(side))\u{2026}", isProblem: false)
+            case .noWindow:
+                return SetupNotice(text: "\(name(side)) has no window open. Open a chat in it.", isProblem: false)
+            case .noConversation:
+                return SetupNotice(text: "\(name(side)) has no conversation to relay into. Open a chat in it.",
+                                   isProblem: false)
+            case .available(let windows) where windows > 1:
+                return SetupNotice(text: "\(name(side)) has \(windows) conversations open. Click its icon to choose one.",
+                                   isProblem: false)
+            case .available, .notInstalled, .notRunning:
+                return SetupNotice(text: "Connecting \(name(side))\u{2026}", isProblem: false)
+            }
+        }
+        return nil
     }
 }
 

@@ -1,7 +1,9 @@
 // A participant's column at either end of the capsule: the installed
-// app's icon and a single name/action label during preparation. Useful
-// destination or recovery details add a second line; a corner mark shows
-// the connection. ChatGPT stands left and Claude right whoever starts. The
+// app's icon and one line under it. The line is the status when there is
+// one — replying, opening, the connected conversation, the next thing to
+// do, what is wrong — and the app's name only when there is not; the icon
+// says which app it is the rest of the time. A corner mark shows the
+// connection. ChatGPT stands left and Claude right whoever starts. The
 // icon is the side's control and changes with the step: it opens the app,
 // is dragged to connect its conversation, or shows the destination's
 // details; it never changes who starts, which the session settings do.
@@ -12,6 +14,11 @@
 // app. Through both connect steps either open app's icon can be dragged,
 // a connected one again — the step names one side, but the gesture is the
 // lesson in where Errol writes, and repeating it costs nothing.
+//
+// On the direct console (PerchConsole.swift) there are no steps and no
+// drag: beside the editor the icon opens its app, brings it forward for a
+// chat to be opened in it, or — where the app shows several conversations —
+// offers them in a menu, and one chosen there is connected.
 
 import SwiftUI
 
@@ -42,7 +49,7 @@ struct PerchParticipant: View {
     /// concern and outlives the role: a connected side shows its details
     /// on a click and connects again on a drag.
     private enum Role {
-        case launch, openConversation, connect, chooseArrangement, details, none
+        case launch, openConversation, connect, chooseArrangement, chooseConversation, details, none
     }
 
     private var role: Role {
@@ -50,7 +57,16 @@ struct PerchParticipant: View {
         case .running:
             return .none
         case .compose, .finished:
-            return side.isConnected ? .details : .none
+            if side.isConnected { return .details }
+            // Only the direct console reaches the editor with a side
+            // still unconnected.
+            guard controller.stage == .compose else { return .none }
+            switch side.presence {
+            case .notRunning: return .launch
+            case .noWindow, .noConversation: return .openConversation
+            case .available: return setup.state.needsConversationChoice(speaker) ? .chooseConversation : .none
+            default: return .none
+            }
         case .setup:
             switch setup.state.phase {
             case .prepareApps:
@@ -90,22 +106,10 @@ struct PerchParticipant: View {
                             .accessibilityHidden(true)
                     }
                 }
-            PerchAppLabel(name: name, status: preparationLabel,
-                          hintActive: role == .launch && (hoveringIcon || iconFocused))
-            if replying {
-                replyingDots.frame(height: Perch.s(13))
-            } else if let (text, isProblem) = stateLine {
-                Text(text)
-                    .font(Perch.text(11))
-                    .foregroundStyle(isProblem ? Perch.red : Perch.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .contentTransition(.opacity)
-                    .frame(height: Perch.s(13))
-            }
+            statusLine
         }
         .frame(width: Perch.participantWidth)
-        .animation(Perch.fade, value: stateLine?.0)
+        .animation(Perch.fade, value: line)
         .popover(isPresented: $showingDetails, arrowEdge: .bottom) {
             PerchDestinationDetails(controller: controller, speaker: speaker) { showingDetails = false }
         }
@@ -118,7 +122,8 @@ struct PerchParticipant: View {
     // MARK: The icon
 
     private var preparationLabel: String? {
-        guard controller.stage == .setup, setup.state.phase == .prepareApps else { return nil }
+        guard (controller.stage == .setup && setup.state.phase == .prepareApps)
+                || (controller.stage == .compose && setup.isDirect) else { return nil }
         switch side.presence {
         case .launching: return "Opening\u{2026}"
         case .checking: return "Checking\u{2026}"
@@ -127,24 +132,29 @@ struct PerchParticipant: View {
     }
 
     private var iconOpacity: Double {
-        if controller.stage == .setup, !side.presence.isOpen { return 0.45 }
+        if controller.stage == .setup || controller.stage == .compose, !side.presence.isOpen { return 0.45 }
         return controller.isRunning && !replying ? 0.7 : 1
     }
 
     @ViewBuilder private var icon: some View {
         let avatar = PerchAvatar(bundleID: bundleID, initial: String(name.prefix(1)), feather: feather,
                                  presence: presence, check: connectedAndReady)
-            .modifier(PerchLaunchBounce(isLaunching: controller.stage == .setup && side.presence == .launching))
+            .modifier(PerchLaunchBounce(isLaunching: !controller.isRunning && side.presence == .launching))
             .opacity(iconOpacity)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: iconOpacity)
             .brightness(hoveringIcon && role != .none ? -0.06 : 0)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hoveringIcon)
             .onHover { hoveringIcon = $0 }
-        if role == .chooseArrangement {
+        if role == .chooseArrangement || role == .chooseConversation {
+            let connects = role == .chooseConversation
             Menu {
                 ForEach(side.eligible) { candidate in
                     Button("\(candidate.name) \u{00B7} \(candidate.stateLine)") {
-                        setup.chooseArrangementWindow(speaker, candidate.id)
+                        if connects {
+                            setup.connect(speaker, to: candidate.id)
+                        } else {
+                            setup.chooseArrangementWindow(speaker, candidate.id)
+                        }
                     }
                 }
             } label: {
@@ -154,7 +164,7 @@ struct PerchParticipant: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .focused($iconFocused)
-            .accessibilityLabel("Choose which \(name) window to move")
+            .accessibilityLabel(iconLabel)
         } else {
             Button(action: act) {
                 avatar
@@ -180,7 +190,7 @@ struct PerchParticipant: View {
         case .launch: setup.launch(speaker)
         case .openConversation: setup.openConversation(speaker)
         case .details: showingDetails = true
-        case .connect, .chooseArrangement, .none: break
+        case .connect, .chooseArrangement, .chooseConversation, .none: break
         }
     }
 
@@ -191,11 +201,49 @@ struct PerchParticipant: View {
         case .connect: return "Drag \(name) onto its conversation"
         case .details: return "\(name) destination details"
         case .chooseArrangement: return "Choose which \(name) window to move"
+        case .chooseConversation: return "Choose which \(name) conversation to connect"
         case .none: return name
         }
     }
 
-    // MARK: The lines
+    // MARK: The line
+
+    /// What stands under the icon. Whichever it is, the slot has the same
+    /// height, so the icon stays where it is as the status comes and goes.
+    private enum Line: Equatable {
+        case name
+        case status(String, isProblem: Bool)
+        case replying
+    }
+
+    private var line: Line {
+        if replying { return .replying }
+        if let preparationLabel { return .status(preparationLabel, isProblem: false) }
+        if let (text, isProblem) = stateLine { return .status(text, isProblem: isProblem) }
+        return .name
+    }
+
+    private var statusLine: some View {
+        ZStack {
+            switch line {
+            case .name:
+                PerchAppLabel(name: name, hintActive: role == .launch && (hoveringIcon || iconFocused))
+                    .transition(.opacity)
+            case .status(let text, let isProblem):
+                Text(text)
+                    .font(Perch.text(11))
+                    .foregroundStyle(isProblem ? Perch.red : Perch.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .contentTransition(.opacity)
+                    .transition(.opacity)
+            case .replying:
+                replyingDots.transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: Perch.s(17))
+    }
 
     private var connectedAndReady: Bool {
         side.connection?.readiness.isReady == true
@@ -212,11 +260,10 @@ struct PerchParticipant: View {
         }
     }
 
-    /// The state under the app's name: a drag in progress first, then the
-    /// connected conversation and how it reads, or the next thing to do
-    /// for the app at this step. The preparation step shares a single
-    /// name/action slot; only useful destination or recovery information
-    /// needs a second line.
+    /// What the line says when the app's name is not enough: a drag in
+    /// progress first, then the connected conversation and how it reads, or
+    /// the next thing to do for the app at this step. Nil when there is
+    /// nothing to add to the name.
     private var stateLine: (String, Bool)? {
         if controller.stage == .setup, setup.draggingSide == speaker {
             return (setup.dragCandidate == nil ? "Drag to the field" : "Release to connect", false)
@@ -230,7 +277,9 @@ struct PerchParticipant: View {
         }
         if side.presence == .notInstalled { return ("Not installed", true) }
         switch controller.stage {
-        case .running, .finished, .compose:
+        case .compose:
+            return role == .chooseConversation ? ("Choose a chat", false) : nil
+        case .running, .finished:
             return nil
         case .setup:
             switch setup.state.phase {
@@ -287,18 +336,18 @@ private struct PerchIconButtonStyle: ButtonStyle {
     }
 }
 
-/// One label slot: the app name rolls down to briefly reveal its action.
-/// The accessible name stays stable while the visual hint comes and goes.
+/// The app's name, for when nothing else needs saying: it rolls down to
+/// briefly reveal its action. The accessible name stays stable while the
+/// visual hint comes and goes.
 private struct PerchAppLabel: View {
     let name: String
-    let status: String?
     let hintActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingHint = false
 
     var body: some View {
         ZStack {
-            Text(status ?? name)
+            Text(name)
                 .font(Perch.text(12, .medium))
                 .foregroundStyle(Perch.ink)
                 .offset(y: showingHint ? Perch.s(17) : 0)
@@ -313,7 +362,7 @@ private struct PerchAppLabel: View {
         .clipped()
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showingHint)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(status.map { "\(name), \($0)" } ?? name)
+        .accessibilityLabel(name)
         .task(id: hintActive) {
             showingHint = false
             guard hintActive else { return }

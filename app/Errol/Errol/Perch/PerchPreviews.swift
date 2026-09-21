@@ -14,7 +14,9 @@ import SwiftUI
 /// A controller on a preview engine, with the form filled in so Send has
 /// something to send.
 private func previewController(_ engine: PerchPreviewEngine = PerchPreviewEngine()) -> RelayController {
-    let controller = RelayController(engine: engine)
+    // These canvases are the guided capsule's; the direct console has its
+    // own in PerchConsole.swift.
+    let controller = RelayController(engine: engine, guidedSetup: true)
     controller.topic = "Pricing by seat or by usage"
     return controller
 }

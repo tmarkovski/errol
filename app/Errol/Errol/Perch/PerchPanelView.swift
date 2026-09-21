@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Kept for later use, and out of the app's path since the console became
+/// direct (PerchConsole.swift): this is the guided capsule, with the four
+/// steps, their meter, and the Configure button, and its canvases in
+/// PerchPreviews.swift still run it on a controller made with
+/// `guidedSetup: true`.
+///
 /// The one capsule every phase shares — permission aside, which has its
 /// own view in the same shape: the participants at opposite ends, the
 /// content between them changing with the stage (guided setup, the editor,

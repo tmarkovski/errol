@@ -11,9 +11,11 @@ native console keeps a fixed height across states. See [the visual revision](REA
 
 **September 20 revision:** the four progress segments become one bar filled
 through the current step; the automatic Continue on Open apps counts down as a
-ring that empties around the button, with no number; and the trailing action
-holds one position on all four guided screens. The interactive preview has not
-been redrawn for this and still shows the earlier tracks, badge, and fill. See
+ring that empties around the button, with no number; the trailing action
+holds one position on all four guided screens; and each participant has one
+line under its icon, the status when there is one and the app's name only when
+there is not. The interactive preview has not been redrawn for this and still
+shows the earlier tracks, badge, fill, and two-line labels. See
 [the note](README.md#september-20-one-bar-a-ring-and-a-fixed-action).
 
 ## Reference and precedence
@@ -164,19 +166,28 @@ running content and prevents further automation until resolved.
 
 ### Screen 02: Open apps
 
-Use a single 17-point-high label slot beneath each app icon. An open app shows
-only its name; remove **App open** everywhere in setup and do not reserve an
-empty status row. For a closed app, hovering its icon or focusing it by
+Use a single 17-point-high line beneath each app icon, and never a second one.
+It holds the status when there is one and the app's name only when there is
+not: the icon says which app it is the rest of the time. Its height is the same
+whichever it holds, so the icon does not move as the line changes. The status,
+in order of precedence: replying (three small dots), **Opening…** or
+**Checking…**, a drag in progress, the connected conversation and how it
+reads, recovery text such as **Not installed**, and the next thing to do for
+that app at the current step. Statuses are 11-point secondary text, red when
+something is wrong, and truncate in the middle. An open app with nothing to
+add shows its name; remove **App open** everywhere in setup and do not reserve
+an empty status row. For a closed app, hovering its icon or focusing it by
 keyboard slides the name downward out of the slot and brings **Click to
 open** in from above, over 0.18 seconds. Hold the hint for one full second,
 then reverse the transition to restore the name, even if the pointer stays.
 Repeat only on a new hover/focus entry. Leaving the icon, launching the app,
 or changing screens cancels the hint. The label itself is not a hover target.
 
-**Opening…** or **Checking…** temporarily uses that same label slot. Restore
-the app name once open. Preserve essential recovery text such as **Not
-installed**, and destination details in later steps, as a second line when
-needed. Keep the icon's accessible app name and **Open [app]** action stable;
+**Opening…** or **Checking…** temporarily replaces the name in that same line,
+and the name returns once the app is open. Recovery text such as **Not
+installed**, and the connected conversation in later steps, take the line in
+the same way. Keep the icon's accessible app name and **Open [app]** action
+stable whether or not the name is showing;
 with Reduce Motion, swap the label instantly while keeping the one-second
 hold. Launch only in response to the corresponding user action. The step asks only that both
 apps be open: a running app is not necessarily signed in or showing a usable

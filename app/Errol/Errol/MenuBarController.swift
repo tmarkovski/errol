@@ -165,6 +165,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.autoenablesItems = false
+            addSessionOptions(to: menu)
+            menu.addItem(.separator())
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
             let checkForUpdatesItem = menu.addItem(
                 withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
@@ -196,6 +198,101 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     @objc private func checkForUpdates() {
         updater.checkForUpdates()
+    }
+
+    // MARK: Session options
+
+    /// The turn limits the menu offers. The limit in force is listed too
+    /// when it is none of these, so the check always has somewhere to stand.
+    private static let turnLimits = [2, 4, 6, 8, 10, 12, 16, 20]
+
+    /// The options the console's Configure button used to open
+    /// (PerchSettingsPopover, kept but no longer shown): who starts, how the
+    /// conversation ends, how Errol looks, and putting the windows back.
+    /// The window arrangement itself is on the console, beside the prompt.
+    /// What belongs to a run is locked while one is going, as it was there.
+    private func addSessionOptions(to menu: NSMenu) {
+        let unlocked = !relay.isRunning
+
+        let starts = submenu("Starts the Conversation", in: menu)
+        for side in [Speaker.chatgpt, .claude] {
+            let item = option(relay.appName(side), #selector(chooseFirstSpeaker(_:)), side,
+                              checked: relay.firstSpeaker == side, in: starts)
+            item.isEnabled = unlocked
+        }
+
+        let ending = submenu("Ending", in: menu)
+        let automatic = option("When Both Agree They\u{2019}re Done", #selector(chooseTurnLimit(_:)), 0,
+                               checked: !relay.limitTurns, in: ending)
+        automatic.isEnabled = unlocked
+        ending.addItem(.separator())
+        let limits = Set(Self.turnLimits + (relay.limitTurns ? [relay.turns] : [])).sorted()
+        for limit in limits {
+            let item = option("After at Most \(limit) Turns", #selector(chooseTurnLimit(_:)), limit,
+                              checked: relay.limitTurns && relay.turns == limit, in: ending)
+            item.isEnabled = unlocked
+        }
+
+        let display = submenu("Appearance", in: menu)
+        for mode in AppAppearance.allCases {
+            option(mode.title, #selector(chooseAppearance(_:)), mode,
+                   checked: AppearanceStore.shared.appearance == mode, in: display)
+        }
+
+        let palette = submenu("Color Palette", in: menu)
+        for theme in AppTheme.allCases {
+            option(theme.title, #selector(chooseTheme(_:)), theme,
+                   checked: AppearanceStore.shared.theme == theme, in: palette)
+        }
+
+        let restore = menu.addItem(withTitle: "Restore Window Positions",
+                                   action: #selector(restoreWindowPositions), keyEquivalent: "")
+        restore.target = self
+        restore.isEnabled = unlocked && relay.setup.canRestoreLayout
+    }
+
+    private func submenu(_ title: String, in menu: NSMenu) -> NSMenu {
+        let submenu = NSMenu(title: title)
+        submenu.autoenablesItems = false
+        menu.addItem(withTitle: title, action: nil, keyEquivalent: "").submenu = submenu
+        return submenu
+    }
+
+    /// One checkable choice, carrying the value it stands for.
+    @discardableResult
+    private func option(_ title: String, _ action: Selector, _ value: Any, checked: Bool,
+                        in menu: NSMenu) -> NSMenuItem {
+        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.representedObject = value
+        item.state = checked ? .on : .off
+        return item
+    }
+
+    @objc private func chooseFirstSpeaker(_ sender: NSMenuItem) {
+        guard !relay.isRunning, let side = sender.representedObject as? Speaker else { return }
+        relay.firstSpeaker = side
+    }
+
+    /// Zero stands for no limit: the conversation ends when both apps agree.
+    @objc private func chooseTurnLimit(_ sender: NSMenuItem) {
+        guard !relay.isRunning, let limit = sender.representedObject as? Int else { return }
+        relay.limitTurns = limit > 0
+        if limit > 0 { relay.turns = limit }
+    }
+
+    @objc private func chooseAppearance(_ sender: NSMenuItem) {
+        guard let mode = sender.representedObject as? AppAppearance else { return }
+        AppearanceStore.shared.appearance = mode
+    }
+
+    @objc private func chooseTheme(_ sender: NSMenuItem) {
+        guard let theme = sender.representedObject as? AppTheme else { return }
+        AppearanceStore.shared.theme = theme
+    }
+
+    @objc private func restoreWindowPositions() {
+        relay.setup.restoreLayout()
     }
 
     @objc private func quit() {

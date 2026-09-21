@@ -14,11 +14,59 @@ app icons, implementation sequence, and acceptance criteria. Use it for the
 current build direction, including the September 18 visual revision below.
 The discussion retains the earlier alternatives.
 
+## September 20, later: the direct console
+
+The app no longer walks through the four steps. It opens on the prompt, in the
+same 860 × 156 capsule, and what the steps did is folded into that one screen.
+The guided screens, the progress bar, the drag to connect with its drop areas,
+and the Configure popover all remain in the source and in the Xcode canvases
+(`PerchPanelView` on a controller made with `guidedSetup: true`), to be reused
+later. This section describes what the app shows now; everything below it
+describes the guided flow as kept.
+
+- **The layout.** The participants stay at the capsule's ends. Between them, one
+  line of status sits above a prompt box. The box holds the text over a toolbar
+  row, as Claude's prompt does: the window arrangement is a glass segmented
+  control at the row's leading end, and the actions are at its trailing end.
+  Every stage uses this frame. Before a run the text is the topic and the action
+  is **Send to [app]**. During a run the status line carries the running
+  sentence with the turn and the clock at its trailing end, the field is closed
+  with the reminder not to type in the apps, and the actions are Pause and Stop.
+  A paused run opens the steering note in the box. After a run the status line
+  says how it ended, the box holds the count and the clock, and **New topic**
+  returns to the editor.
+- **Opening the apps.** A closed app's icon still opens it on a click. While
+  either app is closed the trailing action is **Open both apps** (or **Open
+  [app]**) in place of Send. Errol still opens an app only when asked.
+- **Arranging.** A choice in the segmented control applies at once, as it did on
+  the arrange step, and it stands for a window connected later. There is no
+  Continue. The control is unavailable during a run.
+- **Connecting.** The drag is parked, so something else has to settle which
+  window Errol writes into, and the rule from the spec still holds: a general
+  search for a chat window at Send can pick a different window without saying
+  so. A side whose app shows exactly one window a run could target is connected
+  to it when a sweep first sees it, the binding is held from then on, and the
+  conversation's name stands under the icon. A side with several such windows
+  is never chosen for, whatever was used last: the status line asks for a click
+  on its icon, which offers the conversations in a menu. A Code session beside
+  a chat window therefore always asks. Nothing is connected during a run; a run
+  that loses its window ends saying so.
+- **The status line.** It names the first thing still needed, in the order the
+  steps had: an app that is not installed, the apps to open, then for each side
+  its window, its choice among several, and how its connected conversation
+  reads. A wait is secondary text and a fault is red. When nothing is needed it
+  says both conversations are connected and which app goes first.
+- **Options.** The Configure button is gone from the capsule. Right-clicking the
+  status item in the menu bar now offers who starts, the ending (when both
+  agree, or after at most a chosen number of turns), the appearance, the color
+  palette, and **Restore Window Positions**, above the existing items. The run's
+  options are unavailable while a run is going.
+
 ## September 20: one bar, a ring, and a fixed action
 
-Three changes to the native console, which the [interactive preview](preview.html)
-does not yet show (it still draws the four tracks, the number badge, and the
-fill described below):
+Four changes to the native console, which the [interactive preview](preview.html)
+does not yet show (it still draws the four tracks, the number badge, the
+fill, and the name labels described below):
 
 - **One progress bar.** The four tracks and the sliding marker become a single
   bar, filled through the current step: green behind it, amber at the current
@@ -33,6 +81,12 @@ fill described below):
   action used to sit wherever its own screen put it, and moved by several
   points with the height of the arrow cue, the layout choices, or a wrapped
   message; now it is placed once and none of them can move it.
+- **One line under each icon.** The app's name and the status line beneath it
+  are now a single line of fixed height. It shows the status when there is one
+  (replying, opening, the connected conversation, what to do next, what is
+  wrong) and the app's name only when there is not, since the icons are
+  recognizable on their own. The icon no longer shifts as a second line comes
+  and goes.
 
 ## September 18: compact actions and a fixed capsule
 

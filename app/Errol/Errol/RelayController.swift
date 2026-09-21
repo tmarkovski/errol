@@ -187,12 +187,15 @@ final class RelayController {
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
+    /// `guidedSetup` brings back the four guided steps before the editor,
+    /// for the screens kept from that flow (PerchPanelView and its
+    /// canvases). The app's console is direct.
     init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil,
-         transferOverlay: TransferOverlay? = nil) {
+         transferOverlay: TransferOverlay? = nil, guidedSetup: Bool = false) {
         self.engine = engine
         self.veils = veils
         self.transferOverlay = transferOverlay
-        setup = SetupController(engine: engine)
+        setup = SetupController(engine: engine, guided: guidedSetup)
         // Reaching the editor is the moment to type: the console comes
         // forward and key through the shell's handler, and the editor takes
         // the keyboard as it appears (PerchWidgetCenter.openingEditor).
@@ -494,6 +497,7 @@ final class RelayController {
         transferOverlay?.stop()
         recordSteeringAtRunEnd()
         resetSteering()
+        setup.runEnded()
         updateScanner()
         focusPanelHandler?()
     }
