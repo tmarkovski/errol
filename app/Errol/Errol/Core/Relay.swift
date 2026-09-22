@@ -177,9 +177,10 @@ extension SteeringOutcome {
         switch send {
         case .confirmed: self = .delivered
         case .unconfirmed, .abandoned: self = .unconfirmed
-        // A withheld send is retried with the note still in hand, so this
-        // reading is only ever reached for a send that was not retried.
-        case .refused, .withheld: self = .refused
+        // A withheld send, or one the app would not come to the front
+        // for, is retried with the note still in hand, so this reading is
+        // only ever reached for a send that was not retried.
+        case .refused, .withheld, .notInFront: self = .refused
         }
     }
 }
@@ -384,10 +385,20 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     func destinationGuard(_ target: TargetApp) -> GuardVerdict {
         let destination = bound(target)
         switch destination.check() {
-        case .same: return .clear
+        case .same: return frontGuard(target)
         case .hidden(let seen): return .block(.windowHidden(side: side(target), seen: seen))
         case .lost(let detail): return .lost(detail)
         }
+    }
+    /// An app that would not come to the front for the relay is the
+    /// human's to bring forward: the run stands on that block
+    /// (RunBlock.notInFront) until the app is frontmost, then goes on
+    /// from where it stood. Only a block already set holds here — the
+    /// failed activation is what says the app will not come, and this
+    /// guard never raises one itself.
+    func frontGuard(_ target: TargetApp) -> GuardVerdict {
+        guard case .notInFront(let held)? = block, held == side(target), !isFrontmost(target) else { return .clear }
+        return .block(.notInFront(side: held))
     }
     /// Before copying `target`'s reply: the destination, and that the reply
     /// the wait completed on is still the newest thing there. A count that
@@ -537,7 +548,10 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             openingOutcome = send(opener, to: speaker, sources: [.userPrompt], showTransfer: showTransfers,
                                   destination: bound(speaker),
                                   inspection: inspection?.sendInspection(speaker))
-            if openingOutcome == .withheld {
+            // Withheld, the send is tried again once the gate clears; not
+            // in front, the run holds for the human first (frontGuard).
+            if openingOutcome == .notInFront { setBlock(.notInFront(side: side(speaker))) }
+            if openingOutcome == .withheld || openingOutcome == .notInFront {
                 endOperation(continuingRun: true)
                 guard standBy() else { return .stopped }
                 continue
@@ -621,6 +635,14 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 if reply == nil {
                     switch destinationGuard(speaker) {
                     case .clear:
+                        // The copy needs the app in front (copyLastResponse).
+                        // One that would not come is the human's to bring;
+                        // the copy is tried again from the gate once it is.
+                        if !isFrontmost(speaker) {
+                            setBlock(.notInFront(side: side(speaker)))
+                            endOperation(continuingRun: true)
+                            continue
+                        }
                         log("Stopping: could not copy response from \(speaker.name) after a retry.")
                         return .copyFailed(side: side(speaker))
                     case .lost(let detail):
@@ -724,7 +746,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                                sources: payload.transferSources(from: side(speaker)), showTransfer: showTransfers,
                                destination: bound(listener),
                                inspection: inspection?.sendInspection(listener))
-                if outcome == .withheld {
+                if outcome == .notInFront { setBlock(.notInFront(side: side(listener))) }
+                if outcome == .withheld || outcome == .notInFront {
                     endOperation(continuingRun: true)
                     guard standBy() else { return .stopped }
                     continue

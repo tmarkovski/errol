@@ -86,7 +86,7 @@ struct RunReport: Equatable {
         case .timedOut:
             parts.append("no reply activity for \(Int(timeout))s")
         case .sendRefused:
-            parts.append("the app would not come to the front")
+            parts.append("the send was called off before anything was typed")
         case .sendAbandoned:
             parts.append("focus was lost mid-send; check whether the message went")
         case .emptyReply:
@@ -128,6 +128,7 @@ extension RunBlock {
         case .replying: return "\(name) was replying to something else"
         case .composerUnreadable: return "\(name)'s composer could not be read"
         case .historyChanged: return "\(name)'s conversation had moved on"
+        case .notInFront: return "\(name) would not come to the front"
         }
     }
 }

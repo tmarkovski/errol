@@ -138,8 +138,14 @@ enum SendOutcome: Equatable {
     /// The attempt started but cannot continue safely (lost focus,
     /// cancellation, or an inspection veto). Submission may have happened.
     case abandoned
-    /// The foreground could not be taken before typing; nothing was typed.
+    /// The send was called off before anything was typed: cancelled, or
+    /// vetoed by an inspection.
     case refused
+    /// The app could not be brought to the front, so nothing was typed:
+    /// a keystroke lands in whatever app is frontmost. The composer stands
+    /// as it was; the caller holds for the human to bring the app forward
+    /// (RunBlock.notInFront) and tries again.
+    case notInFront
     /// Nothing was typed because a check made just before the keystroke
     /// found the destination changed or the clipboard taken. The composer
     /// stands as it was, so the delivery can be tried again once the
@@ -473,9 +479,9 @@ func send(_ text: String, to target: TargetApp,
     // Keystrokes go to the frontmost app no matter what has AX focus, so
     // never type unless the target is verified frontmost.
     guard makeFrontmost(target) else {
-        log("\(target.name): could not bring app to front; refusing to type into another app's window")
+        log("\(target.name): could not bring app to front; not typing into another app's window")
         log("\(target.name): \(focusReport(target))")
-        return .refused
+        return .notInFront
     }
 
     // The two checks made right before every keystroke, after any

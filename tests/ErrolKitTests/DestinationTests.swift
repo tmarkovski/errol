@@ -99,5 +99,11 @@ final class DestinationTests: XCTestCase {
                        "ChatGPT has an unsent draft (16 characters). Finish or clear it, then send again.")
         XCTAssertEqual(RunBlock.historyChanged(side: .claude).headline(names: names),
                        "Paused: Claude's conversation moved on")
+        let front = RunBlock.notInFront(side: .chatgpt)
+        XCTAssertEqual(front.headline(names: names), "Paused: ChatGPT couldn't be brought to the front")
+        XCTAssertTrue(front.recovery(names: names).hasPrefix("Click ChatGPT's window to bring it to the front"))
+        XCTAssertTrue(front.logLine(name: "ChatGPT").hasPrefix("Paused — ChatGPT would not come to the front"))
+        XCTAssertEqual(front.startRefusal(name: "ChatGPT"),
+                       "ChatGPT couldn't be brought to the front. Click its window, then send again.")
     }
 }

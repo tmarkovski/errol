@@ -258,5 +258,6 @@ final class RelayFramingTests: XCTestCase {
         XCTAssertTrue(SendOutcome.unconfirmed.continuesRun)
         XCTAssertFalse(SendOutcome.abandoned.continuesRun)
         XCTAssertFalse(SendOutcome.refused.continuesRun)
+        XCTAssertFalse(SendOutcome.notInFront.continuesRun)
     }
 }

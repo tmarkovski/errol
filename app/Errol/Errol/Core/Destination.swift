@@ -142,11 +142,17 @@ enum RunBlock: Equatable {
     /// The side's conversation has more messages than the reply the relay
     /// waited for: something was said since.
     case historyChanged(side: Speaker)
+    /// The side's app would not come to the front for the relay — a
+    /// keystroke lands in the frontmost app, and the copy button writes
+    /// the clipboard only from a focused window — so the human brings it
+    /// forward, and the relay goes on from where it stood.
+    case notInFront(side: Speaker)
 
     var side: Speaker {
         switch self {
         case .windowHidden(let side, _), .draft(let side, _), .attachments(let side, _),
-             .replying(let side), .composerUnreadable(let side), .historyChanged(let side):
+             .replying(let side), .composerUnreadable(let side), .historyChanged(let side),
+             .notInFront(let side):
             return side
         }
     }
@@ -161,6 +167,7 @@ enum RunBlock: Equatable {
         case .replying: return "Paused: \(name) is replying to something else"
         case .composerUnreadable: return "Paused: \(name)'s composer can't be read"
         case .historyChanged: return "Paused: \(name)'s conversation moved on"
+        case .notInFront: return "Paused: \(name) couldn't be brought to the front"
         }
     }
 
@@ -180,6 +187,8 @@ enum RunBlock: Equatable {
             return "Click into \(name)'s message field so it can be read, or Stop."
         case .historyChanged:
             return "Messages were added in \(name) since the reply Errol was waiting for. Errol cannot tell what to relay now; Stop, or undo the change to continue."
+        case .notInFront:
+            return "Click \(name)'s window to bring it to the front. Errol continues once it is in front, or Stop."
         }
     }
 
@@ -199,6 +208,8 @@ enum RunBlock: Equatable {
             return "\(name)'s message field can't be read. Click into it, then send again."
         case .historyChanged:
             return "\(name)'s conversation changed. Send again."
+        case .notInFront:
+            return "\(name) couldn't be brought to the front. Click its window, then send again."
         }
     }
 
@@ -217,6 +228,8 @@ enum RunBlock: Equatable {
             return "Paused — \(name)'s composer cannot be read, so it cannot be known to be empty."
         case .historyChanged:
             return "Paused — \(name)'s conversation has messages the relay did not expect since its reply completed."
+        case .notInFront:
+            return "Paused — \(name) would not come to the front. Click its window to bring it forward; the relay continues from there, or Stop."
         }
     }
 }
