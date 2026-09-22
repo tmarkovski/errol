@@ -1,19 +1,20 @@
 // The console's Send with who goes first inside it: "Send to" and one
-// app's mark, in one accent pill. The other app's mark stands in its own
-// chip just outside, to the right; a click on it swaps the two marks, the
-// outside one sliding into the pill and the pill's out to the chip, so the
-// pill always reads where the topic goes and the swap itself shows the
-// change. The choice stays open while sending is blocked — the topic can
-// be missing and the order still settled — so the chip is its own
+// app's mark, in one accent pill. The other app's mark stands bare just
+// outside, to the right; a click on it swaps the two marks, the outside
+// one sliding into the pill and the pill's out beside it, so the pill
+// always reads where the topic goes and the swap itself shows the change.
+// The choice stays open while sending is blocked — the topic can be
+// missing and the order still settled — so the outside mark is its own
 // button, and only the pill dims.
 //
 // The pill is drawn by hand: a button style makes one button, and this is
 // a button and a choice in one row. It has the prompt box's kind of corner
 // (Perch.controlCorner) and wears what the console's prominent capsule
 // wears — the accent and its ink — giving the accent up for the well while
-// sending is blocked (PerchCapsuleButton); the chip wears the secondary's
-// well. The marks are drawn once, over the row, and matched to the
-// socket each belongs in, so a swap is one animated move each way.
+// sending is blocked (PerchCapsuleButton); the outside mark wears
+// nothing but a tint under the pointer. The marks are drawn once, over
+// the row, and matched to the socket each belongs in, so a swap is one
+// animated move each way.
 
 import SwiftUI
 
@@ -40,11 +41,10 @@ struct PerchSendPill: View {
     private static let inset = Perch.s(3)
     private static let socketWidth = Perch.s(34)
     private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
-    private static let socketShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
 
-    /// Where a mark sits: in the pill, or in the chip beside it.
+    /// Where a mark sits: in the pill, or beside it.
     private enum Socket: Hashable {
-        case pill, chip
+        case pill, beside
     }
 
     /// The accent stands while Send can go.
@@ -57,9 +57,9 @@ struct PerchSendPill: View {
     private var otherName: String { otherSide?.name ?? "" }
 
     var body: some View {
-        HStack(spacing: Perch.s(6)) {
+        HStack(spacing: Perch.s(4)) {
             pill
-            chip
+            beside
         }
         .overlay { marks }
         .fixedSize()
@@ -75,7 +75,7 @@ struct PerchSendPill: View {
                     .foregroundStyle(tinted ? pillInk : Perch.secondary)
                     .padding(.leading, Perch.s(14))
                     .padding(.trailing, Perch.s(8))
-                socket(.pill, fill: pillInk.opacity(tinted ? 0.28 : 0.11))
+                socket(.pill)
                     .padding(.trailing, Self.inset)
             }
             .frame(height: Self.height)
@@ -92,18 +92,17 @@ struct PerchSendPill: View {
         .accessibilityLabel("Send to \(firstName)")
     }
 
-    /// The other side's mark, in a chip of its own: a click puts that side
-    /// first, and the marks trade places.
-    private var chip: some View {
+    /// The other side's mark, bare beside the pill: a click puts that side
+    /// first, and the marks trade places. Only the pointer marks it as a
+    /// button, with a tint under it.
+    private var beside: some View {
         Button {
             guard let other = otherSide else { return }
             first = other.speaker
         } label: {
-            socket(.chip, fill: .clear)
+            socket(.beside)
                 .padding(Self.inset)
                 .frame(height: Self.height)
-                .background(Self.shape.fill(Perch.well))
-                .overlay(Self.shape.stroke(Perch.chipEdge, lineWidth: 1))
                 .perchHover(Self.shape)
                 .contentShape(Self.shape)
         }
@@ -113,8 +112,9 @@ struct PerchSendPill: View {
     }
 
     /// A socket: the space a mark lands in, and the source of its frame.
-    private func socket(_ socket: Socket, fill: Color) -> some View {
-        Self.socketShape.fill(fill)
+    /// Nothing is drawn; the mark over it is all there is to see.
+    private func socket(_ socket: Socket) -> some View {
+        Color.clear
             .frame(width: Self.socketWidth, height: Self.height - 2 * Self.inset)
             .matchedGeometryEffect(id: socket, in: sockets)
     }
@@ -129,7 +129,7 @@ struct PerchSendPill: View {
                 mark(side)
                     .foregroundStyle(inPill ? pillInk : Perch.ink)
                     .frame(width: Self.socketWidth, height: Self.height - 2 * Self.inset)
-                    .matchedGeometryEffect(id: inPill ? Socket.pill : .chip, in: sockets, isSource: false)
+                    .matchedGeometryEffect(id: inPill ? Socket.pill : .beside, in: sockets, isSource: false)
             }
         }
         .animation(reduceMotion ? nil : Perch.spring, value: first)
