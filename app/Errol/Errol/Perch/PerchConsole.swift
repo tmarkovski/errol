@@ -47,11 +47,11 @@ struct PerchConsoleView: View {
 // MARK: - The topic line
 
 /// The line above the prompt: who goes first, as chosen on the Send pill,
-/// and once the run has started, what it is about — one sentence the
-/// on-device model writes from the prompt (TopicSummarizer). The prompt's
-/// own first line stands in until the sentence arrives, and stays where
-/// the model cannot write one. The sentence outlasts the run: it names
-/// the ending until a new topic is written.
+/// and once the on-device model has written one sentence on what the run
+/// is about from the prompt (TopicSummarizer), that sentence. Who went
+/// first stays on the line until then, and for good where the model
+/// cannot write one. The sentence outlasts the run: it names the ending
+/// until a new topic is written.
 struct PerchTopicLine: View {
     let controller: RelayController
 
@@ -80,10 +80,10 @@ struct PerchTopicLine: View {
     }
 
     private var line: Line {
-        if controller.stage == .compose {
-            return Line(text: "\(controller.appName(controller.firstSpeaker)) goes first", isTopic: false)
+        if controller.stage != .compose, let summary = controller.topicSummary {
+            return Line(text: summary, isTopic: true)
         }
-        return Line(text: controller.topicLine ?? "", isTopic: true)
+        return Line(text: "\(controller.appName(controller.firstSpeaker)) goes first", isTopic: false)
     }
 }
 
@@ -194,26 +194,46 @@ struct PerchRunMetadata: View {
 
 // MARK: - The prompt box
 
-/// The box under the status: text over a toolbar row. The text is the
-/// topic editor before a run, the steering note while the run is paused,
-/// the closed field's notice while the agents work, and the ending's
-/// detail after. The capsule's height is fixed, so the editors scroll
-/// inside what the box leaves them.
+/// The box under the topic line: text over a toolbar row. The text is the
+/// topic editor before a run and, read-only, until the opening has set
+/// off from it; then the steering note while the run is paused, the
+/// closed field's notice while the agents work, and the ending's detail
+/// after. The capsule's height is fixed, so the editors scroll inside
+/// what the box leaves them.
 struct PerchPromptBox: View {
     @Bindable var controller: RelayController
 
     static let textInset = Perch.s(12)
     private static let corner = Perch.s(16)
 
+    /// What stands in the text's place. One value for the prompt as
+    /// written, before and just after Send, so the editor keeps its
+    /// identity — its scroll position, its selection — across the start.
+    private enum Field {
+        case opening, steering, closed, ending
+    }
+
+    private var field: Field {
+        switch controller.stage {
+        case .compose: return .opening
+        case .running:
+            if controller.isSteering { return .steering }
+            return controller.openingStillVisible ? .opening : .closed
+        case .finished: return .ending
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Perch.s(4)) {
             ZStack(alignment: .topLeading) {
-                switch controller.stage {
-                case .compose:
-                    openingEditor
-                case .running:
-                    if controller.isSteering { steering } else { closedField }
-                case .finished:
+                switch field {
+                case .opening:
+                    openingEditor.disabled(controller.isRunning)
+                case .steering:
+                    steering
+                case .closed:
+                    closedField
+                case .ending:
                     ending
                 }
             }
@@ -676,9 +696,9 @@ private func canvas(_ controller: RelayController) -> some View {
 }
 
 #Preview("Console · running") {
-    // Opens on turn 4 of 10, Claude writing. The topic line shows the
-    // prompt's first line for a second, then the sentence a stand-in
-    // writes for it, as the model would.
+    // Opens on turn 4 of 10, Claude writing. The topic line says who went
+    // first for a second, then the sentence a stand-in writes, as the
+    // model would.
     let controller = connectedController(PerchPreviewEngine(turn: 4))
     controller.limitTurns = true
     controller.turns = 10
@@ -691,7 +711,7 @@ private func canvas(_ controller: RelayController) -> some View {
 }
 
 #Preview("Console · running (model unavailable)") {
-    // No sentence comes, so the prompt's first line stays the topic.
+    // No sentence comes, so the line keeps saying who went first.
     let controller = connectedController(PerchPreviewEngine(turn: 4))
     controller.summarize = { _ in nil }
     controller.start()

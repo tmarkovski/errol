@@ -97,6 +97,11 @@ final class RelayController {
     /// wrote it: the topic, or the opening written from scratch. Set at
     /// Start, cleared with the finished run.
     private(set) var runPrompt: String?
+    /// Whether the opening has left the prompt box: true from the first
+    /// transfer that sets off from the prompt, or failing that, the first
+    /// sign of the conversation under way. The box shows the prompt as
+    /// written until then (PerchPromptBox).
+    private(set) var openingSent = false
     /// One sentence on what the run is about, once the on-device model has
     /// written it from the prompt (TopicSummarizer); nil until then, and
     /// for good when the model cannot.
@@ -233,15 +238,20 @@ final class RelayController {
             guard let self else { return }
             switch event {
             case .transfer(let feedback):
+                if case .began(_, let sources, _, _) = feedback, sources.contains(.userPrompt) {
+                    openingSent = true
+                }
                 if isRunning, !control.isCancelled { transferOverlay?.handle(feedback) }
             case .log(let line):
                 append(line)
             case .conversation(let chatgpt, let claude):
                 chatgptConversation = chatgpt
                 claudeConversation = claude
+                if chatgpt != .notStarted || claude != .notStarted { openingSent = true }
                 veils?.update(chatgpt: chatgpt, claude: claude)
             case .turn(let turn):
                 currentTurn = turn
+                if turn > 0 { openingSent = true }
             case .holding(let holding):
                 isHolding = holding
             case .blocked(let block):
@@ -354,19 +364,15 @@ final class RelayController {
         return .compose
     }
 
-    /// What the run is about, for the console's top line: the model's
-    /// sentence once written, the prompt's first line until then. Nil
-    /// while no run is on the panel.
-    var topicLine: String? {
-        if let topicSummary { return topicSummary }
-        guard let runPrompt else { return nil }
-        let first = runPrompt.split(whereSeparator: \.isNewline).first.map(String.init) ?? runPrompt
-        return first.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// The prompt is still in the box, as written: the run has begun and
+    /// the opening has not set off yet. A block or a Stop in that window
+    /// closes the field, so what they say has its place.
+    var openingStillVisible: Bool {
+        isRunning && !openingSent && block == nil && !stopRequested
     }
 
-    /// Ask the model for the run's sentence. The prompt is kept as the
-    /// line's fallback meanwhile; an answer that arrives after the run has
-    /// left the panel, or for another prompt, is dropped.
+    /// Ask the model for the run's sentence. An answer that arrives after
+    /// the run has left the panel, or for another prompt, is dropped.
     private func beginTopicSummary() {
         summaryTask?.cancel()
         let prompt = (showsFullInstructionsEditor ? customInstructions : topic)
@@ -437,6 +443,7 @@ final class RelayController {
         config.first = firstSpeaker
 
         isRunning = true
+        openingSent = false
         stopRequested = false
         transferOverlay?.stop()
         isHolding = false
