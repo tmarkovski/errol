@@ -184,7 +184,7 @@ struct PerchPromptBox: View {
         .padding(.top, Perch.s(6))
         .padding(.bottom, Perch.s(6))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: Self.corner).fill(Perch.paper.opacity(0.6)))
+        .background(RoundedRectangle(cornerRadius: Self.corner).fill(Perch.paper))
         .overlay(RoundedRectangle(cornerRadius: Self.corner).stroke(Perch.chipEdge, lineWidth: 1))
     }
 
@@ -421,19 +421,14 @@ extension LayoutChoice {
     }
 }
 
-/// The three arrangements in one glass capsule at the toolbar's leading
+/// The three arrangements in one flat capsule at the toolbar's leading
 /// end, as tall as the actions beside it. A choice applies at once, and
-/// stands for windows connected later (SetupController.applyIfPending). The glass is a background layer, as
-/// the panel's own is: glass wrapped around content makes AppKit read a
-/// drag inside it as a window move (PanelWindowSurface).
+/// stands for windows connected later (SetupController.applyIfPending).
 ///
-/// It wears what a segmented control wears in a system toolbar — a gray
-/// capsule on the chosen segment, hairlines between the others that hide
-/// beside it — and is drawn by hand because AppKit only draws that inside
-/// an NSToolbar: elsewhere NSSegmentedControl fills its selection with the
-/// accent color, and inside an NSGlassEffectView it keeps its own track as
-/// a second rim within the glass. The stock control's selection also jumps
-/// on mouse-up; this one slides.
+/// A well with a paper thumb on the chosen segment and hairlines between
+/// the others that hide beside it, drawn by hand: NSSegmentedControl fills
+/// its selection with the accent color outside an NSToolbar, and its
+/// selection jumps on mouse-up where this one slides.
 struct PerchLayoutSegments: View {
     let controller: RelayController
     @Namespace private var thumb
@@ -460,7 +455,7 @@ struct PerchLayoutSegments: View {
                         .frame(width: Perch.s(36), height: Perch.s(25))
                         .background {
                             if selected == layout {
-                                Capsule().fill(Perch.ink.opacity(0.11))
+                                Capsule().fill(Perch.paper)
                                     .matchedGeometryEffect(id: "selection", in: thumb)
                             }
                         }
@@ -474,7 +469,7 @@ struct PerchLayoutSegments: View {
             }
         }
         .padding(Perch.s(3.5))
-        .background(Color.clear.glassEffect(.regular, in: Capsule()))
+        .background(Capsule().fill(Perch.well))
         .opacity(isEnabled ? 1 : 0.5)
         .animation(reduceMotion ? nil : Perch.spring, value: selected)
         .fixedSize()
@@ -545,7 +540,7 @@ struct PerchConsoleActions: View {
     private var paused: some View {
         HStack(spacing: Perch.s(8)) {
             PerchTextButton(title: "Resume without note") { controller.resumeWithoutNote() }
-            PerchCapsuleButton(title: "Stop", style: .glass, icon: "stop.fill") { controller.stop() }
+            PerchCapsuleButton(title: "Stop", style: .secondary, icon: "stop.fill") { controller.stop() }
                 .disabled(controller.stopRequested)
                 .help("Stop at the next safe point")
             PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }

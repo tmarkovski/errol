@@ -21,6 +21,13 @@ struct PerchAvatar: View {
     private var slot: CGFloat { Perch.s(46) }
 
     var body: some View {
+        artwork
+            // A soft white halo lifts the icon off whatever the glass
+            // shows behind it.
+            .shadow(color: .white.opacity(0.55), radius: Perch.s(3))
+    }
+
+    @ViewBuilder private var artwork: some View {
         Group {
             if let icon = AppIcons.shared.icon(forBundleID: bundleID) {
                 // A macOS app icon keeps a transparent margin around its

@@ -1,5 +1,7 @@
-// Running actions reveal labels beside stationary icons. Editors,
-// permission setup, and the ending retain their labeled Liquid Glass pills.
+// The console's buttons, drawn flat: filled capsules and circles on the
+// panel's glass, with no material of their own. Running actions reveal
+// labels beside stationary icons; editors, permission setup, and the
+// ending keep their labeled pills.
 
 import SwiftUI
 
@@ -60,7 +62,10 @@ struct PerchRevealButton: View {
 
 struct PerchCapsuleButton: View {
     enum Style {
-        case prominent, glass
+        /// The accent, for the one action that goes forward.
+        case prominent
+        /// The well, for the action beside it.
+        case secondary
     }
 
     enum Size {
@@ -76,7 +81,8 @@ struct PerchCapsuleButton: View {
     var icon: String? = nil
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.appearsActive) private var appearsActive
+
+    private var prominent: Bool { style == .prominent }
 
     var body: some View {
         Button(action: action) {
@@ -89,57 +95,18 @@ struct PerchCapsuleButton: View {
                     .font(size == .large ? Perch.text(13, .semibold) : Perch.text(12, .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(ink)
-            .frame(height: PerchGlassButton.labelHeight(pill: Perch.s(size == .large ? 42 : 29),
-                                                        size: controlSize))
+            .foregroundStyle(prominent ? Perch.onAccent : Perch.ink)
+            .padding(.horizontal, Perch.s(size == .large ? 18 : 13))
+            .frame(height: Perch.s(size == .large ? 42 : 29))
+            .background(Capsule().fill(prominent ? Perch.accent : Perch.well))
+            .overlay(Capsule().stroke(prominent ? Color.clear : Perch.chipEdge, lineWidth: 1))
+            .perchHover(Capsule(), tint: prominent ? .white : Perch.ink, opacity: prominent ? 0.12 : 0.06)
+            .contentShape(Capsule())
         }
-        .modifier(PerchGlassButton(prominent: style == .prominent, size: controlSize))
-        // The glass styles interpolate their tint, and the ink crosses with
-        // it, so an action coming into reach fades in like the text does.
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : 0.45)
+        // An action coming into reach fades in like the text beside it.
         .animation(Perch.fade, value: isEnabled)
-    }
-
-    private var controlSize: ControlSize { size == .large ? .extraLarge : .large }
-
-    /// The prominent pill gives up its tint when it is disabled and when
-    /// the console is not key, and the ink chosen to sit on the accent then
-    /// has nothing to sit on: white on pale glass, in a light theme. The
-    /// neutral inks read on bare glass, and the system dims a disabled one.
-    private var ink: Color {
-        guard isEnabled else { return Perch.secondary }
-        guard style == .prominent else { return Perch.accentText }
-        return appearsActive ? Perch.onAccent : Perch.ink
-    }
-}
-
-/// The system's glass button styles in the console's shape. They bring the
-/// material, the rim, the press response, and the disabled look, and they
-/// follow the window: in a console that is not key the tint and the rim
-/// fade, as every control does in an inactive window.
-private struct PerchGlassButton: ViewModifier {
-    let prominent: Bool
-    let size: ControlSize
-
-    func body(content: Content) -> some View {
-        Group {
-            if prominent {
-                content.buttonStyle(.glassProminent).tint(Perch.accent)
-            } else {
-                // The console tints all it holds with the accent, and a
-                // tinted glass pill would be accent text on accent glass.
-                content.buttonStyle(.glass).tint(nil)
-            }
-        }
-        .buttonBorderShape(.capsule)
-        .controlSize(size)
-    }
-
-    /// The styles pad their label and take their height from it, so a pill
-    /// of a given height asks for a label this tall. The padding is what
-    /// macOS 27 measures — 6 points on each side at large, 10 at extra
-    /// large; a system that pads differently moves the pill by that much.
-    static func labelHeight(pill: CGFloat, size: ControlSize) -> CGFloat {
-        pill - (size == .extraLarge ? 20 : 12)
     }
 }
 

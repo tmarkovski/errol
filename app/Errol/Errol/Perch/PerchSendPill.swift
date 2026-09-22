@@ -5,13 +5,10 @@
 // blocked — the topic can be missing and the order still settled — so the
 // marks are their own buttons, and only "Send to" dims.
 //
-// The pill is drawn by hand where the other capsules use the system's
-// glass button styles: a style makes one button, and this is a button and
-// a segmented choice in one shape. It borrows what those styles do — the
-// accent tint and its ink, given up while sending is blocked and while
-// the console is not key (PerchCapsuleButton) — and, like the arrangement
-// capsule, keeps the glass as a background layer so a drag inside it does
-// not move the window (PanelWindowSurface).
+// The pill is drawn by hand: a button style makes one button, and this is
+// a button and a segmented choice in one shape. It wears what the console's
+// prominent capsule wears — the accent and its ink — and gives the accent
+// up for the well while sending is blocked (PerchCapsuleButton).
 
 import SwiftUI
 
@@ -32,15 +29,14 @@ struct PerchSendPill: View {
     let blocker: String?
     let send: () -> Void
     @Namespace private var thumb
-    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let height = Perch.s(29)
     private static let inset = Perch.s(3)
 
-    /// The accent stands while Send can go and the console is key.
-    private var tinted: Bool { blocker == nil && appearsActive }
-    /// The marks' ink: on the accent, or on bare glass.
+    /// The accent stands while Send can go.
+    private var tinted: Bool { blocker == nil }
+    /// The marks' ink: on the accent, or on the well.
     private var ink: Color { tinted ? Perch.onAccent : Perch.ink }
     private var firstName: String { sides.first { $0.speaker == first }?.name ?? "" }
 
@@ -62,7 +58,8 @@ struct PerchSendPill: View {
             .accessibilityLabel("Send to \(firstName)")
             marks
         }
-        .background(Color.clear.glassEffect(tinted ? .regular.tint(Perch.accent) : .regular, in: Capsule()))
+        .background(Capsule().fill(tinted ? Perch.accent : Perch.well))
+        .overlay(Capsule().stroke(tinted ? Color.clear : Perch.chipEdge, lineWidth: 1))
         .animation(Perch.fade, value: tinted)
         .fixedSize()
         .accessibilityElement(children: .contain)
