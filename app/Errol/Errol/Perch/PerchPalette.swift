@@ -52,8 +52,8 @@ struct PerchPalette {
     /// real saturation. Ink, secondary, accent text, and text on the accent
     /// clear 4.5:1 on paper in both appearances; muted text does so on the well.
 
-    /// Ink as the accent, so the transfer overlay's gold is the only color
-    /// that ever moves.
+    /// Ink as the accent: nothing here, the transfer's dot and prompt light
+    /// included, is any color but ink.
     static let chalkGraphite = PerchPalette(
         light: Colors(
             paper: 0xFBFAF8, well: 0xF3F1EC,

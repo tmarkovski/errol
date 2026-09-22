@@ -135,24 +135,40 @@ private final class TransferPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Core Animation layers keep the short golden wake, the dissolving dot, and
-/// the receiving border on the same clock. No particles or continuous idle work.
+/// Core Animation layers keep the short wake, the dissolving dot, and the
+/// receiving border on the same clock, all in the theme's accent: the color
+/// of the console's Send pill and buttons. The drawing is made afresh for
+/// each flight, so it reads the accent as chosen then, under the appearance
+/// the app shows. No particles or continuous idle work.
 final class TransferDrawing: NSView {
     private let tails = [CAShapeLayer(), CAShapeLayer()]
     private let dots = [CAShapeLayer(), CAShapeLayer()]
     private let bloom = CAShapeLayer()
     private let outline = CAShapeLayer()
-    private let gold = NSColor(srgbRed: 1, green: 0.77, blue: 0.20, alpha: 1)
+    private let accent: CGColor
+    /// The dot's core, a shade lighter than its glow, so it reads as lit
+    /// rather than as a flat disc.
+    private let core: CGColor
 
     override init(frame: NSRect) {
+        let dynamic = AppearanceStore.shared.theme.palette.accent
+        let appearance = NSApp?.effectiveAppearance ?? NSAppearance.currentDrawing()
+        var accent = dynamic.cgColor
+        var core = accent
+        appearance.performAsCurrentDrawingAppearance {
+            accent = dynamic.cgColor
+            core = (dynamic.blended(withFraction: 0.35, of: .white) ?? dynamic).cgColor
+        }
+        self.accent = accent
+        self.core = core
         super.init(frame: frame)
         wantsLayer = true
         layer?.masksToBounds = true
         for shape in tails + [bloom] + dots + [outline] {
             shape.actions = ["path": NSNull(), "opacity": NSNull(), "bounds": NSNull(),
                              "position": NSNull(), "shadowPath": NSNull()]
-            shape.fillColor = gold.cgColor
-            shape.shadowColor = gold.cgColor
+            shape.fillColor = accent
+            shape.shadowColor = accent
             shape.shadowOffset = .zero
             layer?.addSublayer(shape)
         }
@@ -163,13 +179,13 @@ final class TransferDrawing: NSView {
         for dot in dots {
             dot.shadowRadius = 9
             dot.shadowOpacity = 0.95
-            dot.fillColor = NSColor(srgbRed: 1, green: 0.90, blue: 0.52, alpha: 1).cgColor
+            dot.fillColor = core
         }
         bloom.fillColor = nil
-        bloom.strokeColor = gold.cgColor
+        bloom.strokeColor = accent
         bloom.lineWidth = 1.5
         outline.fillColor = nil
-        outline.strokeColor = gold.cgColor
+        outline.strokeColor = accent
         outline.lineWidth = 2
         outline.shadowRadius = 8
         outline.shadowOpacity = 0.8
