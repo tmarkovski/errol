@@ -606,13 +606,24 @@ func send(_ text: String, to target: TargetApp,
                 Thread.sleep(forTimeInterval: 0.01)
             }
             // The human may have switched apps or stopped during the flight.
-            guard !relayControl.isCancelled, isFrontmost(target) else {
+            guard !relayControl.isCancelled else {
                 relayEvents.post(.transfer(.cancelled(id: transferID)))
                 return attempt == 0 ? .refused : .abandoned
             }
+            guard isFrontmost(target) else {
+                relayEvents.post(.transfer(.cancelled(id: transferID)))
+                log("\(target.name): lost the front during the transfer; not typing")
+                log("\(target.name): \(focusReport(target))")
+                return attempt == 0 ? .notInFront : .abandoned
+            }
         }
-        guard !relayControl.isCancelled, isFrontmost(target), inspection?.mayContinue() != false else {
+        guard !relayControl.isCancelled, inspection?.mayContinue() != false else {
             return attempt == 0 ? .refused : .abandoned
+        }
+        guard isFrontmost(target) else {
+            log("\(target.name): lost the front before the keystroke; not typing")
+            log("\(target.name): \(focusReport(target))")
+            return attempt == 0 ? .notInFront : .abandoned
         }
         // A retry only happens over a composer that stands as it did, so
         // a withheld retry has typed nothing that landed either.
@@ -843,6 +854,29 @@ func responseArrived(_ now: ResponseSighting, since baseline: ResponseBaseline,
     if let base = baseline.lastOrdinal, let ordinal = now.lastOrdinal,
        ordinal >= base + (selectors.echoCountsAsAffordance ? 2 : 1) { return true }
     return sawStreaming
+}
+
+/// Whether something was said in the conversation since the reply the
+/// wait completed on — the capture gate's question (captureGuard), asked
+/// once a second until the reply is copied, through any pause. Pure, so
+/// the tests can replay the sightings that fooled it.
+///
+/// The ordinal is the evidence where the completing sighting read one:
+/// a newest message numbered past it is a message since. Where it read
+/// none, an ordinal surfacing later says nothing — it is the same reply
+/// in a list rendered differently — and only the affordance count can
+/// speak, and only a rise past the highest count the wait knew, the
+/// pre-send baseline or the completing sighting. Claude's virtualized
+/// list mounts and unmounts older messages as it scrolls and re-renders,
+/// so a count that fell during the wait and climbs back is the same
+/// messages, not new ones. Observed Sep 22 2026: the wait read no
+/// ordinal at all and 12 affordances at completion; held at the gate
+/// through a pause, the list read 2 affordances and "Message 16", and
+/// the guard took 16 against nothing as history moving on, for good.
+func conversationMovedOn(_ now: ResponseSighting, since expected: ResponseSighting,
+                         baseline: ResponseBaseline) -> Bool {
+    if let known = expected.lastOrdinal, let ordinal = now.lastOrdinal { return ordinal > known }
+    return now.affordances > max(expected.affordances, baseline.affordances + 1)
 }
 
 /// Response polling state, with monotonic timestamps supplied by the

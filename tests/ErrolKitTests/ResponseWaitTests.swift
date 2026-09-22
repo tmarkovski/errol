@@ -22,6 +22,35 @@ final class ResponseWaitTests: XCTestCase {
                                     selectors: config.claudeSelectors, at: 902.4), .complete)
     }
 
+    // MARK: The capture gate
+
+    func testAnOrdinalSurfacingAfterTheWaitIsNotAMessageSince() {
+        // Sep 22 2026, from the run log: Claude read no "Message N" during
+        // the wait, 12 affordances at completion against a baseline of 15;
+        // held at the capture gate through a pause, the list read 2
+        // affordances and "Message 16" — the same reply, rendered anew.
+        let baseline = ResponseBaseline(affordances: 15, lastOrdinal: nil)
+        let completed = ResponseSighting(affordances: 12, lastOrdinal: nil, streaming: false)
+        let paused = ResponseSighting(affordances: 2, lastOrdinal: 16, streaming: false)
+        XCTAssertFalse(conversationMovedOn(paused, since: completed, baseline: baseline))
+        // The list mounting its older messages again is not new messages.
+        let remounted = ResponseSighting(affordances: 15, lastOrdinal: nil, streaming: false)
+        XCTAssertFalse(conversationMovedOn(remounted, since: completed, baseline: baseline))
+        // A count past everything the wait knew is.
+        let grown = ResponseSighting(affordances: 17, lastOrdinal: nil, streaming: false)
+        XCTAssertTrue(conversationMovedOn(grown, since: completed, baseline: baseline))
+    }
+
+    func testAnOrdinalPastTheCompletedReplyIsAMessageSince() {
+        let baseline = ResponseBaseline(affordances: 15, lastOrdinal: 14)
+        let completed = ResponseSighting(affordances: 12, lastOrdinal: 16, streaming: false)
+        let since = ResponseSighting(affordances: 2, lastOrdinal: 18, streaming: false)
+        XCTAssertTrue(conversationMovedOn(since, since: completed, baseline: baseline))
+        // The same newest message, however many older ones are mounted.
+        let same = ResponseSighting(affordances: 15, lastOrdinal: 16, streaming: false)
+        XCTAssertFalse(conversationMovedOn(same, since: completed, baseline: baseline))
+    }
+
     func testNoActivityStillTimesOut() {
         var wait = ResponseWaitState(timeout: 300, startedAt: 100)
         XCTAssertEqual(wait.observe(idle, since: baseline,

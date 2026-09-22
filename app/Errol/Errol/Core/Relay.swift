@@ -401,17 +401,18 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         return .block(.notInFront(side: held))
     }
     /// Before copying `target`'s reply: the destination, and that the reply
-    /// the wait completed on is still the newest thing there. A count that
-    /// rose, or an ordinal that advanced, means something was said since —
-    /// a fall is virtualization unmounting older messages, not evidence.
-    func captureGuard(_ target: TargetApp, expected: ResponseSighting) -> GuardVerdict {
+    /// the wait completed on is still the newest thing there
+    /// (conversationMovedOn), judged against what the wait knew — the
+    /// baseline it started from and the sighting it completed on.
+    func captureGuard(_ target: TargetApp, expected: ResponseSighting,
+                      baseline: ResponseBaseline) -> GuardVerdict {
         let destination = destinationGuard(target)
         guard case .clear = destination else { return destination }
         if hasStopButton(in: target) { return .block(.replying(side: side(target))) }
-        let affordances = messageAffordances(in: target).count
-        let ordinal = lastMessageOrdinal(in: target)
-        if affordances > expected.affordances || (ordinal ?? 0) > (expected.lastOrdinal ?? 0) {
-            trace("\(target.name): \(affordances) affordances, message \(ordinal.map(String.init) ?? "-") against the completed reply's \(expected.affordances)/\(expected.lastOrdinal.map(String.init) ?? "-")")
+        let now = ResponseSighting(affordances: messageAffordances(in: target).count,
+                                   lastOrdinal: lastMessageOrdinal(in: target), streaming: false)
+        if conversationMovedOn(now, since: expected, baseline: baseline) {
+            trace("\(target.name): \(now.affordances) affordances, message \(now.lastOrdinal.map(String.init) ?? "-") against the completed reply's \(expected.affordances)/\(expected.lastOrdinal.map(String.init) ?? "-") and the baseline's \(baseline.affordances)")
             return .block(.historyChanged(side: side(target)))
         }
         return .clear
@@ -623,7 +624,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             while reply == nil {
                 switch openGate(speaker, kind: .capture,
                                 holdLine: "Paused — \(speaker.name)'s reply is ready; waiting to copy it.",
-                                guardCheck: { captureGuard(speaker, expected: expected) }) {
+                                guardCheck: { captureGuard(speaker, expected: expected, baseline: baseline) }) {
                 case .end(let outcome):
                     if outcome == .stopped { log("Run stopped by user.") }
                     return outcome
