@@ -93,6 +93,17 @@ final class RelayController {
     /// which conversation each side is connected to. A run goes into the
     /// windows it bound.
     let setup: SetupController
+    /// The prompt the human sent to start the run on the panel, as they
+    /// wrote it: the topic, or the opening written from scratch. Set at
+    /// Start, cleared with the finished run.
+    private(set) var runPrompt: String?
+    /// One sentence on what the run is about, once the on-device model has
+    /// written it from the prompt (TopicSummarizer); nil until then, and
+    /// for good when the model cannot.
+    private(set) var topicSummary: String?
+    /// What writes the sentence; the live model, or a stand-in in previews.
+    @ObservationIgnored var summarize: @Sendable (String) async -> String? = { await TopicSummarizer.summarize($0) }
+    @ObservationIgnored private var summaryTask: Task<Void, Never>?
     var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
     /// finished, since the summary names it as the ending. The Stop button
@@ -343,6 +354,40 @@ final class RelayController {
         return .compose
     }
 
+    /// What the run is about, for the console's top line: the model's
+    /// sentence once written, the prompt's first line until then. Nil
+    /// while no run is on the panel.
+    var topicLine: String? {
+        if let topicSummary { return topicSummary }
+        guard let runPrompt else { return nil }
+        let first = runPrompt.split(whereSeparator: \.isNewline).first.map(String.init) ?? runPrompt
+        return first.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Ask the model for the run's sentence. The prompt is kept as the
+    /// line's fallback meanwhile; an answer that arrives after the run has
+    /// left the panel, or for another prompt, is dropped.
+    private func beginTopicSummary() {
+        summaryTask?.cancel()
+        let prompt = (showsFullInstructionsEditor ? customInstructions : topic)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        runPrompt = prompt
+        topicSummary = nil
+        let summarize = self.summarize
+        summaryTask = Task { @MainActor [weak self] in
+            let summary = await summarize(prompt)
+            guard !Task.isCancelled, let self, runPrompt == prompt else { return }
+            topicSummary = summary
+        }
+    }
+
+    private func clearTopicSummary() {
+        summaryTask?.cancel()
+        summaryTask = nil
+        runPrompt = nil
+        topicSummary = nil
+    }
+
     /// Why Send is unavailable now, beside it: the topic missing, or a
     /// destination not ready. nil when it can go.
     var sendBlocker: String? {
@@ -405,6 +450,7 @@ final class RelayController {
         currentTurn = 0
         lastRunDuration = nil
         runStartedAt = Date()
+        beginTopicSummary()
         // The buffer holds one run, so the debug window's "last run log"
         // means what it says; lines logged between runs (an inspect report,
         // a failed start) stay until the next run claims the buffer.
@@ -438,6 +484,7 @@ final class RelayController {
         stopRequested = false
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
+        clearTopicSummary()
     }
 
     /// Another topic in these conversations: the editor comes back empty,

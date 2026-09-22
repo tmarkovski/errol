@@ -1,16 +1,19 @@
 // The console the app shows: the prompt from the start, with no steps
 // before it. The participants stand at the capsule's ends as they always
-// have; between them one line of status sits above a prompt box, and the
-// box holds the text over a toolbar row — the window arrangement at its
-// leading end, the actions at its trailing end. Under the box, at each
-// side's end, stand its surface and model as the sweep reads them. Every
-// stage shares that frame: the topic editor, then the run with the field
-// closed or the steering note open in it, then the ending.
+// have; between them, the topic line sits above a prompt box, and the box
+// holds the text over a toolbar row — the window arrangement at its
+// leading end, the actions at its trailing end. The topic line says who
+// goes first, and once the run has started, what it is about. Under the
+// box, one line says what needs saying — what a side still needs, what
+// the apps are doing, how the run ended — and when nothing does, each
+// side's surface and model as the sweep reads them. Every stage shares
+// that frame: the topic editor, then the run with the field closed or the
+// steering note open in it, then the ending.
 //
 // The icons open the apps, the arrangement applies as it is chosen, each
 // side is connected as SetupController.connectIfUnambiguous has it, and
-// the status line names the next thing a side needs. The session's options
-// are on the status item's menu.
+// the line under the box names the next thing a side needs. The session's
+// options are on the status item's menu.
 
 import SwiftUI
 
@@ -23,9 +26,9 @@ struct PerchConsoleView: View {
         HStack(spacing: Perch.s(14)) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
             VStack(alignment: .leading, spacing: Perch.s(5)) {
-                PerchConsoleStatus(controller: controller)
+                PerchTopicLine(controller: controller)
                 PerchPromptBox(controller: controller)
-                PerchSurfaceLabels(controller: controller)
+                PerchConsoleStatus(controller: controller)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .layoutPriority(1)
@@ -41,48 +44,98 @@ struct PerchConsoleView: View {
     }
 }
 
+// MARK: - The topic line
+
+/// The line above the prompt: who goes first, as chosen on the Send pill,
+/// and once the run has started, what it is about — one sentence the
+/// on-device model writes from the prompt (TopicSummarizer). The prompt's
+/// own first line stands in until the sentence arrives, and stays where
+/// the model cannot write one. The sentence outlasts the run: it names
+/// the ending until a new topic is written.
+struct PerchTopicLine: View {
+    let controller: RelayController
+
+    private struct Line: Equatable {
+        var text: String
+        var isTopic: Bool
+    }
+
+    var body: some View {
+        let line = self.line
+        Text(line.text)
+            .font(Perch.text(12, line.isTopic ? .medium : .regular))
+            .foregroundStyle(line.isTopic ? Perch.ink : Perch.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(line.text)
+            .contentTransition(.opacity)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // The line starts where the prompt's text does.
+            .padding(.horizontal, PerchPromptBox.textInset)
+            .frame(height: Perch.s(17))
+            .animation(Perch.fade, value: line)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(line.isTopic ? "Topic" : "Who goes first")
+            .accessibilityValue(line.text)
+    }
+
+    private var line: Line {
+        if controller.stage == .compose {
+            return Line(text: "\(controller.appName(controller.firstSpeaker)) goes first", isTopic: false)
+        }
+        return Line(text: controller.topicLine ?? "", isTopic: true)
+    }
+}
+
 // MARK: - The status line
 
-/// One line above the prompt, whatever the stage: what a side still needs
-/// before Send, what the apps are doing during a run, how the run ended.
-/// A run's turn and clock stand at its trailing end.
+/// The line under the prompt box: what needs saying, whatever the stage
+/// — what a side still needs before Send, a start the engine refused,
+/// what the apps are doing during a run with its turn and clock at the
+/// trailing end, how the run ended — and when nothing does, each side's
+/// surface and model (PerchSurfaceLabels).
 struct PerchConsoleStatus: View {
     let controller: RelayController
 
     var body: some View {
         let status = self.status
         HStack(spacing: Perch.s(8)) {
-            Text(status.text)
-                .font(Perch.text(12))
-                .foregroundStyle(status.isProblem ? Perch.red : Perch.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .help(status.text)
-                .contentTransition(.opacity)
-                .perchShimmer(active: isWorking)
-            Spacer(minLength: 0)
-            if controller.stage == .running {
-                PerchRunMetadata(controller: controller)
-                    .fixedSize()
+            if let status {
+                Text(status.text)
+                    .font(Perch.text(12))
+                    .foregroundStyle(status.isProblem ? Perch.red : Perch.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(status.text)
+                    .contentTransition(.opacity)
+                    .perchShimmer(active: isWorking)
+                    .transition(.opacity)
+                Spacer(minLength: 0)
+                if controller.stage == .running {
+                    PerchRunMetadata(controller: controller)
+                        .fixedSize()
+                        .transition(.opacity)
+                }
+            } else {
+                PerchSurfaceLabels(controller: controller)
                     .transition(.opacity)
             }
         }
-        // The line starts where the prompt's text does.
+        // The line starts and ends where the prompt's text does.
         .padding(.horizontal, PerchPromptBox.textInset)
         .frame(height: Perch.s(17))
         .animation(Perch.fade, value: status)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: status == nil ? .contain : .combine)
     }
 
-    private var status: SetupNotice {
+    /// Nil when everything is idle and nothing is wrong: the labels' turn.
+    private var status: SetupNotice? {
         switch controller.stage {
         case .compose:
             // A start the engine refused outranks what the sweeps say: it
             // is the answer to the click just made.
             if let failed = controller.failedStart { return SetupNotice(text: failed, isProblem: true) }
-            if let notice = controller.setup.notice { return notice }
-            return SetupNotice(text: "Both conversations are connected. "
-                               + "\(controller.appName(controller.firstSpeaker)) goes first.", isProblem: false)
+            return controller.setup.notice
         case .running:
             return SetupNotice(text: controller.runHeadline,
                                isProblem: controller.block != nil && !controller.stopRequested)
@@ -101,7 +154,7 @@ struct PerchConsoleStatus: View {
 
 extension RelayController {
     /// The one running sentence: what is happening in the apps now, as the
-    /// status line above the prompt (PerchConsoleStatus).
+    /// line under the prompt (PerchConsoleStatus).
     var runHeadline: String {
         if stopRequested { return "Ending at the next safe point\u{2026}" }
         if let block { return block.headline(names: names) }
@@ -308,11 +361,12 @@ struct PerchPromptBox: View {
 
 // MARK: - The surface labels
 
-/// One line under the prompt box: at each end, what the side's window is
-/// and what runs in it — the app and its surface as a product name
-/// ("ChatGPT Chat", "Codex", "Claude Code"), then the model, with its
-/// effort after it a shade lighter ("Fable 5 Extra"), as the sweep reads
-/// them. ChatGPT's stands at the leading end and Claude's at the trailing,
+/// The line under the prompt box while nothing needs saying there
+/// (PerchConsoleStatus): at each end, what the side's window is and what
+/// runs in it — the app and its surface as a product name ("ChatGPT
+/// Chat", "Codex", "Claude Code"), then the model, with its effort after
+/// it a shade lighter ("Fable 5 Extra"), as the sweep reads them.
+/// ChatGPT's stands at the leading end and Claude's at the trailing,
 /// under their icons. A connected side is read from its own window as the
 /// latest sweep saw it (SideSetup.connectedCandidate), so a model switched
 /// in the app shows here; an unconnected one from the window the sweep
@@ -342,9 +396,6 @@ struct PerchSurfaceLabels: View {
             label(readings[0], alignment: .leading)
             label(readings[1], alignment: .trailing)
         }
-        // The line starts and ends where the prompt's text does.
-        .padding(.horizontal, PerchPromptBox.textInset)
-        .frame(height: Perch.s(15))
         .animation(Perch.fade, value: readings)
     }
 
@@ -625,10 +676,24 @@ private func canvas(_ controller: RelayController) -> some View {
 }
 
 #Preview("Console · running") {
-    // Opens on turn 4 of 10, Claude writing.
+    // Opens on turn 4 of 10, Claude writing. The topic line shows the
+    // prompt's first line for a second, then the sentence a stand-in
+    // writes for it, as the model would.
     let controller = connectedController(PerchPreviewEngine(turn: 4))
     controller.limitTurns = true
     controller.turns = 10
+    controller.summarize = { _ in
+        try? await Task.sleep(for: .seconds(1.2))
+        return "Whether to price by seat or by usage"
+    }
+    controller.start()
+    return canvas(controller)
+}
+
+#Preview("Console · running (model unavailable)") {
+    // No sentence comes, so the prompt's first line stays the topic.
+    let controller = connectedController(PerchPreviewEngine(turn: 4))
+    controller.summarize = { _ in nil }
     controller.start()
     return canvas(controller)
 }
