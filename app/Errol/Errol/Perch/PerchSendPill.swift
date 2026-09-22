@@ -1,16 +1,19 @@
-// The console's Send with who goes first inside it: "Send to" is the
-// action, the two apps' marks beside it the choice, in one accent pill.
-// Choosing is a click on a mark and the thumb slides to it; the status
-// line above names the result. The choice stays open while sending is
-// blocked — the topic can be missing and the order still settled — so the
-// marks are their own buttons, and only "Send to" dims.
+// The console's Send with who goes first inside it: "Send to" and one
+// app's mark, in one accent pill. The other app's mark stands in its own
+// chip just outside, to the right; a click on it swaps the two marks, the
+// outside one sliding into the pill and the pill's out to the chip, so the
+// pill always reads where the topic goes and the swap itself shows the
+// change. The choice stays open while sending is blocked — the topic can
+// be missing and the order still settled — so the chip is its own
+// button, and only the pill dims.
 //
 // The pill is drawn by hand: a button style makes one button, and this is
-// a button and a segmented choice in one shape, a rounded rectangle with
-// the prompt box's kind of corner (Perch.controlCorner). It wears what
-// the console's prominent capsule wears — the accent and its ink — and
-// gives the accent up for the well while sending is blocked
-// (PerchCapsuleButton).
+// a button and a choice in one row. It has the prompt box's kind of corner
+// (Perch.controlCorner) and wears what the console's prominent capsule
+// wears — the accent and its ink — giving the accent up for the well while
+// sending is blocked (PerchCapsuleButton); the chip wears the secondary's
+// well. The marks are drawn once, over the row, and matched to the
+// socket each belongs in, so a swap is one animated move each way.
 
 import SwiftUI
 
@@ -30,77 +33,109 @@ struct PerchSendPill: View {
     /// Why sending is unavailable now, or nil when it can go.
     let blocker: String?
     let send: () -> Void
-    @Namespace private var thumb
+    @Namespace private var sockets
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let height = Perch.s(29)
     private static let inset = Perch.s(3)
+    private static let socketWidth = Perch.s(34)
     private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
-    private static let thumbShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
+    private static let socketShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
+
+    /// Where a mark sits: in the pill, or in the chip beside it.
+    private enum Socket: Hashable {
+        case pill, chip
+    }
 
     /// The accent stands while Send can go.
     private var tinted: Bool { blocker == nil }
-    /// The marks' ink: on the accent, or on the well.
-    private var ink: Color { tinted ? Perch.onAccent : Perch.ink }
-    private var firstName: String { sides.first { $0.speaker == first }?.name ?? "" }
+    /// The ink on the pill: on the accent, or on the well.
+    private var pillInk: Color { tinted ? Perch.onAccent : Perch.ink }
+    private var firstSide: Side? { sides.first { $0.speaker == first } }
+    private var otherSide: Side? { sides.first { $0.speaker != first } }
+    private var firstName: String { firstSide?.name ?? "" }
+    private var otherName: String { otherSide?.name ?? "" }
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: send) {
-                Text("Send to")
-                    .font(Perch.text(12, .medium))
-                    .foregroundStyle(blocker == nil ? ink : Perch.secondary)
-                    .padding(.leading, Perch.s(14))
-                    .padding(.trailing, Perch.s(8))
-                    .frame(height: Self.height)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(blocker != nil)
-            .keyboardShortcut(.defaultAction)
-            .help(blocker ?? "Send the topic to \(firstName) and start relaying")
-            .accessibilityLabel("Send to \(firstName)")
-            marks
+        HStack(spacing: Perch.s(6)) {
+            pill
+            chip
         }
-        .background(Self.shape.fill(tinted ? Perch.accent : Perch.well))
-        .overlay(Self.shape.stroke(tinted ? Color.clear : Perch.chipEdge, lineWidth: 1))
-        .animation(Perch.fade, value: tinted)
+        .overlay { marks }
         .fixedSize()
         .accessibilityElement(children: .contain)
     }
 
-    /// The choice, as the arrangement capsule draws its own: a thumb on the
-    /// chosen mark, a hairline between the others that hides beside it.
+    /// "Send to" and the socket the first side's mark sits in, one button.
+    private var pill: some View {
+        Button(action: send) {
+            HStack(spacing: 0) {
+                Text("Send to")
+                    .font(Perch.text(12, .medium))
+                    .foregroundStyle(tinted ? pillInk : Perch.secondary)
+                    .padding(.leading, Perch.s(14))
+                    .padding(.trailing, Perch.s(8))
+                socket(.pill, fill: pillInk.opacity(tinted ? 0.28 : 0.11))
+                    .padding(.trailing, Self.inset)
+            }
+            .frame(height: Self.height)
+            .background(Self.shape.fill(tinted ? Perch.accent : Perch.well))
+            .overlay(Self.shape.stroke(tinted ? Color.clear : Perch.chipEdge, lineWidth: 1))
+            .perchHover(Self.shape, tint: tinted ? .white : Perch.ink, opacity: tinted ? 0.12 : 0.06)
+            .contentShape(Self.shape)
+        }
+        .buttonStyle(.plain)
+        .disabled(blocker != nil)
+        .keyboardShortcut(.defaultAction)
+        .animation(Perch.fade, value: tinted)
+        .help(blocker ?? "Send the topic to \(firstName) and start relaying")
+        .accessibilityLabel("Send to \(firstName)")
+    }
+
+    /// The other side's mark, in a chip of its own: a click puts that side
+    /// first, and the marks trade places.
+    private var chip: some View {
+        Button {
+            guard let other = otherSide else { return }
+            first = other.speaker
+        } label: {
+            socket(.chip, fill: .clear)
+                .padding(Self.inset)
+                .frame(height: Self.height)
+                .background(Self.shape.fill(Perch.well))
+                .overlay(Self.shape.stroke(Perch.chipEdge, lineWidth: 1))
+                .perchHover(Self.shape)
+                .contentShape(Self.shape)
+        }
+        .buttonStyle(.plain)
+        .help("\(otherName) goes first instead: the topic is sent to it")
+        .accessibilityLabel("Send to \(otherName) instead")
+    }
+
+    /// A socket: the space a mark lands in, and the source of its frame.
+    private func socket(_ socket: Socket, fill: Color) -> some View {
+        Self.socketShape.fill(fill)
+            .frame(width: Self.socketWidth, height: Self.height - 2 * Self.inset)
+            .matchedGeometryEffect(id: socket, in: sockets)
+    }
+
+    /// Both marks, each taking the frame of the socket it belongs in. They
+    /// are drawn over the buttons and let clicks through to them, so a
+    /// swap is the marks moving and nothing else.
     private var marks: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(sides.enumerated()), id: \.element.id) { index, side in
-                if index > 0 {
-                    Rectangle().fill(ink.opacity(tinted ? 0.35 : 0.2))
-                        .frame(width: 1, height: Perch.s(14))
-                        .opacity(first == side.speaker || first == sides[index - 1].speaker ? 0 : 1)
-                        .accessibilityHidden(true)
-                }
-                Button { first = side.speaker } label: {
-                    mark(side)
-                        .foregroundStyle(ink)
-                        .frame(width: Perch.s(34), height: Self.height - 2 * Self.inset)
-                        .background {
-                            if first == side.speaker {
-                                Self.thumbShape.fill(ink.opacity(tinted ? 0.28 : 0.11))
-                                    .matchedGeometryEffect(id: "thumb", in: thumb)
-                            }
-                        }
-                        .perchHover(Self.thumbShape, tint: ink, opacity: tinted ? 0.12 : 0.06)
-                        .contentShape(Self.thumbShape)
-                }
-                .buttonStyle(.plain)
-                .help("\(side.name) goes first: the topic is sent to it")
-                .accessibilityLabel("\(side.name) goes first")
-                .accessibilityAddTraits(first == side.speaker ? .isSelected : [])
+        ZStack {
+            ForEach(sides) { side in
+                let inPill = side.speaker == first
+                mark(side)
+                    .foregroundStyle(inPill ? pillInk : Perch.ink)
+                    .frame(width: Self.socketWidth, height: Self.height - 2 * Self.inset)
+                    .matchedGeometryEffect(id: inPill ? Socket.pill : .chip, in: sockets, isSource: false)
             }
         }
-        .padding(.trailing, Self.inset)
         .animation(reduceMotion ? nil : Perch.spring, value: first)
+        .animation(Perch.fade, value: tinted)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder private func mark(_ side: Side) -> some View {
