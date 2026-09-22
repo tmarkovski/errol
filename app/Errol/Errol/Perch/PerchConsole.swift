@@ -495,6 +495,7 @@ extension LayoutChoice {
         switch self {
         case .sideBySide: return "rectangle.split.2x1"
         case .stacked: return "rectangle.split.1x2"
+        case .fullScreen: return "rectangle"
         case .keepPositions: return "macwindow.on.rectangle"
         }
     }
@@ -503,12 +504,13 @@ extension LayoutChoice {
         switch self {
         case .sideBySide: return "Move both windows side by side now"
         case .stacked: return "Move both windows into a stack now"
+        case .fullScreen: return "Make both windows fill the screen now, one over the other"
         case .keepPositions: return "Leave both windows where they are"
         }
     }
 }
 
-/// The three arrangements in one flat control at the toolbar's leading
+/// The arrangements in one flat control at the toolbar's leading
 /// end, as tall as the actions beside it and with the prompt box's kind
 /// of corner (Perch.controlCorner). A choice applies at once, and stands
 /// for windows connected later (SetupController.applyIfPending).

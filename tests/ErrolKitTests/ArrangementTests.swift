@@ -20,6 +20,13 @@ final class ArrangementTests: XCTestCase {
                        "the odd point goes to the second window, so nothing is left uncovered")
     }
 
+    func testFullScreenGivesBothWindowsTheWholeArea() throws {
+        let frames = try XCTUnwrap(layoutFrames(.fullScreen, in: area))
+        XCTAssertEqual(frames.first, area)
+        XCTAssertEqual(frames.second, area, "one over the other; the app being written to comes forward")
+        XCTAssertTrue(LayoutChoice.fullScreen.movesWindows)
+    }
+
     func testAnOddWidthLeavesNoGap() throws {
         let frames = try XCTUnwrap(layoutFrames(.sideBySide, in: CGRect(x: 10, y: 0, width: 1001, height: 600)))
         XCTAssertEqual(frames.first.maxX, frames.second.minX)

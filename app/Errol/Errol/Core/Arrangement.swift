@@ -1,5 +1,5 @@
 // Window arrangement for watching a run: the two chosen windows side by
-// side or stacked on one screen, their original frames kept so a restore
+// side, stacked, or each filling one screen, their original frames kept so a restore
 // puts back exactly those windows — and only where nobody has moved them
 // since. Frames are set directly through AX; the native Fill & Arrange
 // only pairs windows interactively and cannot be aimed at a specific
@@ -62,17 +62,22 @@ func currentFrame(_ window: AXUIElement) -> CGRect {
 
 // MARK: - Layouts
 
-/// The layouts the console offers. Keep positions is a choice too, and the
-/// one the console starts on: it moves nothing.
+/// The layouts the console offers. Full screen gives each window the
+/// whole screen, one over the other, so the app being written to is the
+/// one in view; it is the screen's visible area, not the native full
+/// screen, which puts each window in a space of its own. Keep positions
+/// is a choice too, and the one the console starts on: it moves nothing.
 enum LayoutChoice: String, CaseIterable, Equatable {
     case sideBySide
     case stacked
+    case fullScreen
     case keepPositions
 
     var title: String {
         switch self {
         case .sideBySide: return "Side by side"
         case .stacked: return "Stacked"
+        case .fullScreen: return "Full screen"
         case .keepPositions: return "Keep positions"
         }
     }
@@ -84,6 +89,7 @@ enum LayoutChoice: String, CaseIterable, Equatable {
         switch self {
         case .sideBySide: return "Windows are side by side."
         case .stacked: return "Windows are stacked."
+        case .fullScreen: return "Windows fill the screen."
         case .keepPositions: return "Window positions kept."
         }
     }
@@ -91,7 +97,8 @@ enum LayoutChoice: String, CaseIterable, Equatable {
 
 /// The frames a layout gives the two windows in `area` (AX coordinates):
 /// the first for the window on the left or on top, the second for the
-/// other. nil for a layout that moves nothing.
+/// other; the whole area for each under full screen. nil for a layout
+/// that moves nothing.
 func layoutFrames(_ layout: LayoutChoice, in area: CGRect) -> (first: CGRect, second: CGRect)? {
     switch layout {
     case .keepPositions:
@@ -104,6 +111,8 @@ func layoutFrames(_ layout: LayoutChoice, in area: CGRect) -> (first: CGRect, se
         let half = (area.height / 2).rounded(.down)
         return (CGRect(x: area.minX, y: area.minY, width: area.width, height: half),
                 CGRect(x: area.minX, y: area.minY + half, width: area.width, height: area.height - half))
+    case .fullScreen:
+        return (area, area)
     }
 }
 
@@ -163,8 +172,8 @@ final class WindowArranger {
     }
 
     /// Worker thread. Apply `layout` to the two windows — the first on the
-    /// left or on top — on the screen hosting the first, raise both, and
-    /// say how it went.
+    /// left or on top, or both over the whole screen — on the screen
+    /// hosting the first, raise both, and say how it went.
     func apply(_ layout: LayoutChoice, to windows: [ArrangedWindow]) -> ArrangeOutcome {
         guard layout.movesWindows else { return .kept }
         guard windows.count == 2 else { return .windowMissing(windows.first?.side ?? .chatgpt) }
