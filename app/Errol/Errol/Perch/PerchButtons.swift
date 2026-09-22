@@ -109,22 +109,3 @@ struct PerchCapsuleButton: View {
         .animation(Perch.fade, value: isEnabled)
     }
 }
-
-/// A bare text action under or beside a capsule button.
-struct PerchTextButton: View {
-    let title: String
-    let action: () -> Void
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(Perch.text(12))
-                .lineLimit(1)
-                .perchHoverInk(idle: Perch.secondary, active: Perch.ink)
-                .contentShape(Rectangle())
-                .opacity(isEnabled ? 1 : 0.45)
-        }
-        .buttonStyle(.plain)
-    }
-}

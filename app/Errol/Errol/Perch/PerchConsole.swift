@@ -137,6 +137,11 @@ struct PerchConsoleStatus: View {
             if let failed = controller.failedStart { return SetupNotice(text: failed, isProblem: true) }
             return controller.setup.notice
         case .running:
+            // The open field's keys need saying more than the apps' state,
+            // which the turn line and the icons carry meanwhile.
+            if controller.isSteering, !controller.stopRequested, controller.block == nil {
+                return SetupNotice(text: controller.steeringHint, isProblem: false)
+            }
             return SetupNotice(text: controller.runHeadline,
                                isProblem: controller.block != nil && !controller.stopRequested)
         case .finished:
@@ -153,6 +158,20 @@ struct PerchConsoleStatus: View {
 }
 
 extension RelayController {
+    /// What the open field's keys do, as the line under the prompt while
+    /// the note is written (PerchConsoleStatus): with nothing in it yet,
+    /// whom the note would be for and how to resume without one; with
+    /// words, how to send them and how to clear them.
+    var steeringHint: String {
+        let side = nextRecipient
+        if steeringHasText {
+            return side.map { "Return sends it to \($0) \u{00B7} Esc clears it" }
+                ?? "Return sends it with the next handoff \u{00B7} Esc clears it"
+        }
+        return side.map { "Write a note for \($0) \u{00B7} Return or Esc resumes without one" }
+            ?? "Write a note \u{00B7} Return or Esc resumes without one"
+    }
+
     /// The one running sentence: what is happening in the apps now, as the
     /// line under the prompt (PerchConsoleStatus).
     var runHeadline: String {
@@ -297,11 +316,10 @@ struct PerchPromptBox: View {
 
     // MARK: During a run
 
-    /// The note editor, with what its keys do under it. The line costs the
-    /// note its third visible row; a longer note scrolls.
+    /// The note editor. What its keys do is said under the box
+    /// (RelayController.steeringHint).
     private var steering: some View {
-        VStack(alignment: .leading, spacing: Perch.s(3)) {
-            GrowingTextEditor(text: Binding(get: { controller.steeringText },
+        GrowingTextEditor(text: Binding(get: { controller.steeringText },
                                            set: { controller.setSteeringText($0) }),
                               font: Perch.promptFont,
                               minimumFontSize: Perch.promptMinimumFontSize,
@@ -314,8 +332,6 @@ struct PerchPromptBox: View {
                               onSubmit: { controller.sendSteering() },
                               onEscape: { _ in controller.escapeSteering() },
                               session: controller.steeringEditor)
-            PerchRunLine(controller: controller)
-        }
     }
 
     private var hasNoteFeedback: Bool {
@@ -557,8 +573,8 @@ struct PerchLayoutSegments: View {
 
 /// The toolbar's trailing end. Before a run it is Send, with who goes
 /// first inside it, or the way to open the apps while one is closed;
-/// during a run Pause and Stop, or the paused run's three; after it, the
-/// way back to the editor.
+/// during a run Pause and Stop, or the paused run's Resume — Send note
+/// once there is one — and Stop; after it, the way back to the editor.
 struct PerchConsoleActions: View {
     @Bindable var controller: RelayController
 
@@ -612,16 +628,22 @@ struct PerchConsoleActions: View {
         }
     }
 
+    /// One button continues the run: Resume while the field is empty,
+    /// Send note once it has words. Stop stands at the end, where it does
+    /// while the run is going.
     private var paused: some View {
-        HStack(spacing: Perch.s(8)) {
-            PerchTextButton(title: "Resume without note") { controller.resumeWithoutNote() }
+        let hasNote = controller.steeringHasText
+        return HStack(spacing: Perch.s(8)) {
+            PerchCapsuleButton(title: hasNote ? "Send note & continue" : "Resume",
+                               icon: hasNote ? "arrow.up" : "play.fill") { controller.sendSteering() }
+                .help(hasNote
+                      ? (controller.nextRecipient.map { "The note goes to \($0) with the next handoff" }
+                         ?? "The note goes with the next handoff")
+                      : "Continue without a note")
+                .animation(Perch.fade, value: hasNote)
             PerchCapsuleButton(title: "Stop", style: .secondary, icon: "stop.fill") { controller.stop() }
                 .disabled(controller.stopRequested)
                 .help("Stop at the next safe point")
-            PerchCapsuleButton(title: "Send note & continue", icon: "arrow.up") { controller.sendSteering() }
-                .disabled(!controller.steeringHasText)
-                .help(controller.nextRecipient.map { "The note goes to \($0) with the next handoff" }
-                      ?? "The note goes with the next handoff")
         }
     }
 

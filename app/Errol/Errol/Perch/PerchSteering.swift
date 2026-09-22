@@ -3,24 +3,23 @@
 
 import SwiftUI
 
-/// The foot's leading line during a run. Ending outranks everything, the
-/// open field outranks a note in flight (the keys need saying), the note in
-/// flight outranks a queued one, the queued note outranks the record
-/// (opening the field takes the note back), and the last note's record
-/// shows when none of those is true — so closing the field without a note
-/// brings the record back. The line describes the note; whether the run is
-/// running, pausing, or held is the head's turn line to say, and the two
-/// never restate each other.
+/// The closed field's line about the note during a run. Ending outranks
+/// everything, the note in flight outranks a queued one, the queued note
+/// outranks the record (opening the field takes the note back), and the
+/// last note's record shows when none of those is true — so closing the
+/// field without a note brings the record back. The line describes the
+/// note; whether the run is running, pausing, or held is the turn line's
+/// to say, and what the open field's keys do is the line under the box
+/// (RelayController.steeringHint), so the two never restate each other.
 struct PerchRunLine: View {
     let controller: RelayController
 
     private enum Slot: Equatable {
-        case ending, writing, sending, queued, record, empty
+        case ending, sending, queued, record, empty
     }
 
     private var slot: Slot {
         if controller.stopRequested { return .ending }
-        if controller.isSteering { return .writing }
         if controller.steeringInFlight != nil { return .sending }
         if controller.steeringQueued { return .queued }
         if controller.lastReceipt != nil { return .record }
@@ -32,8 +31,6 @@ struct PerchRunLine: View {
             switch slot {
             case .ending:
                 live("Ending the run at the next safe point…")
-            case .writing:
-                hint(writingText)
             case .sending:
                 live("Sending note to \(controller.steeringInFlight?.recipient ?? "the next side")…")
             case .queued:
@@ -63,32 +60,6 @@ struct PerchRunLine: View {
             .contentTransition(.opacity)
             .animation(Perch.fade, value: text)
             .transition(.opacity)
-    }
-
-    /// What the keys do, in the placeholder's voice: instruction, not
-    /// state.
-    private func hint(_ text: String) -> some View {
-        Text(text)
-            .font(Perch.text(11))
-            .foregroundColor(Perch.placeholder)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .contentTransition(.opacity)
-            .animation(Perch.fade, value: text)
-            .transition(.opacity)
-    }
-
-    /// The field is open. With nothing in it yet, whom the note would be
-    /// for and how to continue without one; with words, how to send them
-    /// and how to clear them.
-    private var writingText: String {
-        let side = controller.nextRecipient
-        if controller.steeringHasText {
-            return side.map { "Return sends it to \($0) · Esc clears it" }
-                ?? "Return sends it with the next handoff · Esc clears it"
-        }
-        return side.map { "Write a note for \($0) · Esc continues without one" }
-            ?? "Write a note · Esc continues without one"
     }
 
     private var queuedText: String {

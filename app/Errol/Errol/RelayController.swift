@@ -642,15 +642,6 @@ final class RelayController {
         control.finishSteering(note: note.isEmpty ? nil : note)
     }
 
-    /// Resume without a note: whatever the field holds is dropped, the
-    /// field closes, and the run goes on.
-    func resumeWithoutNote() {
-        guard isRunning, isSteering else { return }
-        steeringEditor.clear()
-        steeringText = ""
-        sendSteering()
-    }
-
     /// Esc in the open field. The first press empties it; the second, on an
     /// empty field, closes it and continues — so Esc twice drops whatever
     /// note was there, queued before or not.
