@@ -7,7 +7,7 @@ struct PerchPalette {
     let paper, well, track, panelEdge, chipEdge, hairline: NSColor
     let ink, secondary, muted, placeholder, previewInk, path: NSColor
     let accent, accentText, accentBack, onAccent: NSColor
-    let green, greenBack, red, redBack, presence: NSColor
+    let green, greenBack, red, redBack: NSColor
     let chatgptFeather, claudeFeather: NSColor
 
     static let warmStone = PerchPalette(
@@ -19,7 +19,7 @@ struct PerchPalette {
             accent: 0x73784F, accentText: 0x5B623C, accentBack: 0xE2E7D4,
             onAccent: 0xFFFFFF,
             green: 0x486748, greenBack: 0xE6EBDD,
-            red: 0xA04B3C, redBack: 0xF3E3DC, presence: 0x64865A),
+            red: 0xA04B3C, redBack: 0xF3E3DC),
         dark: Colors(
             paper: 0x282821, well: 0x303129, track: 0x3C3E32,
             panelEdge: 0x45473A, chipEdge: 0x4C4F40, hairline: 0x45473A,
@@ -28,7 +28,7 @@ struct PerchPalette {
             accent: 0xB5BF85, accentText: 0xCAD49D, accentBack: 0x3D442D,
             onAccent: 0x282E1B,
             green: 0xB0C595, greenBack: 0x35412E,
-            red: 0xE3AD99, redBack: 0x4A332B, presence: 0xA7BF8C))
+            red: 0xE3AD99, redBack: 0x4A332B))
 
     /// The original light palette remains available, with a warm dark variant.
     static let classicAmber = PerchPalette(
@@ -40,7 +40,7 @@ struct PerchPalette {
             accent: 0xD98E2B, accentText: 0xA06D14, accentBack: 0xF6EFDD,
             onAccent: 0xFFFFFF,
             green: 0x2F7D5B, greenBack: 0xE9F2EC,
-            red: 0xA4433C, redBack: 0xF6E3E0, presence: 0x43A373),
+            red: 0xA4433C, redBack: 0xF6E3E0),
         dark: Colors(
             paper: 0x292722, well: 0x34312B, track: 0x403C34,
             panelEdge: 0x474239, chipEdge: 0x4A443A, hairline: 0x474239,
@@ -49,7 +49,7 @@ struct PerchPalette {
             accent: 0xE8B469, accentText: 0xECC487, accentBack: 0x4B3B25,
             onAccent: 0x332610,
             green: 0xA4CDB1, greenBack: 0x2E4036,
-            red: 0xE8AAA4, redBack: 0x4C302D, presence: 0x8BC3A0))
+            red: 0xE8AAA4, redBack: 0x4C302D))
 
     /// Candidates for a lighter, warmer console: near-white paper with a hint
     /// of warmth, neutral grays rather than tinted ones, and one accent with
@@ -67,7 +67,7 @@ struct PerchPalette {
             accent: 0x262523, accentText: 0x1C1B19, accentBack: 0xECE9E3,
             onAccent: 0xFFFFFF,
             green: 0x2F6B48, greenBack: 0xE4EFE7,
-            red: 0xA83E36, redBack: 0xF6E4E1, presence: 0x3F9A66),
+            red: 0xA83E36, redBack: 0xF6E4E1),
         dark: Colors(
             paper: 0x1B1A18, well: 0x232220, track: 0x2E2D2A,
             panelEdge: 0x373532, chipEdge: 0x3C3A37, hairline: 0x302F2C,
@@ -76,7 +76,7 @@ struct PerchPalette {
             accent: 0xF2F0EB, accentText: 0xF2F0EB, accentBack: 0x2F2E2B,
             onAccent: 0x1B1A18,
             green: 0x9CCBAA, greenBack: 0x253A2C,
-            red: 0xE7A79F, redBack: 0x4A2C28, presence: 0x7FBF95))
+            red: 0xE7A79F, redBack: 0x4A2C28))
 
     /// Warm ivory with one saturated blue, well clear of ChatGPT's slate.
     static let ivoryCobalt = PerchPalette(
@@ -88,7 +88,7 @@ struct PerchPalette {
             accent: 0x2E5BE0, accentText: 0x2449B8, accentBack: 0xE1E8FB,
             onAccent: 0xFFFFFF,
             green: 0x2E7A55, greenBack: 0xE3F0E7,
-            red: 0xB03A33, redBack: 0xF7E3E0, presence: 0x3DA36E),
+            red: 0xB03A33, redBack: 0xF7E3E0),
         dark: Colors(
             paper: 0x1C1B19, well: 0x24231F, track: 0x2F2E2A,
             panelEdge: 0x383632, chipEdge: 0x3D3B36, hairline: 0x33312D,
@@ -97,7 +97,7 @@ struct PerchPalette {
             accent: 0x7FA3FF, accentText: 0x9DB8FF, accentBack: 0x2A3550,
             onAccent: 0x0F1B3A,
             green: 0x9DCBAB, greenBack: 0x253A2D,
-            red: 0xE8A8A0, redBack: 0x4B2C29, presence: 0x82C29A))
+            red: 0xE8A8A0, redBack: 0x4B2C29))
 
     /// The brand story's Messenger Blue, deepened toward teal so it does not
     /// read as ChatGPT's participant color.
@@ -110,7 +110,7 @@ struct PerchPalette {
             accent: 0x1F7A76, accentText: 0x176660, accentBack: 0xDDEEEC,
             onAccent: 0xFFFFFF,
             green: 0x2F7A50, greenBack: 0xE3F0E6,
-            red: 0xAE3C35, redBack: 0xF6E3E0, presence: 0x3FA36B),
+            red: 0xAE3C35, redBack: 0xF6E3E0),
         dark: Colors(
             paper: 0x1B1C1A, well: 0x232523, track: 0x2E302E,
             panelEdge: 0x373937, chipEdge: 0x3C3E3C, hairline: 0x323432,
@@ -119,7 +119,7 @@ struct PerchPalette {
             accent: 0x6FC9C2, accentText: 0x8AD6D0, accentBack: 0x214341,
             onAccent: 0x0B2624,
             green: 0x9CCBAB, greenBack: 0x253A2D,
-            red: 0xE7A8A0, redBack: 0x4B2C29, presence: 0x7FC39A))
+            red: 0xE7A8A0, redBack: 0x4B2C29))
 
     /// The olive idea on lighter paper, with neutral grays and a greener,
     /// more saturated accent.
@@ -132,7 +132,7 @@ struct PerchPalette {
             accent: 0x4F7D2E, accentText: 0x3F6624, accentBack: 0xE3EDD8,
             onAccent: 0xFFFFFF,
             green: 0x3A7A45, greenBack: 0xE3F0E4,
-            red: 0xAB3F36, redBack: 0xF6E3E0, presence: 0x4CA35A),
+            red: 0xAB3F36, redBack: 0xF6E3E0),
         dark: Colors(
             paper: 0x1B1C17, well: 0x24251F, track: 0x2F3029,
             panelEdge: 0x383A32, chipEdge: 0x3D3F36, hairline: 0x33352D,
@@ -141,13 +141,13 @@ struct PerchPalette {
             accent: 0xA3D07E, accentText: 0xB6DC93, accentBack: 0x2E4423,
             onAccent: 0x152410,
             green: 0x9DCBA6, greenBack: 0x263A2A,
-            red: 0xE8A9A1, redBack: 0x4B2C29, presence: 0x8CC48A))
+            red: 0xE8A9A1, redBack: 0x4B2C29))
 
     private struct Colors {
         let paper, well, track, panelEdge, chipEdge, hairline: UInt32
         let ink, secondary, muted, placeholder, previewInk, path: UInt32
         let accent, accentText, accentBack, onAccent: UInt32
-        let green, greenBack, red, redBack, presence: UInt32
+        let green, greenBack, red, redBack: UInt32
     }
 
     private init(light: Colors, dark: Colors) {
@@ -171,7 +171,6 @@ struct PerchPalette {
         greenBack = Self.adaptive(light.greenBack, dark.greenBack)
         red = Self.adaptive(light.red, dark.red)
         redBack = Self.adaptive(light.redBack, dark.redBack)
-        presence = Self.adaptive(light.presence, dark.presence)
         // Participant identity is independent of the chosen app theme.
         chatgptFeather = Self.rgb(0x5D7A8C)
         claudeFeather = Self.rgb(0xC97E4A)

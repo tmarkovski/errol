@@ -172,10 +172,8 @@ private func canvas(_ controller: RelayController) -> some View {
     // second names no installed app, so it is the initial-in-a-circle
     // fallback the column uses when an app is missing.
     HStack(spacing: Perch.s(24)) {
-        PerchAvatar(bundleID: config.claudeBundleID, initial: "C",
-                    feather: Perch.claudeFeather, presence: Perch.presence, check: true)
-        PerchAvatar(bundleID: "com.example.not-installed", initial: "C",
-                    feather: Perch.claudeFeather, presence: Perch.red)
+        PerchAvatar(bundleID: config.claudeBundleID, initial: "C", feather: Perch.claudeFeather)
+        PerchAvatar(bundleID: "com.example.not-installed", initial: "C", feather: Perch.claudeFeather)
     }
     .padding(Perch.s(24))
     .background(Perch.paper)

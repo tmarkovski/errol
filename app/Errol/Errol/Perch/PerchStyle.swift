@@ -31,7 +31,6 @@ enum Perch {
     static var greenBack: Color { Color(nsColor: palette.greenBack) }
     static var red: Color { Color(nsColor: palette.red) }
     static var redBack: Color { Color(nsColor: palette.redBack) }
-    static var presence: Color { Color(nsColor: palette.presence) }
     /// Setup's current step and directional cue stay amber in each theme.
     static var setupCurrent: Color { Color(nsColor: PerchPalette.classicAmber.accentText) }
     static var chatgptFeather: Color { Color(nsColor: palette.chatgptFeather) }

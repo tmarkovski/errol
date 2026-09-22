@@ -2,8 +2,8 @@
 // app's icon and one line under it. The line is the status when there is
 // one — replying, opening, the connected conversation, the next thing to
 // do, what is wrong — and the app's name only when there is not; the icon
-// says which app it is the rest of the time. A corner mark shows the
-// connection. ChatGPT stands left and Claude right whoever starts. The
+// says which app it is the rest of the time. ChatGPT stands left and
+// Claude right whoever starts. The
 // icon is the side's control and changes with the step: it opens the app,
 // is dragged to connect its conversation, or shows the destination's
 // details; it never changes who starts, which the Send pill does.
@@ -137,8 +137,7 @@ struct PerchParticipant: View {
     }
 
     @ViewBuilder private var icon: some View {
-        let avatar = PerchAvatar(bundleID: bundleID, initial: String(name.prefix(1)), feather: feather,
-                                 presence: presence, check: connectedAndReady)
+        let avatar = PerchAvatar(bundleID: bundleID, initial: String(name.prefix(1)), feather: feather)
             .modifier(PerchLaunchBounce(isLaunching: !controller.isRunning && side.presence == .launching))
             .opacity(iconOpacity)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: iconOpacity)
@@ -243,21 +242,6 @@ struct PerchParticipant: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: Perch.s(17))
-    }
-
-    private var connectedAndReady: Bool {
-        side.connection?.readiness.isReady == true
-    }
-
-    /// The mark's color once the side is connected: how its conversation
-    /// reads. Before that the corner stays bare, as the reference has it.
-    private var presence: Color? {
-        guard let connection = side.connection else { return nil }
-        switch connection.readiness {
-        case .ready: return Perch.presence
-        case .unverified: return Perch.path
-        default: return Perch.red
-        }
     }
 
     /// What the line says when the app's name is not enough: a drag in

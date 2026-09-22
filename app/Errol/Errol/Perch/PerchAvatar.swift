@@ -15,11 +15,6 @@ struct PerchAvatar: View {
     let initial: String
     /// The fallback circle's fill (Perch.chatgptFeather / claudeFeather).
     let feather: Color
-    /// The mark in the corner: how the side's connection reads. Nil before
-    /// the side is connected, when the corner stays bare.
-    var presence: Color? = nil
-    /// A check in place of the dot: the side is connected and ready.
-    var check = false
 
     /// The layout slot: the same for the icon and the fallback so the head
     /// does not shift depending on which apps are installed.
@@ -48,22 +43,6 @@ struct PerchAvatar: View {
                         .font(Perch.text(17, .semibold))
                         .foregroundColor(.white)
                 }
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if let presence {
-                ZStack {
-                    Circle()
-                        .fill(presence)
-                        .frame(width: Perch.s(check ? 18 : 11), height: Perch.s(check ? 18 : 11))
-                        .overlay(Circle().stroke(Perch.paper, lineWidth: Perch.s(2)))
-                    if check {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: Perch.s(9), weight: .heavy))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .offset(x: Perch.s(1), y: Perch.s(1))
             }
         }
     }
