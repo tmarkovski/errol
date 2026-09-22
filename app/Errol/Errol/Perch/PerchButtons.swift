@@ -1,4 +1,4 @@
-// Setup and running actions reveal labels beside stationary icons. Editors,
+// Running actions reveal labels beside stationary icons. Editors,
 // permission setup, and the ending retain their labeled Liquid Glass pills.
 
 import SwiftUI
@@ -9,10 +9,6 @@ struct PerchRevealButton: View {
     let title: String
     let icon: String
     var prominent = true
-    /// How much of an automatic wait has passed, 0 to 1. Drawn as a ring
-    /// around the circle that empties clockwise from twelve o'clock; it
-    /// takes no room, so the circle stays where it is.
-    var expiring: Double? = nil
     /// A secondary in a pair reveals its label before the other control.
     var labelClearance: CGFloat = 0
     let action: () -> Void
@@ -57,35 +53,8 @@ struct PerchRevealButton: View {
         .focused($focused)
         .onHover { hovering = $0 }
         .opacity(isEnabled ? 1 : 0.45)
-        .overlay {
-            if let expiring {
-                PerchExpiryRing(passed: expiring)
-            }
-        }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: revealed)
         .accessibilityLabel(title)
-    }
-}
-
-/// A wait shown as a ring standing just outside the circle it belongs to:
-/// whole at the start, its used part erased clockwise from the top as the
-/// time goes, a faint track left where it was. An overlay wider than its
-/// circle, it neither takes room nor takes clicks.
-private struct PerchExpiryRing: View {
-    let passed: Double
-
-    var body: some View {
-        let line = Perch.s(2)
-        ZStack {
-            Circle().stroke(Perch.track, lineWidth: line)
-            Circle()
-                .trim(from: min(1, max(0, passed)), to: 1)
-                .stroke(Perch.accent, style: StrokeStyle(lineWidth: line, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: Perch.actionDiameter + Perch.s(8), height: Perch.actionDiameter + Perch.s(8))
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 
@@ -105,8 +74,6 @@ struct PerchCapsuleButton: View {
     var style = Style.prominent
     var size = Size.regular
     var icon: String? = nil
-    /// Optional elapsed countdown fill, over the pill and clipped to it.
-    var progress: Double? = nil
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.appearsActive) private var appearsActive
@@ -130,18 +97,6 @@ struct PerchCapsuleButton: View {
         // The glass styles interpolate their tint, and the ink crosses with
         // it, so an action coming into reach fades in like the text does.
         .animation(Perch.fade, value: isEnabled)
-        // The wash is the label's own color, so it passes over the label
-        // without changing it.
-        .overlay(alignment: .leading) {
-            if let progress {
-                GeometryReader { geometry in
-                    Rectangle().fill(Perch.onAccent.opacity(0.2))
-                        .frame(width: geometry.size.width * min(1, max(0, progress)))
-                }
-                .clipShape(Capsule())
-                .allowsHitTesting(false)
-            }
-        }
     }
 
     private var controlSize: ControlSize { size == .large ? .extraLarge : .large }

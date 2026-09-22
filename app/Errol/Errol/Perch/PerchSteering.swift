@@ -1,5 +1,5 @@
-// Shared steering feedback and finished-run summary for the widget. The
-// native editor and run actions live in PerchWidget.swift.
+// The steering note's feedback lines on the console. The native editor
+// and the run's actions live in PerchConsole.swift.
 
 import SwiftUI
 
@@ -113,45 +113,6 @@ struct PerchRunLine: View {
         .fixedSize()
         .help("Drop the queued note — nothing goes with the next handoff")
         .transition(.opacity)
-    }
-}
-
-/// The finished run, where the field was: how it ended as the headline,
-/// the count and the clock under it, and the last note's record when there
-/// is one. It stays until New session, since ending is when someone
-/// inspects what happened. The head's turn line keeps to the count; this
-/// is where the rest of the story goes — rendered from the run's own
-/// report (RunReport), so a timeout on the last permitted turn reads as
-/// a timeout and the count is of replies actually relayed.
-struct PerchRunSummary: View {
-    let controller: RelayController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(5)) {
-            Text(headline)
-                .font(Perch.text(13, .semibold))
-                .foregroundColor(Perch.ink)
-            Text(detail)
-                .font(Perch.text(11))
-                .foregroundColor(Perch.muted)
-                .lineLimit(2)
-                .truncationMode(.tail)
-                .help(detail)
-            if let receipt = controller.lastReceipt {
-                PerchReceiptLine(controller: controller, receipt: receipt)
-            }
-        }
-        .padding(.vertical, GrowingTextEditor.insetHeight)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private var headline: String {
-        controller.lastReport?.headline(names: controller.names) ?? "Run ended"
-    }
-
-    private var detail: String {
-        controller.lastReport?.detail(names: controller.names, duration: controller.lastRunDuration,
-                                      timeout: config.timeout) ?? ""
     }
 }
 

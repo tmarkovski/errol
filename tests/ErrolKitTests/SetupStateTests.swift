@@ -1,8 +1,8 @@
-// The setup flow's state machine, driven the way the engine's observations
-// and the human's actions drive it in the app: presence from sweeps, the
-// steps completing only on their actions, connections judged by the same
-// evidence the run's preflight uses, and a side losing its conversation
-// reopening only that side.
+// The console's setup state, driven the way the engine's observations and
+// the human's actions drive it in the app: presence from sweeps, a side
+// connected on its own only where that takes no guess, connections judged
+// by the same evidence the run's preflight uses, and a side losing its
+// conversation reopening only that side.
 
 import XCTest
 @testable import ErrolKit
@@ -25,8 +25,7 @@ final class SetupStateTests: XCTestCase {
         BindingObservation(check: check, identity: candidate.identity, composer: candidate.composer)
     }
 
-    /// A state with both apps running and one ready window each, at the
-    /// prepare step.
+    /// A state with both apps running and one ready window each.
     private func prepared() throws -> (SetupState, WindowCandidate, WindowCandidate) {
         var state = SetupState()
         let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
@@ -36,25 +35,27 @@ final class SetupStateTests: XCTestCase {
         return (state, gpt, cld)
     }
 
-    /// The whole guided flow through to the editor.
+    /// Both sides connected.
     private func composed() throws -> SetupState {
         var (state, gpt, cld) = try prepared()
-        XCTAssertTrue(state.continueFromPrepare())
-        XCTAssertTrue(state.continueFromArrange())
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
         state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
         return state
     }
 
-    // MARK: Prepare
+    // MARK: The apps
 
-    func testStartsAtPrepareWithNothingDone() {
+    func testStartsCheckingAndAsksForTheApps() {
         var state = SetupState()
-        XCTAssertEqual(state.phase, .prepareApps)
-        XCTAssertEqual(state.progress(of: .prepareApps), .current)
-        XCTAssertEqual(state.progress(of: .arrange), .remaining)
-        XCTAssertEqual(state.progressDescription(names: names), "Step 1 of 4: Open the apps")
-        XCTAssertFalse(state.continueFromPrepare(), "nothing is known about the apps yet")
+        XCTAssertEqual(state.notice(names: names), SetupNotice(text: "Checking ChatGPT\u{2026}", isProblem: false))
+        state.observe(.chatgpt, presence: .notRunning, candidates: [])
+        state.observe(.claude, presence: .notRunning, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.text, "Open ChatGPT and Claude to begin.")
+        XCTAssertEqual(state.sendBlocker(names: names), "Open ChatGPT and Claude to begin.")
+        state.observe(.chatgpt, presence: .noConversation, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.text, "Open Claude to begin.")
+        state.observe(.claude, presence: .notInstalled, candidates: [])
+        XCTAssertEqual(state.notice(names: names)?.isProblem, true, "a missing app is the human's to fix")
     }
 
     func testPresenceFollowsTheSweepAndNamesTheNextAction() throws {
@@ -71,12 +72,8 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(AppPresence.launching.action(name: "ChatGPT"), "Opening\u{2026}")
         XCTAssertEqual(AppPresence.noConversation.action(name: "Claude"), "Open a conversation")
         XCTAssertEqual(AppPresence.available(windows: 2).action(name: "Claude"), "Ready")
-        XCTAssertEqual(AppPresence.notRunning.openState, "Click to open")
-        XCTAssertEqual(AppPresence.noConversation.openState, "App open")
         XCTAssertTrue(AppPresence.noWindow.isOpen, "open asks nothing of the windows")
         XCTAssertFalse(AppPresence.launching.isOpen)
-        XCTAssertNil(AppPresence.available(windows: 1).problem(name: "Claude"))
-        XCTAssertTrue(AppPresence.notInstalled.problem(name: "ChatGPT")!.contains("isn't installed"))
     }
 
     func testALaunchStaysOpeningUntilTheAppIsSeen() throws {
@@ -85,6 +82,7 @@ final class SetupStateTests: XCTestCase {
         state.launching(.chatgpt)
         state.observe(.chatgpt, presence: .notRunning, candidates: [])
         XCTAssertEqual(state.chatgpt.presence, .launching, "a sweep from before the app came up says nothing")
+        XCTAssertEqual(state.notice(names: names)?.text, "Opening ChatGPT\u{2026}")
         state.observe(.chatgpt, presence: .noWindow, candidates: [])
         XCTAssertEqual(state.chatgpt.presence, .noWindow)
         state.launching(.claude)
@@ -92,28 +90,10 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.claude.presence, .notInstalled)
     }
 
-    func testContinueNeedsBothAppsOpenAndNothingOfTheirWindows() throws {
-        var state = SetupState()
-        let gpt = try candidate("chatgpt-chat-home", selectors: chatgpt)
-        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
-        state.observe(.claude, presence: .notRunning, candidates: [])
-        XCTAssertFalse(state.continueFromPrepare())
-        XCTAssertEqual(state.phase, .prepareApps)
-        state.observe(.claude, presence: .launching, candidates: [])
-        XCTAssertFalse(state.continueFromPrepare(), "opening is not open yet")
-        state.observe(.claude, presence: .noConversation, candidates: [])
-        XCTAssertTrue(state.bothOpen, "a running app is open, whatever its windows show")
-        XCTAssertTrue(state.continueFromPrepare())
-        XCTAssertEqual(state.phase, .arrange)
-        XCTAssertEqual(state.progress(of: .prepareApps), .done)
-        XCTAssertEqual(state.progress(of: .arrange), .current)
-    }
-
     // MARK: Arrange
 
-    func testTheLayoutAppliesAsChosenAndTheStepCompletesOnContinue() throws {
+    func testTheLayoutAppliesAsChosen() throws {
         var (state, _, _) = try prepared()
-        state.continueFromPrepare()
         XCTAssertEqual(state.layout, .keepPositions, "the windows stay where they are unless a layout is chosen")
         XCTAssertTrue(state.layoutApplied, "keep positions applies itself")
         XCTAssertTrue(state.canArrange, "one eligible window each is the window to move")
@@ -125,74 +105,70 @@ final class SetupStateTests: XCTestCase {
         state.layoutOutcome(.arranged)
         XCTAssertTrue(state.layoutApplied)
         XCTAssertNil(state.layoutProblem)
-        XCTAssertEqual(state.progress(of: .arrange), .current, "arranging does not complete the step; continuing does")
         state.choose(.keepPositions)
         XCTAssertTrue(state.layoutApplied)
-        XCTAssertTrue(state.continueFromArrange())
-        XCTAssertEqual(state.progress(of: .arrange), .done)
-        XCTAssertEqual(state.phase, .connect(.chatgpt), "ChatGPT connects first, whoever starts")
-        XCTAssertFalse(state.continueFromArrange(), "only from the arrange step")
     }
 
-    func testContinueIsOfferedWhateverTheArrangementDid() throws {
+    func testAMissingWindowLeavesTheLayoutToApplyLater() throws {
         var (state, _, _) = try prepared()
-        state.continueFromPrepare()
         state.choose(.stacked)
-        XCTAssertTrue(state.continueFromArrange(), "a move still in flight is the controller's to wait on")
-        var (again, _, _) = try prepared()
-        again.continueFromPrepare()
-        again.choose(.stacked)
-        again.layoutOutcome(.windowMissing(.claude))
-        XCTAssertFalse(again.layoutApplied)
-        XCTAssertNil(again.layoutProblem, "the sweep says what to open; the layout applies again once it is there")
-        XCTAssertTrue(again.continueFromArrange(), "the windows are as they are, which is somewhere to go on from")
-        XCTAssertEqual(again.progress(of: .arrange), .done)
+        state.layoutOutcome(.windowMissing(.claude))
+        XCTAssertFalse(state.layoutApplied)
+        XCTAssertNil(state.layoutProblem, "the sweep says what to open; the layout applies again once it is there")
     }
 
-    func testSeveralWindowsNeedAnExplicitOneBeforeArranging() throws {
+    func testSeveralWindowsGiveNothingToMoveUntilOneIsConnected() throws {
         var state = SetupState()
         let one = try candidate("claude-chat-conversation", id: 1, selectors: claude)
         let two = try candidate("claude-chat-home", id: 2, selectors: claude)
         state.observe(.claude, presence: .available(windows: 2), candidates: [one, two])
         XCTAssertNil(state.claude.arrangementTarget)
-        XCTAssertTrue(state.claude.needsArrangementChoice)
-        XCTAssertFalse(state.needsArrangementChoice(.claude), "nothing to choose while nothing moves")
-        state.choose(.stacked)
-        XCTAssertTrue(state.needsArrangementChoice(.claude))
-        state.chooseArrangementWindow(.claude, two.id)
-        XCTAssertEqual(state.claude.arrangementTarget, two.id)
-        XCTAssertFalse(state.claude.needsArrangementChoice)
-        // A connection outranks the choice.
+        XCTAssertTrue(state.claude.needsConversationChoice)
+        XCTAssertFalse(state.canArrange)
+        // The connection names the window to move.
         state.connected(.claude, window: one.id, identity: one.identity, model: nil, observation: observation(one))
         XCTAssertEqual(state.claude.arrangementTarget, one.id)
+        XCTAssertFalse(state.claude.needsConversationChoice)
     }
 
     // MARK: Connect
 
-    func testConnectingBothSidesInOrderReachesTheEditorWithEveryStepDone() throws {
-        let state = try composed()
-        XCTAssertEqual(state.phase, .compose)
-        XCTAssertEqual(state.completed, Set(SetupStep.allCases))
-        XCTAssertTrue(state.bothReady)
+    func testOnlyASideWithOneUsableWindowIsConnectedForIt() throws {
+        var state = SetupState()
+        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
+        let named = try candidate("claude-chat-conversation", id: 2, selectors: claude)
+        let fresh = try candidate("claude-chat-home", id: 3, selectors: claude)
+        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
+        state.observe(.claude, presence: .available(windows: 2), candidates: [named, fresh])
+        state.claude.hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
+
+        XCTAssertEqual(state.automaticConnection(for: .chatgpt), gpt.id)
+        XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among, hint or not")
+        XCTAssertTrue(state.needsConversationChoice(.claude))
+        XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
+
+        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
+        XCTAssertNil(state.automaticConnection(for: .chatgpt), "a connected side is left alone")
+        XCTAssertEqual(state.notice(names: names)?.text,
+                       "Claude has 2 conversations open. Click its icon to choose one.")
+
+        state.connected(.claude, window: named.id, identity: named.identity, model: nil,
+                        observation: observation(named))
+        XCTAssertNil(state.notice(names: names))
         XCTAssertNil(state.sendBlocker(names: names))
-        XCTAssertEqual(state.progressDescription(names: names), "Setup complete: 4 of 4 steps done")
+    }
+
+    func testConnectingBothSidesReadsReadyAndRemembersTheNamedOne() throws {
+        let state = try composed()
+        XCTAssertTrue(state.chatgpt.isReady)
+        XCTAssertTrue(state.claude.isReady)
+        XCTAssertNil(state.sendBlocker(names: names))
         XCTAssertEqual(state.chatgpt.connection?.context, "New chat")
         XCTAssertEqual(state.claude.connection?.name, "\u{201C}Errol brand naming\u{201D}")
         XCTAssertEqual(state.claude.connection?.context, "Continues here")
         XCTAssertEqual(state.claude.hint, DestinationHint(title: "Errol brand naming", surface: "Chat"),
                        "a named conversation is remembered; an unnamed one is not")
         XCTAssertNil(state.chatgpt.hint)
-    }
-
-    func testConnectingTheSecondSideFirstStillAsksForTheFirst() throws {
-        var (state, gpt, cld) = try prepared()
-        state.continueFromPrepare()
-        state.continueFromArrange()
-        state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
-        XCTAssertEqual(state.phase, .connect(.chatgpt))
-        XCTAssertEqual(state.progress(of: .connectClaude), .done)
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        XCTAssertEqual(state.phase, .compose)
     }
 
     func testAWorkSurfaceConnectsLikeAnyConversation() throws {
@@ -236,11 +212,12 @@ final class SetupStateTests: XCTestCase {
         let drafted = try candidate("chatgpt-chat-conversation", id: 1, selectors: chatgpt)
         XCTAssertEqual(drafted.composer, .draft(characters: 16))
         state.observe(.chatgpt, binding: observation(drafted))
-        XCTAssertEqual(state.phase, .compose, "the connection stands; the draft is the human's to finish")
+        XCTAssertTrue(state.chatgpt.isConnected, "the connection stands; the draft is the human's to finish")
         XCTAssertEqual(state.chatgpt.connection?.readiness, .finishPreparing(.draft(side: .chatgpt, characters: 16)))
         XCTAssertEqual(state.chatgpt.connection?.readiness.status(name: "ChatGPT"), "Finish preparing")
         XCTAssertEqual(state.sendBlocker(names: names),
                        "ChatGPT has an unsent draft (16 characters). Finish or clear it, then send again.")
+        XCTAssertEqual(state.notice(names: names)?.isProblem, true)
         XCTAssertEqual(state.chatgpt.connection?.identity.title, "Logo brainstorm",
                        "the identity follows the observation, so an adopted name shows")
         let home = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
@@ -252,7 +229,7 @@ final class SetupStateTests: XCTestCase {
         var state = try composed()
         let claudeHome = try candidate("claude-chat-home", id: 2, selectors: claude)
         state.observe(.claude, binding: observation(claudeHome, check: .hidden("minimized")))
-        XCTAssertEqual(state.phase, .compose, "the connection stands; the window is the human's to bring back")
+        XCTAssertTrue(state.claude.isConnected, "the connection stands; the window is the human's to bring back")
         XCTAssertEqual(state.claude.connection?.readiness, .hidden("minimized"))
         XCTAssertEqual(state.claude.connection?.readiness.status(name: "Claude"), "Hidden")
         XCTAssertEqual(state.sendBlocker(names: names), "Claude's window is minimized. Bring it back to send.")
@@ -261,137 +238,47 @@ final class SetupStateTests: XCTestCase {
 
     func testALostConversationReopensOnlyThatSide() throws {
         var state = try composed()
-        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
-        state.observe(.chatgpt, binding: observation(gpt, check: .lost("ChatGPT quit")))
+        state.observe(.claude, binding: observation(state.claude.connectedCandidate!, check: .lost("the window closed")))
+        XCTAssertNil(state.claude.connection)
+        XCTAssertNotNil(state.chatgpt.connection, "the other side keeps its conversation")
+        XCTAssertEqual(state.automaticConnection(for: .claude), state.claude.eligible[0].id,
+                       "the side's one window is connected again as the next sweep sees it")
+    }
+
+    func testDisconnectingASideKeepsTheOther() throws {
+        var state = try composed()
+        state.disconnect(.chatgpt)
         XCTAssertNil(state.chatgpt.connection)
-        XCTAssertEqual(state.phase, .connect(.chatgpt))
         XCTAssertTrue(state.claude.isConnected)
-        XCTAssertEqual(state.progress(of: .connectChatGPT), .current)
-        XCTAssertEqual(state.progress(of: .connectClaude), .done)
-        XCTAssertEqual(state.progress(of: .arrange), .done)
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        XCTAssertEqual(state.phase, .compose)
+        XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
     }
 
-    func testDisconnectingWhileConnectingTheOtherSideWaitsItsTurn() throws {
-        var (state, gpt, cld) = try prepared()
-        state.continueFromPrepare()
-        state.continueFromArrange()
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        XCTAssertEqual(state.phase, .connect(.claude))
-        state.disconnect(.chatgpt)
-        XCTAssertEqual(state.phase, .connect(.chatgpt), "the first side comes first again")
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        XCTAssertEqual(state.phase, .connect(.claude))
-        state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
-        XCTAssertEqual(state.phase, .compose)
-    }
-
-    // MARK: Return and restart
-
-    func testProgressNavigationPreservesSetupAndStopsAutomaticReturn() throws {
-        var state = try composed()
-        let original = state
-        XCTAssertTrue(state.revisit(.prepareApps))
-        XCTAssertFalse(state.automaticallyContinuePreparation)
-        XCTAssertEqual(state.progress(of: .prepareApps), .current)
-        XCTAssertEqual(state.completed, original.completed)
-        XCTAssertEqual(state.chatgpt, original.chatgpt)
-        XCTAssertEqual(state.claude, original.claude)
-        XCTAssertEqual(state.layout, original.layout)
-        XCTAssertTrue(state.continueFromPrepare())
-        XCTAssertTrue(state.continueFromArrange())
-        XCTAssertEqual(state.phase, .compose, "existing connections do not need rebinding")
-        state.restart()
-        XCTAssertTrue(state.automaticallyContinuePreparation, "fresh setup restores its countdown")
-    }
-
-    func testProgressNavigationOnlyOffersEarlierAvailableSteps() throws {
-        var (state, _, _) = try prepared()
-        XCTAssertFalse(state.revisit(.prepareApps), "the current segment is not a cancel button")
-        XCTAssertFalse(state.revisit(.arrange), "the bar cannot skip ahead")
-        state.continueFromPrepare()
-        state.continueFromArrange()
-        XCTAssertTrue(state.canRevisit(.arrange))
-        XCTAssertFalse(state.canRevisit(.connectClaude))
-        state.observe(.claude, presence: .notRunning, candidates: [])
-        XCTAssertFalse(state.revisit(.arrange), "later screens still require both apps open")
-        XCTAssertTrue(state.revisit(.prepareApps))
-        var running = try composed()
-        XCTAssertTrue(running.canRevisit(.prepareApps))
-        running.runStarted()
-        XCTAssertFalse(running.canRevisit(.prepareApps), "a run's hidden meter cannot reopen setup")
-    }
-
-    func testRevisitedConnectionCanContinueWithItsExistingBinding() throws {
-        var state = try composed()
-        let connection = state.chatgpt.connection
-        XCTAssertTrue(state.revisit(.connectChatGPT))
-        XCTAssertEqual(state.progress(of: .connectChatGPT), .current)
-        XCTAssertEqual(state.chatgpt.connection, connection)
-        XCTAssertTrue(state.continueFromConnection())
-        XCTAssertEqual(state.phase, .compose)
-        state.disconnect(.chatgpt)
-        XCTAssertFalse(state.continueFromConnection(), "a lost connection must be chosen again")
-    }
+    // MARK: Return
 
     func testReturningMarksBothConnectionsUnverifiedUntilObserved() throws {
         var state = try composed()
-        state.runStarted()
-        XCTAssertFalse(state.meterVisible)
         state.markUnverified()
         XCTAssertEqual(state.chatgpt.connection?.readiness, .unverified)
+        XCTAssertFalse(state.chatgpt.isReady)
         XCTAssertEqual(state.chatgpt.connection?.readiness.status(name: "ChatGPT"), "Last used")
         XCTAssertEqual(state.sendBlocker(names: names), "Checking ChatGPT's conversation\u{2026}")
+        XCTAssertEqual(state.notice(names: names)?.isProblem, false, "a wait is not a problem")
         let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
         let cld = try candidate("claude-chat-conversation", id: 2, selectors: claude)
         state.observe(.chatgpt, binding: observation(gpt))
         state.observe(.claude, binding: observation(cld))
         XCTAssertNil(state.sendBlocker(names: names))
-        XCTAssertFalse(state.meterVisible, "the ordinary return keeps the meter hidden")
     }
 
-    func testFreshConversationsReconnectBothAndKeepTheAppsAndLayout() throws {
-        var state = try composed()
-        state.runStarted()
-        state.reconnectBoth()
-        XCTAssertEqual(state.phase, .connect(.chatgpt))
-        XCTAssertFalse(state.bothConnected)
-        XCTAssertEqual(state.completed, [.prepareApps, .arrange])
-        XCTAssertTrue(state.meterVisible)
-        XCTAssertEqual(state.claude.hint?.title, "Errol brand naming", "the last conversation stays a hint")
-    }
-
-    func testChangingTheLayoutLaterIsAPreferenceNotAReopenedStep() throws {
+    func testChangingTheLayoutLaterAppliesOnItsOwn() throws {
         var state = try composed()
         state.choose(.stacked)
         XCTAssertEqual(state.layout, .stacked)
-        XCTAssertFalse(state.layoutApplied, "applied by its own command, from the settings")
-        XCTAssertEqual(state.progress(of: .arrange), .done, "the step stays done")
-        XCTAssertEqual(state.phase, .compose)
+        XCTAssertFalse(state.layoutApplied, "a moving layout waits for the engine's word")
+        XCTAssertTrue(state.canArrange, "the connected windows are the ones to move")
     }
 
-    func testRestartKeepsOnlyTheHints() throws {
-        var state = try composed()
-        state.restart()
-        XCTAssertEqual(state.phase, .prepareApps)
-        XCTAssertTrue(state.completed.isEmpty)
-        XCTAssertNil(state.claude.connection)
-        XCTAssertEqual(state.claude.hint?.title, "Errol brand naming")
-        XCTAssertEqual(state.claude.presence, .checking)
-    }
-
-    func testTheHintPointsThePickerAtTheRememberedWindow() throws {
-        var side = SideSetup(side: .claude)
-        let named = try candidate("claude-chat-conversation", id: 1, selectors: claude)
-        let fresh = try candidate("claude-chat-home", id: 2, selectors: claude)
-        side.candidates = [fresh, named]
-        XCTAssertEqual(side.preferredCandidate?.id, fresh.id, "without a hint, the first eligible window")
-        side.hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
-        XCTAssertEqual(side.preferredCandidate?.id, named.id)
-        side.hint = DestinationHint(title: "Something else", surface: "Chat")
-        XCTAssertEqual(side.preferredCandidate?.id, fresh.id, "a hint no window shows points nowhere")
-    }
+    // MARK: Remembered destinations
 
     func testHintsRoundTripThroughTheDefaults() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "ErrolKitTests.hints.\(UUID().uuidString)"))
@@ -404,70 +291,12 @@ final class SetupStateTests: XCTestCase {
         XCTAssertNil(DestinationHints.load(from: defaults)[.chatgpt])
     }
 
-    // MARK: The direct console
-
-    func testTheDirectConsoleStartsAtTheEditorAndAsksForTheApps() {
-        var state = SetupState.direct()
-        XCTAssertEqual(state.phase, .compose)
-        XCTAssertFalse(state.meterVisible)
-        XCTAssertEqual(state.notice(names: names), SetupNotice(text: "Checking ChatGPT\u{2026}", isProblem: false))
-        state.observe(.chatgpt, presence: .notRunning, candidates: [])
-        state.observe(.claude, presence: .notRunning, candidates: [])
-        XCTAssertEqual(state.notice(names: names)?.text, "Open ChatGPT and Claude to begin.")
-        XCTAssertEqual(state.sendBlocker(names: names), "Open ChatGPT and Claude to begin.")
-        state.observe(.chatgpt, presence: .noConversation, candidates: [])
-        XCTAssertEqual(state.notice(names: names)?.text, "Open Claude to begin.")
-        state.observe(.claude, presence: .notInstalled, candidates: [])
-        XCTAssertEqual(state.notice(names: names)?.isProblem, true, "a missing app is the human's to fix")
-    }
-
-    func testOnlyASideWithOneUsableWindowIsConnectedForIt() throws {
-        var state = SetupState.direct()
-        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
-        let named = try candidate("claude-chat-conversation", id: 2, selectors: claude)
-        let fresh = try candidate("claude-chat-home", id: 3, selectors: claude)
-        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
-        state.observe(.claude, presence: .available(windows: 2), candidates: [named, fresh])
-        state.claude.hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
-
-        XCTAssertEqual(state.automaticConnection(for: .chatgpt), gpt.id)
-        XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among, hint or not")
-        XCTAssertTrue(state.needsConversationChoice(.claude))
-        XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
-
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        XCTAssertEqual(state.phase, .compose, "the editor stays while the other side is unconnected")
-        XCTAssertNil(state.automaticConnection(for: .chatgpt), "a connected side is left alone")
-        XCTAssertEqual(state.notice(names: names)?.text,
-                       "Claude has 2 conversations open. Click its icon to choose one.")
-
-        state.connected(.claude, window: named.id, identity: named.identity, model: nil,
-                        observation: observation(named))
-        XCTAssertNil(state.notice(names: names))
-        XCTAssertNil(state.sendBlocker(names: names))
-
-        var guided = SetupState()
-        guided.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
-        XCTAssertNil(guided.automaticConnection(for: .chatgpt), "the guided flow connects by the drag alone")
-    }
-
-    func testALostConversationKeepsTheDirectConsoleOnTheEditor() throws {
-        var state = SetupState.direct()
-        let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
-        let cld = try candidate("claude-chat-conversation", id: 2, selectors: claude)
-        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
-        state.observe(.claude, presence: .available(windows: 1), candidates: [cld])
-        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
-        state.connected(.claude, window: cld.id, identity: cld.identity, model: nil, observation: observation(cld))
-
-        state.observe(.claude, binding: observation(cld, check: .lost("the window closed")))
-        XCTAssertEqual(state.phase, .compose)
-        XCTAssertNil(state.claude.connection)
-        XCTAssertNotNil(state.chatgpt.connection, "the other side keeps its conversation")
-        XCTAssertEqual(state.automaticConnection(for: .claude), cld.id)
-
-        state.restart()
-        XCTAssertFalse(state.guided, "starting over stays in the flow it was in")
-        XCTAssertEqual(state.phase, .compose)
+    func testAHintMatchesOnlyAWindowShowingItsTitle() throws {
+        let named = try candidate("claude-chat-conversation", id: 1, selectors: claude)
+        let fresh = try candidate("claude-chat-home", id: 2, selectors: claude)
+        let hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
+        XCTAssertTrue(hint.matches(named))
+        XCTAssertFalse(hint.matches(fresh))
+        XCTAssertFalse(DestinationHint(title: "Something else", surface: "Chat").matches(named))
     }
 }

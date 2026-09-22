@@ -7,12 +7,10 @@
 // stage shares that frame: the topic editor, then the run with the field
 // closed or the steering note open in it, then the ending.
 //
-// What the four guided steps did is folded into it. The icons open the
-// apps, the arrangement applies as it is chosen, each side is connected as
-// SetupController.connectIfUnambiguous has it, and the status line names the
-// next thing a side needs. The guided capsule (PerchPanelView, PerchSetup)
-// and the drag to connect are kept, out of the app's path, for later use.
-// The session's options moved to the status item's menu.
+// The icons open the apps, the arrangement applies as it is chosen, each
+// side is connected as SetupController.connectIfUnambiguous has it, and
+// the status line names the next thing a side needs. The session's options
+// are on the status item's menu.
 
 import SwiftUI
 
@@ -78,7 +76,7 @@ struct PerchConsoleStatus: View {
 
     private var status: SetupNotice {
         switch controller.stage {
-        case .setup, .compose:
+        case .compose:
             // A start the engine refused outranks what the sweeps say: it
             // is the answer to the click just made.
             if let failed = controller.failedStart { return SetupNotice(text: failed, isProblem: true) }
@@ -101,6 +99,46 @@ struct PerchConsoleStatus: View {
     }
 }
 
+extension RelayController {
+    /// The one running sentence: what is happening in the apps now, as the
+    /// status line above the prompt (PerchConsoleStatus).
+    var runHeadline: String {
+        if stopRequested { return "Ending at the next safe point\u{2026}" }
+        if let block { return block.headline(names: names) }
+        if isSteeringPending { return "Pausing after the current handoff\u{2026}" }
+        if isHolding { return "Paused \u{00B7} Nothing is being copied or sent" }
+        switch (chatgptConversation, claudeConversation) {
+        case (.chatting, _): return "\(names.chatgpt) is replying\u{2026}"
+        case (_, .chatting): return "\(names.claude) is replying\u{2026}"
+        case (.replied, _): return "Sending \(names.chatgpt)'s reply to \(names.claude)"
+        case (_, .replied): return "Sending \(names.claude)'s reply to \(names.chatgpt)"
+        default:
+            return currentTurn == 0
+                ? "Sending the topic to \(appName(firstSpeaker))\u{2026}"
+                : "Relaying the reply\u{2026}"
+        }
+    }
+}
+
+/// The run's turn and clock, at the status line's trailing end.
+struct PerchRunMetadata: View {
+    let controller: RelayController
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let turn = controller.limitTurns ? "Turn \(controller.currentTurn) of \(controller.turns)"
+                : "Turn \(controller.currentTurn)"
+            let phase = controller.isSteering ? "Paused" : controller.conversation
+            Text("\(phase) · \(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))")
+                .font(Perch.text(11))
+                .foregroundStyle(Perch.muted)
+                .monospacedDigit()
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+    }
+}
+
 // MARK: - The prompt box
 
 /// The box under the status: text over a toolbar row. The text is the
@@ -118,7 +156,7 @@ struct PerchPromptBox: View {
         VStack(alignment: .leading, spacing: Perch.s(4)) {
             ZStack(alignment: .topLeading) {
                 switch controller.stage {
-                case .setup, .compose:
+                case .compose:
                     openingEditor
                 case .running:
                     if controller.isSteering { steering } else { closedField }
@@ -384,9 +422,8 @@ extension LayoutChoice {
 }
 
 /// The three arrangements in one glass capsule at the toolbar's leading
-/// end, as tall as the actions beside it. A choice applies at once, as it
-/// did on the arrange step, and stands for windows connected later
-/// (SetupController.applyIfPending). The glass is a background layer, as
+/// end, as tall as the actions beside it. A choice applies at once, and
+/// stands for windows connected later (SetupController.applyIfPending). The glass is a background layer, as
 /// the panel's own is: glass wrapped around content makes AppKit read a
 /// drag inside it as a window move (PanelWindowSurface).
 ///
@@ -460,7 +497,7 @@ struct PerchConsoleActions: View {
     var body: some View {
         HStack(spacing: Perch.s(8)) {
             switch controller.stage {
-            case .setup, .compose:
+            case .compose:
                 if closedApps.isEmpty { send } else { open }
             case .running:
                 if controller.isSteering { paused } else { running }
@@ -528,23 +565,39 @@ struct PerchConsoleActions: View {
     }
 }
 
+// MARK: - Canvases
+
+// Every canvas runs on PerchPreviewEngine, so the controls do what they
+// do in the app — an icon opens an app or connects a conversation, Send
+// starts a run, Stop ends it at the next handoff and leaves the summary,
+// Pause to steer holds it and opens the field, Return sends the note —
+// and nothing reaches either app.
+
 #if DEBUG
-#Preview("Console · several conversations") {
-    // The preview engine shows two windows on each side, so neither is
-    // connected until one is chosen from its icon.
-    PerchConsoleView(controller: RelayController(engine: PerchPreviewEngine()))
+/// Both sides connected, with the form filled in so Send has something
+/// to send.
+private func connectedController(_ engine: PerchPreviewEngine = PerchPreviewEngine()) -> RelayController {
+    let controller = RelayController(engine: engine)
+    controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
+    controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeConversation)
+    controller.topic = "Pricing by seat or by usage"
+    return controller
+}
+
+private func canvas(_ controller: RelayController) -> some View {
+    PerchConsoleView(controller: controller)
         .padding(24)
         .background(Color(white: 0.75))
 }
 
+#Preview("Console · several conversations") {
+    // The preview engine shows two windows on each side, so neither is
+    // connected until one is chosen from its icon.
+    canvas(RelayController(engine: PerchPreviewEngine()))
+}
+
 #Preview("Console · both connected") {
-    let controller = RelayController(engine: PerchPreviewEngine())
-    controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
-    controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeConversation)
-    controller.topic = "Pricing by seat or by usage"
-    return PerchConsoleView(controller: controller)
-        .padding(24)
-        .background(Color(white: 0.75))
+    canvas(connectedController())
 }
 
 #Preview("Console · Code session") {
@@ -553,16 +606,97 @@ struct PerchConsoleActions: View {
     let controller = RelayController(engine: PerchPreviewEngine())
     controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
     controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeCode)
-    return PerchConsoleView(controller: controller)
-        .padding(24)
-        .background(Color(white: 0.75))
+    return canvas(controller)
 }
 
 #Preview("Console · ChatGPT closed") {
     var closed = PerchPreviewEngine.bothReady
     closed.chatgpt = SideStatus(appName: "ChatGPT", state: .missing, headline: "Not running")
-    return PerchConsoleView(controller: RelayController(engine: PerchPreviewEngine(readiness: closed)))
-        .padding(24)
-        .background(Color(white: 0.75))
+    return canvas(RelayController(engine: PerchPreviewEngine(readiness: closed)))
+}
+
+#Preview("Console · Claude not installed") {
+    var missing = PerchPreviewEngine.bothReady
+    missing.claude = SideStatus(appName: "Claude", state: .missing, headline: "Not running")
+    return canvas(RelayController(engine: PerchPreviewEngine(readiness: missing,
+                                                             installed: [.chatgpt: true, .claude: false])))
+}
+
+#Preview("Console · long topic") {
+    let controller = connectedController()
+    controller.topic = Array(repeating: "Compare pricing by seat and by usage. Consider predictability, fairness, and how each option grows with a team.", count: 8)
+        .joined(separator: "\n\n")
+    return canvas(controller)
+}
+
+#Preview("Console · running") {
+    // Opens on turn 4 of 10, Claude writing.
+    let controller = connectedController(PerchPreviewEngine(turn: 4))
+    controller.limitTurns = true
+    controller.turns = 10
+    controller.start()
+    return canvas(controller)
+}
+
+#Preview("Console · paused (field open, holding)") {
+    // Claude's reply is ready to capture, so the pause holds at once.
+    let controller = connectedController(PerchPreviewEngine(turn: 4, atHandoff: true))
+    controller.start()
+    controller.beginSteering()
+    controller.setSteeringText("Push on the pricing question before you wrap up.")
+    return canvas(controller)
+}
+
+#Preview("Console · paused (queued note)") {
+    // The note is in the mailbox; it rides the handoff after Claude's
+    // reply, and its echo the one after that.
+    let controller = connectedController(PerchPreviewEngine(turn: 4))
+    controller.start()
+    controller.beginSteering()
+    controller.setSteeringText("Push on the pricing question before you wrap up.")
+    controller.sendSteering()
+    return canvas(controller)
+}
+
+#Preview("Console · finished") {
+    // A run's leavings, set directly: what the console shows once the
+    // engine has posted .finished.
+    let controller = connectedController()
+    controller.setup.runStarted()
+    controller.currentTurn = 6
+    controller.lastReport = RunReport(outcome: .completed, repliesCaptured: 6)
+    controller.lastRunDuration = 272
+    controller.chatgptConversation = .ended
+    controller.claudeConversation = .ended
+    return canvas(controller)
+}
+
+#Preview("Console · finished (stopped, played)") {
+    // A short run stopped from the actions: Stop dims and the line says the
+    // end is coming, then the summary reads "Run stopped". Both sides sign
+    // off from turn 8, so left alone it completes instead.
+    let controller = connectedController(PerchPreviewEngine(pace: .seconds(2), signOffAt: 8))
+    controller.start()
+    return canvas(controller)
+}
+
+#Preview("Console · handoff (animated)") {
+    // Replies take two seconds and nobody signs off, so the transfer plays
+    // over and over until Stop.
+    let controller = connectedController(PerchPreviewEngine(pace: .seconds(2.2)))
+    controller.start()
+    return canvas(controller)
+}
+
+#Preview("Avatars (icon and fallback)") {
+    // The first wears whatever Claude Desktop's icon is on this Mac; the
+    // second names no installed app, so it is the initial-in-a-circle
+    // fallback the column uses when an app is missing.
+    HStack(spacing: Perch.s(24)) {
+        PerchAvatar(bundleID: config.claudeBundleID, initial: "C", feather: Perch.claudeFeather)
+        PerchAvatar(bundleID: "com.example.not-installed", initial: "C", feather: Perch.claudeFeather)
+    }
+    .padding(Perch.s(24))
+    .background(Perch.paper)
 }
 #endif

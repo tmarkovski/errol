@@ -166,24 +166,6 @@ final class PerchPreviewEngine: RelayEngine {
         return true
     }
 
-    func connectionDropZones(for side: Speaker, windows ids: [WindowID],
-                             completion: @escaping ([ConnectionDropZone]) -> Void) {
-        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now, its message field marked."))
-        // The canvas's windows in their listed order, front first, with a
-        // field along the bottom of each, under the app's own overlap rule.
-        let showing = windows(side).compactMap { window in window.frame.map { (window, $0) } }
-            .filter { !$0.0.isMinimized }
-        let onScreen = showing.enumerated().map { index, entry in
-            WindowHitRegion(number: UInt32(index + 1), owner: 1, frame: entry.1)
-        }
-        let candidates = showing.filter { ids.contains($0.0.id) }.map { window, frame in
-            ConnectionDropCandidate(window: window.id, frame: frame,
-                                    prompt: CGRect(x: frame.minX + 40, y: frame.maxY - 128,
-                                                   width: frame.width - 80, height: 96))
-        }
-        completion(dropZones(for: candidates, owner: 1, onScreen: onScreen))
-    }
-
     func bringForward(_ side: Speaker) {
         events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now."))
     }

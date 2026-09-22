@@ -1,10 +1,10 @@
-// The setup flow's state: where the human is in preparing a run, and what
-// each side has been observed to be. Pure, so every transition runs in the
-// tests with no app open (docs/design-proposals/setup-interaction/SPEC.md).
-// The observable controller in the app wraps a SetupState and asks the
-// engine for the observations; nothing here touches Accessibility, and the
-// live window elements never enter it — a window is a WindowID here, and
-// the engine keeps the element the id stands for.
+// The console's setup state: what each side has been observed to be, which
+// conversation it is connected to, and how the windows are arranged. Pure,
+// so every transition runs in the tests with no app open. The observable
+// controller in the app wraps a SetupState and asks the engine for the
+// observations; nothing here touches Accessibility, and the live window
+// elements never enter it — a window is a WindowID here, and the engine
+// keeps the element the id stands for.
 
 import Foundation
 
@@ -129,23 +129,11 @@ enum AppPresence: Equatable {
         return false
     }
 
-    /// Running, whatever its windows show: all the prepare step asks.
+    /// Running, whatever its windows show.
     var isOpen: Bool {
         switch self {
         case .noWindow, .noConversation, .available: return true
         case .checking, .notInstalled, .notRunning, .launching: return false
-        }
-    }
-
-    /// The state under the app's name on the prepare step, which asks
-    /// only that the app be open.
-    var openState: String {
-        switch self {
-        case .checking: return "Checking\u{2026}"
-        case .notInstalled: return "Not installed"
-        case .notRunning: return "Click to open"
-        case .launching: return "Opening\u{2026}"
-        case .noWindow, .noConversation, .available: return "App open"
         }
     }
 
@@ -159,22 +147,6 @@ enum AppPresence: Equatable {
         case .noWindow: return "Open a window"
         case .noConversation: return "Open a conversation"
         case .available: return "Ready"
-        }
-    }
-
-    /// What keeps this side from being prepared, for the capsule's
-    /// supporting line; nil when nothing does.
-    func problem(name: String) -> String? {
-        switch self {
-        case .checking: return nil
-        case .notInstalled:
-            return "\(name) isn't installed on this Mac. Install it, then come back here."
-        case .notRunning: return "\(name) isn't open."
-        case .launching: return "Opening \(name)\u{2026}"
-        case .noWindow: return "\(name) has no window open. Open one, then continue."
-        case .noConversation:
-            return "\(name) has no conversation to relay into. Open a chat in it, then continue."
-        case .available: return nil
         }
     }
 }
@@ -312,13 +284,13 @@ struct SideSetup: Equatable {
     var candidates: [WindowCandidate] = []
     var connection: SideConnection?
     var hint: DestinationHint?
-    /// The window chosen for arrangement when several could be moved and
-    /// none is connected yet.
-    var arrangementChoice: WindowID?
 
     var eligible: [WindowCandidate] { candidates.filter(\.isEligible) }
     var isConnected: Bool { connection != nil }
     var isReady: Bool { connection?.readiness.isReady ?? false }
+    /// Several windows could be connected and none has been named: the
+    /// human chooses one from the icon.
+    var needsConversationChoice: Bool { !isConnected && eligible.count > 1 }
 
     /// The connected window as the latest sweep saw it. The connection
     /// keeps what the window showed when it was made — the connection is
@@ -330,94 +302,17 @@ struct SideSetup: Equatable {
         return candidates.first { $0.id == connection.window }
     }
 
-    /// The window a layout moves: the connected one, else the one chosen
-    /// for it, else the only one there is.
+    /// The window a layout moves: the connected one, else the only one
+    /// there is.
     var arrangementTarget: WindowID? {
         if let connection { return connection.window }
-        if let choice = arrangementChoice, candidates.contains(where: { $0.id == choice }) { return choice }
         return eligible.count == 1 ? eligible[0].id : nil
     }
-
-    /// Several windows could be moved and none has been named.
-    var needsArrangementChoice: Bool { arrangementTarget == nil && eligible.count > 1 }
-
-    /// The candidate the picker highlights first: the remembered one where
-    /// a window still shows it, else the one a run would prefer.
-    var preferredCandidate: WindowCandidate? {
-        if let hint, let match = eligible.first(where: hint.matches) { return match }
-        return eligible.first
-    }
-}
-
-// MARK: - Steps and phases
-
-/// The four guided steps, in the order the meter shows them: left to right,
-/// ChatGPT before Claude whoever starts the conversation.
-enum SetupStep: Int, CaseIterable, Comparable {
-    case prepareApps, arrange, connectChatGPT, connectClaude
-
-    static func < (lhs: SetupStep, rhs: SetupStep) -> Bool { lhs.rawValue < rhs.rawValue }
-
-    static func connect(_ side: Speaker) -> SetupStep {
-        side == .chatgpt ? .connectChatGPT : .connectClaude
-    }
-
-    var side: Speaker? {
-        switch self {
-        case .prepareApps, .arrange: return nil
-        case .connectChatGPT: return .chatgpt
-        case .connectClaude: return .claude
-        }
-    }
-
-    func title(names: (chatgpt: String, claude: String)) -> String {
-        switch self {
-        case .prepareApps: return "Open the apps"
-        case .arrange: return "Arrange the windows"
-        case .connectChatGPT: return "Connect \(names.chatgpt)"
-        case .connectClaude: return "Connect \(names.claude)"
-        }
-    }
-}
-
-enum SetupPhase: Equatable {
-    case prepareApps
-    case arrange
-    case connect(Speaker)
-    /// Both sides connected: the topic editor and the named Send.
-    case compose
-
-    var step: SetupStep? {
-        switch self {
-        case .prepareApps: return .prepareApps
-        case .arrange: return .arrange
-        case .connect(let side): return .connect(side)
-        case .compose: return nil
-        }
-    }
-
-    var isConnecting: Bool {
-        if case .connect = self { return true }
-        return false
-    }
-}
-
-enum StepProgress: Equatable {
-    case done, current, remaining
 }
 
 // MARK: - The state
 
 struct SetupState: Equatable {
-    /// Whether the four guided steps lead to the editor. The console the app
-    /// shows now is direct: the editor from the start, the phase always
-    /// `.compose`, each side connected for it where that takes no guess
-    /// (see "The direct console" below). The guided flow is kept whole for
-    /// the screens that still use it.
-    var guided = true
-    var phase = SetupPhase.prepareApps
-    /// An intentional return to Open apps waits for Continue for this setup.
-    var automaticallyContinuePreparation = true
     var chatgpt = SideSetup(side: .chatgpt)
     var claude = SideSetup(side: .claude)
     var layout = LayoutChoice.keepPositions
@@ -427,11 +322,6 @@ struct SetupState: Equatable {
     var layoutApplied = true
     /// Why the last arrangement did not happen, beside the action.
     var layoutProblem: String?
-    var completed = Set<SetupStep>()
-    /// The meter shows through the guided steps and on first reaching the
-    /// editor; a run starting hides it, and the ordinary return keeps it
-    /// hidden.
-    var meterVisible = true
 
     subscript(side: Speaker) -> SideSetup {
         get { side == .chatgpt ? chatgpt : claude }
@@ -440,70 +330,12 @@ struct SetupState: Equatable {
         }
     }
 
-    var currentStep: SetupStep? { phase.step }
-
-    func progress(of step: SetupStep) -> StepProgress {
-        if currentStep == step { return .current }
-        if completed.contains(step) { return .done }
-        return .remaining
-    }
-
-    /// The progress meter revisits earlier steps without discarding work or
-    /// bypassing a prerequisite. The editor follows all four guided steps.
-    func canRevisit(_ step: SetupStep) -> Bool {
-        guard meterVisible, step.rawValue < (currentStep?.rawValue ?? SetupStep.allCases.count) else { return false }
-        return step == .prepareApps || bothOpen
-    }
-
-    @discardableResult
-    mutating func revisit(_ step: SetupStep) -> Bool {
-        guard canRevisit(step) else { return false }
-        switch step {
-        case .prepareApps:
-            automaticallyContinuePreparation = false
-            phase = .prepareApps
-        case .arrange: phase = .arrange
-        case .connectChatGPT: phase = .connect(.chatgpt)
-        case .connectClaude: phase = .connect(.claude)
-        }
-        return true
-    }
-
-    /// The meter's spoken value.
-    func progressDescription(names: (chatgpt: String, claude: String)) -> String {
-        guard let step = currentStep else { return "Setup complete: \(completed.count) of \(SetupStep.allCases.count) steps done" }
-        return "Step \(step.rawValue + 1) of \(SetupStep.allCases.count): \(step.title(names: names))"
-    }
-
-    /// Both apps are running; the prepare step asks nothing of their windows.
-    var bothOpen: Bool { chatgpt.presence.isOpen && claude.presence.isOpen }
     /// Both sides have a window a layout could move.
     var canArrange: Bool { chatgpt.arrangementTarget != nil && claude.arrangementTarget != nil }
-    /// A side with several windows and none named, while the layout would
-    /// move one; nothing to choose while nothing moves.
-    func needsArrangementChoice(_ side: Speaker) -> Bool {
-        layout.movesWindows && self[side].needsArrangementChoice
-    }
-    var bothConnected: Bool { chatgpt.isConnected && claude.isConnected }
-    var bothReady: Bool { chatgpt.isReady && claude.isReady }
-
-    /// The side whose connection is wanted first: ChatGPT before Claude.
-    var firstUnconnected: Speaker? {
-        if !chatgpt.isConnected { return .chatgpt }
-        if !claude.isConnected { return .claude }
-        return nil
-    }
 
     /// Why Send is unavailable, or nil when both destinations are ready.
     func sendBlocker(names: (chatgpt: String, claude: String)) -> String? {
-        guard guided else { return notice(names: names)?.text }
-        guard phase == .compose else { return "Finish connecting both conversations first." }
-        for side in [Speaker.chatgpt, .claude] {
-            let name = side == .chatgpt ? names.chatgpt : names.claude
-            guard let connection = self[side].connection else { return "Connect \(name) first." }
-            if let problem = connection.readiness.problem(name: name) { return problem }
-        }
-        return nil
+        notice(names: names)?.text
     }
 
     // MARK: Observations
@@ -533,7 +365,7 @@ struct SetupState: Equatable {
         self[side].connection = connection
     }
 
-    // MARK: Prepare
+    // MARK: The apps
 
     mutating func launching(_ side: Speaker) {
         self[side].presence = .launching
@@ -543,22 +375,10 @@ struct SetupState: Equatable {
         self[side].presence = installed ? .notRunning : .notInstalled
     }
 
-    /// Going on is offered once both apps are open. Whether a window shows
-    /// a conversation a run could target is the connect steps' concern.
-    @discardableResult
-    mutating func continueFromPrepare() -> Bool {
-        guard phase == .prepareApps, bothOpen else { return false }
-        completed.insert(.prepareApps)
-        phase = .arrange
-        return true
-    }
-
     // MARK: Arrange
 
     /// Another layout. Keep positions is applied by the choice itself; a
-    /// moving layout waits for the engine's word. The step's completion is
-    /// untouched: it completes on Continue, and from the settings later
-    /// the layout is a preference.
+    /// moving layout waits for the engine's word.
     mutating func choose(_ layout: LayoutChoice) {
         guard self.layout != layout else { return }
         self.layout = layout
@@ -566,15 +386,10 @@ struct SetupState: Equatable {
         layoutApplied = !layout.movesWindows
     }
 
-    mutating func chooseArrangementWindow(_ side: Speaker, _ window: WindowID) {
-        self[side].arrangementChoice = window
-    }
-
     /// The engine's word on an arrangement. A layout that could not be
     /// made explains itself beside the action; a window gone is the next
     /// sweep's to report, and the layout applies again once there is a
-    /// window to move. Either way the windows are as they are, and
-    /// Continue stays offered.
+    /// window to move. Either way the windows are as they are.
     mutating func layoutOutcome(_ outcome: ArrangeOutcome) {
         switch outcome {
         case .arranged, .kept:
@@ -589,62 +404,34 @@ struct SetupState: Equatable {
         }
     }
 
-    /// Continue is offered from the start: the windows are where the
-    /// layout put them or where the human had them, and either is
-    /// somewhere to go on from. The step completes here, not on the
-    /// arrangement.
-    @discardableResult
-    mutating func continueFromArrange() -> Bool {
-        guard phase == .arrange else { return false }
-        completed.insert(.arrange)
-        advanceToConnection()
-        return true
-    }
-
     // MARK: Connect
 
-    /// A revisited destination remains bound until the user chooses another.
-    @discardableResult
-    mutating func continueFromConnection() -> Bool {
-        guard case .connect(let side) = phase, self[side].isConnected else { return false }
-        advanceToConnection()
-        return true
+    /// The window a side is connected to without being asked: the only one
+    /// a run could target. With several, which one is the human's to say,
+    /// and nothing is guessed from their order or from the last one used.
+    func automaticConnection(for side: Speaker) -> WindowID? {
+        guard !self[side].isConnected, self[side].eligible.count == 1 else { return nil }
+        return self[side].eligible[0].id
     }
 
-    /// The engine bound the chosen window: the step is done, and the flow
-    /// moves to the other side or to the editor.
+    /// Several windows could be connected and none has been named.
+    func needsConversationChoice(_ side: Speaker) -> Bool {
+        self[side].needsConversationChoice
+    }
+
+    /// The engine bound the chosen window.
     mutating func connected(_ side: Speaker, window: WindowID, identity: DestinationIdentity,
                             model: String?, observation: BindingObservation) {
         var connection = SideConnection(window: window, identity: identity, model: model)
         connection.readiness = destinationReadiness(observation, side: side)
         self[side].connection = connection
         self[side].hint = DestinationHint(identity: identity) ?? self[side].hint
-        completed.insert(.connect(side))
-        if phase.isConnecting || phase == .compose { advanceToConnection() }
     }
 
     /// Drop a side's connection: the side needs connecting again, and only
     /// that side — the other keeps its connection and the topic stays.
     mutating func disconnect(_ side: Speaker) {
         self[side].connection = nil
-        completed.remove(.connect(side))
-        // The direct console stays on the editor and says what the side needs.
-        guard guided else { return }
-        switch phase {
-        case .compose, .connect: phase = .connect(firstUnconnected ?? side)
-        case .prepareApps, .arrange: break
-        }
-    }
-
-    /// Set up fresh conversations: both sides are connected anew, the apps
-    /// and the layout taken as they are.
-    mutating func reconnectBoth() {
-        chatgpt.connection = nil
-        claude.connection = nil
-        completed.subtract([.connectChatGPT, .connectClaude])
-        guard guided else { return }
-        phase = .connect(.chatgpt)
-        meterVisible = true
     }
 
     /// Both connections stand to be verified again: a finished run's, on
@@ -655,61 +442,7 @@ struct SetupState: Equatable {
         }
     }
 
-    mutating func runStarted() {
-        meterVisible = false
-    }
-
-    /// Setup from the top, in the flow it was in, with only the remembered
-    /// destinations kept.
-    mutating func restart() {
-        let hints = (chatgpt.hint, claude.hint)
-        self = guided ? SetupState() : .direct()
-        chatgpt.hint = hints.0
-        claude.hint = hints.1
-    }
-
-    private mutating func advanceToConnection() {
-        guard guided else { return }
-        if let next = firstUnconnected {
-            phase = .connect(next)
-        } else {
-            phase = .compose
-        }
-    }
-}
-
-// MARK: - The direct console
-
-/// The line above the prompt on the direct console: the next thing a side
-/// needs, or what is wrong with it.
-struct SetupNotice: Equatable {
-    var text: String
-    var isProblem: Bool
-}
-
-extension SetupState {
-    /// The state the app starts in now: the editor at once, with no steps
-    /// before it and no meter over it.
-    static func direct() -> SetupState {
-        var state = SetupState()
-        state.guided = false
-        state.phase = .compose
-        state.meterVisible = false
-        return state
-    }
-
-    /// The window a side is connected to without being asked: the only one
-    /// a run could target. With several, which one is the human's to say,
-    /// and nothing is guessed from their order or from the last one used.
-    func automaticConnection(for side: Speaker) -> WindowID? {
-        guard !guided, !self[side].isConnected, self[side].eligible.count == 1 else { return nil }
-        return self[side].eligible[0].id
-    }
-
-    /// Several windows could be connected and none has been named.
-    func needsConversationChoice(_ side: Speaker) -> Bool {
-        !guided && !self[side].isConnected && self[side].eligible.count > 1
-    }
+    // MARK: The notice
 
     /// What stands between the console and Send, the first thing first: an
     /// app missing, the apps closed, then each side's windows and its
@@ -753,6 +486,13 @@ extension SetupState {
         }
         return nil
     }
+}
+
+/// The line above the prompt: the next thing a side needs, or what is
+/// wrong with it.
+struct SetupNotice: Equatable {
+    var text: String
+    var isProblem: Bool
 }
 
 // MARK: - Remembered destinations

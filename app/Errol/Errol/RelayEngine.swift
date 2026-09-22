@@ -59,13 +59,6 @@ protocol RelayEngine: AnyObject {
     /// Bind `window` as the side's destination. The observation arrives on
     /// the main thread; nil when the window is gone.
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void)
-    /// Bring the app forward — beneath the console, which floats — and,
-    /// once its windows are showing, answer with where a dragged icon can
-    /// be dropped: an area over each listed window's message field, front
-    /// to back, in AX coordinates (Core/WindowHitTesting.swift). Answered
-    /// on the main thread; empty when nothing of the app is on screen.
-    func connectionDropZones(for side: Speaker, windows: [WindowID],
-                             completion: @escaping ([ConnectionDropZone]) -> Void)
     func unbind(_ side: Speaker)
     /// Apply a layout to the two windows, ChatGPT first. Answered on the
     /// main thread.
@@ -248,45 +241,6 @@ final class LiveRelayEngine: RelayEngine {
 
     func unbind(_ side: Speaker) {
         registry.unbind(side)
-    }
-
-    func connectionDropZones(for side: Speaker, windows ids: [WindowID],
-                             completion: @escaping ([ConnectionDropZone]) -> Void) {
-        runExclusively { [registry] in
-            guard let target = registry.target(side) else {
-                DispatchQueue.main.async { completion([]) }
-                return
-            }
-            let windows = ids.compactMap { id in registry.window(side, id).map { (id, $0.1) } }
-            let zones = Self.presentDropZones(target: target, windows: windows)
-            DispatchQueue.main.async { completion(zones) }
-        }
-    }
-
-    /// On the worker. LaunchServices activation is the one that lands from
-    /// a background process (Activation.swift): the app's windows rise
-    /// above every other app's, and the console, a floating panel, stays
-    /// above them. The wait is for the window server to show them there —
-    /// a Space switch, an unhide — and is bounded, so an app that will not
-    /// come forward still gets areas wherever its fields are showing. Each
-    /// field is found the way the transfer outline finds it: the prompt
-    /// shell around the last text input, else the input itself.
-    private static func presentDropZones(target: TargetApp,
-                                         windows: [(id: WindowID, element: AXUIElement)]) -> [ConnectionDropZone] {
-        let pid = target.app.processIdentifier
-        if frontWindowOwnerPID() != pid {
-            activateViaLaunchServices(target)
-            let deadline = Date().addingTimeInterval(2)
-            while frontWindowOwnerPID() != pid, Date() < deadline { usleep(100_000) }
-        }
-        let candidates = windows.compactMap { id, element -> ConnectionDropCandidate? in
-            guard windowIsAlive(element), let frame = windowFrame(element) else { return nil }
-            let composer = composerElement(under: LiveElement(ax: element))?.ax
-            let anchor = transferAnchor(for: composer, in: target)
-            return ConnectionDropCandidate(window: id, frame: frame,
-                                           prompt: anchor.map { $0.promptFrame ?? $0.frame })
-        }
-        return dropZones(for: candidates, owner: pid, onScreen: onScreenWindowRegions())
     }
 
     func arrange(_ layout: LayoutChoice, windows: [Speaker: WindowID],

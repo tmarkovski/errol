@@ -1,6 +1,6 @@
 // The AppKit shell around the SwiftUI interface: the status item (the Errol symbol,
 // hidden until clicked) and the floating panel that hosts the console
-// (PerchPanelView).
+// (PerchConsoleView).
 //
 // The shell stays AppKit on purpose. SwiftUI's MenuBarExtra window dismisses
 // itself whenever another app activates — which the relay does on every
@@ -206,12 +206,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// when it is none of these, so the check always has somewhere to stand.
     private static let turnLimits = [2, 4, 6, 8, 10, 12, 16, 20]
 
-    /// The options the console's Configure button used to open
-    /// (PerchSettingsPopover, kept but no longer shown): how the
-    /// conversation ends, how Errol looks, and putting the windows back.
-    /// The window arrangement and who starts are on the console, beside
-    /// the prompt. What belongs to a run is locked while one is going, as
-    /// it was there.
+    /// The session's options: how the conversation ends, how Errol looks,
+    /// and putting the windows back. The window arrangement and who starts
+    /// are on the console, beside the prompt. What belongs to a run is
+    /// locked while one is going.
     private func addSessionOptions(to menu: NSMenu) {
         let unlocked = !relay.isRunning
 
@@ -342,7 +340,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
         panel.onCancel = { [weak self] in
             guard let self else { return false }
-            if self.relay.setup.cancelIfDragging() { return true }
             guard self.navigation.screen == .settings else { return false }
             self.showConsole()
             return true

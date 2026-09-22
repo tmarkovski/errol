@@ -13,7 +13,6 @@ enum Perch {
 
     static var paper: Color { Color(nsColor: palette.paper) }
     static var well: Color { Color(nsColor: palette.well) }
-    static var track: Color { Color(nsColor: palette.track) }
     static var panelEdge: Color { Color(nsColor: palette.panelEdge) }
     static var chipEdge: Color { Color(nsColor: palette.chipEdge) }
     static var hairline: Color { Color(nsColor: palette.hairline) }
@@ -22,17 +21,12 @@ enum Perch {
     static var muted: Color { Color(nsColor: palette.muted) }
     static var placeholder: Color { Color(nsColor: palette.placeholder) }
     static var previewInk: Color { Color(nsColor: palette.previewInk) }
-    static var path: Color { Color(nsColor: palette.path) }
     static var accent: Color { Color(nsColor: palette.accent) }
     static var accentText: Color { Color(nsColor: palette.accentText) }
     static var accentBack: Color { Color(nsColor: palette.accentBack) }
     static var onAccent: Color { Color(nsColor: palette.onAccent) }
-    static var green: Color { Color(nsColor: palette.green) }
-    static var greenBack: Color { Color(nsColor: palette.greenBack) }
     static var red: Color { Color(nsColor: palette.red) }
     static var redBack: Color { Color(nsColor: palette.redBack) }
-    /// Setup's current step and directional cue stay amber in each theme.
-    static var setupCurrent: Color { Color(nsColor: PerchPalette.classicAmber.accentText) }
     static var chatgptFeather: Color { Color(nsColor: palette.chatgptFeather) }
     static var claudeFeather: Color { Color(nsColor: palette.claudeFeather) }
 
@@ -78,7 +72,7 @@ enum Perch {
     /// One inset for the head and the full-width composer's contents.
     static let contentInset = s(12)
     static let primaryDiameter = s(36)
-    /// Configure and the actions below it share one fixed horizontal anchor.
+    /// The console's circular actions.
     static let actionDiameter = s(32)
     /// A step tighter than the card, for a well set inside a window: the
     /// log window's text area.
@@ -87,10 +81,9 @@ enum Perch {
     /// Settings keeps its separate content-sized card.
     static let cardWidth = s(464)
     /// The capsule's footprint: the reference is 860 × 156 CSS pixels at
-    /// full desktop width (docs/design-proposals/setup-interaction/SPEC.md),
-    /// taken as points and not put through `s` — here the mockup's own
-    /// measure is the panel's, and every screen from permission to the
-    /// ending shares it. Settings keeps its card width.
+    /// full desktop width, taken as points and not put through `s` — here
+    /// the mockup's own measure is the panel's, and every screen from
+    /// permission to the ending shares it. Settings keeps its card width.
     static let widgetWidth: CGFloat = 860
     static let widgetHeight: CGFloat = 156
     /// A participant's column: the app's icon over a destination name,

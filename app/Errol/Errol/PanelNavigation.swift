@@ -67,10 +67,9 @@ struct PanelScreenPresentation: ViewModifier {
 ///
 /// The glass goes on the background layer, not on the content. Wrapping the
 /// content in `.glassEffect` made AppKit treat every drag inside the panel
-/// as a window move (isMovableByWindowBackground), including a drag that
-/// started on the connection handle, whose NSView opts out of moving the
-/// window and still received the events. Glass behind the content leaves
-/// the handle's opt-out in force, while the same layer carries the drag
+/// as a window move (isMovableByWindowBackground), even one that started
+/// on a view that opts out of moving the window. Glass behind the content
+/// leaves such opt-outs in force, while the same layer carries the drag
 /// gesture for the bare surface.
 struct PanelWindowSurface: ViewModifier {
     var navigation: PanelNavigation? = nil

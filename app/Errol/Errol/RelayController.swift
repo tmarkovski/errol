@@ -89,9 +89,9 @@ final class RelayController {
     /// pill (PerchSendPill), and copied into config at Start, which is
     /// where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
-    /// The guided setup: which apps are open, how their windows are
-    /// arranged, and which conversation each side is connected to. A run
-    /// starts only from its editor phase, into the windows it bound.
+    /// The setup: which apps are open, how their windows are arranged, and
+    /// which conversation each side is connected to. A run goes into the
+    /// windows it bound.
     let setup: SetupController
     var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
@@ -182,25 +182,17 @@ final class RelayController {
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
-    /// does the guided setup on reaching the editor, so the topic can be
-    /// typed at once. So does an arrangement of the windows, which brings
-    /// both chat apps forward on the way.
+    /// does an arrangement of the windows, which brings both chat apps
+    /// forward on the way.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
-    /// `guidedSetup` brings back the four guided steps before the editor,
-    /// for the screens kept from that flow (PerchPanelView and its
-    /// canvases). The app's console is direct.
     init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil,
-         transferOverlay: TransferOverlay? = nil, guidedSetup: Bool = false) {
+         transferOverlay: TransferOverlay? = nil) {
         self.engine = engine
         self.veils = veils
         self.transferOverlay = transferOverlay
-        setup = SetupController(engine: engine, guided: guidedSetup)
-        // Reaching the editor is the moment to type: the console comes
-        // forward and key through the shell's handler, and the editor takes
-        // the keyboard as it appears (PerchWidgetCenter.openingEditor).
-        setup.onReachCompose = { [weak self] in self?.focusPanelHandler?() }
+        setup = SetupController(engine: engine)
         setup.onArranged = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
         transferOverlay?.iconSource = { [iconTransferSources] in iconTransferSources[$0] }
@@ -217,8 +209,8 @@ final class RelayController {
                 self.setup.apply(report)
             }
             // The live sweep reports from its own thread; a preview engine
-            // answers on the main thread at once, so a canvas can step
-            // through setup in its own setup code.
+            // answers on the main thread at once, so a canvas can connect
+            // its sides in its own setup code.
             if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
         }
         // The engine's ordered event stream, delivered on the main thread.
@@ -336,23 +328,18 @@ final class RelayController {
         engine.setScanning(panelVisible && !isRunning)
     }
 
-    // MARK: What the capsule shows
+    // MARK: What the console shows
 
-    /// The capsule's content, in the order the run's lifetime gives it:
-    /// the guided screens, the editor, the exchange, the ending.
+    /// The console's content, in the order the run's lifetime gives it:
+    /// the editor, the exchange, the ending.
     enum Stage: Equatable {
-        case setup, compose, running, finished
+        case compose, running, finished
     }
 
     var stage: Stage {
         if isRunning { return .running }
         if hasFinishedRun { return .finished }
-        return setup.isGuiding ? .setup : .compose
-    }
-
-    /// The named Send: whoever starts the conversation receives the topic.
-    var sendLabel: String {
-        "Send to \(appName(firstSpeaker))"
+        return .compose
     }
 
     /// Why Send is unavailable now, beside it: the topic missing, or a
@@ -462,19 +449,8 @@ final class RelayController {
         setup.revalidate()
     }
 
-    /// Set up fresh conversations: the topic is cleared with the run and
-    /// both sides are connected anew, once the human has opened new chats
-    /// in the apps. Errol makes no chats itself.
-    func setUpFreshConversations() {
-        guard hasFinishedRun else { return }
-        resetSession()
-        topic = ""
-        setup.setUpFresh()
-    }
-
     /// Choose another conversation for one side, from its details. A
-    /// finished run's summary gives way first, so the picker has the
-    /// capsule; the topic stays.
+    /// finished run's summary gives way first; the topic stays.
     func chooseAnotherConversation(_ side: Speaker) {
         guard !isRunning else { return }
         if hasFinishedRun { resetSession() }
