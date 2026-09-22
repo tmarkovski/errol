@@ -39,7 +39,7 @@ struct PerchSendPill: View {
 
     private static let height = Perch.s(29)
     private static let inset = Perch.s(3)
-    private static let socketWidth = Perch.s(34)
+    private static let socketWidth = Perch.s(26)
     private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
 
     /// Where a mark sits: in the pill, or beside it.
@@ -74,9 +74,9 @@ struct PerchSendPill: View {
                     .font(Perch.text(12, .medium))
                     .foregroundStyle(tinted ? pillInk : Perch.secondary)
                     .padding(.leading, Perch.s(14))
-                    .padding(.trailing, Perch.s(8))
+                    .padding(.trailing, Perch.s(2))
                 socket(.pill)
-                    .padding(.trailing, Self.inset)
+                    .padding(.trailing, Perch.s(5))
             }
             .frame(height: Self.height)
             .background(Self.shape.fill(tinted ? Perch.accent : Perch.well))
