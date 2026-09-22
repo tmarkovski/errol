@@ -406,6 +406,28 @@ func composeSideStatus(appName: String, scans: [WindowScan], selectors: AppSelec
     return status
 }
 
+/// A model line's two parts, for showing the effort apart from the model:
+/// the text after the line's last " · " — Claude's own announcement
+/// ("Fable 5 · Extra"), and the Code pair as composeSideStatus joins it —
+/// or, where the line has none, a trailing word from the app's effort
+/// suffixes, which ChatGPT folds into the popup's title ("5.6 Sol High").
+/// A line with neither, or with nothing before the effort, comes back
+/// whole with no effort.
+func splitEffort(_ line: String, selectors: AppSelectors) -> (model: String, effort: String?) {
+    if let dot = line.range(of: " \u{00B7} ", options: .backwards) {
+        let model = line[..<dot.lowerBound].trimmingCharacters(in: .whitespaces)
+        let effort = line[dot.upperBound...].trimmingCharacters(in: .whitespaces)
+        if !model.isEmpty, !effort.isEmpty { return (model, effort) }
+    } else if let space = line.range(of: " ", options: .backwards) {
+        let model = line[..<space.lowerBound].trimmingCharacters(in: .whitespaces)
+        let effort = String(line[space.upperBound...])
+        if !model.isEmpty, selectors.modelPopupSuffixes.contains(effort.lowercased()) {
+            return (model, effort)
+        }
+    }
+    return (line, nil)
+}
+
 /// Both sides in one sweep. Runs on the scanner's worker thread. Checks the
 /// permission without prompting — the prompt stays tied to the Start button.
 func scanBothSides() -> (chatgpt: SideStatus, claude: SideStatus) {

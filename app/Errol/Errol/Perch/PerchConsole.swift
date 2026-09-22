@@ -2,9 +2,10 @@
 // before it. The participants stand at the capsule's ends as they always
 // have; between them one line of status sits above a prompt box, and the
 // box holds the text over a toolbar row — the window arrangement at its
-// leading end, the actions at its trailing end. Every stage shares that
-// frame: the topic editor, then the run with the field closed or the
-// steering note open in it, then the ending.
+// leading end, the actions at its trailing end. Under the box, at each
+// side's end, stand its surface and model as the sweep reads them. Every
+// stage shares that frame: the topic editor, then the run with the field
+// closed or the steering note open in it, then the ending.
 //
 // What the four guided steps did is folded into it. The icons open the
 // apps, the arrangement applies as it is chosen, each side is connected as
@@ -26,6 +27,7 @@ struct PerchConsoleView: View {
             VStack(alignment: .leading, spacing: Perch.s(5)) {
                 PerchConsoleStatus(controller: controller)
                 PerchPromptBox(controller: controller)
+                PerchSurfaceLabels(controller: controller)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .layoutPriority(1)
@@ -266,6 +268,101 @@ struct PerchPromptBox: View {
     }
 }
 
+// MARK: - The surface labels
+
+/// One line under the prompt box: at each end, what the side's window is
+/// and what runs in it — the app and its surface as a product name
+/// ("ChatGPT Chat", "Codex", "Claude Code"), then the model, with its
+/// effort after it a shade lighter ("Fable 5 Extra"), as the sweep reads
+/// them. ChatGPT's stands at the leading end and Claude's at the trailing,
+/// under their icons. A connected side is read from its own window as the
+/// latest sweep saw it (SideSetup.connectedCandidate), so a model switched
+/// in the app shows here; an unconnected one from the window the sweep
+/// would choose. An end stays empty while nothing is known — the icon says
+/// which app it is.
+struct PerchSurfaceLabels: View {
+    let controller: RelayController
+
+    /// One side's label in its parts. The product and model share the
+    /// line's color, a dot between them; the effort, split from the
+    /// model line (splitEffort), follows the model after a space, lighter.
+    private struct Reading: Equatable {
+        var product: String?
+        var model: String?
+        var effort: String?
+
+        var isEmpty: Bool { product == nil && model == nil }
+        /// The parts in the line's own color, up to the effort.
+        var lead: String { [product, model].compactMap { $0 }.joined(separator: " \u{00B7} ") }
+        /// The whole line, for the tooltip and the accessible name.
+        var text: String { effort.map { "\(lead) \($0)" } ?? lead }
+    }
+
+    var body: some View {
+        let readings = [Speaker.chatgpt, .claude].map(reading(for:))
+        HStack(spacing: Perch.s(12)) {
+            label(readings[0], alignment: .leading)
+            label(readings[1], alignment: .trailing)
+        }
+        // The line starts and ends where the prompt's text does.
+        .padding(.horizontal, PerchPromptBox.textInset)
+        .frame(height: Perch.s(15))
+        .animation(Perch.fade, value: readings)
+    }
+
+    private func label(_ reading: Reading, alignment: Alignment) -> some View {
+        var text = Text(reading.lead).foregroundStyle(Perch.secondary)
+        if let effort = reading.effort {
+            text = text + Text(" \(effort)").foregroundStyle(Perch.muted)
+        }
+        return text
+            .font(Perch.text(11))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(reading.text)
+            .contentTransition(.opacity)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .accessibilityHidden(reading.isEmpty)
+    }
+
+    /// What one side's label says; empty when nothing is known of it.
+    private func reading(for speaker: Speaker) -> Reading {
+        let side = controller.setup.state[speaker]
+        let status = speaker == .chatgpt ? controller.chatgptStatus : controller.claudeStatus
+        let surface: String?
+        let line: String?
+        if let connection = side.connection {
+            let live = side.connectedCandidate
+            surface = live?.identity.surface ?? connection.identity.surface
+            line = live?.model ?? connection.model
+        } else {
+            surface = status.surface
+            line = status.model
+        }
+        var reading = Reading(product: Self.productName(app: status.appName, surface: surface))
+        if let line {
+            let selectors = speaker == .chatgpt ? config.chatgptSelectors : config.claudeSelectors
+            let split = splitEffort(line, selectors: selectors)
+            reading.model = split.model
+            reading.effort = split.effort
+            // A model with no surface read still says whose it is.
+            if reading.product == nil { reading.product = status.appName }
+        }
+        return reading
+    }
+
+    /// Surfaces that are products of their own, named without the app.
+    private static let standaloneSurfaces: Set<String> = ["Codex"]
+
+    /// The surface as a product: the app's name with the surface after it
+    /// ("Claude Code", "ChatGPT Work"), or the surface alone where it is a
+    /// product of its own ("Codex"). nil where no surface was read.
+    static func productName(app: String, surface: String?) -> String? {
+        guard let surface else { return nil }
+        return standaloneSurfaces.contains(surface) ? surface : "\(app) \(surface)"
+    }
+}
+
 // MARK: - The window arrangement
 
 extension LayoutChoice {
@@ -428,6 +525,17 @@ struct PerchConsoleActions: View {
     controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
     controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeConversation)
     controller.topic = "Pricing by seat or by usage"
+    return PerchConsoleView(controller: controller)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+#Preview("Console · Code session") {
+    // Claude's side is a Code session: named as one under the prompt, with
+    // the bare model its popup announces.
+    let controller = RelayController(engine: PerchPreviewEngine())
+    controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
+    controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeCode)
     return PerchConsoleView(controller: controller)
         .padding(24)
         .background(Color(white: 0.75))

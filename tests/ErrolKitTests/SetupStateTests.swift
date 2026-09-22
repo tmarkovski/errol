@@ -209,6 +209,28 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.claude.connection?.readiness, .ready)
     }
 
+    func testTheConnectedWindowIsReadFromTheLatestSweep() throws {
+        // The connection keeps the model it was made with; what the window
+        // shows now comes from the sweep's candidate for that same window,
+        // and from no other window.
+        var (state, gpt, _) = try prepared()
+        state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: "5.6 Sol High",
+                        observation: observation(gpt))
+        XCTAssertEqual(state.chatgpt.connectedCandidate?.id, gpt.id)
+
+        var scan = scanWindow(try XCTUnwrap(loadFixture("chatgpt-chat-home").first), selectors: chatgpt)
+        scan.model = "5.6 Sol Low"
+        let switched = WindowCandidate(id: gpt.id, scan: scan, selectors: chatgpt)
+        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [switched])
+        XCTAssertEqual(state.chatgpt.connectedCandidate?.model, "5.6 Sol Low")
+        XCTAssertEqual(state.chatgpt.connection?.model, "5.6 Sol High")
+
+        let other = WindowCandidate(id: WindowID(raw: 9), scan: scan, selectors: chatgpt)
+        state.observe(.chatgpt, presence: .available(windows: 1), candidates: [other])
+        XCTAssertNil(state.chatgpt.connectedCandidate, "another window's reading is not this one's")
+        XCTAssertNil(state.claude.connectedCandidate, "nothing is read for a side that is not connected")
+    }
+
     func testADraftIsAFinishPreparingStepNotAConnectionLoss() throws {
         var state = try composed()
         let drafted = try candidate("chatgpt-chat-conversation", id: 1, selectors: chatgpt)

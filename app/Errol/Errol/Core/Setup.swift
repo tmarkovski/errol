@@ -320,6 +320,16 @@ struct SideSetup: Equatable {
     var isConnected: Bool { connection != nil }
     var isReady: Bool { connection?.readiness.isReady ?? false }
 
+    /// The connected window as the latest sweep saw it. The connection
+    /// keeps what the window showed when it was made — the connection is
+    /// the window, not the conversation in it — while this is what shows
+    /// in it now: the surface tab, the model and its effort. nil until a
+    /// sweep after the connection lists the window, and without one.
+    var connectedCandidate: WindowCandidate? {
+        guard let connection else { return nil }
+        return candidates.first { $0.id == connection.window }
+    }
+
     /// The window a layout moves: the connected one, else the one chosen
     /// for it, else the only one there is.
     var arrangementTarget: WindowID? {

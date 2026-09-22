@@ -70,4 +70,24 @@ final class ReadinessCompositionTests: XCTestCase {
         let status = composeSideStatus(appName: "Claude", scans: [scan], selectors: selectors)
         XCTAssertEqual(status.model, "Extra")
     }
+
+    func testTheEffortSplitsFromTheModelLineTheWayEachAppWritesIt() {
+        // Claude's announcement and the Code pair's join put a dot between
+        // them; ChatGPT folds the effort into the title as its last word.
+        let claude = splitEffort("Fable 5 \u{00B7} Extra", selectors: selectors)
+        XCTAssertEqual(claude.model, "Fable 5")
+        XCTAssertEqual(claude.effort, "Extra")
+        let chatgpt = splitEffort("5.6 Sol High", selectors: config.chatgptSelectors)
+        XCTAssertEqual(chatgpt.model, "5.6 Sol")
+        XCTAssertEqual(chatgpt.effort, "High")
+
+        // A bare model, ChatGPT's default, and an effort with nothing
+        // before it stay whole.
+        XCTAssertNil(splitEffort("Fable 5", selectors: selectors).effort)
+        XCTAssertNil(splitEffort("Default", selectors: config.chatgptSelectors).effort)
+        XCTAssertEqual(splitEffort("Extra", selectors: selectors).model, "Extra")
+        XCTAssertNil(splitEffort("High", selectors: config.chatgptSelectors).effort)
+        // Only ChatGPT's own effort words count as one on its titles.
+        XCTAssertNil(splitEffort("5.6 Sol", selectors: config.chatgptSelectors).effort)
+    }
 }
