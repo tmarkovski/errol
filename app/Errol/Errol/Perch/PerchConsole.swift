@@ -613,18 +613,15 @@ struct PerchConsoleActions: View {
         }, first: $controller.firstSpeaker, blocker: controller.sendBlocker) { controller.start() }
     }
 
+    /// Pause and Stop as bare icons: what each does is plain, and the
+    /// status line under the box says when a pause is pending.
     private var running: some View {
         HStack(spacing: Perch.s(8)) {
-            PerchRevealButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
-                              icon: "pause.fill") { controller.beginSteering() }
+            PerchRoundButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
+                             icon: "pause.fill") { controller.beginSteering() }
                 .disabled(controller.isSteeringPending || controller.stopRequested)
-                .help(controller.isSteeringPending
-                      ? "Pausing after the current handoff"
-                      : "Pause at a safe handoff and write a note for the next side")
-            PerchRevealButton(title: "Stop", icon: "stop.fill", prominent: false,
-                              labelClearance: 1.5 * Perch.actionDiameter + Perch.s(16)) { controller.stop() }
+            PerchRoundButton(title: "Stop", icon: "stop.fill", prominent: false) { controller.stop() }
                 .disabled(controller.stopRequested)
-                .help("Stop at the next safe point")
         }
     }
 

@@ -1,26 +1,19 @@
 // The console's buttons, drawn flat: filled capsules and circles on the
-// panel's glass, with no material of their own. Running actions reveal
-// labels beside stationary icons; editors, permission setup, and the
-// ending keep their labeled pills.
+// panel's glass, with no material of their own. The running actions are
+// bare icons in circles — pause and stop say themselves; editors,
+// permission setup, and the ending keep their labeled pills.
 
 import SwiftUI
 
-/// Only the circular control participates in layout. The label is revealed
-/// behind it towards the left, so neither the icon nor adjacent content moves.
-struct PerchRevealButton: View {
+/// A circle with an icon in it and nothing beside it. The title is the
+/// accessible name only.
+struct PerchRoundButton: View {
     let title: String
     let icon: String
     var prominent = true
-    /// A secondary in a pair reveals its label before the other control.
-    var labelClearance: CGFloat = 0
     let action: () -> Void
-    @State private var hovering = false
-    @State private var labelWidth: CGFloat = 0
-    @FocusState private var focused: Bool
     @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var revealed: Bool { isEnabled && (hovering || focused) }
     private var ink: Color { prominent ? Perch.onAccent : Perch.ink }
 
     var body: some View {
@@ -31,31 +24,10 @@ struct PerchRevealButton: View {
                 .frame(width: Perch.actionDiameter, height: Perch.actionDiameter)
                 .background(Circle().fill(prominent ? Perch.accent : Perch.paper))
                 .overlay(Circle().stroke(prominent ? Perch.accent : Perch.chipEdge, lineWidth: 1))
-                .background(alignment: .trailing) {
-                    Text(title)
-                        .font(Perch.text(12, .medium))
-                        .foregroundStyle(ink)
-                        .padding(.leading, Perch.s(12))
-                        .padding(.trailing, labelClearance == 0 ? Perch.actionDiameter / 2 + Perch.s(6) : Perch.s(12))
-                        .frame(height: Perch.actionDiameter)
-                        .fixedSize()
-                        .background(Capsule().fill(prominent ? Perch.accent : Perch.paper))
-                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { labelWidth = $0 }
-                        .mask(alignment: .trailing) {
-                            Rectangle().frame(width: revealed ? labelWidth : 0)
-                        }
-                        .offset(x: -(Perch.actionDiameter / 2 + labelClearance))
-                        .opacity(revealed ? 1 : 0)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .focused($focused)
-        .onHover { hovering = $0 }
         .opacity(isEnabled ? 1 : 0.45)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: revealed)
         .accessibilityLabel(title)
     }
 }
