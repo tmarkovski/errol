@@ -3,11 +3,12 @@
 // one — replying, opening, the connected conversation, the next thing to
 // do, what is wrong — and the app's name only when there is not; the icon
 // says which app it is the rest of the time. ChatGPT stands left and
-// Claude right whoever starts. The icon is the side's control: it opens
-// the app, brings it forward for a chat to be opened in it, offers the
-// conversations in a menu where the app shows several, or shows the
-// connected destination's details; it never changes who starts, which the
-// Send pill does.
+// Claude right whoever starts. The icon is the side's control: a click
+// opens the app when it is closed, and otherwise brings it forward — its
+// connected window in front — and hands the keyboard straight back to
+// the console; where the app shows several conversations, it offers them
+// in a menu instead, and a connected side can be switched from the icon's
+// context menu. It never changes who starts, which the Send pill does.
 //
 // Readiness reads from the icon itself: it stands faded until the side's
 // conversation is connected and ready, and fades in once it is.
@@ -17,7 +18,6 @@ import SwiftUI
 struct PerchParticipant: View {
     let controller: RelayController
     let speaker: Speaker
-    @State private var showingDetails = false
     @State private var hoveringIcon = false
     @FocusState private var iconFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -37,18 +37,19 @@ struct PerchParticipant: View {
     private var feather: Color { speaker == .claude ? Perch.claudeFeather : Perch.chatgptFeather }
     private var replying: Bool { controller.isRunning && conversation == .chatting }
 
-    /// What a click on the icon does now.
+    /// What a click on the icon does now. Nothing during a run, which
+    /// owns the apps' focus.
     private enum Role {
-        case launch, openConversation, chooseConversation, details, none
+        case launch, bringForward, chooseConversation, none
     }
 
     private var role: Role {
-        guard controller.stage == .compose else { return .none }
-        if side.isConnected { return .details }
+        guard !controller.isRunning else { return .none }
+        if side.isConnected { return .bringForward }
         switch side.presence {
         case .notRunning: return .launch
-        case .noWindow, .noConversation: return .openConversation
-        case .available: return side.needsConversationChoice ? .chooseConversation : .none
+        case .noWindow, .noConversation: return .bringForward
+        case .available: return side.needsConversationChoice ? .chooseConversation : .bringForward
         default: return .none
         }
     }
@@ -69,9 +70,6 @@ struct PerchParticipant: View {
         }
         .frame(width: Perch.participantWidth)
         .animation(Perch.fade, value: line)
-        .popover(isPresented: $showingDetails, arrowEdge: .bottom) {
-            PerchDestinationDetails(controller: controller, speaker: speaker) { showingDetails = false }
-        }
         .help(details)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(name)
@@ -129,14 +127,19 @@ struct PerchParticipant: View {
             .disabled(role == .none)
             .focused($iconFocused)
             .accessibilityLabel(iconLabel)
+            .contextMenu {
+                if side.isConnected {
+                    Button("Choose Another Conversation") { controller.chooseAnotherConversation(speaker) }
+                        .disabled(controller.isRunning)
+                }
+            }
         }
     }
 
     private func act() {
         switch role {
         case .launch: setup.launch(speaker)
-        case .openConversation: setup.openConversation(speaker)
-        case .details: showingDetails = true
+        case .bringForward: setup.bringForward(speaker)
         case .chooseConversation, .none: break
         }
     }
@@ -144,8 +147,7 @@ struct PerchParticipant: View {
     private var iconLabel: String {
         switch role {
         case .launch: return "Open \(name)"
-        case .openConversation: return "Bring \(name) forward"
-        case .details: return "\(name) destination details"
+        case .bringForward: return "Bring \(name) forward"
         case .chooseConversation: return "Choose which \(name) conversation to connect"
         case .none: return name
         }
@@ -314,60 +316,5 @@ private struct PerchLaunchBounce: ViewModifier {
             return 0
         }
         return -4 * height * CGFloat(progress * (1 - progress))
-    }
-}
-
-// MARK: - Destination details
-
-/// The connected side in full — app, surface, conversation, model, and
-/// how it reads now — with the one choice that belongs to it: another
-/// conversation. A Code session is named as one and connects like any chat.
-struct PerchDestinationDetails: View {
-    let controller: RelayController
-    let speaker: Speaker
-    var dismiss: () -> Void
-
-    private var setup: SetupController { controller.setup }
-
-    var body: some View {
-        let side = setup.state[speaker]
-        let name = setup.name(speaker)
-        VStack(alignment: .leading, spacing: Perch.s(10)) {
-            Text(name)
-                .font(Perch.text(13, .semibold))
-                .foregroundStyle(Perch.ink)
-            if let connection = side.connection {
-                detail("Conversation", connection.name)
-                detail("Context", connection.context)
-                detail("Surface", connection.identity.surface ?? "Not observed")
-                detail("Model", connection.model ?? "Not observed")
-                detail("Status", connection.readiness.problem(name: name) ?? "Ready to relay into")
-                PerchCapsuleButton(title: "Choose another conversation", style: .secondary) {
-                    dismiss()
-                    controller.chooseAnotherConversation(speaker)
-                }
-                .disabled(controller.isRunning)
-            } else {
-                detail("Status", side.presence.action(name: name))
-                if let hint = side.hint { detail("Last used", hint.name) }
-            }
-        }
-        .padding(Perch.s(14))
-        .frame(width: Perch.s(340), alignment: .leading)
-        .foregroundStyle(Perch.ink)
-        .tint(Perch.accent)
-    }
-
-    private func detail(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Perch.s(8)) {
-            Text(label)
-                .font(Perch.text(11))
-                .foregroundStyle(Perch.muted)
-                .frame(width: Perch.s(76), alignment: .leading)
-            Text(value)
-                .font(Perch.text(12))
-                .foregroundStyle(Perch.ink)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }

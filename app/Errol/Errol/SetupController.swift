@@ -20,6 +20,10 @@ final class SetupController {
     /// .apply), which leaves the keyboard with whichever app came forward
     /// last; the shell takes it back for the console. Main thread.
     @ObservationIgnored var onArranged: (() -> Void)?
+    /// Told each time an app has been brought forward from its icon, which
+    /// leaves the keyboard with that app; the shell takes it back for the
+    /// console. Main thread.
+    @ObservationIgnored var onBroughtForward: (() -> Void)?
     /// A bind is on the worker: a second Return or click waits for it.
     private(set) var isBinding = false
     /// An arrangement is on the worker.
@@ -112,9 +116,11 @@ final class SetupController {
         }
     }
 
-    /// Bring the app forward so a conversation can be opened in it.
-    func openConversation(_ side: Speaker) {
-        engine.bringForward(side)
+    /// Bring the app forward — its connected window, where it has one —
+    /// so the conversation is in view, and hand the keyboard back to the
+    /// console once it is there.
+    func bringForward(_ side: Speaker) {
+        engine.bringForward(side) { [weak self] in self?.onBroughtForward?() }
     }
 
     private func clearLaunchDeadline(_ side: Speaker) {

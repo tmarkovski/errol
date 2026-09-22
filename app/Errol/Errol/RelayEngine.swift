@@ -54,8 +54,11 @@ protocol RelayEngine: AnyObject {
     /// Open the app. false when it is not installed, in which case nothing
     /// is opened.
     func launch(_ side: Speaker) -> Bool
-    /// Bring the app forward, so the human can open a conversation in it.
-    func bringForward(_ side: Speaker)
+    /// Bring the app forward — its bound window first, where it has one —
+    /// and say when it is there, on the main thread, so the console can
+    /// take the keyboard back. Answered anyway, after a bounded wait, for
+    /// an app that will not come.
+    func bringForward(_ side: Speaker, completion: @escaping () -> Void)
     /// Bind `window` as the side's destination. The observation arrives on
     /// the main thread; nil when the window is gone.
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void)
@@ -216,10 +219,23 @@ final class LiveRelayEngine: RelayEngine {
         return true
     }
 
-    func bringForward(_ side: Speaker) {
-        runExclusively { [self] in
+    func bringForward(_ side: Speaker, completion: @escaping () -> Void) {
+        runExclusively { [self, registry] in
+            defer { DispatchQueue.main.async(execute: completion) }
             guard let target = findApp(bundleID: bundleID(side), name: name(side), selectors: selectors(side)) else { return }
-            activateViaLaunchServices(target)
+            // The bound window comes to the front of its app's own windows
+            // first: activation alone leaves whichever window was last up.
+            if let bound = registry.binding(side), windowIsAlive(bound.window) { raiseWindow(bound.window) }
+            let pid = target.app.processIdentifier
+            if frontWindowOwnerPID() != pid {
+                // LaunchServices activation is the one that lands from a
+                // background process (Activation.swift). The wait is for
+                // the window server to show the app in front — a Space
+                // switch, an unhide — and is bounded.
+                activateViaLaunchServices(target)
+                let deadline = Date().addingTimeInterval(2)
+                while frontWindowOwnerPID() != pid, Date() < deadline { usleep(100_000) }
+            }
         }
     }
 

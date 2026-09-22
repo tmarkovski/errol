@@ -166,8 +166,9 @@ final class PerchPreviewEngine: RelayEngine {
         return true
     }
 
-    func bringForward(_ side: Speaker) {
+    func bringForward(_ side: Speaker, completion: @escaping () -> Void) {
         events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now."))
+        DispatchQueue.main.async(execute: completion)
     }
 
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void) {

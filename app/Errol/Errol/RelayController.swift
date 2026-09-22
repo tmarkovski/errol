@@ -183,7 +183,7 @@ final class RelayController {
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
     /// does an arrangement of the windows, which brings both chat apps
-    /// forward on the way.
+    /// forward on the way, and an app brought forward from its icon.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
@@ -194,6 +194,7 @@ final class RelayController {
         self.transferOverlay = transferOverlay
         setup = SetupController(engine: engine)
         setup.onArranged = { [weak self] in self?.focusPanelHandler?() }
+        setup.onBroughtForward = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
         transferOverlay?.iconSource = { [iconTransferSources] in iconTransferSources[$0] }
         // Most sweeps see the same picture as the last one; publishing them
