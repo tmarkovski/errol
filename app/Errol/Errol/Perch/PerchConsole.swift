@@ -492,9 +492,10 @@ extension LayoutChoice {
     }
 }
 
-/// The three arrangements in one flat capsule at the toolbar's leading
-/// end, as tall as the actions beside it. A choice applies at once, and
-/// stands for windows connected later (SetupController.applyIfPending).
+/// The three arrangements in one flat control at the toolbar's leading
+/// end, as tall as the actions beside it and with the prompt box's kind
+/// of corner (Perch.controlCorner). A choice applies at once, and stands
+/// for windows connected later (SetupController.applyIfPending).
 ///
 /// A well with a paper thumb on the chosen segment and hairlines between
 /// the others that hide beside it, drawn by hand: NSSegmentedControl fills
@@ -502,6 +503,9 @@ extension LayoutChoice {
 /// selection jumps on mouse-up where this one slides.
 struct PerchLayoutSegments: View {
     let controller: RelayController
+    private static let inset = Perch.s(3.5)
+    private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
+    private static let thumbShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
     @Namespace private var thumb
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -526,12 +530,12 @@ struct PerchLayoutSegments: View {
                         .frame(width: Perch.s(36), height: Perch.s(25))
                         .background {
                             if selected == layout {
-                                Capsule().fill(Perch.paper)
+                                Self.thumbShape.fill(Perch.paper)
                                     .matchedGeometryEffect(id: "selection", in: thumb)
                             }
                         }
-                        .perchHover(Capsule())
-                        .contentShape(Capsule())
+                        .perchHover(Self.thumbShape)
+                        .contentShape(Self.thumbShape)
                 }
                 .buttonStyle(.plain)
                 .help(layout.actionHelp)
@@ -539,8 +543,8 @@ struct PerchLayoutSegments: View {
                 .accessibilityAddTraits(selected == layout ? .isSelected : [])
             }
         }
-        .padding(Perch.s(3.5))
-        .background(Capsule().fill(Perch.well))
+        .padding(Self.inset)
+        .background(Self.shape.fill(Perch.well))
         .opacity(isEnabled ? 1 : 0.5)
         .animation(reduceMotion ? nil : Perch.spring, value: selected)
         .fixedSize()

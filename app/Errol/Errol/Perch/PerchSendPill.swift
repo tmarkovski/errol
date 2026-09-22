@@ -6,9 +6,11 @@
 // marks are their own buttons, and only "Send to" dims.
 //
 // The pill is drawn by hand: a button style makes one button, and this is
-// a button and a segmented choice in one shape. It wears what the console's
-// prominent capsule wears — the accent and its ink — and gives the accent
-// up for the well while sending is blocked (PerchCapsuleButton).
+// a button and a segmented choice in one shape, a rounded rectangle with
+// the prompt box's kind of corner (Perch.controlCorner). It wears what
+// the console's prominent capsule wears — the accent and its ink — and
+// gives the accent up for the well while sending is blocked
+// (PerchCapsuleButton).
 
 import SwiftUI
 
@@ -33,6 +35,8 @@ struct PerchSendPill: View {
 
     private static let height = Perch.s(29)
     private static let inset = Perch.s(3)
+    private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
+    private static let thumbShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
 
     /// The accent stands while Send can go.
     private var tinted: Bool { blocker == nil }
@@ -58,8 +62,8 @@ struct PerchSendPill: View {
             .accessibilityLabel("Send to \(firstName)")
             marks
         }
-        .background(Capsule().fill(tinted ? Perch.accent : Perch.well))
-        .overlay(Capsule().stroke(tinted ? Color.clear : Perch.chipEdge, lineWidth: 1))
+        .background(Self.shape.fill(tinted ? Perch.accent : Perch.well))
+        .overlay(Self.shape.stroke(tinted ? Color.clear : Perch.chipEdge, lineWidth: 1))
         .animation(Perch.fade, value: tinted)
         .fixedSize()
         .accessibilityElement(children: .contain)
@@ -82,12 +86,12 @@ struct PerchSendPill: View {
                         .frame(width: Perch.s(34), height: Self.height - 2 * Self.inset)
                         .background {
                             if first == side.speaker {
-                                Capsule().fill(ink.opacity(tinted ? 0.28 : 0.11))
+                                Self.thumbShape.fill(ink.opacity(tinted ? 0.28 : 0.11))
                                     .matchedGeometryEffect(id: "thumb", in: thumb)
                             }
                         }
-                        .perchHover(Capsule(), tint: ink, opacity: tinted ? 0.12 : 0.06)
-                        .contentShape(Capsule())
+                        .perchHover(Self.thumbShape, tint: ink, opacity: tinted ? 0.12 : 0.06)
+                        .contentShape(Self.thumbShape)
                 }
                 .buttonStyle(.plain)
                 .help("\(side.name) goes first: the topic is sent to it")

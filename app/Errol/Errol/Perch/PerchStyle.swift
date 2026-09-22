@@ -77,6 +77,11 @@ enum Perch {
     /// A step tighter than the card, for a well set inside a window: the
     /// log window's text area.
     static let insetCorner = s(10)
+    /// The toolbar's segmented controls — the Send pill and the window
+    /// arrangement — at their height read as rounded rectangles, like the
+    /// prompt box around them, not as capsules. A thumb inside one takes
+    /// this less its inset, so the two corners are concentric.
+    static let controlCorner = s(10)
 
     /// Settings keeps its separate content-sized card.
     static let cardWidth = s(464)
@@ -100,10 +105,11 @@ enum Perch {
     // MARK: The composer's measures
 
     /// The oval's editors shrink before wrapping, then scroll after three
-    /// lines. The reference sets the editor at 16 points under a 19-point
-    /// instruction; both go through `s` like every other size here.
-    static let promptFont = NSFont.systemFont(ofSize: s(16))
-    static let promptMinimumFontSize = s(13)
+    /// lines. The editor's type is the console's ordinary size, a step
+    /// over the lines around the box, not a display size; both go through
+    /// `s` like every other size here.
+    static let promptFont = NSFont.systemFont(ofSize: s(13))
+    static let promptMinimumFontSize = s(12)
     static let promptMaximumLines = 3
 
     /// The gap between the composer's rows: tabs, preview, hairline, editor,
