@@ -6,7 +6,7 @@
 // connection. ChatGPT stands left and Claude right whoever starts. The
 // icon is the side's control and changes with the step: it opens the app,
 // is dragged to connect its conversation, or shows the destination's
-// details; it never changes who starts, which the session settings do.
+// details; it never changes who starts, which the Send pill does.
 //
 // Dragging an icon connects a window: the app comes forward under the
 // console with an area drawn over each message field, and the drop lands

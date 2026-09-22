@@ -37,6 +37,11 @@ final class SetupController {
     /// bring the console forward and hand the editor the keyboard. Silent
     /// while the phase is already the editor's. Main thread, like the rest.
     @ObservationIgnored var onReachCompose: (() -> Void)?
+    /// Told each time a layout has moved the windows. Arranging brings each
+    /// chat app forward so the pair is the visible one (WindowArranger
+    /// .apply), which leaves the keyboard with whichever app came forward
+    /// last; the shell takes it back for the console. Main thread.
+    @ObservationIgnored var onArranged: (() -> Void)?
     private(set) var draggingSide: Speaker?
     /// The window under the dragged icon: the one whose area is armed.
     private(set) var dragCandidate: WindowCandidate?
@@ -257,6 +262,9 @@ final class SetupController {
             guard let self else { return }
             arrangementsInFlight -= 1
             isArranging = arrangementsInFlight > 0
+            // Whatever the choice is now, the windows moved and the apps
+            // came forward.
+            if outcome == .arranged { onArranged?() }
             // The word on a layout no longer chosen says nothing about the
             // one that is.
             guard state.layout == layout else { return }

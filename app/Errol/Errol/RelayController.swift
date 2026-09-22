@@ -85,9 +85,9 @@ final class RelayController {
     var customInstructions = ""
     var limitTurns = config.limitTurns
     var turns = config.turns
-    /// Which side sends the opening message. Chosen in the session settings
-    /// (the Send button names the recipient), and copied into config at
-    /// Start, which is where the relay loop reads it.
+    /// Which side sends the opening message. Chosen on the console's Send
+    /// pill (PerchSendPill), and copied into config at Start, which is
+    /// where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
     /// The guided setup: which apps are open, how their windows are
     /// arranged, and which conversation each side is connected to. A run
@@ -183,7 +183,8 @@ final class RelayController {
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
     /// does the guided setup on reaching the editor, so the topic can be
-    /// typed at once.
+    /// typed at once. So does an arrangement of the windows, which brings
+    /// both chat apps forward on the way.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
@@ -200,6 +201,7 @@ final class RelayController {
         // forward and key through the shell's handler, and the editor takes
         // the keyboard as it appears (PerchWidgetCenter.openingEditor).
         setup.onReachCompose = { [weak self] in self?.focusPanelHandler?() }
+        setup.onArranged = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
         transferOverlay?.iconSource = { [iconTransferSources] in iconTransferSources[$0] }
         // Most sweeps see the same picture as the last one; publishing them

@@ -384,11 +384,19 @@ extension LayoutChoice {
 }
 
 /// The three arrangements in one glass capsule at the toolbar's leading
-/// end. A choice applies at once, as it did on the arrange step, and stands
-/// for windows connected later (SetupController.applyIfPending). The glass
-/// is a background layer, as the panel's own is: glass wrapped around
-/// content makes AppKit read a drag inside it as a window move
-/// (PanelWindowSurface).
+/// end, as tall as the actions beside it. A choice applies at once, as it
+/// did on the arrange step, and stands for windows connected later
+/// (SetupController.applyIfPending). The glass is a background layer, as
+/// the panel's own is: glass wrapped around content makes AppKit read a
+/// drag inside it as a window move (PanelWindowSurface).
+///
+/// It wears what a segmented control wears in a system toolbar — a gray
+/// capsule on the chosen segment, hairlines between the others that hide
+/// beside it — and is drawn by hand because AppKit only draws that inside
+/// an NSToolbar: elsewhere NSSegmentedControl fills its selection with the
+/// accent color, and inside an NSGlassEffectView it keeps its own track as
+/// a second rim within the glass. The stock control's selection also jumps
+/// on mouse-up; this one slides.
 struct PerchLayoutSegments: View {
     let controller: RelayController
     @Namespace private var thumb
@@ -396,18 +404,26 @@ struct PerchLayoutSegments: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let layouts = LayoutChoice.allCases
         let selected = controller.setup.state.layout
-        HStack(spacing: Perch.s(2)) {
-            ForEach(LayoutChoice.allCases, id: \.self) { layout in
+        let selectedIndex = layouts.firstIndex(of: selected)
+        HStack(spacing: 0) {
+            ForEach(layouts.indices, id: \.self) { index in
+                let layout = layouts[index]
+                if index > 0 {
+                    Rectangle().fill(Perch.ink.opacity(0.2))
+                        .frame(width: 1, height: Perch.s(14))
+                        .opacity(selectedIndex == index || selectedIndex == index - 1 ? 0 : 1)
+                        .accessibilityHidden(true)
+                }
                 Button { controller.setup.choose(layout) } label: {
                     Image(systemName: layout.symbol)
-                        .font(Perch.text(13))
-                        .foregroundStyle(selected == layout ? Perch.ink : Perch.secondary)
-                        .frame(width: Perch.s(34), height: Perch.s(24))
+                        .font(Perch.text(14))
+                        .foregroundStyle(Perch.ink)
+                        .frame(width: Perch.s(36), height: Perch.s(25))
                         .background {
                             if selected == layout {
-                                Capsule().fill(Perch.paper)
-                                    .overlay(Capsule().stroke(Perch.chipEdge, lineWidth: 1))
+                                Capsule().fill(Perch.ink.opacity(0.11))
                                     .matchedGeometryEffect(id: "selection", in: thumb)
                             }
                         }
@@ -420,7 +436,7 @@ struct PerchLayoutSegments: View {
                 .accessibilityAddTraits(selected == layout ? .isSelected : [])
             }
         }
-        .padding(Perch.s(3))
+        .padding(Perch.s(3.5))
         .background(Color.clear.glassEffect(.regular, in: Capsule()))
         .opacity(isEnabled ? 1 : 0.5)
         .animation(reduceMotion ? nil : Perch.spring, value: selected)
@@ -432,11 +448,12 @@ struct PerchLayoutSegments: View {
 
 // MARK: - The actions
 
-/// The toolbar's trailing end. Before a run it is Send, or the way to open
-/// the apps while one is closed; during a run Pause and Stop, or the paused
-/// run's three; after it, the way back to the editor.
+/// The toolbar's trailing end. Before a run it is Send, with who goes
+/// first inside it, or the way to open the apps while one is closed;
+/// during a run Pause and Stop, or the paused run's three; after it, the
+/// way back to the editor.
 struct PerchConsoleActions: View {
-    let controller: RelayController
+    @Bindable var controller: RelayController
 
     private var setup: SetupController { controller.setup }
 
@@ -465,12 +482,12 @@ struct PerchConsoleActions: View {
             .help("Open whichever app isn\u{2019}t open yet")
     }
 
+    /// Send and the choice of who receives the topic, in one pill.
     private var send: some View {
-        PerchCapsuleButton(title: controller.sendLabel, icon: "paperplane.fill") { controller.start() }
-            .disabled(controller.sendBlocker != nil)
-            .keyboardShortcut(.defaultAction)
-            .help(controller.sendBlocker
-                  ?? "Send the topic to \(controller.appName(controller.firstSpeaker)) and start relaying")
+        PerchSendPill(sides: [Speaker.chatgpt, .claude].map { side in
+            PerchSendPill.Side(speaker: side, name: controller.appName(side),
+                               bundleID: side == .chatgpt ? config.chatgptBundleID : config.claudeBundleID)
+        }, first: $controller.firstSpeaker, blocker: controller.sendBlocker) { controller.start() }
     }
 
     private var running: some View {

@@ -207,19 +207,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private static let turnLimits = [2, 4, 6, 8, 10, 12, 16, 20]
 
     /// The options the console's Configure button used to open
-    /// (PerchSettingsPopover, kept but no longer shown): who starts, how the
+    /// (PerchSettingsPopover, kept but no longer shown): how the
     /// conversation ends, how Errol looks, and putting the windows back.
-    /// The window arrangement itself is on the console, beside the prompt.
-    /// What belongs to a run is locked while one is going, as it was there.
+    /// The window arrangement and who starts are on the console, beside
+    /// the prompt. What belongs to a run is locked while one is going, as
+    /// it was there.
     private func addSessionOptions(to menu: NSMenu) {
         let unlocked = !relay.isRunning
-
-        let starts = submenu("Starts the Conversation", in: menu)
-        for side in [Speaker.chatgpt, .claude] {
-            let item = option(relay.appName(side), #selector(chooseFirstSpeaker(_:)), side,
-                              checked: relay.firstSpeaker == side, in: starts)
-            item.isEnabled = unlocked
-        }
 
         let ending = submenu("Ending", in: menu)
         let automatic = option("When Both Agree They\u{2019}re Done", #selector(chooseTurnLimit(_:)), 0,
@@ -267,11 +261,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         item.representedObject = value
         item.state = checked ? .on : .off
         return item
-    }
-
-    @objc private func chooseFirstSpeaker(_ sender: NSMenuItem) {
-        guard !relay.isRunning, let side = sender.representedObject as? Speaker else { return }
-        relay.firstSpeaker = side
     }
 
     /// Zero stands for no limit: the conversation ends when both apps agree.
