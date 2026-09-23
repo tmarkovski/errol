@@ -530,6 +530,8 @@ func send(_ text: String, to target: TargetApp,
     // at unconfirmed whatever the composer does afterwards: a send signal
     // cannot vouch for a payload nobody saw land.
     var pasteVerified = false
+    // Whether this send has already brought the app back once (holdsFront).
+    var frontRetried = false
     // The opening letters and digits, fence lines skipped: what the composer
     // is expected to hold once the paste lands (pasteNeedle).
     let needle = pasteNeedle(for: payload)
@@ -562,6 +564,43 @@ func send(_ text: String, to target: TargetApp,
         } else {
             log("\(target.name): could not locate input area, pasting into current focus")
             trace("focus before pasting: \(focusReport(target))")
+        }
+        // The human can take the front while the dot is in flight: a click
+        // on the console, or on another app. The app is brought back once
+        // per send before the send gives up on it (makeFrontmost lets go of
+        // the console's key status first); the flight has played, so the
+        // paste goes on from where it stood, into the composer asked for
+        // focus again. A second loss is the human's to settle
+        // (RunBlock.notInFront).
+        func holdsFront(_ when: String) -> Bool {
+            if isFrontmost(target) { return true }
+            guard !frontRetried, !relayControl.isCancelled else {
+                log("\(target.name): lost the front \(when); not typing")
+                log("\(target.name): \(focusReport(target))")
+                return false
+            }
+            frontRetried = true
+            log("\(target.name): lost the front \(when); bringing it back")
+            log("\(target.name): \(focusReport(target))")
+            guard makeFrontmost(target) else {
+                if !relayControl.isCancelled {
+                    log("\(target.name): would not come back to the front; not typing")
+                    log("\(target.name): \(focusReport(target))")
+                }
+                return false
+            }
+            if let resolved {
+                AXUIElementSetAttributeValue(resolved.element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                usleep(150_000)
+            }
+            trace("back in front: \(focusReport(target))")
+            return true
+        }
+        // What a send that could not keep the front comes to: nothing typed
+        // yet, a hold for the human, or a Stop that won meanwhile.
+        func lostFront() -> SendOutcome {
+            if attempt > 0 { return .abandoned }
+            return relayControl.isCancelled ? .refused : .notInFront
         }
         let expectation = PasteExpectation(payload: payload, valueBefore: valueBefore)
         trace("expecting: needle \"\(expectation.needle)\""
@@ -610,21 +649,15 @@ func send(_ text: String, to target: TargetApp,
                 relayEvents.post(.transfer(.cancelled(id: transferID)))
                 return attempt == 0 ? .refused : .abandoned
             }
-            guard isFrontmost(target) else {
+            guard holdsFront("during the transfer") else {
                 relayEvents.post(.transfer(.cancelled(id: transferID)))
-                log("\(target.name): lost the front during the transfer; not typing")
-                log("\(target.name): \(focusReport(target))")
-                return attempt == 0 ? .notInFront : .abandoned
+                return lostFront()
             }
         }
         guard !relayControl.isCancelled, inspection?.mayContinue() != false else {
             return attempt == 0 ? .refused : .abandoned
         }
-        guard isFrontmost(target) else {
-            log("\(target.name): lost the front before the keystroke; not typing")
-            log("\(target.name): \(focusReport(target))")
-            return attempt == 0 ? .notInFront : .abandoned
-        }
+        guard holdsFront("before the keystroke") else { return lostFront() }
         // A retry only happens over a composer that stands as it did, so
         // a withheld retry has typed nothing that landed either.
         guard destinationHolds(), clipboardHolds() else { return .withheld }
