@@ -13,7 +13,8 @@
 // The icons open the apps, the arrangement applies as it is chosen, each
 // side is connected as SetupController.connectIfUnambiguous has it, and
 // the line under the box names the next thing a side needs. The session's
-// options are on the status item's menu.
+// options are on the status item's menu. While a run waits for an app to
+// be brought to the front, PerchFocusAlert covers all of it.
 
 import SwiftUI
 
@@ -23,6 +24,7 @@ struct PerchConsoleView: View {
     var onCardResize: ((CGSize) -> Void)? = nil
 
     var body: some View {
+        let focusSide = PerchFocusAlert.side(for: controller)
         HStack(spacing: Perch.s(14)) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
             VStack(alignment: .leading, spacing: Perch.s(5)) {
@@ -36,6 +38,17 @@ struct PerchConsoleView: View {
         }
         .padding(.horizontal, Perch.s(28))
         .padding(.vertical, Perch.s(10))
+        // Under the alert, the console is only something to see through,
+        // softened so its lines do not compete with the ask.
+        .blur(radius: focusSide != nil ? Perch.s(6) : 0)
+        .accessibilityHidden(focusSide != nil)
+        .overlay {
+            if let focusSide {
+                PerchFocusAlert(controller: controller, side: focusSide)
+                    .transition(.opacity)
+            }
+        }
+        .animation(PerchFocusAlert.fade, value: focusSide)
         .frame(width: width, height: Perch.widgetHeight)
         .tint(Perch.accent)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
@@ -763,6 +776,20 @@ private func canvas(_ controller: RelayController) -> some View {
     controller.beginSteering()
     controller.setSteeringText("Push on the pricing question before you wrap up.")
     controller.sendSteering()
+    return canvas(controller)
+}
+
+#Preview("Console · waiting for focus") {
+    // Claude would not come to the front: the alert covers the console for
+    // four seconds, then fades as if its window had been clicked.
+    let engine = PerchPreviewEngine(turn: 4)
+    let controller = connectedController(engine)
+    controller.start()
+    engine.events.post(.blocked(.notInFront(side: .claude)))
+    Task {
+        try? await Task.sleep(for: .seconds(4))
+        engine.events.post(.blocked(nil))
+    }
     return canvas(controller)
 }
 
