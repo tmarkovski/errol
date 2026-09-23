@@ -1,27 +1,28 @@
-// One short sentence on what a reply said, for the run's log in the prompt
-// box (PerchTranscript): written by the on-device model once the reply is
-// in hand, while the other side writes its answer, so the wait costs the
-// run nothing. The log names who replied with the app's mark, and the
-// sentence has no subject of its own: asked to name the speaker, the
-// model credited replies to the wrong side, and took a reply's "you
-// argued…" for the other side's position. A reply that fits the log's
-// line as it is shows whole; one the model cannot sum up (unavailable,
-// declined, too slow) shows its opening instead. Nothing leaves the Mac.
+// One short sentence on what a reply said, for the run's transcript under
+// the console (PerchTranscript): written by the on-device model once the
+// reply is in hand, while the other side writes its answer, so the wait
+// costs the run nothing. The transcript names who replied with the app's
+// mark, and the sentence has no subject of its own: asked to name the
+// speaker, the model credited replies to the wrong side, and took a
+// reply's "you argued…" for the other side's position. A reply that fits
+// the transcript's line as it is shows whole; one the model cannot sum up
+// (unavailable, declined, too slow) shows its opening instead. Nothing
+// leaves the Mac.
 
 import Foundation
 import FoundationModels
 
 enum ReplySummarizer {
     /// Replies up to this long, once flattened, are shown whole: they fit
-    /// the log's one line as they are, and a sentence on one would be as
-    /// long as the reply.
+    /// the transcript's line as they are, and a sentence on one would be
+    /// as long as the reply.
     static let wholeLimit = 90
 
     /// Whether a flattened reply is long enough to need the model's line.
     static func needsGist(_ flat: String) -> Bool { flat.count > wholeLimit }
 
     /// The line, or nil when the model is unavailable, declines, answers
-    /// with nothing usable, or takes longer than the log should wait.
+    /// with nothing usable, or takes longer than the transcript should wait.
     static func gist(_ reply: String) async -> String? {
         let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, SystemLanguageModel.default.isAvailable else { return nil }
@@ -85,10 +86,10 @@ enum ReplySummarizer {
         return String(text.prefix(head)) + "\n\n[\u{2026}]\n\n" + String(text.suffix(tail))
     }
 
-    /// The model's answer as the log's line: its first sentence, should it
-    /// write more than the one asked for, unquoted, capitalized, without a
-    /// closing full stop (like the topic line), and of a length the log
-    /// can show. Nil when nothing is left.
+    /// The model's answer as the transcript's line: its first sentence,
+    /// should it write more than the one asked for, unquoted, capitalized,
+    /// without a closing full stop (like the topic line), and of a length
+    /// the transcript can show. Nil when nothing is left.
     static func clean(_ answer: String) -> String? {
         var line = answer.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -108,7 +109,7 @@ enum ReplySummarizer {
 
     /// A reply, or a note, as one line of plain text: code blocks out,
     /// markdown's marks off the words, the lines joined. Capped well past
-    /// what the log shows, which truncates it.
+    /// what the transcript shows, which truncates it.
     static func flatten(_ text: String) -> String {
         var lines: [String] = []
         var inCode = false

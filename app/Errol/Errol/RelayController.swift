@@ -62,9 +62,9 @@ struct SteeringReceipt: Equatable {
     var echo: Echo?
 }
 
-/// One line of the run's log in the prompt box (PerchTranscript): what a
-/// reply said, or a note the human sent, in the order the conversation
-/// took them in.
+/// One line of the run's transcript under the console (PerchTranscript):
+/// what a reply said, or a note the human sent, in the order the
+/// conversation took them in.
 struct TranscriptEntry: Identifiable, Equatable {
     enum Author: Equatable {
         case side(Speaker)
@@ -82,12 +82,13 @@ struct TranscriptEntry: Identifiable, Equatable {
     /// cannot write one; a short reply whole; a note as it was sent.
     var text: String
     /// Whether the text is the reply's own words rather than a sentence
-    /// on it, which the log sets apart (PerchTranscript).
+    /// on it, which the transcript sets apart (PerchTranscript).
     var verbatim = false
     /// Whether the model is still writing the reply's sentence.
     var summarizing = false
-    /// Whether the reply carried the sign-off, which the log marks after
-    /// the text: a sentence on the reply's words alone would not say so.
+    /// Whether the reply carried the sign-off, which the transcript marks
+    /// after the text: a sentence on the reply's words alone would not
+    /// say so.
     var signsOff = false
     /// For a note, whom it went to and where it stands; nil for a reply.
     var recipient: Speaker?
@@ -141,16 +142,15 @@ final class RelayController {
     /// What writes the sentence; the live model, or a stand-in in previews.
     @ObservationIgnored var summarize: @Sendable (String) async -> String? = { await TopicSummarizer.summarize($0) }
     @ObservationIgnored private var summaryTask: Task<Void, Never>?
-    /// The run's log for the prompt box (PerchTranscript), oldest first:
-    /// each reply once it is in hand, each note once it sets off. Only the
-    /// newest few show, so only the newest dozen are kept. Cleared at the
-    /// next start and by New session.
+    /// The run's transcript for the window under the console
+    /// (PerchTranscript), oldest first: each reply once it is in hand,
+    /// each note once it sets off. Kept whole through the ending, and
+    /// cleared at the next start and by New topic.
     private(set) var transcript: [TranscriptEntry] = []
     /// What writes a reply's line; the live model, or a stand-in in previews.
     @ObservationIgnored var summarizeReply: @Sendable (String) async -> String? = { await ReplySummarizer.gist($0) }
     @ObservationIgnored private var gistTasks: [Int: Task<Void, Never>] = [:]
     @ObservationIgnored private var nextTranscriptID = 0
-    private static let transcriptCap = 12
     var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
     /// finished, since the summary names it as the ending. The Stop button
@@ -438,12 +438,12 @@ final class RelayController {
         topicSummary = nil
     }
 
-    // MARK: The run's log
+    // MARK: The run's transcript
 
-    /// A reply in hand goes on the log at once, as its opening (or whole,
-    /// when it is short), and the model's sentence takes the opening's
-    /// place when it comes. A sign-off is marked on the line; a reply that
-    /// is nothing else is only that.
+    /// A reply in hand goes on the transcript at once, as its opening (or
+    /// whole, when it is short), and the model's sentence takes the
+    /// opening's place when it comes. A sign-off is marked on the line; a
+    /// reply that is nothing else is only that.
     private func replyCaptured(_ reply: String, from side: Speaker) {
         guard isRunning else { return }
         let signsOff = reply.contains(config.stopSequence)
@@ -480,12 +480,6 @@ final class RelayController {
         transcript.append(TranscriptEntry(id: id, author: author, text: text, verbatim: verbatim,
                                           summarizing: summarizing, signsOff: signsOff,
                                           recipient: recipient, delivery: delivery))
-        if transcript.count > Self.transcriptCap {
-            for entry in transcript.prefix(transcript.count - Self.transcriptCap) {
-                gistTasks.removeValue(forKey: entry.id)?.cancel()
-            }
-            transcript.removeFirst(transcript.count - Self.transcriptCap)
-        }
         return id
     }
 
@@ -495,10 +489,10 @@ final class RelayController {
         transcript.removeAll()
     }
 
-    /// A note's line: on the log as it sets off, and marked with how its
-    /// handoff went. A note that never set off (too long to travel whole)
-    /// still goes on, marked as not sent, so the log does not lose it; one
-    /// the run ended on is the ending's to report.
+    /// A note's line: on the transcript as it sets off, and marked with
+    /// how its handoff went. A note that never set off (too long to
+    /// travel whole) still goes on, marked as not sent, so the transcript
+    /// does not lose it; one the run ended on is the ending's to report.
     private func noteOnTranscript(_ delivery: SteeringDelivery) {
         guard isRunning, delivery.leg == .note else { return }
         let state: TranscriptEntry.Delivery

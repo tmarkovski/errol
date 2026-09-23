@@ -1,89 +1,112 @@
-// The run's log, in the prompt box while the agents work: each reply as a
-// line beside the mark of the app that wrote it, summed up by the
-// on-device model (ReplySummarizer), and each note the human sent beside
-// a person, in the order the conversation took them in. A reply's own
-// words stand in italics, on one line, until the model's sentence
-// replaces them. The newest line sits at the bottom, level with the run's
-// actions, and may take a second line; the ones before it keep one line
-// each and fade out toward the top of the box. It is a glance at where the conversation has been, not
-// a transcript to read back: it does not scroll, and an older line's full
-// text is its tooltip. It shows only while the run goes with the field
-// closed: the note editor takes the box while the run is paused, and the
-// ending after.
+// The run's transcript, in a window of its own under the console
+// (MenuBarController.transcriptPanel): each reply as a line beside the
+// mark of the app that wrote it, summed up by the on-device model
+// (ReplySummarizer), and each note the human sent beside a person, in the
+// order the conversation took them in. The window is shaped like the
+// prompt box — the same paper, corner, and insets, and as wide as the
+// box, centered under it — and it behaves like the box: the lines start
+// at the top, the newest at the bottom, and once they overflow they
+// scroll, following the newest line unless the reader has scrolled up to
+// an older one. A reply's own words stand in italics, on one line, until
+// the model's sentence replaces them; an older line's full text is its
+// tooltip. It shows from the run's start, with only a placeholder until
+// the first reply, through the ending, until New topic.
 
 import SwiftUI
 
 struct PerchTranscript: View {
     let controller: RelayController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether the newest line is in view. A line landing, or the sentence
+    /// taking an opening's place, scrolls the transcript to itself only
+    /// then; a reader who has scrolled up to an older line is left there.
+    @State private var followsNewest = true
+    /// Whether the transcript is scrolling itself to the newest line, so
+    /// the scroll's own motion is not read as the reader's.
+    @State private var scrollingToNewest = false
 
-    /// A row of the log: an entry, or the note queued for the next
-    /// handoff, which stays under every reply until it sets off with one.
-    private enum Row: Identifiable, Equatable {
-        case entry(TranscriptEntry)
-        case queued(String)
+    /// The window's height: room for six lines, or five and the sentence
+    /// on the newest taking two.
+    static let height = Perch.s(120)
+    /// The gap between the capsule's edge and the window.
+    static let gap = Perch.s(10)
+    private static let lineSpacing = Perch.s(4)
+    private static let follow = Animation.easeOut(duration: 0.35)
 
-        var id: String {
-            switch self {
-            case .entry(let entry): "entry-\(entry.id)"
-            case .queued: "queued"
-            }
-        }
-    }
-
-    private var rows: [Row] {
-        var rows = controller.transcript.map(Row.entry)
-        if let queued = controller.queuedSteering { rows.append(.queued(queued)) }
-        return rows
+    /// Where the reader is in the lines, from the scroll view's geometry:
+    /// the top of what shows, and how much of the lines lies below it.
+    private struct Extent: Equatable {
+        var top: CGFloat
+        var below: CGFloat
     }
 
     var body: some View {
-        let rows = self.rows
-        // The box's space, exactly: the rows stand on its bottom edge at
-        // their own heights, and what does not fit goes off the top, under
-        // the fade, as the log moves up. (A flexible frame would grow to
-        // the rows instead, and clip nothing.)
-        Color.clear
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: Perch.s(2)) {
-                    ForEach(rows) { row in
-                        let newest = row.id == rows.last?.id
-                        Group {
-                            switch row {
-                            case .entry(let entry):
-                                PerchTranscriptRow(controller: controller, entry: entry, isNewest: newest)
-                            case .queued(let note):
-                                PerchTranscriptRow(controller: controller,
-                                                   entry: TranscriptEntry(id: -1, author: .human,
-                                                                          text: ReplySummarizer.flatten(note)),
-                                                   isNewest: newest, isQueued: true)
-                            }
-                        }
-                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                                removal: .opacity))
+        let entries = controller.transcript
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: Self.lineSpacing) {
+                    ForEach(entries) { entry in
+                        PerchTranscriptRow(controller: controller, entry: entry,
+                                           isNewest: entry.id == entries.last?.id)
+                            .id(entry.id)
+                            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                                    removal: .opacity))
                     }
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, GrowingTextEditor.insetHeight)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .animation(reduceMotion ? Perch.fade : Self.follow, value: entries.map(\.id))
             }
-            .clipped()
-            .mask {
-            LinearGradient(stops: [.init(color: .clear, location: 0),
-                                   .init(color: .black, location: 0.32)],
-                           startPoint: .top, endPoint: .bottom)
+            .onScrollGeometryChange(for: Extent.self) { geometry in
+                Extent(top: geometry.visibleRect.minY,
+                       below: geometry.contentSize.height - geometry.visibleRect.maxY)
+            } action: { old, new in
+                // Only a scroll moves the top. A line landing or growing
+                // moves what lies below, and whether that is followed is
+                // for the reader's last position to say.
+                guard !scrollingToNewest, new.top != old.top else { return }
+                followsNewest = new.below <= Self.lineSpacing
+            }
+            .onChange(of: entries) { _, entries in
+                guard followsNewest, let newest = entries.last else { return }
+                scrollingToNewest = true
+                withAnimation(reduceMotion ? nil : Self.follow) {
+                    proxy.scrollTo(newest.id, anchor: .bottom)
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(450))
+                    scrollingToNewest = false
+                }
+            }
         }
-        .animation(reduceMotion ? Perch.fade : .easeOut(duration: 0.35), value: rows.map(\.id))
+        .overlay(alignment: .topLeading) {
+            if entries.isEmpty {
+                Text("Each reply lands here, summed up in a line.")
+                    .font(Perch.text(13))
+                    .foregroundStyle(Perch.placeholder)
+                    .lineLimit(1)
+                    .padding(.vertical, GrowingTextEditor.insetHeight)
+                    .transition(.opacity)
+            }
+        }
+        .animation(Perch.fade, value: entries.isEmpty)
+        // The box's insets: its text starts here too.
+        .padding(.horizontal, PerchPromptBox.textInset)
+        .padding(.vertical, PerchPromptBox.verticalInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: PerchPromptBox.corner).fill(Perch.paper))
+        .overlay(RoundedRectangle(cornerRadius: PerchPromptBox.corner).stroke(Perch.chipEdge, lineWidth: 1))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("The conversation so far")
     }
 }
 
-/// One line of the log: whose it is, what it says, whether it signed off,
-/// and for a note, where it stands.
+/// One line of the transcript: whose it is, what it says, whether it
+/// signed off, and for a note, where it stands.
 private struct PerchTranscriptRow: View {
     let controller: RelayController
     let entry: TranscriptEntry
     let isNewest: Bool
-    var isQueued = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Perch.s(7)) {
@@ -93,10 +116,12 @@ private struct PerchTranscriptRow: View {
                 // The mark sits on the first line's text, not above it.
                 .alignmentGuide(.firstTextBaseline) { $0[.bottom] - Perch.s(1.5) }
             Text(entry.text)
-                .font(Perch.text(11))
+                .font(Perch.text(12))
                 .italic(entry.verbatim)
                 .foregroundStyle(ink)
-                .lineLimit(isNewest && !entry.verbatim ? 2 : 1)
+                // The model's sentence may run to a second line; a reply's
+                // own words get one, as a quotation, not a reading.
+                .lineLimit(entry.verbatim ? 1 : 2)
                 .truncationMode(.tail)
                 .contentTransition(.opacity)
                 .animation(Perch.fade, value: entry.text)
@@ -106,7 +131,7 @@ private struct PerchTranscriptRow: View {
                 tag
             } else if entry.signsOff {
                 Text("\u{00B7} signs off")
-                    .font(Perch.text(11))
+                    .font(Perch.text(12))
                     .foregroundStyle(Perch.muted)
                     .lineLimit(1)
                     .fixedSize()
@@ -123,14 +148,14 @@ private struct PerchTranscriptRow: View {
         }
     }
 
-    /// The newest line reads in the box's ink; the ones before it step back.
-    /// A reply's own words, in italics on one line, sit a step lighter than
-    /// a sentence on it would — lighter still, under the busy shimmer,
-    /// while the model writes that sentence — so the log reads as the
-    /// model's account, with the replies quoted only where it has none.
+    /// The newest line reads in the box's ink; the ones before it step
+    /// back. A reply's own words, in italics on one line, sit a step
+    /// lighter than a sentence on it would — lighter still, under the
+    /// busy shimmer, while the model writes that sentence — so the
+    /// transcript reads as the model's account, with the replies quoted
+    /// only where it has none.
     private var ink: Color {
         if entry.summarizing { return Perch.muted }
-        if isQueued { return Perch.secondary }
         if entry.verbatim { return isNewest ? Perch.secondary : Perch.muted }
         return isNewest ? Perch.ink : Perch.secondary
     }
@@ -160,50 +185,88 @@ private struct PerchTranscriptRow: View {
     }
 
     /// Where a note stands, after it, kept whole while the note truncates:
-    /// queued for the next handoff with the way to drop it, on its way,
-    /// or how its handoff went. Its echo to the other side is the ending's
-    /// to tell (PerchReceiptLine).
+    /// on its way, or how its handoff went. A note still queued is the
+    /// prompt box's to show (PerchRunLine), since it is not yet part of
+    /// the conversation; its echo to the other side is the ending's to
+    /// tell (PerchReceiptLine).
     @ViewBuilder private var tag: some View {
         let recipient = entry.recipient.map(controller.appName)
         Group {
-            if isQueued {
-                HStack(spacing: Perch.s(8)) {
-                    Text(controller.nextRecipient.map { "Queued for \($0)" } ?? "Queued")
-                        .foregroundStyle(Perch.accentText)
-                    Button {
-                        withAnimation(Perch.fade) { _ = controller.clearSteering() }
-                    } label: {
-                        Text("Clear")
-                            .font(Perch.text(11, .medium))
-                            .perchHoverInk(idle: Perch.secondary, active: Perch.ink)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Drop the queued note \u{2014} nothing goes with the next handoff")
-                }
-            } else {
-                switch entry.delivery {
-                case .sending?:
-                    Text(recipient.map { "Sending to \($0)\u{2026}" } ?? "Sending\u{2026}")
-                        .foregroundStyle(Perch.accentText)
-                case .sent?:
-                    Text(recipient.map { "to \($0)" } ?? "Sent")
-                        .foregroundStyle(Perch.muted)
-                case .unconfirmed?:
-                    Text(recipient.map { "to \($0) \u{00B7} unconfirmed" } ?? "Unconfirmed")
-                        .foregroundStyle(Perch.muted)
-                case .notSent?:
-                    Text("Not sent")
-                        .foregroundStyle(Perch.red)
-                case nil:
-                    EmptyView()
-                }
+            switch entry.delivery {
+            case .sending?:
+                Text(recipient.map { "Sending to \($0)\u{2026}" } ?? "Sending\u{2026}")
+                    .foregroundStyle(Perch.accentText)
+            case .sent?:
+                Text(recipient.map { "to \($0)" } ?? "Sent")
+                    .foregroundStyle(Perch.muted)
+            case .unconfirmed?:
+                Text(recipient.map { "to \($0) \u{00B7} unconfirmed" } ?? "Unconfirmed")
+                    .foregroundStyle(Perch.muted)
+            case .notSent?:
+                Text("Not sent")
+                    .foregroundStyle(Perch.red)
+            case nil:
+                EmptyView()
             }
         }
-        .font(Perch.text(11))
+        .font(Perch.text(12))
         .lineLimit(1)
         .fixedSize()
         .contentTransition(.opacity)
         .animation(Perch.fade, value: entry.delivery)
     }
 }
+
+// MARK: - Canvases
+
+#if DEBUG
+/// The transcript at its window's size, over a desktop-like gray, the way
+/// it stands under the console.
+private func card(_ controller: RelayController) -> some View {
+    PerchTranscript(controller: controller)
+        .frame(width: PerchConsoleView.promptBoxWidth(consoleWidth: Perch.widgetWidth),
+               height: PerchTranscript.height)
+        .padding(24)
+        .background(Color(white: 0.75))
+}
+
+/// A run with the given replies in hand, and a note sent with the third
+/// handoff when there are that many.
+private func playedController(replies: Int, note: Bool = true,
+                              summarize: (@Sendable (String) async -> String?)? = nil) -> RelayController {
+    let engine = PerchPreviewEngine(turn: replies + 1)
+    let controller = connectedController(engine)
+    if let summarize { controller.summarizeReply = summarize }
+    controller.start()
+    let text = "Push on the pricing question before you wrap up."
+    for turn in stride(from: 1, through: replies, by: 1) {
+        engine.events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: PerchPreviewEngine.reply(turn: turn)))
+        if note, turn == 3 {
+            engine.events.post(.steeringCommitted(note: text, recipient: .claude, turn: 3))
+            engine.events.post(.steering(SteeringDelivery(leg: .note, note: text, recipient: .claude, turn: 3,
+                                                          outcome: .delivered)))
+        }
+    }
+    return controller
+}
+
+#Preview("Transcript · waiting for the first reply") {
+    card(playedController(replies: 0))
+}
+
+#Preview("Transcript · first reply") {
+    // The opening in italics, then the model's sentence a beat later.
+    card(playedController(replies: 1))
+}
+
+#Preview("Transcript · running") {
+    // Seven replies and a note: more lines than the window shows,
+    // scrolled to the newest.
+    card(playedController(replies: 7))
+}
+
+#Preview("Transcript · model unavailable") {
+    // No sentence comes, so each line keeps the reply's opening.
+    card(playedController(replies: 4, summarize: { _ in nil }))
+}
+#endif
