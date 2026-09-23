@@ -667,6 +667,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 log("\(speaker.name) ended the conversation (empty reply).")
                 return .emptyReply(side: side(speaker))
             }
+            relayEvents.post(.reply(side: side(speaker), text: reply))
             let signedOff = trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
             if signedOff {
                 setConversation(speaker, .ended)

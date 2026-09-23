@@ -22,6 +22,10 @@ enum RelayEvent {
     case conversation(chatgpt: ConversationStatus, claude: ConversationStatus)
     /// Each turn as it begins (1-based).
     case turn(Int)
+    /// A reply as it was copied from the side that wrote it, once it is
+    /// in hand and before it is relayed. The panel's log sums it up
+    /// (ReplySummarizer).
+    case reply(side: Speaker, text: String)
     /// The run parking at a handoff to wait for Resume, and letting go.
     /// Asking for a pause and the run acting on it are different moments —
     /// the request lands mid-reply and takes effect only once that reply
