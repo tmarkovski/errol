@@ -36,6 +36,34 @@ final class PerchPreviewEngine: RelayEngine {
                            detail: "\u{201C}Pricing by seat or by usage\u{201D}")
     )
 
+    /// What the agents say in a played run, one reply a turn from the
+    /// first, round again once they run out, and the sentence the model
+    /// would write on each (nil for a reply short enough to show whole). A
+    /// canvas hands `gist(for:)` to the controller in the model's place.
+    static let replies: [(text: String, gist: String?)] = [
+        ("I'd lean toward per-seat pricing for the first year. Buyers can predict the bill, procurement understands it, and it maps to how the team already thinks about headcount. Usage pricing is fairer in theory, but it makes the first invoice a surprise, and surprises slow renewals. Where would you push back?",
+         "Favors per-seat pricing because buyers can predict the bill"),
+        ("Predictability matters, but seats punish exactly the customers you want: teams that roll the tool out widely and use it lightly. They'll share logins or cap seats, and you lose the network effect. I'd price by usage with a monthly cap, so the bill can't surprise anyone and wide adoption stays cheap.",
+         "Holds that seats punish wide, light use and proposes capped usage pricing"),
+        ("A cap helps, but it's still hard for a finance team to forecast. What about a hybrid: a small platform fee per seat, with usage above a generous included allowance? Seats give you the floor, and usage captures the heavy teams.",
+         "Concedes the cap helps but proposes a per-seat floor plus usage"),
+        ("The hybrid works if the allowance is generous enough that most teams never see an overage line. Otherwise you get the worst of both: seat friction and bill anxiety. I'd set the allowance at the 80th percentile of current usage and revisit it every quarter.",
+         "Agrees with the hybrid if the allowance covers most teams"),
+        ("Agreed on the 80th percentile. Let's draft the pricing page next.", nil),
+        ("Here's a first pass. Headline: \u{201C}Pay for your team, not your curiosity.\u{201D} Then three tiers, each listing seats, the included allowance, and the overage rate, plus a calculator so buyers can check their own numbers before they ever talk to sales.",
+         "Drafts pricing page copy with three tiers and a calculator"),
+    ]
+
+    static func reply(turn: Int) -> String {
+        replies[(max(1, turn) - 1) % replies.count].text
+    }
+
+    static func gist(for reply: String) -> String? {
+        let text = reply.replacingOccurrences(of: config.stopSequence, with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return replies.first { $0.text == text }?.gist
+    }
+
     /// The windows each app offers a canvas: the ids a preview connects by.
     enum Windows {
         static let chatgptConversation = WindowID(raw: 101)
@@ -323,6 +351,8 @@ private final class PreviewRun {
             }
 
             let signedOff = signOffAt.map { turn >= $0 } ?? false
+            let reply = PerchPreviewEngine.reply(turn: turn)
+            events.post(.reply(side: speaker, text: signedOff ? "\(reply)\n\n\(config.stopSequence)" : reply))
             if signedOff {
                 set(speaker, .ended)
                 if lastReplyEnded {

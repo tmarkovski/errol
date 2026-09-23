@@ -62,6 +62,38 @@ struct SteeringReceipt: Equatable {
     var echo: Echo?
 }
 
+/// One line of the run's log in the prompt box (PerchTranscript): what a
+/// reply said, or a note the human sent, in the order the conversation
+/// took them in.
+struct TranscriptEntry: Identifiable, Equatable {
+    enum Author: Equatable {
+        case side(Speaker)
+        case human
+    }
+    /// Where a note stands. Its echo to the other side is the receipt's
+    /// to tell (SteeringReceipt), once the run has ended.
+    enum Delivery: Equatable {
+        case sending, sent, unconfirmed, notSent
+    }
+    let id: Int
+    let author: Author
+    /// What the line says: the model's sentence on a reply once it has
+    /// one, and the reply's opening before that and wherever the model
+    /// cannot write one; a short reply whole; a note as it was sent.
+    var text: String
+    /// Whether the text is the reply's own words rather than a sentence
+    /// on it, which the log sets apart (PerchTranscript).
+    var verbatim = false
+    /// Whether the model is still writing the reply's sentence.
+    var summarizing = false
+    /// Whether the reply carried the sign-off, which the log marks after
+    /// the text: a sentence on the reply's words alone would not say so.
+    var signsOff = false
+    /// For a note, whom it went to and where it stands; nil for a reply.
+    var recipient: Speaker?
+    var delivery: Delivery?
+}
+
 @Observable
 final class RelayController {
     /// The picker tag for free-form instructions; not a ConversationTemplate.
@@ -109,6 +141,16 @@ final class RelayController {
     /// What writes the sentence; the live model, or a stand-in in previews.
     @ObservationIgnored var summarize: @Sendable (String) async -> String? = { await TopicSummarizer.summarize($0) }
     @ObservationIgnored private var summaryTask: Task<Void, Never>?
+    /// The run's log for the prompt box (PerchTranscript), oldest first:
+    /// each reply once it is in hand, each note once it sets off. Only the
+    /// newest few show, so only the newest dozen are kept. Cleared at the
+    /// next start and by New session.
+    private(set) var transcript: [TranscriptEntry] = []
+    /// What writes a reply's line; the live model, or a stand-in in previews.
+    @ObservationIgnored var summarizeReply: @Sendable (String) async -> String? = { await ReplySummarizer.gist($0) }
+    @ObservationIgnored private var gistTasks: [Int: Task<Void, Never>] = [:]
+    @ObservationIgnored private var nextTranscriptID = 0
+    private static let transcriptCap = 12
     var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
     /// finished, since the summary names it as the ending. The Stop button
@@ -252,6 +294,8 @@ final class RelayController {
             case .turn(let turn):
                 currentTurn = turn
                 if turn > 0 { openingSent = true }
+            case .reply(let side, let text):
+                replyCaptured(text, from: side)
             case .holding(let holding):
                 isHolding = holding
             case .blocked(let block):
@@ -394,6 +438,83 @@ final class RelayController {
         topicSummary = nil
     }
 
+    // MARK: The run's log
+
+    /// A reply in hand goes on the log at once, as its opening (or whole,
+    /// when it is short), and the model's sentence takes the opening's
+    /// place when it comes. A sign-off is marked on the line; a reply that
+    /// is nothing else is only that.
+    private func replyCaptured(_ reply: String, from side: Speaker) {
+        guard isRunning else { return }
+        let signsOff = reply.contains(config.stopSequence)
+        let text = reply.replacingOccurrences(of: config.stopSequence, with: "")
+        let flat = ReplySummarizer.flatten(text)
+        guard !flat.isEmpty else {
+            if signsOff { appendTranscript(.side(side), text: "Signs off") }
+            return
+        }
+        let summarizing = ReplySummarizer.needsGist(flat)
+        let id = appendTranscript(.side(side), text: flat, verbatim: true, summarizing: summarizing,
+                                  signsOff: signsOff)
+        guard summarizing else { return }
+        let summarize = summarizeReply
+        gistTasks[id] = Task { @MainActor [weak self] in
+            let gist = await summarize(text)
+            guard !Task.isCancelled, let self else { return }
+            gistTasks[id] = nil
+            guard let index = transcript.firstIndex(where: { $0.id == id }) else { return }
+            if let gist {
+                transcript[index].text = gist
+                transcript[index].verbatim = false
+            }
+            transcript[index].summarizing = false
+        }
+    }
+
+    @discardableResult
+    private func appendTranscript(_ author: TranscriptEntry.Author, text: String, verbatim: Bool = false,
+                                  summarizing: Bool = false, signsOff: Bool = false,
+                                  recipient: Speaker? = nil, delivery: TranscriptEntry.Delivery? = nil) -> Int {
+        let id = nextTranscriptID
+        nextTranscriptID += 1
+        transcript.append(TranscriptEntry(id: id, author: author, text: text, verbatim: verbatim,
+                                          summarizing: summarizing, signsOff: signsOff,
+                                          recipient: recipient, delivery: delivery))
+        if transcript.count > Self.transcriptCap {
+            for entry in transcript.prefix(transcript.count - Self.transcriptCap) {
+                gistTasks.removeValue(forKey: entry.id)?.cancel()
+            }
+            transcript.removeFirst(transcript.count - Self.transcriptCap)
+        }
+        return id
+    }
+
+    private func clearTranscript() {
+        gistTasks.values.forEach { $0.cancel() }
+        gistTasks.removeAll()
+        transcript.removeAll()
+    }
+
+    /// A note's line: on the log as it sets off, and marked with how its
+    /// handoff went. A note that never set off (too long to travel whole)
+    /// still goes on, marked as not sent, so the log does not lose it; one
+    /// the run ended on is the ending's to report.
+    private func noteOnTranscript(_ delivery: SteeringDelivery) {
+        guard isRunning, delivery.leg == .note else { return }
+        let state: TranscriptEntry.Delivery
+        switch delivery.outcome {
+        case .delivered: state = .sent
+        case .unconfirmed: state = .unconfirmed
+        case .refused, .tooLong, .runEnded: state = .notSent
+        }
+        if let index = transcript.lastIndex(where: { $0.author == .human && $0.delivery == .sending }) {
+            transcript[index].delivery = state
+        } else if delivery.outcome != .runEnded {
+            appendTranscript(.human, text: ReplySummarizer.flatten(delivery.note),
+                             recipient: delivery.recipient, delivery: state)
+        }
+    }
+
     /// Why Send is unavailable now, beside it: the topic missing, or a
     /// destination not ready. nil when it can go.
     var sendBlocker: String? {
@@ -458,6 +579,7 @@ final class RelayController {
         lastRunDuration = nil
         runStartedAt = Date()
         beginTopicSummary()
+        clearTranscript()
         // The buffer holds one run, so the debug window's "last run log"
         // means what it says; lines logged between runs (an inspect report,
         // a failed start) stay until the next run claims the buffer.
@@ -492,6 +614,7 @@ final class RelayController {
         chatgptConversation = .notStarted
         claudeConversation = .notStarted
         clearTopicSummary()
+        clearTranscript()
     }
 
     /// Another topic in these conversations: the editor comes back empty,
@@ -703,6 +826,7 @@ final class RelayController {
     /// the field is already open and empty for a new one.
     private func steeringCommitted(_ note: String, to recipient: Speaker, turn: Int) {
         steeringInFlight = SteeringInFlight(note: note, recipient: appName(recipient), turn: turn)
+        appendTranscript(.human, text: ReplySummarizer.flatten(note), recipient: recipient, delivery: .sending)
         if let queued = queuedSteering,
            queued.trimmingCharacters(in: .whitespacesAndNewlines) == note {
             queuedSteering = nil
@@ -715,6 +839,7 @@ final class RelayController {
     /// it queued — never had a committed event, so the field lets go of it
     /// here instead.
     private func steeringDelivered(_ delivery: SteeringDelivery) {
+        noteOnTranscript(delivery)
         let recipient = appName(delivery.recipient)
         switch delivery.leg {
         case .note:

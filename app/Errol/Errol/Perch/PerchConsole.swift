@@ -8,7 +8,9 @@
 // still needs, what the apps are doing, how the run ended — and when
 // nothing does, each side's surface and model as the sweep reads them.
 // Every stage shares that frame: the topic editor, then the run with the
-// field closed or the steering note open in it, then the ending.
+// field closed or the steering note open in it, then the ending. With the
+// field closed, the run's log (PerchTranscript) fills the box once the
+// agents have replied.
 //
 // The icons open the apps, the arrangement applies as it is chosen, each
 // side is connected as SetupController.connectIfUnambiguous has it, and
@@ -231,12 +233,18 @@ struct PerchRunMetadata: View {
 /// off from it; then the steering note while the run is paused, the
 /// closed field's notice while the agents work, and the ending's detail
 /// after. The capsule's height is fixed, so the editors scroll inside
-/// what the box leaves them.
+/// what the box leaves them. Once the agents have something to show, the
+/// closed field gives way to the run's log (PerchTranscript), which takes
+/// the box's whole height beside the actions, since the toolbar holds
+/// nothing else during a run.
 struct PerchPromptBox: View {
     @Bindable var controller: RelayController
+    /// The actions' width, which the log stays clear of.
+    @State private var actionsWidth: CGFloat = 0
 
     static let textInset = Perch.s(12)
     private static let corner = Perch.s(16)
+    private static let toolbarInset = Perch.s(7)
 
     /// What stands in the text's place. One value for the prompt as
     /// written, before and just after Send, so the editor keeps its
@@ -264,7 +272,7 @@ struct PerchPromptBox: View {
                 case .steering:
                     steering
                 case .closed:
-                    closedField
+                    if !showsTranscript { closedField }
                 case .ending:
                     ending
                 }
@@ -283,10 +291,22 @@ struct PerchPromptBox: View {
                 }
                 Spacer(minLength: 0)
                 PerchConsoleActions(controller: controller)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { actionsWidth = $0 }
             }
             .frame(height: Perch.actionDiameter)
-            .padding(.horizontal, Perch.s(7))
+            .padding(.horizontal, Self.toolbarInset)
         }
+        .overlay {
+            if showsTranscript {
+                PerchTranscript(controller: controller)
+                    .padding(.leading, Self.textInset)
+                    .padding(.trailing, Self.toolbarInset + actionsWidth + Perch.s(16))
+                    // The newest line sits level with the actions' middle.
+                    .padding(.bottom, Perch.s(9))
+                    .transition(.opacity)
+            }
+        }
+        .animation(Perch.fade, value: showsTranscript)
         .padding(.top, Perch.s(6))
         .padding(.bottom, Perch.s(6))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -350,6 +370,16 @@ struct PerchPromptBox: View {
 
     private var hasNoteFeedback: Bool {
         controller.steeringQueued || controller.steeringInFlight != nil || controller.lastReceipt != nil
+    }
+
+    /// The run's log takes the closed field once there is a line for it,
+    /// a reply or a queued note, and while nothing in the apps needs the
+    /// human: a block's recovery is what the box says then. The log says
+    /// where each note stands, so the note's own lines step aside for it.
+    private var showsTranscript: Bool {
+        guard field == .closed else { return false }
+        if controller.block != nil, !controller.stopRequested { return false }
+        return !controller.transcript.isEmpty || controller.steeringQueued
     }
 
     /// The field is closed while the agents work: how to recover from a
@@ -688,6 +718,12 @@ private func connectedController(_ engine: PerchPreviewEngine = PerchPreviewEngi
     controller.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
     controller.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeConversation)
     controller.topic = "Pricing by seat or by usage"
+    // The replies' lines come from the played run's own table, a beat
+    // after each reply, the way the model's would.
+    controller.summarizeReply = { reply in
+        try? await Task.sleep(for: .seconds(1.5))
+        return PerchPreviewEngine.gist(for: reply)
+    }
     return controller
 }
 
@@ -751,10 +787,29 @@ private func canvas(_ controller: RelayController) -> some View {
     return canvas(controller)
 }
 
+#Preview("Console · running (log)") {
+    // Five replies in and a note sent with the fourth handoff, so the log
+    // is full and fading at the top; Claude is writing the sixth.
+    let engine = PerchPreviewEngine(turn: 6)
+    let controller = connectedController(engine)
+    controller.start()
+    let note = "Push on the pricing question before you wrap up."
+    for turn in 1...4 {
+        engine.events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: PerchPreviewEngine.reply(turn: turn)))
+    }
+    engine.events.post(.steeringCommitted(note: note, recipient: .chatgpt, turn: 4))
+    engine.events.post(.steering(SteeringDelivery(leg: .note, note: note, recipient: .chatgpt, turn: 4,
+                                                  outcome: .delivered)))
+    engine.events.post(.reply(side: .chatgpt, text: PerchPreviewEngine.reply(turn: 5)))
+    return canvas(controller)
+}
+
 #Preview("Console · running (model unavailable)") {
-    // No sentence comes, so the line keeps saying who went first.
+    // No sentence comes, so the line keeps saying who went first, and the
+    // log shows each reply's opening.
     let controller = connectedController(PerchPreviewEngine(turn: 4))
     controller.summarize = { _ in nil }
+    controller.summarizeReply = { _ in nil }
     controller.start()
     return canvas(controller)
 }
