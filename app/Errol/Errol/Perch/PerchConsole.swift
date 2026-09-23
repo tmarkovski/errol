@@ -2,13 +2,13 @@
 // before it. The participants stand at the capsule's ends as they always
 // have; between them, the topic line sits above a prompt box, and the box
 // holds the text over a toolbar row — the window arrangement at its
-// leading end, the actions at its trailing end. The topic line says who
-// goes first, and once the run has started, what it is about. Under the
-// box, one line says what needs saying — what a side still needs, what
-// the apps are doing, how the run ended — and when nothing does, each
-// side's surface and model as the sweep reads them. Every stage shares
-// that frame: the topic editor, then the run with the field closed or the
-// steering note open in it, then the ending.
+// leading end until the run starts, the actions at its trailing end. The
+// topic line says who goes first, and once the run has started, what it
+// is about. Under the box, one line says what needs saying — what a side
+// still needs, what the apps are doing, how the run ended — and when
+// nothing does, each side's surface and model as the sweep reads them.
+// Every stage shares that frame: the topic editor, then the run with the
+// field closed or the steering note open in it, then the ending.
 //
 // The icons open the apps, the arrangement applies as it is chosen, each
 // side is connected as SetupController.connectIfUnambiguous has it, and
@@ -265,8 +265,9 @@ struct PerchPromptBox: View {
                     .accessibilityHidden(true)
             }
             HStack(spacing: Perch.s(10)) {
-                PerchLayoutSegments(controller: controller)
-                    .disabled(controller.stage == .running)
+                if controller.stage == .compose {
+                    PerchLayoutSegments(controller: controller)
+                }
                 Spacer(minLength: 0)
                 PerchConsoleActions(controller: controller)
             }
@@ -513,7 +514,9 @@ extension LayoutChoice {
 /// The arrangements in one flat control at the toolbar's leading
 /// end, as tall as the actions beside it and with the prompt box's kind
 /// of corner (Perch.controlCorner). A choice applies at once, and stands
-/// for windows connected later (SetupController.applyIfPending).
+/// for windows connected later (SetupController.applyIfPending). It is
+/// there only before a run: once one starts, and after it ends, the
+/// actions have the toolbar to themselves until New topic brings it back.
 ///
 /// A well with a paper thumb on the chosen segment and hairlines between
 /// the others that hide beside it, drawn by hand: NSSegmentedControl fills
