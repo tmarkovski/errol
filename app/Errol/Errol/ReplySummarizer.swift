@@ -1,7 +1,8 @@
-// One short sentence on what a reply said, for the run's transcript under
-// the console (PerchTranscript): written by the on-device model once the
-// reply is in hand, while the other side writes its answer, so the wait
-// costs the run nothing. The transcript names who replied with the app's
+// A line on what a reply said, for the run's transcript under the console
+// (PerchTranscript): the move the reply makes, and what carries it, in at
+// most two sentences, written by the on-device model once the reply is
+// in hand, while the other side writes its answer, so the wait costs the
+// run nothing. The transcript names who replied with the app's
 // mark, and the sentence has no subject of its own: asked to name the
 // speaker, the model credited replies to the wrong side, and took a
 // reply's "you argued…" for the other side's position. A reply that fits
@@ -28,7 +29,9 @@ enum ReplySummarizer {
         guard !text.isEmpty, SystemLanguageModel.default.isAvailable else { return nil }
         let excerpt = Self.excerpt(text)
         var options = GenerationOptions()
-        options.maximumResponseTokens = 60
+        // Two sentences of thirty words run to some forty-five tokens;
+        // the rest is room for the model to overrun, which clean trims.
+        options.maximumResponseTokens = 90
         let instructions = Self.instructions
         return await withTaskGroup(of: String?.self) { group in
             group.addTask {
@@ -59,22 +62,31 @@ enum ReplySummarizer {
     /// point; shown forty it settled on "Suggests". A short list grouped by
     /// the kind of move a message makes has it name the move first, so the
     /// verb follows the reply. Asked for the message it answers as well, it
-    /// mixed the two up. One sentence is asked for; clean keeps the first.
+    /// mixed the two up. One sentence on the move alone was reliable but
+    /// thin, and most replies came out "Suggests…"; a second sentence for
+    /// what carries the move (the reason, the steps, the terms) has the
+    /// lines say more and read less alike, at about the same rate of a
+    /// wrong detail, one in five. A third sentence overflowed the row and
+    /// inverted a long reply's argument, and two sentences with no list of
+    /// moves lost the form altogether. clean keeps the first two.
     private static let instructions = """
-        You write a one-line gist of one message in a discussion, for a \
-        person glancing at it. Say the message's main move, what it mainly \
-        does, in one sentence of at most fifteen words. A message may make a \
-        claim (Holds that..., Argues that..., Warns that..., Doubts \
-        that...), a proposal (Proposes..., Suggests...), a plan (Lays \
-        out..., Lists...), a question (Asks whether..., Asks for...), an \
-        example (Gives the example of...), a decision (Settles on..., \
-        Drops...), a pushback (Rejects..., Insists that...), or, when it \
-        does nothing else, an agreement (Agrees...). Lead with the move that \
-        carries most of the message, not with what it grants along the way. \
-        Start with a present-tense verb and leave out the subject. When the \
-        message pushes back on a view, say what it holds instead, never the \
-        view it answers. Say nothing the message does not say. Do not quote \
-        it, and do not add a label, a preamble, or a closing remark.
+        You write a short gist of one message in a discussion, for a \
+        person glancing at it: at most two sentences and thirty words in \
+        all. The first sentence says the message's main move, what it \
+        mainly does. A message may make a claim (Holds that..., Argues \
+        that..., Warns that..., Doubts that...), a proposal (Proposes..., \
+        Suggests...), a plan (Lays out..., Lists...), a question (Asks \
+        whether..., Asks for...), an example (Gives the example of...), a \
+        decision (Settles on..., Drops...), a pushback (Rejects..., \
+        Insists that...), or, when it does nothing else, an agreement \
+        (Agrees...). The second sentence, when the message has more in \
+        it, gives what carries the move: the reason, the plan's steps, the \
+        example, or the question's terms. Lead with the move that carries \
+        most of the message, not with what it grants along the way. Start \
+        with a present-tense verb and leave out the subject. When the \
+        message pushes back on a view, say what it holds instead, never \
+        the view it answers. Say nothing the message does not say. Do not \
+        quote it, and do not add a label, a preamble, or a closing remark.
         """
 
     /// What the model reads: the whole reply when it fits the context
@@ -86,10 +98,11 @@ enum ReplySummarizer {
         return String(text.prefix(head)) + "\n\n[\u{2026}]\n\n" + String(text.suffix(tail))
     }
 
-    /// The model's answer as the transcript's line: its first sentence,
-    /// should it write more than the one asked for, unquoted, capitalized,
-    /// without a closing full stop (like the topic line), and of a length
-    /// the transcript can show. Nil when nothing is left.
+    /// The model's answer as the transcript's line: its first two
+    /// sentences, should it write more than asked for, unquoted,
+    /// capitalized, without a closing full stop (like the topic line), and
+    /// of a length the transcript's two lines can show. Nil when nothing
+    /// is left.
     static func clean(_ answer: String) -> String? {
         var line = answer.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -97,8 +110,19 @@ enum ReplySummarizer {
             .joined(separator: " ")
         let quotes = CharacterSet(charactersIn: "\"'\u{201C}\u{201D}\u{2018}\u{2019}")
         line = line.trimmingCharacters(in: quotes)
-        if let end = line.range(of: #"[.!?]\s"#, options: .regularExpression) {
-            line = String(line[..<end.lowerBound])
+        // Names of code come back in the reply's own backticks and bold.
+        for mark in ["**", "__", "`"] { line = line.replacingOccurrences(of: mark, with: "") }
+        // The move and what carries it; anything after is the model going
+        // on. A sentence ends at its stop only where another follows.
+        var sentences = 0
+        var from = line.startIndex
+        while let end = line.range(of: #"[.!?]\s"#, options: .regularExpression, range: from..<line.endIndex) {
+            sentences += 1
+            if sentences == 2 {
+                line = String(line[..<end.lowerBound])
+                break
+            }
+            from = end.upperBound
         }
         while line.hasSuffix(".") { line.removeLast() }
         line = line.trimmingCharacters(in: .whitespacesAndNewlines)
