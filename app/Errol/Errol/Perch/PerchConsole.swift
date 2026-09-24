@@ -1,24 +1,6 @@
-// The console the app shows: the prompt from the start, with no steps
-// before it. The participants stand at the capsule's ends as they always
-// have; between them, the topic line sits above a prompt box, and the box
-// holds the text over a toolbar row — the window arrangement at its
-// leading end until the run starts, the actions at its trailing end. The
-// topic line says who goes first, and once the run has started, what it
-// is about. Under the box, one line says what needs saying — what a side
-// still needs, what the apps are doing, how the run ended — and when
-// nothing does, each side's surface and model as the sweep reads them.
-// Every stage shares that frame: the topic editor, then the run with the
-// field closed or the steering note open in it, then the ending. The
-// run's transcript is not in the capsule: it stands under it, in a window
-// of its own shaped like the prompt box (PerchTranscript), from the start
-// of a run until New topic.
-//
-// The icons open the apps, the arrangement applies as it is chosen, each
-// side is connected as SetupController.connectIfUnambiguous has it, and
-// the line under the box names the next thing a side needs. The session's
-// options are on the status item's menu. While a run waits for an app to
-// be brought to the front, PerchFocusAlert covers all of it.
+// The fixed console: session options, editor or status panel, and persistent destinations.
 
+import AppKit
 import SwiftUI
 
 struct PerchConsoleView: View {
@@ -45,14 +27,14 @@ struct PerchConsoleView: View {
             VStack(alignment: .leading, spacing: Perch.s(5)) {
                 PerchTopicLine(controller: controller)
                 PerchPromptBox(controller: controller)
-                PerchConsoleStatus(controller: controller)
+                PerchDestinations(controller: controller)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .layoutPriority(1)
             PerchParticipant(controller: controller, speaker: .claude)
         }
         .padding(.horizontal, Self.endInset)
-        .padding(.vertical, Perch.s(10))
+        .padding(.vertical, Perch.s(8))
         // Under the alert, the console is only something to see through,
         // softened so its lines do not compete with the ask.
         .blur(radius: focusSide != nil ? Perch.s(6) : 0)
@@ -72,124 +54,168 @@ struct PerchConsoleView: View {
     }
 }
 
-// MARK: - The topic line
+// MARK: - Session options and the app menu
 
-/// The line above the prompt: who goes first, as chosen on the Send pill,
-/// and once the on-device model has written one sentence on what the run
-/// is about from the prompt (TopicSummarizer), that sentence. Who went
-/// first stays on the line until then, and for good where the model
-/// cannot write one. The sentence outlasts the run: it names the ending
-/// until a new topic is written.
+/// Before a run, the run's settings as chips that show their values; during
+/// and after one, the topic. The ··· app menu stands at the trailing end in
+/// every stage. A chip's width follows its value, so choosing another one
+/// springs the chip, and the chips after it, to the new width.
 struct PerchTopicLine: View {
-    let controller: RelayController
-
-    private struct Line: Equatable {
-        var text: String
-        var isTopic: Bool
-    }
+    @Bindable var controller: RelayController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let line = self.line
-        Text(line.text)
-            .font(Perch.text(12, line.isTopic ? .medium : .regular))
-            .foregroundStyle(line.isTopic ? Perch.ink : Perch.secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .help(line.text)
-            .contentTransition(.opacity)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // The line starts where the prompt's text does.
-            .padding(.horizontal, PerchPromptBox.textInset)
-            .frame(height: Perch.s(17))
-            .animation(Perch.fade, value: line)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(line.isTopic ? "Topic" : "Who goes first")
-            .accessibilityValue(line.text)
+        HStack(spacing: Perch.s(6)) {
+            if controller.stage == .compose {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Perch.s(6)) { starterMenu; endingMenu; windowsMenu }.fixedSize()
+                    HStack(spacing: Perch.s(6)) { starterMenu; runOptionsMenu }.fixedSize()
+                }
+            } else {
+                let topic = controller.topicSummary ?? controller.runPrompt ?? "Conversation"
+                Text(topic).font(Perch.text(12, .medium))
+                    .foregroundStyle(Perch.ink).lineLimit(1).help(topic)
+                    .padding(.leading, PerchChip.inset)
+            }
+            Spacer(minLength: 0)
+            PerchAppMenuButton(controller: controller)
+        }
+        .animation(reduceMotion ? nil : Perch.spring, value: [starterTitle, endingTitle, windowsTitle])
+        .padding(.leading, PerchPromptBox.textInset - PerchChip.inset)
+        .padding(.trailing, Perch.s(7) - PerchChip.inset)
+        .frame(height: Perch.s(22))
     }
 
-    private var line: Line {
-        if controller.stage != .compose, let summary = controller.topicSummary {
-            return Line(text: summary, isTopic: true)
+    private var starterTitle: String { "\(controller.appName(controller.firstSpeaker)) starts" }
+
+    private var endingTitle: String {
+        controller.limitTurns ? "Ends after \(controller.turns) turns" : "Ends when both agree"
+    }
+
+    private var windowsTitle: String { controller.setup.state.layout.consoleTitle }
+
+    private var starterMenu: some View {
+        PerchChipMenu(title: starterTitle) { starterItems }
+            .help("Who receives the topic first")
+    }
+
+    private var endingMenu: some View {
+        PerchChipMenu(title: endingTitle) { endingItems }
+            .help("A turn limit is a maximum; mutual sign-off can end the relay sooner")
+    }
+
+    private var windowsMenu: some View {
+        PerchChipMenu(title: windowsTitle) { windowsItems }
+            .help("Choosing an arrangement moves the connected windows immediately")
+            .disabled(controller.isShowingWindow)
+    }
+
+    /// The narrow console's fallback: the ending and the arrangement as
+    /// submenus titled with their values.
+    private var runOptionsMenu: some View {
+        PerchChipMenu(title: "Run options") {
+            Menu(endingTitle) { endingItems }
+            Menu(windowsTitle) { windowsItems }
+                .disabled(controller.isShowingWindow)
         }
-        return Line(text: "\(controller.appName(controller.firstSpeaker)) goes first", isTopic: false)
+        .help("\(endingTitle) \u{00B7} \(windowsTitle)")
+    }
+
+    // Toggles, so the menu checks the value in force in its own column.
+    // Choosing the checked one again changes nothing.
+
+    @ViewBuilder private var starterItems: some View {
+        ForEach([Speaker.chatgpt, .claude], id: \.self) { speaker in
+            Toggle("\(controller.appName(speaker)) starts", isOn: Binding(
+                get: { controller.firstSpeaker == speaker },
+                set: { if $0 { controller.firstSpeaker = speaker } }))
+        }
+    }
+
+    @ViewBuilder private var endingItems: some View {
+        Toggle("When both agree", isOn: Binding(
+            get: { !controller.limitTurns },
+            set: { if $0 { controller.limitTurns = false } }))
+        Divider()
+        ForEach(Array(Set([2, 4, 6, 8, 10, 12, 16, 20, controller.turns])).sorted(), id: \.self) { turns in
+            Toggle("After at most \(turns) turns", isOn: Binding(
+                get: { controller.limitTurns && controller.turns == turns },
+                set: {
+                    guard $0 else { return }
+                    controller.turns = turns
+                    controller.limitTurns = true
+                }))
+        }
+    }
+
+    @ViewBuilder private var windowsItems: some View {
+        ForEach(LayoutChoice.allCases, id: \.self) { layout in
+            Toggle(isOn: Binding(
+                get: { controller.setup.state.layout == layout },
+                set: { if $0 { controller.setup.choose(layout) } })) {
+                Label(layout.title, systemImage: layout.symbol)
+            }
+        }
+        Divider()
+        Button("Restore window positions") { controller.setup.restoreLayout() }
+            .disabled(!controller.setup.canRestoreLayout)
     }
 }
 
-// MARK: - The status line
-
-/// The line under the prompt box: what needs saying, whatever the stage
-/// — what a side still needs before Send, a start the engine refused,
-/// what the apps are doing during a run with its turn and clock at the
-/// trailing end, how the run ended — and when nothing does, each side's
-/// surface and model (PerchSurfaceLabels).
-struct PerchConsoleStatus: View {
+/// The ··· at the top row's trailing end: the app menu the status item
+/// also shows (MenuBarController.makeAppMenu), popped under the chip.
+struct PerchAppMenuButton: View {
     let controller: RelayController
+    @State private var anchor = PerchMenuAnchor.Reference()
 
     var body: some View {
-        let status = self.status
-        HStack(spacing: Perch.s(8)) {
-            if let status {
-                Text(status.text)
-                    .font(Perch.text(12))
-                    .foregroundStyle(status.isProblem ? Perch.red : Perch.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .help(status.text)
-                    .contentTransition(.opacity)
-                    .perchShimmer(active: isWorking)
-                    .transition(.opacity)
-                Spacer(minLength: 0)
-                if controller.stage == .running {
-                    PerchRunMetadata(controller: controller)
-                        .fixedSize()
-                        .transition(.opacity)
+        Button {
+            controller.presentedParticipant = nil
+            guard let view = anchor.view, let menu = controller.appMenuProvider?() else { return }
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.maxY + Perch.s(4)), in: view)
+        } label: {
+            // Drawn rather than the ellipsis symbol: under the console's
+            // capsule clip, the offscreen renders drew that symbol in white
+            // in every rendering mode, while plain shapes keep their ink.
+            HStack(spacing: Perch.s(2.6)) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle().frame(width: Perch.s(3.3), height: Perch.s(3.3))
                 }
-            } else {
-                PerchSurfaceLabels(controller: controller)
-                    .transition(.opacity)
             }
+            .foregroundStyle(Perch.secondary)
+            .perchChip()
         }
-        // The line starts and ends where the prompt's text does.
-        .padding(.horizontal, PerchPromptBox.textInset)
-        .frame(height: Perch.s(17))
-        .animation(Perch.fade, value: status)
-        .accessibilityElement(children: status == nil ? .contain : .combine)
+        .buttonStyle(.plain)
+        .background(PerchMenuAnchor(reference: anchor).allowsHitTesting(false).accessibilityHidden(true))
+        .help("App menu")
+        .accessibilityLabel("App menu")
+    }
+}
+
+/// Where an AppKit menu pops up from a SwiftUI control: a flipped view in
+/// the control's background, so y grows downward from its top edge.
+struct PerchMenuAnchor: NSViewRepresentable {
+    final class Reference {
+        weak var view: NSView?
     }
 
-    /// Nil when everything is idle and nothing is wrong: the labels' turn.
-    private var status: SetupNotice? {
-        switch controller.stage {
-        case .compose:
-            // A start the engine refused outranks what the sweeps say: it
-            // is the answer to the click just made.
-            if let failed = controller.failedStart { return SetupNotice(text: failed, isProblem: true) }
-            return controller.setup.notice
-        case .running:
-            // The open field's keys need saying more than the apps' state,
-            // which the turn line and the icons carry meanwhile.
-            if controller.isSteering, !controller.stopRequested, controller.block == nil {
-                return SetupNotice(text: controller.steeringHint, isProblem: false)
-            }
-            return SetupNotice(text: controller.runHeadline,
-                               isProblem: controller.block != nil && !controller.stopRequested)
-        case .finished:
-            return SetupNotice(text: controller.lastReport?.headline(names: controller.names) ?? "Run ended",
-                               isProblem: false)
-        }
+    private final class AnchorView: NSView {
+        override var isFlipped: Bool { true }
     }
 
-    /// The apps are at work and nothing is asked of the human.
-    private var isWorking: Bool {
-        controller.stage == .running && !controller.isSteering && !controller.holdRequested
-            && !controller.stopRequested && controller.block == nil
+    let reference: Reference
+
+    func makeNSView(context: Context) -> NSView {
+        let view = AnchorView()
+        reference.view = view
+        return view
     }
+
+    func updateNSView(_ view: NSView, context: Context) { reference.view = view }
 }
 
 extension RelayController {
-    /// What the open field's keys do, as the line under the prompt while
-    /// the note is written (PerchConsoleStatus): with nothing in it yet,
-    /// whom the note would be for and how to resume without one; with
-    /// words, how to send them and how to clear them.
+    /// Keyboard hints beside Resume or Send note & continue.
     var steeringHint: String {
         let side = nextRecipient
         if steeringHasText {
@@ -200,8 +226,7 @@ extension RelayController {
             ?? "Write a note \u{00B7} Return or Esc resumes without one"
     }
 
-    /// The one running sentence: what is happening in the apps now, as the
-    /// line under the prompt (PerchConsoleStatus).
+    /// The status panel headline follows the actual relay state.
     var runHeadline: String {
         if stopRequested { return "Ending at the next safe point\u{2026}" }
         if let block { return block.headline(names: names) }
@@ -228,8 +253,7 @@ struct PerchRunMetadata: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let turn = controller.limitTurns ? "Turn \(controller.currentTurn) of \(controller.turns)"
                 : "Turn \(controller.currentTurn)"
-            let phase = controller.isSteering ? "Paused" : controller.conversation
-            Text("\(phase) · \(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))")
+            Text("\(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))")
                 .font(Perch.text(11))
                 .foregroundStyle(Perch.muted)
                 .monospacedDigit()
@@ -241,13 +265,8 @@ struct PerchRunMetadata: View {
 
 // MARK: - The prompt box
 
-/// The box under the topic line: text over a toolbar row. The text is the
-/// topic editor before a run and, read-only, until the opening has set
-/// off from it; then the steering note while the run is paused, the
-/// closed field's notice while the agents work, and the ending's detail
-/// after. The capsule's height is fixed, so the editors scroll inside
-/// what the box leaves them. The transcript under the console
-/// (PerchTranscript) borrows the box's paper, corner, and insets.
+/// Only composing and a granted pause mount a text editor. The remaining
+/// stages show accessible status text with stable actions.
 struct PerchPromptBox: View {
     @Bindable var controller: RelayController
 
@@ -256,59 +275,117 @@ struct PerchPromptBox: View {
     /// The box's inset above its text and below its toolbar.
     static let verticalInset = Perch.s(6)
 
-    /// What stands in the text's place. One value for the prompt as
-    /// written, before and just after Send, so the editor keeps its
-    /// identity — its scroll position, its selection — across the start.
-    private enum Field {
-        case opening, steering, closed, ending
-    }
-
-    private var field: Field {
-        switch controller.stage {
-        case .compose: return .opening
-        case .running:
-            if controller.isSteering { return .steering }
-            return controller.openingStillVisible ? .opening : .closed
-        case .finished: return .ending
-        }
-    }
+    private var editing: Bool { controller.stage == .compose || controller.consoleAccess.pauseGranted }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Perch.s(4)) {
-            ZStack(alignment: .topLeading) {
-                switch field {
-                case .opening:
-                    openingEditor.disabled(controller.isRunning)
-                case .steering:
-                    steering
-                case .closed:
-                    closedField
-                case .ending:
-                    ending
+        Group {
+            if editing {
+                VStack(alignment: .leading, spacing: Perch.s(4)) {
+                    Group {
+                        if controller.stage == .compose { openingEditor } else { steering }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, Self.textInset)
+                    HStack(spacing: Perch.s(8)) {
+                        Text(editorHint)
+                            .font(Perch.text(11))
+                            .foregroundStyle(controller.failedStart == nil ? Perch.secondary : Perch.red)
+                            .lineLimit(2).help(editorHint)
+                        Spacer(minLength: 0)
+                        PerchConsoleActions(controller: controller)
+                    }
+                    .padding(.horizontal, Perch.s(7))
                 }
+            } else {
+                statusPanel
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, Self.textInset)
-            // The replies' dots fly to and from here in every stage.
-            .background {
-                PromptTransferProbe(source: controller.promptTransferSource)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-            HStack(spacing: Perch.s(10)) {
-                if controller.stage == .compose {
-                    PerchLayoutSegments(controller: controller)
-                }
-                Spacer(minLength: 0)
-                PerchConsoleActions(controller: controller)
-            }
-            .frame(height: Perch.actionDiameter)
-            .padding(.horizontal, Perch.s(7))
         }
         .padding(.vertical, Self.verticalInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: Self.corner).fill(Perch.paper))
-        .overlay(RoundedRectangle(cornerRadius: Self.corner).stroke(Perch.chipEdge, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: Self.corner).fill(editing ? Perch.paper : Perch.well))
+        .overlay(RoundedRectangle(cornerRadius: Self.corner)
+            .stroke(controller.consoleAccess.pauseGranted ? Perch.accent : Perch.chipEdge,
+                    lineWidth: controller.consoleAccess.pauseGranted ? 1.5 : 1))
+        .background {
+            PromptTransferProbe(source: controller.promptTransferSource)
+                .allowsHitTesting(false).accessibilityHidden(true)
+        }
+    }
+
+    private var editorHint: String {
+        if controller.consoleAccess.pauseGranted { return controller.steeringHint }
+        return controller.failedStart ?? controller.setup.problem ?? controller.setup.state.layoutProblem
+            ?? controller.sendBlocker ?? ""
+    }
+
+    private var statusPanel: some View {
+        HStack(alignment: .center, spacing: Perch.s(9)) {
+            statusIcon.frame(width: Perch.s(24), height: Perch.s(24))
+            VStack(alignment: .leading, spacing: Perch.s(3)) {
+                Text(headline).font(Perch.text(13, .semibold))
+                    .foregroundStyle(needsAttention ? Perch.red : Perch.ink)
+                    .lineLimit(2).help(headline)
+                if controller.stage == .finished {
+                    let detail = controller.lastReport?.detail(names: controller.names,
+                        duration: controller.lastRunDuration, timeout: config.timeout) ?? ""
+                    Text(detail).font(Perch.text(11)).foregroundStyle(Perch.secondary)
+                        .lineLimit(3).help(detail)
+                } else if let block = controller.block, !controller.stopRequested {
+                    let recovery = block.recovery(names: controller.names)
+                    Text(recovery).font(Perch.text(11)).foregroundStyle(Perch.secondary)
+                        .lineLimit(3).help(recovery)
+                } else if controller.steeringQueued {
+                    PerchRunLine(controller: controller)
+                    Text(controller.steeringText).font(Perch.text(11))
+                        .foregroundStyle(Perch.secondary).lineLimit(1).help(controller.steeringText)
+                } else if controller.isSteeringPending {
+                    Text("Finishing the current copy or delivery before you can write.")
+                        .font(Perch.text(11)).foregroundStyle(Perch.secondary).lineLimit(2)
+                }
+                if controller.stage == .running { PerchRunMetadata(controller: controller) }
+                if !controller.steeringQueued && !controller.stopRequested {
+                    if controller.steeringInFlight != nil {
+                        PerchRunLine(controller: controller)
+                    } else if let receipt = controller.lastReceipt {
+                        PerchReceiptLine(controller: controller, receipt: receipt)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            PerchConsoleActions(controller: controller)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .padding(.horizontal, Self.textInset)
+    }
+
+    private var headline: String {
+        controller.stage == .finished
+            ? controller.lastReport?.headline(names: controller.names) ?? "Run ended"
+            : controller.runHeadline
+    }
+
+    private var needsAttention: Bool {
+        controller.stage == .finished ? controller.lastReport?.outcome.needsAttention == true
+            : controller.block != nil && !controller.stopRequested
+    }
+
+    @ViewBuilder private var statusIcon: some View {
+        if controller.stage == .finished {
+            Image(systemName: controller.lastReport?.outcome.symbol ?? "stop.circle")
+                .font(Perch.text(20))
+                .foregroundStyle(needsAttention ? Perch.red
+                    : controller.lastReport?.outcome == .completed ? Perch.accentText : Perch.secondary)
+        } else if needsAttention {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Perch.red)
+        } else {
+            let speaker: Speaker = controller.chatgptConversation == .chatting || controller.chatgptConversation == .replied
+                ? .chatgpt : controller.claudeConversation == .notStarted ? controller.firstSpeaker : .claude
+            PerchAvatar(bundleID: speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID,
+                        initial: String(controller.appName(speaker).prefix(1)),
+                        feather: speaker == .chatgpt ? Perch.chatgptFeather : Perch.claudeFeather)
+                .scaleEffect(0.48).frame(width: Perch.s(24), height: Perch.s(24))
+                .accessibilityHidden(true)
+        }
     }
 
     // MARK: Before a run
@@ -365,163 +442,20 @@ struct PerchPromptBox: View {
                               session: controller.steeringEditor)
     }
 
-    private var hasNoteFeedback: Bool {
-        controller.steeringQueued || controller.steeringInFlight != nil || controller.lastReceipt != nil
-    }
-
-    /// The field is closed while the agents work: how to recover from a
-    /// hold, or the reminder not to type in the apps, and what has become
-    /// of a note.
-    private var closedField: some View {
-        VStack(alignment: .leading, spacing: Perch.s(4)) {
-            if let block = controller.block, !controller.stopRequested {
-                let recovery = block.recovery(names: controller.names)
-                Text(recovery)
-                    .font(Perch.text(12))
-                    .foregroundStyle(Perch.red)
-                    .lineLimit(2)
-                    .help(recovery)
-                    .transition(.opacity)
-            } else if !hasNoteFeedback {
-                Text("Pause before typing in either conversation.")
-                    .font(Perch.text(13))
-                    .foregroundStyle(Perch.placeholder)
-                    .lineLimit(1)
-            }
-            if hasNoteFeedback {
-                PerchRunLine(controller: controller)
-            }
-            if controller.steeringQueued {
-                Text(controller.steeringText)
-                    .font(Perch.text(12))
-                    .foregroundStyle(Perch.secondary)
-                    .lineLimit(2)
-                    .help(controller.steeringText)
-            }
-        }
-        .padding(.vertical, GrowingTextEditor.insetHeight)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    // MARK: After a run
-
-    /// The status line has how the run ended; the count, the clock, and the
-    /// last note's record go where the text was.
-    private var ending: some View {
-        let detail = controller.lastReport?.detail(names: controller.names, duration: controller.lastRunDuration,
-                                                   timeout: config.timeout) ?? ""
-        return VStack(alignment: .leading, spacing: Perch.s(4)) {
-            Text(detail)
-                .font(Perch.text(12))
-                .foregroundStyle(Perch.secondary)
-                .lineLimit(2)
-                .truncationMode(.tail)
-                .help(detail)
-            if let receipt = controller.lastReceipt {
-                PerchReceiptLine(controller: controller, receipt: receipt)
-            }
-        }
-        .padding(.vertical, GrowingTextEditor.insetHeight)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-}
-
-// MARK: - The surface labels
-
-/// The line under the prompt box while nothing needs saying there
-/// (PerchConsoleStatus): at each end, what the side's window is and what
-/// runs in it — the app and its surface as a product name ("ChatGPT
-/// Chat", "Codex", "Claude Code"), then the model, with its effort after
-/// it a shade lighter ("Fable 5 Extra"), as the sweep reads them.
-/// ChatGPT's stands at the leading end and Claude's at the trailing,
-/// under their icons. A connected side is read from its own window as the
-/// latest sweep saw it (SideSetup.connectedCandidate), so a model switched
-/// in the app shows here; an unconnected one from the window the sweep
-/// would choose. An end stays empty while nothing is known — the icon says
-/// which app it is.
-struct PerchSurfaceLabels: View {
-    let controller: RelayController
-
-    /// One side's label in its parts. The product and model share the
-    /// line's color, a dot between them; the effort, split from the
-    /// model line (splitEffort), follows the model after a space, lighter.
-    private struct Reading: Equatable {
-        var product: String?
-        var model: String?
-        var effort: String?
-
-        var isEmpty: Bool { product == nil && model == nil }
-        /// The parts in the line's own color, up to the effort.
-        var lead: String { [product, model].compactMap { $0 }.joined(separator: " \u{00B7} ") }
-        /// The whole line, for the tooltip and the accessible name.
-        var text: String { effort.map { "\(lead) \($0)" } ?? lead }
-    }
-
-    var body: some View {
-        let readings = [Speaker.chatgpt, .claude].map(reading(for:))
-        HStack(spacing: Perch.s(12)) {
-            label(readings[0], alignment: .leading)
-            label(readings[1], alignment: .trailing)
-        }
-        .animation(Perch.fade, value: readings)
-    }
-
-    private func label(_ reading: Reading, alignment: Alignment) -> some View {
-        var text = Text(reading.lead).foregroundStyle(Perch.secondary)
-        if let effort = reading.effort {
-            text = text + Text(" \(effort)").foregroundStyle(Perch.muted)
-        }
-        return text
-            .font(Perch.text(11))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .help(reading.text)
-            .contentTransition(.opacity)
-            .frame(maxWidth: .infinity, alignment: alignment)
-            .accessibilityHidden(reading.isEmpty)
-    }
-
-    /// What one side's label says; empty when nothing is known of it.
-    private func reading(for speaker: Speaker) -> Reading {
-        let side = controller.setup.state[speaker]
-        let status = speaker == .chatgpt ? controller.chatgptStatus : controller.claudeStatus
-        let surface: String?
-        let line: String?
-        if let connection = side.connection {
-            let live = side.connectedCandidate
-            surface = live?.identity.surface ?? connection.identity.surface
-            line = live?.model ?? connection.model
-        } else {
-            surface = status.surface
-            line = status.model
-        }
-        var reading = Reading(product: Self.productName(app: status.appName, surface: surface))
-        if let line {
-            let selectors = speaker == .chatgpt ? config.chatgptSelectors : config.claudeSelectors
-            let split = splitEffort(line, selectors: selectors)
-            reading.model = split.model
-            reading.effort = split.effort
-            // A model with no surface read still says whose it is.
-            if reading.product == nil { reading.product = status.appName }
-        }
-        return reading
-    }
-
-    /// Surfaces that are products of their own, named without the app.
-    private static let standaloneSurfaces: Set<String> = ["Codex"]
-
-    /// The surface as a product: the app's name with the surface after it
-    /// ("Claude Code", "ChatGPT Work"), or the surface alone where it is a
-    /// product of its own ("Codex"). nil where no surface was read.
-    static func productName(app: String, surface: String?) -> String? {
-        guard let surface else { return nil }
-        return standaloneSurfaces.contains(surface) ? surface : "\(app) \(surface)"
-    }
 }
 
 // MARK: - The window arrangement
 
 extension LayoutChoice {
+    var consoleTitle: String {
+        switch self {
+        case .sideBySide: "Windows side by side"
+        case .stacked: "Windows stacked"
+        case .fullScreen: "Windows fill screen"
+        case .keepPositions: "Windows: keep positions"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .sideBySide: return "rectangle.split.2x1"
@@ -541,75 +475,9 @@ extension LayoutChoice {
     }
 }
 
-/// The arrangements in one flat control at the toolbar's leading
-/// end, as tall as the actions beside it and with the prompt box's kind
-/// of corner (Perch.controlCorner). A choice applies at once, and stands
-/// for windows connected later (SetupController.applyIfPending). It is
-/// there only before a run: once one starts, and after it ends, the
-/// actions have the toolbar to themselves until New topic brings it back.
-///
-/// A well with a paper thumb on the chosen segment and hairlines between
-/// the others that hide beside it, drawn by hand: NSSegmentedControl fills
-/// its selection with the accent color outside an NSToolbar, and its
-/// selection jumps on mouse-up where this one slides.
-struct PerchLayoutSegments: View {
-    let controller: RelayController
-    private static let inset = Perch.s(3.5)
-    private static let shape = RoundedRectangle(cornerRadius: Perch.controlCorner)
-    private static let thumbShape = RoundedRectangle(cornerRadius: Perch.controlCorner - inset)
-    @Namespace private var thumb
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let layouts = LayoutChoice.allCases
-        let selected = controller.setup.state.layout
-        let selectedIndex = layouts.firstIndex(of: selected)
-        HStack(spacing: 0) {
-            ForEach(layouts.indices, id: \.self) { index in
-                let layout = layouts[index]
-                if index > 0 {
-                    Rectangle().fill(Perch.ink.opacity(0.2))
-                        .frame(width: 1, height: Perch.s(14))
-                        .opacity(selectedIndex == index || selectedIndex == index - 1 ? 0 : 1)
-                        .accessibilityHidden(true)
-                }
-                Button { controller.setup.choose(layout) } label: {
-                    Image(systemName: layout.symbol)
-                        .font(Perch.text(14))
-                        .foregroundStyle(Perch.ink)
-                        .frame(width: Perch.s(36), height: Perch.s(25))
-                        .background {
-                            if selected == layout {
-                                Self.thumbShape.fill(Perch.paper)
-                                    .matchedGeometryEffect(id: "selection", in: thumb)
-                            }
-                        }
-                        .perchHover(Self.thumbShape)
-                        .contentShape(Self.thumbShape)
-                }
-                .buttonStyle(.plain)
-                .help(layout.actionHelp)
-                .accessibilityLabel(layout.title)
-                .accessibilityAddTraits(selected == layout ? .isSelected : [])
-            }
-        }
-        .padding(Self.inset)
-        .background(Self.shape.fill(Perch.well))
-        .opacity(isEnabled ? 1 : 0.5)
-        .animation(reduceMotion ? nil : Perch.spring, value: selected)
-        .fixedSize()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Window arrangement. Choices apply immediately.")
-    }
-}
-
 // MARK: - The actions
 
-/// The toolbar's trailing end. Before a run it is Send, with who goes
-/// first inside it, or the way to open the apps while one is closed;
-/// during a run Pause and Stop, or the paused run's Resume — Send note
-/// once there is one — and Stop; after it, the way back to the editor.
+/// The primary action and run controls stay at the trailing end.
 struct PerchConsoleActions: View {
     @Bindable var controller: RelayController
 
@@ -621,7 +489,7 @@ struct PerchConsoleActions: View {
             case .compose:
                 if closedApps.isEmpty { send } else { open }
             case .running:
-                if controller.isSteering { paused } else { running }
+                if controller.consoleAccess.pauseGranted { paused } else { running }
             case .finished:
                 finished
             }
@@ -633,23 +501,20 @@ struct PerchConsoleActions: View {
         [Speaker.chatgpt, .claude].filter { setup.state[$0].presence == .notRunning }
     }
 
-    /// Apps are opened only when asked: here, or by a click on an icon.
+    /// Apps open only through this explicit action or the participant popover.
     private var open: some View {
         let title = closedApps.count == 2 ? "Open both apps" : "Open \(setup.name(closedApps[0]))"
         return PerchCapsuleButton(title: title, icon: "arrow.up.right") { setup.launchBoth() }
             .help("Open whichever app isn\u{2019}t open yet")
     }
 
-    /// Send and the choice of who receives the topic, in one pill.
     private var send: some View {
-        PerchSendPill(sides: [Speaker.chatgpt, .claude].map { side in
-            PerchSendPill.Side(speaker: side, name: controller.appName(side),
-                               bundleID: side == .chatgpt ? config.chatgptBundleID : config.claudeBundleID)
-        }, first: $controller.firstSpeaker, blocker: controller.sendBlocker) { controller.start() }
+        PerchCapsuleButton(title: "Start relay", icon: "arrow.right") { controller.start() }
+            .disabled(controller.sendBlocker != nil)
+            .help(controller.sendBlocker ?? "Send the topic to \(controller.appName(controller.firstSpeaker)) and begin relaying")
     }
 
-    /// Pause and Stop as bare icons: what each does is plain, and the
-    /// status line under the box says when a pause is pending.
+    /// The status panel names a pending pause; Stop remains available.
     private var running: some View {
         HStack(spacing: Perch.s(8)) {
             PerchRoundButton(title: controller.steeringQueued ? "Edit note" : "Pause to steer",
@@ -673,6 +538,7 @@ struct PerchConsoleActions: View {
                          ?? "The note goes with the next handoff")
                       : "Continue without a note")
                 .animation(Perch.fade, value: hasNote)
+                .disabled(!controller.consoleAccess.canResume)
             PerchCapsuleButton(title: "Stop", style: .secondary, icon: "stop.fill") { controller.stop() }
                 .disabled(controller.stopRequested)
                 .help("Stop at the next safe point")
@@ -683,7 +549,7 @@ struct PerchConsoleActions: View {
     /// Send is offered; a conversation changed in the apps meanwhile is
     /// picked up the way any other is.
     private var finished: some View {
-        PerchCapsuleButton(title: "New topic", icon: "arrow.counterclockwise") { controller.anotherTopicHere() }
+        PerchCapsuleButton(title: "New topic in these chats", icon: "arrow.counterclockwise") { controller.anotherTopicHere() }
             .keyboardShortcut(.defaultAction)
             .help("Write another topic for these conversations; their context carries on")
     }

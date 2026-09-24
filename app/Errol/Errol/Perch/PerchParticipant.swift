@@ -1,320 +1,413 @@
-// A participant's column at either end of the console: the installed
-// app's icon and one line under it. The line is the status when there is
-// one — replying, opening, the connected conversation, the next thing to
-// do, what is wrong — and the app's name only when there is not; the icon
-// says which app it is the rest of the time. ChatGPT stands left and
-// Claude right whoever starts. The icon is the side's control: a click
-// opens the app when it is closed, and otherwise brings it forward — its
-// connected window in front — and hands the keyboard straight back to
-// the console; where the app shows several conversations, it offers them
-// in a menu instead, and a connected side can be switched from the icon's
-// context menu. It never changes who starts, which the Send pill does.
+// App identity at the ends; destination details use the wider line below the box.
 //
-// Readiness reads from the icon itself: it stands faded until the side's
-// conversation is connected and ready, and fades in once it is.
-
+// Each end is the app's icon with a state badge straddling its lower trailing
+// corner, and the app's name under it. The icon and the side's destination
+// line both open the side's details (PerchParticipantPopover), and close them
+// again when they are open.
+import AppKit
 import SwiftUI
 
 struct PerchParticipant: View {
-    let controller: RelayController
+    @Bindable var controller: RelayController
     let speaker: Speaker
-    @State private var hoveringIcon = false
-    @FocusState private var iconFocused: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var setup: SetupController { controller.setup }
-    private var side: SideSetup { setup.state[speaker] }
-    private var status: SideStatus {
-        speaker == .chatgpt ? controller.chatgptStatus : controller.claudeStatus
-    }
-    private var conversation: ConversationStatus {
-        speaker == .chatgpt ? controller.chatgptConversation : controller.claudeConversation
-    }
-    private var bundleID: String {
-        speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID
-    }
-    private var name: String { status.appName }
-    private var feather: Color { speaker == .claude ? Perch.claudeFeather : Perch.chatgptFeather }
-    private var replying: Bool { controller.isRunning && conversation == .chatting }
-
-    /// What a click on the icon does now. Nothing during a run, which
-    /// owns the apps' focus.
-    private enum Role {
-        case launch, bringForward, chooseConversation, none
-    }
-
-    private var role: Role {
-        guard !controller.isRunning else { return .none }
-        if side.isConnected { return .bringForward }
-        switch side.presence {
-        case .notRunning: return .launch
-        case .noWindow, .noConversation: return .bringForward
-        case .available: return side.needsConversationChoice ? .chooseConversation : .bringForward
-        default: return .none
-        }
-    }
+    @State private var hovering = false
 
     var body: some View {
-        VStack(spacing: Perch.s(4)) {
-            icon
-                // Where this side's replies set off from
-                // (RelayController.iconTransferSources).
-                .background {
-                    if let source = controller.iconTransferSources[speaker] {
-                        PromptTransferProbe(source: source)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
+        let presentation = ParticipantPresentation(controller: controller, speaker: speaker)
+        VStack(spacing: Perch.s(6)) {
+            Button { controller.toggleDetails(speaker) } label: {
+                PerchAvatar(bundleID: presentation.bundleID,
+                            initial: String(presentation.name.prefix(1)), feather: presentation.feather)
+                    .opacity(presentation.state == .waiting ? 0.8 : 1)
+                    .animation(Perch.fade, value: presentation.state)
+                    // The icon answers the pointer the way a Dock icon does:
+                    // it darkens a little. The badge keeps its color.
+                    .brightness(hovering ? -0.06 : 0)
+                    .overlay(alignment: .bottomTrailing) {
+                        ParticipantBadge(state: presentation.state)
+                            .alignmentGuide(.trailing) { $0[HorizontalAlignment.center] + ParticipantBadge.cornerInset }
+                            .alignmentGuide(.bottom) { $0[VerticalAlignment.center] + ParticipantBadge.cornerInset }
                     }
-                }
-            statusLine
-        }
-        .frame(width: Perch.participantWidth)
-        .animation(Perch.fade, value: line)
-        .help(details)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(name)
-        .accessibilityValue(details)
-    }
-
-    // MARK: The icon
-
-    private var preparationLabel: String? {
-        guard controller.stage == .compose else { return nil }
-        switch side.presence {
-        case .launching: return "Opening\u{2026}"
-        case .checking: return "Checking\u{2026}"
-        default: return nil
-        }
-    }
-
-    /// Faded until the side reads ready — the same evidence Send uses —
-    /// and full once it does. During a run the side writing is the one
-    /// at full strength.
-    private var iconOpacity: Double {
-        if controller.isRunning { return replying ? 1 : 0.7 }
-        return side.isReady ? 1 : 0.45
-    }
-
-    @ViewBuilder private var icon: some View {
-        let avatar = PerchAvatar(bundleID: bundleID, initial: String(name.prefix(1)), feather: feather)
-            .modifier(PerchLaunchBounce(isLaunching: !controller.isRunning && side.presence == .launching))
-            .opacity(iconOpacity)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: iconOpacity)
-            .brightness(hoveringIcon && role != .none ? -0.06 : 0)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hoveringIcon)
-            .onHover { hoveringIcon = $0 }
-        if role == .chooseConversation {
-            Menu {
-                ForEach(side.eligible) { candidate in
-                    Button("\(candidate.name) \u{00B7} \(candidate.stateLine)") {
-                        setup.connect(speaker, to: candidate.id)
-                    }
-                }
-            } label: {
-                avatar.contentShape(Rectangle())
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .focused($iconFocused)
-            .accessibilityLabel(iconLabel)
-        } else {
-            Button(action: act) {
-                avatar
                     .contentShape(Rectangle())
             }
-            .buttonStyle(PerchIconButtonStyle())
-            .disabled(role == .none)
-            .focused($iconFocused)
-            .accessibilityLabel(iconLabel)
-            .contextMenu {
-                if side.isConnected {
-                    Button("Choose Another Conversation") { controller.chooseAnotherConversation(speaker) }
-                        .disabled(controller.isRunning)
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+            .onKeyPress(.return) {
+                controller.toggleDetails(speaker)
+                return .handled
+            }
+            .accessibilityLabel("\(presentation.name) participant details")
+            .accessibilityValue(presentation.stateText)
+            .help(presentation.details)
+            .background {
+                if let source = controller.iconTransferSources[speaker] {
+                    PromptTransferProbe(source: source).allowsHitTesting(false).accessibilityHidden(true)
                 }
             }
-        }
-    }
-
-    private func act() {
-        switch role {
-        case .launch: setup.launch(speaker)
-        case .bringForward: setup.bringForward(speaker)
-        case .chooseConversation, .none: break
-        }
-    }
-
-    private var iconLabel: String {
-        switch role {
-        case .launch: return "Open \(name)"
-        case .bringForward: return "Bring \(name) forward"
-        case .chooseConversation: return "Choose which \(name) conversation to connect"
-        case .none: return name
-        }
-    }
-
-    // MARK: The line
-
-    /// What stands under the icon. Whichever it is, the slot has the same
-    /// height, so the icon stays where it is as the status comes and goes.
-    private enum Line: Equatable {
-        case name
-        case status(String, isProblem: Bool)
-        case replying
-    }
-
-    private var line: Line {
-        if replying { return .replying }
-        if let preparationLabel { return .status(preparationLabel, isProblem: false) }
-        if let (text, isProblem) = stateLine { return .status(text, isProblem: isProblem) }
-        return .name
-    }
-
-    private var statusLine: some View {
-        ZStack {
-            switch line {
-            case .name:
-                PerchAppLabel(name: name, hintActive: role == .launch && (hoveringIcon || iconFocused))
-                    .transition(.opacity)
-            case .status(let text, let isProblem):
-                Text(text)
-                    .font(Perch.text(11))
-                    .foregroundStyle(isProblem ? Perch.red : Perch.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .contentTransition(.opacity)
-                    .transition(.opacity)
-            case .replying:
-                replyingDots.transition(.opacity)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Perch.s(17))
-    }
-
-    /// What the line says when the app's name is not enough: the connected
-    /// conversation and how it reads, or the next thing to do for the app.
-    /// Nil when there is nothing to add to the name.
-    private var stateLine: (String, Bool)? {
-        if let connection = side.connection {
-            switch connection.readiness {
-            case .ready: return (connection.name, false)
-            case .unverified: return ("Last used", false)
-            default: return (connection.readiness.status(name: name), true)
-            }
-        }
-        if side.presence == .notInstalled { return ("Not installed", true) }
-        return role == .chooseConversation ? ("Choose a chat", false) : nil
-    }
-
-    private var replyingDots: some View {
-        TimelineView(.animation(minimumInterval: 0.3, paused: reduceMotion)) { context in
-            HStack(spacing: Perch.s(3)) {
-                ForEach(0..<3) { index in
-                    Circle().fill(Perch.accentText)
-                        .opacity(reduceMotion || Int(context.date.timeIntervalSinceReferenceDate * 3) % 3 == index ? 1 : 0.3)
-                        .frame(width: Perch.s(4), height: Perch.s(4))
+            .background {
+                PerchDetailsAnchor(isPresented: Binding(
+                    get: { controller.presentedParticipant == speaker },
+                    set: { if !$0 && controller.presentedParticipant == speaker { controller.presentedParticipant = nil } }),
+                    canTakeFocus: { controller.consoleAccess.canTakeFocus }) {
+                    PerchParticipantPopover(controller: controller, speaker: speaker)
                 }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
+            Text(presentation.name).font(Perch.text(12, .medium)).foregroundStyle(Perch.ink)
+                .lineLimit(1).frame(height: Perch.s(17))
         }
-        .accessibilityLabel("Replying")
-    }
-
-    private var details: String {
-        var parts = [name]
-        if let connection = side.connection {
-            parts.append(connection.name)
-            parts.append(connection.context)
-            if let surface = connection.identity.surface { parts.append(surface) }
-            if let model = connection.model { parts.append(model) }
-            if let problem = connection.readiness.problem(name: name) { parts.append(problem) }
-        } else {
-            parts.append(side.presence.action(name: name))
-            if let surface = status.surface { parts.append(surface) }
-        }
-        if replying { parts.append("Replying") }
-        if controller.firstSpeaker == speaker, controller.stage == .compose { parts.append("Starts the conversation") }
-        return parts.joined(separator: " \u{00B7} ")
+        .frame(width: Perch.participantWidth)
     }
 }
 
-/// Availability controls icon opacity. The standard plain button style
-/// would also dim an open app whose icon currently has no action.
-private struct PerchIconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+extension RelayController {
+    /// The icon and the destination line both open a side's details, and
+    /// close them when they are already open.
+    func toggleDetails(_ speaker: Speaker) {
+        presentedParticipant = presentedParticipant == speaker ? nil : speaker
     }
 }
 
-/// The app's name, for when nothing else needs saying: it rolls down to
-/// briefly reveal its action. The accessible name stays stable while the
-/// visual hint comes and goes.
-private struct PerchAppLabel: View {
-    let name: String
-    let hintActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showingHint = false
+enum ParticipantState {
+    case ready, attention, replying, waiting
+
+    /// Every state is a filled circle with a white mark in it, so the four
+    /// share a silhouette on the icon and differ in their mark and color.
+    var symbol: String {
+        switch self {
+        case .ready: "checkmark.circle.fill"
+        case .attention: "exclamationmark.circle.fill"
+        case .replying: "ellipsis.circle.fill"
+        case .waiting: "clock.circle.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .ready: "Ready"
+        case .attention: "Needs attention"
+        case .replying: "Replying"
+        case .waiting: "Waiting"
+        }
+    }
+
+    /// Status colors are the system's, adapting to the appearance and to
+    /// Increase Contrast; replying is Errol's own activity, so it takes the
+    /// theme's accent.
+    var color: Color {
+        switch self {
+        case .ready: Color(nsColor: .systemGreen)
+        case .attention: Color(nsColor: .systemOrange)
+        case .replying: Perch.accent
+        case .waiting: Color(nsColor: .systemGray)
+        }
+    }
+
+    /// The mark on that color: white on the system's, and on the accent the
+    /// theme's own ink for it, which a dark theme's light accent needs.
+    var mark: Color { self == .replying ? Perch.onAccent : .white }
+}
+
+/// A state as a badge: the state's mark on its color, ringed in paper where
+/// it sits over an icon so it stands clear of the artwork. A new state
+/// replaces the mark in place.
+struct ParticipantBadge: View {
+    let state: ParticipantState
+    var size = Perch.s(12)
+    var ringed = true
+
+    /// How far in from the icon frame's corner the badge's center sits: on
+    /// the squircle's rounded corner, so the badge straddles the icon's edge
+    /// instead of sitting inside the artwork.
+    static let cornerInset = Perch.s(3.5)
 
     var body: some View {
-        ZStack {
-            Text(name)
-                .font(Perch.text(12, .medium))
-                .foregroundStyle(Perch.ink)
-                .offset(y: showingHint ? Perch.s(17) : 0)
-            Text("Click to open")
-                .font(Perch.text(11))
-                .foregroundStyle(Perch.secondary)
-                .offset(y: showingHint ? 0 : -Perch.s(17))
-        }
-        .lineLimit(1)
-        .frame(maxWidth: .infinity)
-        .frame(height: Perch.s(17))
-        .clipped()
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showingHint)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(name)
-        .task(id: hintActive) {
-            showingHint = false
-            guard hintActive else { return }
-            showingHint = true
-            do {
-                try await Task.sleep(for: .milliseconds(reduceMotion ? 1000 : 1180))
-            } catch { return }
-            showingHint = false
-        }
+        Image(systemName: state.symbol)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(state.mark, state.color)
+            .font(.system(size: size, weight: .bold))
+            .contentTransition(.symbolEffect(.replace))
+            .background {
+                if ringed { Circle().fill(Perch.paper).padding(-Perch.s(0.5)) }
+            }
+            .animation(Perch.fade, value: state)
+            .accessibilityLabel(state.title)
     }
 }
 
-/// A Dock-style hop while launch is pending. Only the artwork moves; the
-/// participant's labels, layout slot, and button target stay in place.
-private struct PerchLaunchBounce: ViewModifier {
-    let isLaunching: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var started = Date.now
-
-    func body(content: Content) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !isLaunching || reduceMotion)) { context in
-            content
-                .offset(y: offset(at: context.date))
-                .transaction { $0.animation = nil }
+/// Read current window metadata, falling back to the binding only if no sweep
+/// has seen that window. A remembered hint is explicitly unverified.
+struct ParticipantPresentation {
+    let controller: RelayController
+    let speaker: Speaker
+    var side: SideSetup { controller.setup.state[speaker] }
+    var name: String { controller.appName(speaker) }
+    var bundleID: String { speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID }
+    var feather: Color { speaker == .chatgpt ? Perch.chatgptFeather : Perch.claudeFeather }
+    var conversation: ConversationStatus {
+        speaker == .chatgpt ? controller.chatgptConversation : controller.claudeConversation
+    }
+    var shortStatus: String? {
+        if let block = controller.block, block.side == speaker { return block.shortStatus }
+        if controller.stage == .finished, let outcome = controller.lastReport?.outcome,
+           outcome.attentionSide == speaker { return outcome.shortStatus }
+        return side.connection?.readiness.shortStatus
+    }
+    var state: ParticipantState {
+        if controller.block?.side == speaker || (controller.stage == .finished && controller.lastReport?.outcome.attentionSide == speaker) {
+            return .attention
         }
-        .onChange(of: isLaunching) { _, _ in started = .now }
+        if controller.isRunning {
+            return conversation == .chatting ? .replying : .waiting
+        }
+        if side.isReady { return .ready }
+        if side.presence == .checking || side.presence == .launching || side.connection?.readiness == .unverified { return .waiting }
+        return .attention
+    }
+    var stateText: String {
+        if controller.isRunning { return controller.consoleAccess.pauseGranted ? "Paused" : shortStatus ?? state.title }
+        return shortStatus ?? (side.isConnected ? state.title : presenceText)
+    }
+    /// What a side with nothing connected is, in the words its badge stands
+    /// for; the destination line says what to do about it.
+    private var presenceText: String {
+        switch side.presence {
+        case .checking: "Checking\u{2026}"
+        case .notInstalled: "Not installed"
+        case .notRunning: "Not running"
+        case .launching: "Opening\u{2026}"
+        case .noWindow: "No window open"
+        case .noConversation: "No conversation open"
+        case .available: "Not connected"
+        }
+    }
+    var needsChoice: Bool { !side.isConnected && !side.eligible.isEmpty }
+    var isRemembered: Bool {
+        side.connection?.readiness == .unverified || (!side.isConnected && !needsChoice && side.hint != nil)
+    }
+    var destination: String {
+        if let title = side.destinationName {
+            return side.connection?.readiness == .unverified ? "Last used · \(title)" : title
+        }
+        if needsChoice {
+            return side.eligible.count == 1 ? "Choose this conversation" : "Choose one of \(side.eligible.count) conversations"
+        }
+        if let hint = side.hint { return "Last used · \(hint.name)" }
+        if side.presence == .noWindow || side.presence == .noConversation { return "Open a conversation in \(name)" }
+        return side.presence.action(name: name)
+    }
+    /// A problem the destination line names after the title, in red. "Last
+    /// used" is not one; the muted title already says it.
+    var problem: String? {
+        guard let status = shortStatus, status != "Last used" else { return nil }
+        return status
+    }
+    /// Whether the continuing conversation or a new one: said only when the
+    /// window's title does not already say it.
+    var continuation: String? {
+        switch side.destinationContext {
+        case "Continues here"?: "continues this chat"
+        case "New chat"? where destination != "New chat": "starts a new chat"
+        default: nil
+        }
+    }
+    var details: String {
+        [name, destination, side.destinationSurface, side.destinationModel, side.destinationContext, stateText]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+}
+
+/// Each side's destination under the box, as a chip: the surface, the
+/// title truncated in the middle so similar titles keep the ends that tell
+/// them apart, a problem when there is one, and the chevron that says it
+/// opens the side's details. It hugs its text, so only the text is the
+/// target, and a new destination springs the chip to its new width.
+struct PerchDestinations: View {
+    let controller: RelayController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let lines = [Speaker.chatgpt, .claude].map { ParticipantPresentation(controller: controller, speaker: $0) }
+        HStack(spacing: Perch.s(12)) {
+            destination(lines[0]).frame(maxWidth: .infinity, alignment: .leading)
+            destination(lines[1]).frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .animation(reduceMotion ? nil : Perch.spring,
+                   value: lines.map { [$0.side.destinationSurface ?? "", $0.destination, $0.problem ?? ""] })
+        .padding(.horizontal, PerchPromptBox.textInset - PerchChip.inset)
+        .frame(height: Perch.s(17))
     }
 
-    private func offset(at date: Date) -> CGFloat {
-        guard isLaunching, !reduceMotion else { return 0 }
-        let phase = max(0, date.timeIntervalSince(started)).truncatingRemainder(dividingBy: 1)
-        let progress: Double
-        let height: CGFloat
-        if phase < 0.6 {
-            progress = phase / 0.6
-            height = Perch.s(12)
-        } else if phase < 0.84 {
-            progress = (phase - 0.6) / 0.24
-            height = Perch.s(4)
-        } else {
-            return 0
+    private func destination(_ info: ParticipantPresentation) -> some View {
+        let speaker = info.speaker
+        // Nothing connected yet: the line is what to do, in the accent. A
+        // remembered destination stays muted, as unverified.
+        let needsSomething = !info.side.isConnected && info.state == .attention && !info.isRemembered
+        return Button { controller.toggleDetails(speaker) } label: {
+            HStack(spacing: Perch.s(4)) {
+                if let surface = info.side.destinationSurface {
+                    Text(surface).fontWeight(.medium).fixedSize()
+                    Text("\u{00B7}").foregroundStyle(Perch.muted).fixedSize()
+                }
+                Text(info.destination).truncationMode(.middle)
+                    .foregroundStyle(needsSomething ? Perch.accentText : info.isRemembered ? Perch.muted : Perch.secondary)
+                if let problem = info.problem {
+                    Text("\u{00B7} \(problem)").fontWeight(.medium).foregroundStyle(Perch.red).fixedSize()
+                }
+                Image(systemName: "chevron.down").font(Perch.text(8, .semibold))
+                    .foregroundStyle(needsSomething ? Perch.accentText : Perch.muted).fixedSize()
+            }
+            .font(Perch.text(11.5)).lineLimit(1)
+            .foregroundStyle(Perch.secondary)
+            .perchChip()
         }
-        return -4 * height * CGFloat(progress * (1 - progress))
+        .buttonStyle(.plain)
+        .background(PerchDetailsToggleRegion().allowsHitTesting(false).accessibilityHidden(true))
+        .help(info.details)
+        .onKeyPress(.return) {
+            controller.toggleDetails(speaker)
+            return .handled
+        }
+        .accessibilityLabel("\(info.name) destination: \(info.destination)")
+        .accessibilityValue(info.stateText)
+        .accessibilityHint("Opens participant details")
+    }
+}
+
+/// A side's details, from its icon or its destination line: the app and its
+/// state, the destination in full, what Errol does with the window, and the
+/// actions the run allows now. An action the run holds back stays in place,
+/// disabled, and the line under the actions says why. The card and its
+/// arrow are PerchDetailsCallout's.
+struct PerchParticipantPopover: View {
+    let controller: RelayController
+    let speaker: Speaker
+
+    static let width = Perch.s(322)
+
+    var body: some View {
+        let info = ParticipantPresentation(controller: controller, speaker: speaker)
+        VStack(alignment: .leading, spacing: Perch.s(12)) {
+            header(info)
+            VStack(alignment: .leading, spacing: Perch.s(3)) {
+                Text(info.destination)
+                    .font(Perch.text(12.5, .medium))
+                    .foregroundStyle(info.isRemembered ? Perch.secondary : Perch.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                let metadata = [info.side.destinationSurface, info.side.destinationModel, info.continuation]
+                    .compactMap { $0 }.joined(separator: " \u{00B7} ")
+                if !metadata.isEmpty {
+                    Text(metadata).font(Perch.text(11)).foregroundStyle(Perch.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Text("Errol writes into this window, whatever conversation it shows when a message is due.")
+                .font(Perch.text(11)).foregroundStyle(Perch.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: Perch.s(8)) {
+                // Side by side when both labels fit whole, else one above
+                // the other; a label never truncates.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Perch.s(8)) { primaryAction(info); chooseMenu(info) }
+                    VStack(alignment: .leading, spacing: Perch.s(8)) { primaryAction(info); chooseMenu(info) }
+                }
+                if let reason = reason(info) {
+                    Text(reason).font(Perch.text(10.5)).foregroundStyle(Perch.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Perch.fade, value: reason(info))
+        }
+        .padding(Perch.s(14))
+        .frame(width: Self.width, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(info.name) details")
+        .accessibilityAction(.escape) { controller.presentedParticipant = nil }
+    }
+
+    private func header(_ info: ParticipantPresentation) -> some View {
+        HStack(spacing: Perch.s(9)) {
+            PerchAvatar(bundleID: info.bundleID, initial: String(info.name.prefix(1)), feather: info.feather)
+                .scaleEffect(28.0 / 46.0)
+                .frame(width: Perch.s(28), height: Perch.s(28))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Perch.s(1)) {
+                Text(info.name).font(Perch.text(13, .semibold)).foregroundStyle(Perch.ink)
+                HStack(spacing: Perch.s(4)) {
+                    ParticipantBadge(state: info.state, size: Perch.s(10), ringed: false)
+                        .accessibilityHidden(true)
+                    Text(sentenceCase(info.stateText)).font(Perch.text(11)).foregroundStyle(Perch.secondary)
+                        .contentTransition(.opacity)
+                }
+                .animation(Perch.fade, value: info.stateText)
+            }
+        }
+    }
+
+    /// Open while the app is closed, and Show window once it is open.
+    @ViewBuilder private func primaryAction(_ info: ParticipantPresentation) -> some View {
+        switch info.side.presence {
+        case .notRunning, .notInstalled, .launching:
+            PerchCapsuleButton(title: info.side.presence == .launching ? "Opening\u{2026}" : "Open \(info.name)",
+                               icon: "arrow.up.right") {
+                guard !controller.isRunning else { return }
+                controller.setup.launch(speaker)
+            }
+            .disabled(controller.isRunning || info.side.presence != .notRunning)
+        default:
+            PerchCapsuleButton(title: "Show window", style: .secondary, icon: "macwindow") {
+                controller.presentedParticipant = nil
+                controller.showWindow(speaker)
+            }
+            .disabled(!controller.consoleAccess.canShowWindow || !info.side.presence.isOpen)
+        }
+    }
+
+    /// The app's eligible windows, the connected one checked.
+    private func chooseMenu(_ info: ParticipantPresentation) -> some View {
+        Menu {
+            ForEach(info.side.eligible) { candidate in
+                Toggle("\(candidate.name) \u{00B7} \(candidate.stateLine)", isOn: Binding(
+                    get: { info.side.connection?.window == candidate.id },
+                    set: {
+                        guard $0 else { return }
+                        controller.connect(speaker, to: candidate.id)
+                        controller.presentedParticipant = nil
+                    }))
+            }
+        } label: {
+            PerchCapsuleLabel(title: info.side.isConnected ? "Choose another\u{2026}" : "Choose a conversation\u{2026}",
+                              style: .secondary, icon: "arrow.left.arrow.right")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(!controller.consoleAccess.canChangeDestination || info.side.eligible.isEmpty || controller.setup.isBinding)
+    }
+
+    private func reason(_ info: ParticipantPresentation) -> String? {
+        if controller.isShowingWindow { return "Waiting for the window to appear\u{2026}" }
+        if controller.isRunning {
+            let later = info.side.isConnected ? "Choose another" : "Choose a conversation"
+            return controller.consoleAccess.pauseGranted
+                ? "\(later) once the run ends."
+                : "Pause to show this window or to type in either conversation. \(later) once the run ends."
+        }
+        switch info.side.presence {
+        case .notInstalled: return "Install \(info.name) to connect it."
+        case .notRunning: return "Open \(info.name) to choose a conversation."
+        case .checking, .launching: return nil
+        default: break
+        }
+        if info.side.eligible.isEmpty { return "Open a conversation in \(info.name) first." }
+        return controller.setup.problem
+    }
+
+    private func sentenceCase(_ text: String) -> String {
+        text.prefix(1).uppercased() + text.dropFirst()
     }
 }

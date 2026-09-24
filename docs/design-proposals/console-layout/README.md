@@ -2,7 +2,7 @@
 
 September 24, 2026. This is the layout Claude and Codex converged on after reviewing each other's
 assessments of the Perch console, in a conversation relayed by Errol. It records the experience to build;
-it does not report that the application implements it. Nothing under `app/` has changed.
+the implementation is now in place. See [implementation and verification](IMPLEMENTATION.md) for changes, rendered examples, and remaining live checks.
 
 The sources, in order:
 
@@ -13,8 +13,7 @@ The sources, in order:
 4. [The earlier Codex alternative](../../../output/ux-review-2026-09-24-codex/earlier-layout.html),
    kept as history, not as the direction
 
-The reviews sit in `output/`, which was untracked when this was written. Commit them with this spec, or
-these links break.
+The original reviews and their assets are kept in `output/`.
 
 ![Today and the converged layout](compare-today-final.png)
 

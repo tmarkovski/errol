@@ -13,6 +13,7 @@
 // events, so what it shows and what the perches say cannot disagree.
 
 import Combine
+import AppKit
 import Foundation
 import Observation
 
@@ -119,7 +120,7 @@ final class RelayController {
     var limitTurns = config.limitTurns
     var turns = config.turns
     /// Which side sends the opening message. Chosen on the console's Send
-    /// pill (PerchSendPill), and copied into config at Start, which is
+    /// starter menu, and copied into config at Start, which is
     /// where the relay loop reads it.
     var firstSpeaker = Speaker.chatgpt
     /// The setup: which apps are open, how their windows are arranged, and
@@ -238,6 +239,33 @@ final class RelayController {
     /// Set by the AppKit shell; the panel's Settings… item routes here to
     /// navigate to Settings inside the panel.
     @ObservationIgnored var openSettingsHandler: (() -> Void)?
+    /// The native shell builds the same menu for the console and status item.
+    @ObservationIgnored var appMenuProvider: (() -> NSMenu)?
+    private(set) var isShowingWindow = false
+    var presentedParticipant: Speaker?
+
+    var consoleAccess: ConsoleAccess {
+        ConsoleAccess(running: isRunning, steering: isSteering, pending: isSteeringPending,
+                      stopping: isRunning && stopRequested, showingWindow: isShowingWindow,
+                      focusOperationActive: control.hasFocusOperation)
+    }
+
+    func showWindow(_ side: Speaker) {
+        guard consoleAccess.canShowWindow else { return }
+        isShowingWindow = true
+        setup.bringForward(side) { [weak self] in
+            guard let self else { return }
+            isShowingWindow = false
+            focusPanelHandler?()
+            if consoleAccess.pauseGranted { steeringEditor.restoreFocus() }
+        }
+    }
+
+    func connect(_ side: Speaker, to window: WindowID) {
+        guard consoleAccess.canChangeDestination else { return }
+        if hasFinishedRun { resetSession() }
+        setup.connect(side, to: window)
+    }
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
     /// does an arrangement of the windows, which brings both chat apps
@@ -512,6 +540,7 @@ final class RelayController {
     /// Why Send is unavailable now, beside it: the topic missing, or a
     /// destination not ready. nil when it can go.
     var sendBlocker: String? {
+        if isShowingWindow { return "Waiting for the window to appear…" }
         if let blocker = setup.state.sendBlocker(names: names) { return blocker }
         guard instructionsReady else {
             if showsFullInstructionsEditor { return "Write the opening prompt first." }
@@ -538,7 +567,7 @@ final class RelayController {
     }
 
     func start() {
-        guard !isRunning, stage == .compose else { return }
+        guard !isRunning, !isShowingWindow, stage == .compose else { return }
 
         // Rechecked at the click, against the last sweep: the destinations
         // must read ready and the opening content must exist. A refusal
@@ -742,7 +771,7 @@ final class RelayController {
     /// just continues. Posting comes before the hold lifts, so the handoff the
     /// flag releases is one that finds the note.
     func sendSteering() {
-        guard isRunning, isSteering, !control.isCancelled else { return }
+        guard consoleAccess.canResume, !control.isCancelled else { return }
         // The outgoing SwiftUI view can survive its fade. Stop its NSTextView
         // synchronously, including any marked text, before opening either gate.
         if let text = steeringEditor.end() { steeringText = text }

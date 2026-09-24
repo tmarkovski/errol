@@ -1,8 +1,8 @@
 // The settings card: the console's own idiom — the panel's glass, system
 // type, soft wells, capsule buttons — as a screen inside the main panel.
 // The native header provides Back. Appearance preferences sit above the
-// conversation shapes, which the composer does not offer for now
-// (RelayController.conversation).
+// retained conversation-shape implementation. The shapes editor stays hidden
+// until the console offers a shape picker again (RelayController.conversation).
 
 import SwiftUI
 
@@ -28,16 +28,12 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Perch.s(14)) {
             appearanceControls
-            Rectangle().fill(Perch.hairline).frame(height: 1)
-            HStack(alignment: .top, spacing: Perch.s(14)) {
-                rail
-                editor
-            }
+
         }
         .padding(.horizontal, Perch.s(18))
         .padding(.bottom, Perch.s(18))
         .padding(.top, Perch.chromeInset)
-        .frame(width: Perch.cardWidth, height: Perch.s(490))
+        .frame(width: Perch.cardWidth, height: Perch.s(145))
         .tint(Perch.accent)
         // The title stays centered in the header, as on the console.
         .overlay(alignment: .top) {

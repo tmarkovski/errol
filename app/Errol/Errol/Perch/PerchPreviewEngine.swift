@@ -86,7 +86,9 @@ final class PerchPreviewEngine: RelayEngine {
         scan.isExcluded = excluded
         scan.surfacePath = excluded ? "epitaxy" : nil
         scan.messageAffordances = messages
-        return WindowCandidate(id: id, scan: scan, selectors: selectors, frame: frame)
+        var candidate = WindowCandidate(id: id, scan: scan, selectors: selectors, frame: frame)
+        if candidate.identity.surface == nil { candidate.identity.surface = excluded ? "Code" : "Chat" }
+        return candidate
     }
 
     static let chatgptWindows = [

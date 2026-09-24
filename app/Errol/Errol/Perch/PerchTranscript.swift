@@ -53,55 +53,66 @@ struct PerchTranscript: View {
 
     var body: some View {
         let entries = controller.transcript
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: Self.lineSpacing) {
-                    ForEach(entries) { entry in
-                        PerchTranscriptRow(controller: controller, entry: entry,
-                                           isNewest: entry.id == entries.last?.id)
-                            .id(entry.id)
-                            .transition(reduceMotion ? .opacity
-                                        : .asymmetric(insertion: .offset(y: Self.rise).combined(with: .opacity),
-                                                      removal: .opacity))
+        VStack(spacing: 0) {
+            HStack {
+                Text("Conversation summary").font(Perch.text(11, .semibold))
+                Spacer()
+                let replies = entries.filter { if case .side = $0.author { return true }; return false }.count
+                Text("\(replies) \(replies == 1 ? "reply" : "replies")").font(Perch.text(11))
+            }
+            .foregroundStyle(Perch.secondary)
+            .padding(.top, Perch.s(8)).padding(.bottom, Perch.s(5))
+            Divider()
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: Self.lineSpacing) {
+                        ForEach(entries) { entry in
+                            PerchTranscriptRow(controller: controller, entry: entry,
+                                               isNewest: entry.id == entries.last?.id)
+                                .id(entry.id)
+                                .transition(reduceMotion ? .opacity
+                                            : .asymmetric(insertion: .offset(y: Self.rise).combined(with: .opacity),
+                                                          removal: .opacity))
+                        }
+                    }
+                    .padding(.vertical, Self.endInset)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .animation(reduceMotion ? Perch.fade : Self.landing, value: entries.map(\.id))
+                }
+                .onScrollGeometryChange(for: Extent.self) { geometry in
+                    Extent(top: geometry.visibleRect.minY,
+                           below: geometry.contentSize.height - geometry.visibleRect.maxY)
+                } action: { old, new in
+                    // Only a scroll moves the top. A line landing or growing
+                    // moves what lies below, and whether that is followed is
+                    // for the reader's last position to say.
+                    guard !scrollingToNewest, new.top != old.top else { return }
+                    followsNewest = new.below <= Self.lineSpacing
+                }
+                .onChange(of: entries) { _, entries in
+                    guard followsNewest, let newest = entries.last else { return }
+                    scrollingToNewest = true
+                    withAnimation(reduceMotion ? nil : Self.follow) {
+                        proxy.scrollTo(newest.id, anchor: .bottom)
+                    }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(450))
+                        scrollingToNewest = false
                     }
                 }
-                .padding(.vertical, Self.endInset)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .animation(reduceMotion ? Perch.fade : Self.landing, value: entries.map(\.id))
             }
-            .onScrollGeometryChange(for: Extent.self) { geometry in
-                Extent(top: geometry.visibleRect.minY,
-                       below: geometry.contentSize.height - geometry.visibleRect.maxY)
-            } action: { old, new in
-                // Only a scroll moves the top. A line landing or growing
-                // moves what lies below, and whether that is followed is
-                // for the reader's last position to say.
-                guard !scrollingToNewest, new.top != old.top else { return }
-                followsNewest = new.below <= Self.lineSpacing
-            }
-            .onChange(of: entries) { _, entries in
-                guard followsNewest, let newest = entries.last else { return }
-                scrollingToNewest = true
-                withAnimation(reduceMotion ? nil : Self.follow) {
-                    proxy.scrollTo(newest.id, anchor: .bottom)
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(450))
-                    scrollingToNewest = false
+            .overlay(alignment: .topLeading) {
+                if entries.isEmpty {
+                    Text("Each reply lands here, summed up in a line.")
+                        .font(Perch.text(13))
+                        .foregroundStyle(Perch.placeholder)
+                        .lineLimit(1)
+                        .padding(.vertical, Self.endInset)
+                        .transition(.opacity)
                 }
             }
+            .animation(Perch.fade, value: entries.isEmpty)
         }
-        .overlay(alignment: .topLeading) {
-            if entries.isEmpty {
-                Text("Each reply lands here, summed up in a line.")
-                    .font(Perch.text(13))
-                    .foregroundStyle(Perch.placeholder)
-                    .lineLimit(1)
-                    .padding(.vertical, Self.endInset)
-                    .transition(.opacity)
-            }
-        }
-        .animation(Perch.fade, value: entries.isEmpty)
         // The box's inset: its text starts here too. The lines' top and
         // bottom insets are inside the scrolling, so it reaches the edges.
         .padding(.horizontal, PerchPromptBox.textInset)
@@ -109,7 +120,7 @@ struct PerchTranscript: View {
         .background(RoundedRectangle(cornerRadius: PerchPromptBox.corner).fill(Perch.paper))
         .overlay(RoundedRectangle(cornerRadius: PerchPromptBox.corner).stroke(Perch.chipEdge, lineWidth: 1))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("The conversation so far")
+        .accessibilityLabel("Conversation summary")
     }
 }
 
@@ -119,6 +130,8 @@ private struct PerchTranscriptRow: View {
     let controller: RelayController
     let entry: TranscriptEntry
     let isNewest: Bool
+    @State private var hovering = false
+    @FocusState private var actionFocused: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Perch.s(7)) {
@@ -127,7 +140,9 @@ private struct PerchTranscriptRow: View {
                 .accessibilityLabel(author)
                 // The mark sits on the first line's text, not above it.
                 .alignmentGuide(.firstTextBaseline) { $0[.bottom] - Perch.s(1.5) }
-            Text(entry.text)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                if entry.verbatim { Text("“").fixedSize() }
+                Text(entry.text)
                 .font(Perch.text(12))
                 .italic(entry.verbatim)
                 .foregroundStyle(ink)
@@ -139,6 +154,11 @@ private struct PerchTranscriptRow: View {
                 .animation(Perch.fade, value: entry.text)
                 .perchShimmer(active: entry.summarizing)
                 .help(entry.text)
+                // Separate closing punctuation survives native truncation:
+                // the ellipsis is inside the closing quote, even on narrow rows.
+                if entry.verbatim { Text("”").fixedSize() }
+            }
+            .font(Perch.text(12)).italic(entry.verbatim).foregroundStyle(ink)
             if entry.author == .human {
                 tag
             } else if entry.signsOff {
@@ -150,7 +170,24 @@ private struct PerchTranscriptRow: View {
             }
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
+        .overlay(alignment: .trailing) {
+            if let side = actionSide, controller.consoleAccess.canShowWindow {
+                Button("Show \(controller.appName(side)) window") { controller.showWindow(side) }
+                    .font(Perch.text(10)).buttonStyle(.plain).foregroundStyle(Perch.accentText)
+                    .fixedSize().focused($actionFocused)
+                    .padding(.leading, Perch.s(8)).padding(.vertical, Perch.s(2))
+                    .background(Perch.paper)
+                    .opacity(hovering || actionFocused ? 1 : 0)
+                    .help("Show the connected window; its current conversation may have changed")
+            }
+        }
+        .contentShape(Rectangle()).onHover { hovering = $0 }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var actionSide: Speaker? {
+        if case .side(let side) = entry.author { return side }
+        return entry.recipient
     }
 
     private var author: String {
@@ -209,10 +246,10 @@ private struct PerchTranscriptRow: View {
                 Text(recipient.map { "Sending to \($0)\u{2026}" } ?? "Sending\u{2026}")
                     .foregroundStyle(Perch.accentText)
             case .sent?:
-                Text(recipient.map { "to \($0)" } ?? "Sent")
+                Text(recipient.map { "note to \($0) · sent" } ?? "Sent")
                     .foregroundStyle(Perch.muted)
             case .unconfirmed?:
-                Text(recipient.map { "to \($0) \u{00B7} unconfirmed" } ?? "Unconfirmed")
+                Text(recipient.map { "note to \($0) \u{00B7} unconfirmed" } ?? "Unconfirmed")
                     .foregroundStyle(Perch.muted)
             case .notSent?:
                 Text("Not sent")

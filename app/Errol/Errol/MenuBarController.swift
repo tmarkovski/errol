@@ -25,7 +25,8 @@ final class KeyablePanel: NSPanel {
     /// Navigation gets the first chance at Escape; other screens hide the panel.
     var onCancel: (() -> Bool)?
 
-    override var canBecomeKey: Bool { true }
+    var permitsKey: (() -> Bool)?
+    override var canBecomeKey: Bool { permitsKey?() ?? true }
     override func cancelOperation(_ sender: Any?) {
         if onCancel?() != true { orderOut(nil) }
     }
@@ -116,6 +117,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         buildPanel()
         trackStatusIcon()
         trackTranscript()
+        relay.appMenuProvider = { [weak self] in self?.makeAppMenu() ?? NSMenu() }
         relay.openSettingsHandler = { [weak self] in self?.showSettings() }
         relay.focusPanelHandler = { [weak self] in self?.showPanel() }
         // A menu-bar app with no window gives a first-time user nothing to
@@ -171,31 +173,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     @objc private func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
-            let menu = NSMenu()
-            menu.autoenablesItems = false
-            addSessionOptions(to: menu)
-            menu.addItem(.separator())
-            menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
-            let checkForUpdatesItem = menu.addItem(
-                withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-            checkForUpdatesItem.target = self
-            // Refused rather than queued during a run: queueing would only
-            // surface Sparkle's window later, at a moment nobody chose.
-            checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
-            menu.addItem(.separator())
-            // The debug pair. The console dropped its log well and Inspect
-            // button; the in-memory run log and the inspector live here.
-            menu.addItem(withTitle: "Show Last Run Log", action: #selector(showRunLog),
-                         keyEquivalent: "").target = self
-            menu.addItem(withTitle: "Show Debug Logs in Finder", action: #selector(showDebugLogs),
-                         keyEquivalent: "").target = self
-            let inspectItem = menu.addItem(
-                withTitle: "Inspect Apps", action: #selector(inspectApps), keyEquivalent: "")
-            inspectItem.target = self
-            // A run owns the apps' AX trees; inspecting mid-run would fight it.
-            inspectItem.isEnabled = !relay.isRunning
-            menu.addItem(.separator())
-            menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
+            let menu = makeAppMenu()
             if let button = statusItem.button {
                 menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 6), in: button)
             }
@@ -204,35 +182,50 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         togglePanel()
     }
 
+    private func makeAppMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
+        addAppearanceOptions(to: menu)
+        menu.addItem(.separator())
+        let checkForUpdatesItem = menu.addItem(
+            withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkForUpdatesItem.target = self
+        // Refused rather than queued during a run: queueing would only
+        // surface Sparkle's window later, at a moment nobody chose.
+        checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
+        menu.addItem(.separator())
+        // The debug pair. The console dropped its log well and Inspect
+        // button; the in-memory run log and the inspector live here.
+        menu.addItem(withTitle: "Show Last Run Log", action: #selector(showRunLog),
+                 keyEquivalent: "").target = self
+        let finderItem = menu.addItem(withTitle: "Show Debug Logs in Finder", action: #selector(showDebugLogs),
+                                     keyEquivalent: "")
+        finderItem.target = self
+        finderItem.isEnabled = relay.consoleAccess.canChangeDestination
+        let inspectItem = menu.addItem(
+            withTitle: "Inspect Apps", action: #selector(inspectApps), keyEquivalent: "")
+        inspectItem.target = self
+        // A run owns the apps' AX trees; inspecting mid-run would fight it.
+        inspectItem.isEnabled = relay.consoleAccess.canChangeDestination
+        let restore = menu.addItem(withTitle: "Restore Window Positions",
+                                   action: #selector(restoreWindowPositions), keyEquivalent: "")
+        restore.target = self
+        restore.isEnabled = relay.consoleAccess.canChangeDestination && relay.setup.canRestoreLayout
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
+        return menu
+    }
+
+    @objc private func openSettingsFromMenu() { relay.openSettings() }
+
     @objc private func checkForUpdates() {
         updater.checkForUpdates()
     }
 
     // MARK: Session options
 
-    /// The turn limits the menu offers. The limit in force is listed too
-    /// when it is none of these, so the check always has somewhere to stand.
-    private static let turnLimits = [2, 4, 6, 8, 10, 12, 16, 20]
-
-    /// The session's options: how the conversation ends, how Errol looks,
-    /// and putting the windows back. The window arrangement and who starts
-    /// are on the console, beside the prompt. What belongs to a run is
-    /// locked while one is going.
-    private func addSessionOptions(to menu: NSMenu) {
-        let unlocked = !relay.isRunning
-
-        let ending = submenu("Ending", in: menu)
-        let automatic = option("When Both Agree They\u{2019}re Done", #selector(chooseTurnLimit(_:)), 0,
-                               checked: !relay.limitTurns, in: ending)
-        automatic.isEnabled = unlocked
-        ending.addItem(.separator())
-        let limits = Set(Self.turnLimits + (relay.limitTurns ? [relay.turns] : [])).sorted()
-        for limit in limits {
-            let item = option("After at Most \(limit) Turns", #selector(chooseTurnLimit(_:)), limit,
-                              checked: relay.limitTurns && relay.turns == limit, in: ending)
-            item.isEnabled = unlocked
-        }
-
+    private func addAppearanceOptions(to menu: NSMenu) {
         let display = submenu("Appearance", in: menu)
         for mode in AppAppearance.allCases {
             option(mode.title, #selector(chooseAppearance(_:)), mode,
@@ -245,10 +238,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                    checked: AppearanceStore.shared.theme == theme, in: palette)
         }
 
-        let restore = menu.addItem(withTitle: "Restore Window Positions",
-                                   action: #selector(restoreWindowPositions), keyEquivalent: "")
-        restore.target = self
-        restore.isEnabled = unlocked && relay.setup.canRestoreLayout
     }
 
     private func submenu(_ title: String, in menu: NSMenu) -> NSMenu {
@@ -269,13 +258,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return item
     }
 
-    /// Zero stands for no limit: the conversation ends when both apps agree.
-    @objc private func chooseTurnLimit(_ sender: NSMenuItem) {
-        guard !relay.isRunning, let limit = sender.representedObject as? Int else { return }
-        relay.limitTurns = limit > 0
-        if limit > 0 { relay.turns = limit }
-    }
-
     @objc private func chooseAppearance(_ sender: NSMenuItem) {
         guard let mode = sender.representedObject as? AppAppearance else { return }
         AppearanceStore.shared.appearance = mode
@@ -287,6 +269,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     @objc private func restoreWindowPositions() {
+        guard relay.consoleAccess.canChangeDestination else { return }
         relay.setup.restoreLayout()
     }
 
@@ -326,6 +309,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: PerchMetrics.initialPanel),
                              styleMask: [.borderless, .nonactivatingPanel],
                              backing: .buffered, defer: false)
+        panel.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? true }
         // Transparent, so the glass refracts what lies behind the window.
         // The shadow follows the content's alpha silhouette, so it has to
         // be invalidated whenever that silhouette changes (order-front,
@@ -404,8 +388,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func pushPanelVisibility() {
         guard let panel else { return }
-        relay.setPanelVisible(panel.isVisible && panel.occlusionState.contains(.visible)
-                              && navigation.screen == .console)
+        let showing = panel.isVisible && panel.occlusionState.contains(.visible)
+            && navigation.screen == .console
+        relay.setPanelVisible(showing)
+        // A child panel stays up when its parent is ordered out, so a side's
+        // details close with the console, and when Settings or the
+        // permission ask takes its place.
+        if !showing { relay.presentedParticipant = nil }
     }
 
     // MARK: Observation bridges
@@ -517,6 +506,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.makeFirstResponder(nil)
         navigation.showsSettings = false
         updateNavigation()
+        if relay.consoleAccess.pauseGranted {
+            DispatchQueue.main.async { [weak self] in self?.relay.steeringEditor.restoreFocus() }
+        }
     }
 
     private func refreshAccessibility() {
@@ -564,10 +556,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// in it never takes the keyboard from the console's field, and it
     /// never moves on its own: it goes where the console is dragged.
     private func makeTranscriptPanel() -> NSPanel {
-        let transcript = NSPanel(contentRect: NSRect(origin: .zero,
+        let transcript = KeyablePanel(contentRect: NSRect(origin: .zero,
                                                      size: NSSize(width: 1, height: PerchTranscript.height)),
                                  styleMask: [.borderless, .nonactivatingPanel],
                                  backing: .buffered, defer: false)
+        transcript.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
+        transcript.onCancel = { [weak self] in
+            self?.showPanel()
+            self?.relay.steeringEditor.restoreFocus()
+            return true
+        }
         transcript.isOpaque = false
         transcript.backgroundColor = .clear
         transcript.hasShadow = true
@@ -672,6 +670,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                                                   .nonactivatingPanel],
                                       backing: .buffered, defer: false)
             window.title = "Errol Log"
+            window.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = true
@@ -685,7 +684,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             window.center()
             logWindow = window
         }
-        logWindow?.makeKeyAndOrderFront(nil)
+        if relay.consoleAccess.canTakeFocus { logWindow?.makeKeyAndOrderFront(nil) }
+        else { logWindow?.orderFront(nil) }
     }
 
     /// The on-disk debug logs (RunLog in Core/Logging.swift): one file per
@@ -693,6 +693,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// at failures. Reveals the latest run's file when this process has
     /// written one, else opens the folder.
     @objc private func showDebugLogs() {
+        guard relay.consoleAccess.canChangeDestination else { return }
         let directory = RunLog.directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         if let path = RunLog.lastPath {
@@ -706,6 +707,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// and anything that stops it, a missing app or permission — lands
     /// somewhere visible.
     @objc private func inspectApps() {
+        guard relay.consoleAccess.canChangeDestination else { return }
         showRunLog()
         relay.runInspect()
     }
@@ -720,6 +722,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// end through LaunchServices, left the panel without key status.
     private func showPanel() {
         if !panel.isVisible { positionPanel() }
-        panel.makeKeyAndOrderFront(nil)
+        if relay.consoleAccess.canTakeFocus { panel.makeKeyAndOrderFront(nil) }
+        else { panel.orderFront(nil) }
     }
 }

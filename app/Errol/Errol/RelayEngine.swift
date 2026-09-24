@@ -220,8 +220,13 @@ final class LiveRelayEngine: RelayEngine {
     }
 
     func bringForward(_ side: Speaker, completion: @escaping () -> Void) {
-        runExclusively { [self, registry] in
+        // A held relay occupies the ordinary worker. The controller keeps
+        // its hold until this action returns (Resume and Start are gated).
+        // Recheck on the worker: a stopped/finished hold must do nothing.
+        let duringHold = control.canOpenSteering
+        let work = { [self, registry] in
             defer { DispatchQueue.main.async(execute: completion) }
+            if duringHold && !control.canOpenSteering { return }
             guard let target = findApp(bundleID: bundleID(side), name: name(side), selectors: selectors(side)) else { return }
             // The bound window comes to the front of its app's own windows
             // first: activation alone leaves whichever window was last up.
@@ -237,6 +242,7 @@ final class LiveRelayEngine: RelayEngine {
                 while frontWindowOwnerPID() != pid, Date() < deadline { usleep(100_000) }
             }
         }
+        if duringHold { heldWindowWorker.run(work) } else { runExclusively(work) }
     }
 
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void) {
@@ -336,11 +342,15 @@ final class LiveRelayEngine: RelayEngine {
         return (chatgpt, claude)
     }
 
-    /// Everything that drives the apps goes through one worker, in the
+    /// Relay and setup jobs go through one worker, in the
     /// order asked: an arrangement pressed just before Send is finished
     /// before the run touches a window, and a binding is made before the
     /// run that needs it.
     private let worker = EngineWorker()
+    /// Only Show window during a granted steering hold uses this worker.
+    /// The relay worker is parked, the hold remains set, and the controller
+    /// blocks Resume/Start until activation's completion reaches the main thread.
+    private let heldWindowWorker = EngineWorker()
 
     private func runExclusively(_ work: @escaping () -> Void) {
         worker.run(work)

@@ -57,6 +57,7 @@ struct PerchRunLine: View {
             .foregroundColor(Perch.accentText)
             .lineLimit(1)
             .truncationMode(.tail)
+            .help(text)
             .contentTransition(.opacity)
             .animation(Perch.fade, value: text)
             .transition(.opacity)
@@ -111,8 +112,10 @@ struct PerchReceiptLine: View {
         .help(receipt.note)
         .accessibilityLabel(text)
         .accessibilityHint("Opens the note")
-        .popover(isPresented: $showingNote, arrowEdge: .bottom) {
-            PerchNotePopover(title: text, note: receipt.note)
+        .background {
+            PerchDetailsAnchor(isPresented: $showingNote, canTakeFocus: { controller.consoleAccess.canTakeFocus }) {
+                PerchNotePopover(title: text, note: receipt.note)
+            }
         }
         .contentTransition(.opacity)
         .animation(Perch.fade, value: text)

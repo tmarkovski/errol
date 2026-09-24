@@ -119,8 +119,10 @@ final class SetupController {
     /// Bring the app forward — its connected window, where it has one —
     /// so the conversation is in view, and hand the keyboard back to the
     /// console once it is there.
-    func bringForward(_ side: Speaker) {
-        engine.bringForward(side) { [weak self] in self?.onBroughtForward?() }
+    func bringForward(_ side: Speaker, completion: (() -> Void)? = nil) {
+        engine.bringForward(side) { [weak self] in
+            if let completion { completion() } else { self?.onBroughtForward?() }
+        }
     }
 
     private func clearLaunchDeadline(_ side: Speaker) {
@@ -133,7 +135,7 @@ final class SetupController {
     /// The layout as chosen, from the control beside the prompt: the
     /// choice applies at once — the windows move, or stay.
     func choose(_ layout: LayoutChoice) {
-        guard state.layout != layout else { return }
+        guard !runInProgress, state.layout != layout else { return }
         problem = nil
         state.choose(layout)
         applyIfChosen()
@@ -150,7 +152,7 @@ final class SetupController {
     /// applies once a sweep offers windows it has not tried: the choice
     /// stands. A layout that would not fit is not tried again on its own.
     private func applyIfPending() {
-        guard state.layout.movesWindows, state.layoutProblem == nil,
+        guard !runInProgress, state.layout.movesWindows, state.layoutProblem == nil,
               !isArranging, let targets = arrangementTargets, targets != arrangedTargets else { return }
         applyLayout()
     }
@@ -164,6 +166,7 @@ final class SetupController {
     /// Apply the chosen layout to the two windows. Keep positions applies
     /// itself; the others need a window on each side.
     func applyLayout() {
+        guard !runInProgress else { return }
         problem = nil
         guard state.layout.movesWindows else {
             state.layoutOutcome(.kept)
@@ -206,6 +209,7 @@ final class SetupController {
 
     /// Put the arranged windows back where they were.
     func restoreLayout() {
+        guard !runInProgress else { return }
         engine.restoreArrangement { [weak self] restored in
             guard let self else { return }
             if restored == 0 { problem = "Nothing to put back: the windows were moved since, or are gone." }
@@ -218,7 +222,7 @@ final class SetupController {
     /// its worker and answers with what it read; the state takes the
     /// connection from there.
     func connect(_ side: Speaker, to window: WindowID) {
-        guard !isBinding else { return }
+        guard !runInProgress, !isBinding else { return }
         isBinding = true
         problem = nil
         let candidate = state[side].candidates.first { $0.id == window }

@@ -28,6 +28,12 @@ final class TextEditorSession {
         textView?.string = ""
     }
 
+    func restoreFocus() {
+        guard acceptsInput, let textView else { return }
+        textView.window?.makeKeyAndOrderFront(nil)
+        textView.window?.makeFirstResponder(textView)
+    }
+
     func attach(_ view: NSTextView) {
         if let previous = textView, previous !== view {
             previous.isEditable = false

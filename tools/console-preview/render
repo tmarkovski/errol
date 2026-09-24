@@ -1,0 +1,12 @@
+#!/bin/zsh
+# Compile native views without replacing or re-signing the installed app.
+set -eu
+cd "${0:A:h}/../.."
+preview_build=${ERROL_PREVIEW_BUILD:-/private/tmp/errol-console-preview}
+mkdir -p "$preview_build"
+flags=(-enable-upcoming-feature MemberImportVisibility -enable-upcoming-feature DisableOutwardActorInference -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature InferIsolatedConformances -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature NonisolatedNonsendingByDefault)
+sources=(${(f)"$(find app/Errol/Errol -name '*.swift' | grep -v -E '/(ErrolApp|MenuBarController|UpdaterController)\.swift$')"})
+xcrun swiftc -Onone -D DEBUG -module-cache-path "$preview_build/modules" -o "$preview_build/render" -module-name ErrolConsolePreview "${flags[@]}" \
+  -sdk "$(xcrun --show-sdk-path --sdk macosx)" -target arm64-apple-macos26.4 -swift-version 5 \
+  "${sources[@]}" tools/console-preview/main.swift
+"$preview_build/render" "${@}"
