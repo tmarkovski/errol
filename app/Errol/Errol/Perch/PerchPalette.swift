@@ -10,6 +10,26 @@ struct PerchPalette {
     let red, redBack: NSColor
     let chatgptFeather, claudeFeather: NSColor
 
+    /// Warm-neutral surfaces leave each participant's fixed color distinct;
+    /// teal marks Errol's controls and the transfer drawn over either app.
+    static let chalkTeal = PerchPalette(
+        light: Colors(
+            paper: 0xFBFAF8, well: 0xF3F1EC,
+            panelEdge: 0xE2DFD8, chipEdge: 0xDDDAD2, hairline: 0xE6E3DC,
+            ink: 0x1C1B19, secondary: 0x4A4845, muted: 0x6F6C66,
+            placeholder: 0x726F67, previewInk: 0x6F6C66,
+            accent: 0x1F7A76, accentText: 0x176660, accentBack: 0xDDEEEC,
+            onAccent: 0xFFFFFF,
+            red: 0xA83E36, redBack: 0xF6E4E1),
+        dark: Colors(
+            paper: 0x1B1A18, well: 0x232220,
+            panelEdge: 0x373532, chipEdge: 0x3C3A37, hairline: 0x302F2C,
+            ink: 0xF2F0EB, secondary: 0xC8C5BE, muted: 0xA29F97,
+            placeholder: 0x858279, previewInk: 0xA29F97,
+            accent: 0x6FC9C2, accentText: 0x8AD6D0, accentBack: 0x214341,
+            onAccent: 0x0B2624,
+            red: 0xE7A79F, redBack: 0x4A2C28))
+
     static let warmStone = PerchPalette(
         light: Colors(
             paper: 0xFAF7F0, well: 0xEFECE4,
@@ -176,6 +196,7 @@ struct PerchPalette {
 extension AppTheme {
     var palette: PerchPalette {
         switch self {
+        case .chalkTeal: .chalkTeal
         case .warmStone: .warmStone
         case .classicAmber: .classicAmber
         case .chalkGraphite: .chalkGraphite
