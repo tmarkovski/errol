@@ -555,10 +555,14 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     /// A borderless, non-activating panel like the console's, transparent
-    /// so the card's paper is its silhouette and AppKit's shadow follows
-    /// that. It cannot become key, so a click or a scroll in it never
-    /// takes the keyboard from the console's field, and it never moves on
-    /// its own: it goes where the console is dragged.
+    /// so the card's paper is its silhouette, and with the console's kind
+    /// of shadow around that silhouette, rim and all (buildPanel), so it
+    /// stands apart from the chat windows under it the way the console
+    /// does. The shadow is AppKit's rather than drawn in the card, so the
+    /// window stays the card's size and a click beside the card reaches
+    /// the window under it. It cannot become key, so a click or a scroll
+    /// in it never takes the keyboard from the console's field, and it
+    /// never moves on its own: it goes where the console is dragged.
     private func makeTranscriptPanel() -> NSPanel {
         let transcript = NSPanel(contentRect: NSRect(origin: .zero,
                                                      size: NSSize(width: 1, height: PerchTranscript.height)),
@@ -598,6 +602,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let frame = NSRect(origin: origin, size: size)
         guard transcript.frame != frame else { return }
         transcript.setFrame(frame, display: true)
+        // The shadow follows the silhouette, which a new size changes.
         transcript.invalidateShadow()
     }
 
@@ -617,6 +622,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
         placeTranscript()
         guard transcript.alphaValue < 1 else { return }
+        // The shadow is taken from the drawn card, once it is drawn whole.
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             transcript.alphaValue = 1
             transcript.invalidateShadow()

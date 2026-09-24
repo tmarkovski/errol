@@ -3,14 +3,15 @@
 // mark of the app that wrote it, summed up by the on-device model
 // (ReplySummarizer), and each note the human sent beside a person, in the
 // order the conversation took them in. The window is shaped like the
-// prompt box — the same paper, corner, and insets, and as wide as the
-// box, centered under it — and it behaves like the box: the lines start
-// at the top, the newest at the bottom, and once they overflow they
-// scroll, following the newest line unless the reader has scrolled up to
-// an older one. A reply's own words stand in italics, on one line, until
-// the model's sentence replaces them; an older line's full text is its
-// tooltip. It shows from the run's start, with only a placeholder until
-// the first reply, through the ending, until New topic.
+// prompt box — the same paper, corner, and insets, as wide as the box
+// and centered under it, as tall as the console — and it behaves like the
+// box: the lines start at the top, the newest at the bottom, and once
+// they overflow they scroll, right up to the window's edge, following the
+// newest line unless the reader has scrolled up to an older one. A
+// reply's own words stand in italics, on one line, until the model's
+// sentence replaces them; an older line's full text is its tooltip. It
+// shows from the run's start, with only a placeholder until the first
+// reply, through the ending, until New topic.
 
 import SwiftUI
 
@@ -25,13 +26,23 @@ struct PerchTranscript: View {
     /// the scroll's own motion is not read as the reader's.
     @State private var scrollingToNewest = false
 
-    /// The window's height: room for six lines, or five and the sentence
-    /// on the newest taking two.
-    static let height = Perch.s(120)
+    /// The window's height: the console's, so the two stand as a pair.
+    /// Room for seven lines, or six with the newest taking two.
+    static let height = Perch.widgetHeight
     /// The gap between the capsule's edge and the window.
     static let gap = Perch.s(10)
+    /// The lines' inset from the window's top and bottom edges, the
+    /// prompt's own; it scrolls away with the lines, so a scrolled line
+    /// runs to the edge.
+    private static let endInset = PerchPromptBox.verticalInset + GrowingTextEditor.insetHeight
     private static let lineSpacing = Perch.s(4)
     private static let follow = Animation.easeOut(duration: 0.35)
+    /// A new line's landing: it rises into place from a little under
+    /// where it stops, fading in, overshoots a few points, and settles.
+    /// The scroll that follows it is a plain ease, so the bounce is the
+    /// line's own. (Rubber-banding at the ends is AppKit's, on a trackpad.)
+    private static let landing = Animation.spring(duration: 0.55, bounce: 0.45)
+    private static let rise = Perch.s(24)
 
     /// Where the reader is in the lines, from the scroll view's geometry:
     /// the top of what shows, and how much of the lines lies below it.
@@ -49,13 +60,14 @@ struct PerchTranscript: View {
                         PerchTranscriptRow(controller: controller, entry: entry,
                                            isNewest: entry.id == entries.last?.id)
                             .id(entry.id)
-                            .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                                    removal: .opacity))
+                            .transition(reduceMotion ? .opacity
+                                        : .asymmetric(insertion: .offset(y: Self.rise).combined(with: .opacity),
+                                                      removal: .opacity))
                     }
                 }
-                .padding(.vertical, GrowingTextEditor.insetHeight)
+                .padding(.vertical, Self.endInset)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-                .animation(reduceMotion ? Perch.fade : Self.follow, value: entries.map(\.id))
+                .animation(reduceMotion ? Perch.fade : Self.landing, value: entries.map(\.id))
             }
             .onScrollGeometryChange(for: Extent.self) { geometry in
                 Extent(top: geometry.visibleRect.minY,
@@ -85,14 +97,14 @@ struct PerchTranscript: View {
                     .font(Perch.text(13))
                     .foregroundStyle(Perch.placeholder)
                     .lineLimit(1)
-                    .padding(.vertical, GrowingTextEditor.insetHeight)
+                    .padding(.vertical, Self.endInset)
                     .transition(.opacity)
             }
         }
         .animation(Perch.fade, value: entries.isEmpty)
-        // The box's insets: its text starts here too.
+        // The box's inset: its text starts here too. The lines' top and
+        // bottom insets are inside the scrolling, so it reaches the edges.
         .padding(.horizontal, PerchPromptBox.textInset)
-        .padding(.vertical, PerchPromptBox.verticalInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: PerchPromptBox.corner).fill(Perch.paper))
         .overlay(RoundedRectangle(cornerRadius: PerchPromptBox.corner).stroke(Perch.chipEdge, lineWidth: 1))
