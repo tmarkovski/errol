@@ -3,6 +3,14 @@
 Durable records of UI directions that may inform production work but are not
 part of the application build.
 
+- [Console layout — converged spec](console-layout/README.md) — September 24,
+  2026: keep the capsule and the app icons at its ends, and put each side's
+  destination under the box, with the run's settings as labeled menus above
+  it. The box is a status panel whenever the relay owns it. There is one
+  participant popover, whose actions follow the run's actual hold. Converged
+  by Claude and Codex from their two assessments in `output/`; thirteen
+  reference renders and their harness are included.
+
 - [Participatory setup and session UI — implementation spec](setup-interaction/SPEC.md)
   — the agreed native capsule, desktop app icons, all ten reference screens,
   connection and recovery behavior, current-code mapping, and acceptance criteria.

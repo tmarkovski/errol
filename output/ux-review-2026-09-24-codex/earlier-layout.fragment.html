@@ -1,0 +1,121 @@
+<div id="errol-layout-review" aria-label="Errol layout proposal">
+  <style>
+    #errol-layout-review { font: 14px/1.45 -apple-system, BlinkMacSystemFont, sans-serif; color: light-dark(#1c1b19,#f2f0eb); --er-paper:light-dark(#fbfaf8,#1b1a18); --er-well:light-dark(#f3f1ec,#232220); --er-line:light-dark(#dddad2,#3c3a37); --er-secondary:light-dark(#4a4845,#c8c5be); --er-accent:light-dark(#1f7a76,#6fc9c2); --er-on-accent:light-dark(#ffffff,#0b2624); }
+    #errol-layout-review * { box-sizing:border-box; }
+    #errol-layout-review .er-caption { color:var(--er-secondary); font-size:12px; margin:0 0 10px; }
+    #errol-layout-review .er-window { background:var(--er-paper); border:1px solid var(--er-line); border-radius:22px; padding:18px; }
+    #errol-layout-review .er-header, #errol-layout-review .er-foot, #errol-layout-review .er-person-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    #errol-layout-review .er-header { justify-content:space-between; margin-bottom:14px; }
+    #errol-layout-review .er-header strong, #errol-layout-review strong { font-weight:500; }
+    #errol-layout-review .er-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+    #errol-layout-review .er-person { min-width:0; padding:10px 12px; border-radius:12px; background:var(--er-well); }
+    #errol-layout-review .er-tile { width:30px; height:30px; display:grid; place-items:center; border:1px solid var(--er-line); border-radius:8px; font-weight:500; background:var(--er-paper); flex-shrink:0; }
+    #errol-layout-review .er-person-top { flex-wrap:nowrap; }
+    #errol-layout-review .er-destination { display:block; margin-top:8px; overflow-wrap:anywhere; }
+    #errol-layout-review .er-meta { color:var(--er-secondary); font-size:12px; }
+    #errol-layout-review .er-person-state { display:block; margin-top:4px; }
+    #errol-layout-review .er-composer { grid-column:1/-1; grid-row:2; min-width:0; }
+    #errol-layout-review label { display:block; font-size:12px; color:var(--er-secondary); }
+    #errol-layout-review textarea { width:100%; min-height:76px; padding:10px 12px; margin:5px 0 8px; border:1px solid var(--er-line); background:var(--er-paper); color:inherit; border-radius:12px; resize:vertical; font:inherit; }
+    #errol-layout-review select, #errol-layout-review button { font:inherit; color:inherit; background:var(--er-well); border:1px solid var(--er-line); border-radius:9px; padding:7px 10px; }
+    #errol-layout-review .er-primary { background:var(--er-accent); color:var(--er-on-accent); border-color:var(--er-accent); }
+    #errol-layout-review .er-foot { justify-content:space-between; margin-top:10px; }
+    #errol-layout-review .er-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    #errol-layout-review .er-status { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--er-line); }
+    #errol-layout-review .er-log { margin-top:14px; }
+    #errol-layout-review .er-log-row { display:grid; grid-template-columns:60px minmax(0,1fr); gap:10px; margin-top:8px; }
+    #errol-layout-review [hidden] { display:none !important; }
+    #errol-layout-review[data-layout="sides"] .er-grid { grid-template-columns:125px minmax(0,1fr) 125px; }
+    #errol-layout-review[data-layout="sides"] .er-composer { grid-column:2; grid-row:1; }
+    #errol-layout-review[data-layout="sides"] .er-person { align-self:start; }
+    #errol-layout-review[data-layout="sides"] .er-person:last-child { grid-column:3; grid-row:1; }
+    #errol-layout-review[data-layout="sides"] .er-person-top { flex-direction:column; align-items:flex-start; gap:6px; }
+    @media(max-width:560px) {
+      #errol-layout-review[data-layout="sides"] .er-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+      #errol-layout-review[data-layout="sides"] .er-composer { grid-column:1/-1; grid-row:2; }
+      #errol-layout-review[data-layout="sides"] .er-person:last-child { grid-column:2; }
+      #errol-layout-review .er-window { padding:12px; }
+      #errol-layout-review textarea { font-size:16px; }
+    }
+    @media(pointer:coarse) { #errol-layout-review button, #errol-layout-review select { min-height:44px; } }
+  </style>
+  <p class="er-caption">Proposed arrangement · illustrative content · controls simulate a session</p>
+  <section class="er-window" aria-label="Errol session">
+    <div class="er-header"><strong>Errol</strong><span class="er-meta">Connected windows</span></div>
+    <div class="er-grid">
+      <div class="er-person" aria-label="Codex destination">
+        <div class="er-person-top"><span class="er-tile" aria-hidden="true">C</span><strong>Codex</strong></div>
+        <span class="er-destination">Pricing strategy</span><span class="er-meta">Code · selected window</span>
+        <span class="er-person-state er-meta" data-person="Codex">Ready</span>
+      </div>
+      <div class="er-composer">
+        <label for="er-topic">Opening prompt</label>
+        <textarea id="er-topic">Compare pricing by seat with pricing by usage.</textarea>
+        <div class="er-foot">
+          <label id="er-first-label">Starts with
+            <select id="er-first" class="cursor-interaction"><option>Codex</option><option>Claude</option></select>
+          </label>
+          <div class="er-actions">
+            <button type="button" id="er-action" class="er-primary cursor-interaction">Start relay</button>
+            <button type="button" id="er-stop" class="cursor-interaction" hidden>Stop</button>
+          </div>
+        </div>
+      </div>
+      <div class="er-person" aria-label="Claude destination">
+        <div class="er-person-top"><span class="er-tile" aria-hidden="true">C</span><strong>Claude</strong></div>
+        <span class="er-destination">Pricing critique</span><span class="er-meta">Chat · selected window</span>
+        <span class="er-person-state er-meta" data-person="Claude">Ready</span>
+      </div>
+    </div>
+    <div id="er-status" class="er-status" aria-live="polite">Ready · Ends when both assistants agree they are done</div>
+    <div id="er-log" class="er-log" hidden>
+      <strong>Conversation summary</strong>
+      <div class="er-log-row"><span class="er-meta">Codex</span><span>Seat pricing makes monthly costs easier to predict.</span></div>
+      <div class="er-log-row"><span class="er-meta">Claude</span><span>Usage pricing connects cost to value, but can surprise customers.</span></div>
+    </div>
+  </section>
+  <script>
+    (() => {
+      const root = document.getElementById('errol-layout-review');
+      const state = { layout:'above', phase:'ready', first:'Codex', topic:'Compare pricing by seat with pricing by usage.', note:'' };
+      const action=root.querySelector('#er-action'), stop=root.querySelector('#er-stop'), topic=root.querySelector('#er-topic'), first=root.querySelector('#er-first');
+      function restore(saved) {
+        const p=saved?.privateContent;
+        if (!p) return;
+        if (['above','sides'].includes(p.layout)) state.layout=p.layout;
+        if (['ready','running','paused','finished'].includes(p.phase)) state.phase=p.phase;
+        if (['Codex','Claude'].includes(p.first)) state.first=p.first;
+        if (typeof p.topic==='string') state.topic=p.topic;
+        if (typeof p.note==='string') state.note=p.note;
+      }
+      function save() {
+        if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{layout:state.layout,sessionState:state.phase},privateContent:{...state}}).catch(()=>{});
+      }
+      function render() {
+        root.dataset.layout=state.layout;
+        first.value=state.first;
+        const paused=state.phase==='paused', running=state.phase==='running', ready=state.phase==='ready';
+        topic.value=paused?state.note:state.topic;
+        topic.readOnly=!ready&&!paused;
+        topic.placeholder=paused?'Optional note for the next handoff':'';
+        root.querySelector('label[for="er-topic"]').textContent=paused?'Note for the next handoff':'Opening prompt';
+        root.querySelector('#er-first-label').hidden=!ready;
+        stop.hidden=ready||state.phase==='finished';
+        action.textContent=ready?'Start relay':running?'Pause':paused?(state.note.trim()?'Send note & continue':'Resume'):'New topic · same chats';
+        action.disabled=ready&&!state.topic.trim();
+        root.querySelector('#er-log').hidden=ready;
+        const statuses={ready:'Ready · Ends when both assistants agree they are done',running:state.first+' is replying · Turn 3 · Pause before typing in either conversation',paused:'Paused · Nothing is being copied or sent',finished:'Relay stopped · The connected chats keep their existing context'};
+        root.querySelector('#er-status').textContent=statuses[state.phase];
+        root.querySelectorAll('[data-person]').forEach(el=>{el.textContent=ready?'Ready':paused?'Paused':state.phase==='finished'?'Connected':el.dataset.person===state.first?'Replying…':'Waiting';});
+      }
+      restore(window.openai?.widgetState); render();
+      topic.addEventListener('input',()=>{if(state.phase==='paused')state.note=topic.value;else state.topic=topic.value;action.disabled=state.phase==='ready'&&!state.topic.trim();if(state.phase==='paused')action.textContent=state.note.trim()?'Send note & continue':'Resume';});
+      topic.addEventListener('change',save);
+      first.addEventListener('change',()=>{state.first=first.value;save();});
+      action.addEventListener('click',()=>{if(state.phase==='ready')state.phase='running';else if(state.phase==='running')state.phase='paused';else if(state.phase==='paused'){state.phase='running';state.note='';}else{state.phase='ready';state.topic='';}render();save();});
+      stop.addEventListener('click',()=>{state.phase='finished';render();save();});
+      window.addEventListener('openai:set_globals',event=>{if(event.detail?.globals?.widgetState){restore(event.detail.globals.widgetState);render();}});
+      if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=>{render();save();}});tweak.addSelect(state,'layout',{label:'Participant placement',options:[{label:'Above the prompt',value:'above'},{label:'At opposite ends',value:'sides'}]});tweak.addSelect(state,'phase',{label:'Session state',options:['ready','running','paused','finished']});}
+    })();
+  </script>
+</div>
