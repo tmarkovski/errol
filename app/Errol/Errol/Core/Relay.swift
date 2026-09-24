@@ -10,23 +10,37 @@ import Foundation
 /// lives as a template rather than an interpolated literal: the token stands
 /// in for `config.stopSequence` and is substituted at send time, keeping the
 /// marker itself a single source of truth however the prose is rewritten.
+///
+/// The rules are the framing and then how the conversation ends: the
+/// sign-off, or, when only Stop ends the run, the human ending it.
 enum RelayRules {
     static let stopSequenceToken = "{{stopSequence}}"
-    static let defaultTemplate = """
+    static let framing = """
         This is an automated agent-to-agent conversation: your replies are relayed \
         to another AI assistant, and its replies are relayed back to you. The human \
         who set this up is not taking part in the conversation, though they may \
         occasionally interject a steering note to guide it — such notes arrive in \
         clearly marked sections, and both sides get to see them. Treat it as a real \
         multi-turn dialogue, not a one-shot answer: contribute incrementally and \
-        leave room for the other assistant to build on your reply. When you want to \
-        end the conversation, include {{stopSequence}} anywhere in a reply — \
-        but only once the exchange has genuinely run its course; never initiate \
+        leave room for the other assistant to build on your reply.
+        """
+    static let signOff = """
+        When you want to end the conversation, include {{stopSequence}} anywhere \
+        in a reply — but only once the exchange has genuinely run its course; never initiate \
         the sign-off in your first reply. When the other assistant sends it, reply \
         with your own goodbye containing {{stopSequence}} — the conversation \
         closes once both sides have sent it. Replying with an empty message ends \
         the conversation immediately.
         """
+    /// For a run that only Stop ends. No marker is mentioned, so neither side
+    /// reaches for one out of habit.
+    static let humanEnds = """
+        There is no sign-off in this conversation: the human will end it when \
+        they choose. Until then, keep the exchange going — build on each other's \
+        replies, and when a thread runs dry, take up a new angle on the topic \
+        rather than wrapping up or saying goodbye.
+        """
+    static let defaultTemplate = framing + " " + signOff
 }
 
 /// Ground rules given to each agent once, at the start of its side of the
@@ -34,9 +48,11 @@ enum RelayRules {
 /// verbatim. Reads the template from `config` (copied there at Start), not
 /// the settings store — this runs on the relay worker thread.
 func relayRules() -> String {
-    config.relayRulesTemplate
-        .replacingOccurrences(of: RelayRules.stopSequenceToken,
-                              with: config.stopSequence)
+    let template = config.ending.endsOnSignOff
+        ? config.relayRulesTemplate
+        : RelayRules.framing + " " + RelayRules.humanEnds
+    return template.replacingOccurrences(of: RelayRules.stopSequenceToken,
+                                         with: config.stopSequence)
 }
 
 /// What the first agent receives: the rules plus the human's initial message.
@@ -295,8 +311,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     }
 
     // nil = no cap: the run ends on the conversation's own close (mutual
-    // sign-off, empty reply, timeout, or Stop).
-    let turnCap = config.limitTurns ? config.turns : nil
+    // sign-off, empty reply, timeout, or Stop), or only on Stop.
+    let turnCap = config.turnCap
     if let turnCap, turnCap < 1 {
         return failedStart("The turn limit must be at least 1 when it is on.")
     }
@@ -668,7 +684,10 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 return .emptyReply(side: side(speaker))
             }
             relayEvents.post(.reply(side: side(speaker), text: reply))
-            let signedOff = trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
+            // With the run ending only on Stop, the marker is text like any
+            // other, and the reply goes on to the listener.
+            let signedOff = config.ending.endsOnSignOff
+                && trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
             if signedOff {
                 setConversation(speaker, .ended)
                 if lastReplyEnded {

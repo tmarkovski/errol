@@ -20,6 +20,10 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
   - One line under the buttons says why an action is unavailable.
   - The icon and the destination line toggle the panel. A click elsewhere or Esc closes it, and it closes with the console.
   - A side with nothing connected names its state ("Not connected", "Not running") instead of "Ready".
+- **Three endings, with a stepper for the turn limit.** The ending menu offers **When both agree**, **After a set number of turns**, and **When you stop it**; the fixed list of turn counts is gone.
+  - With a turn limit, a minus/plus stepper stands beside the chip, and its count rolls as it steps. It holds to repeat, takes the arrow keys, and adjusts as one control in VoiceOver.
+  - When you stop it, the assistants are told the human will end the conversation, and a sign-off marker no longer ends the run. The status line reads "until you stop it".
+  - In the narrow console, the ending and its stepper stay on the row, while who starts and the arrangement fold into Run options.
 
 Only the prompt and an acknowledged steering pause mount editors. Running, pending pause, queued note, recovery, and finished states use status panels. RunReport supplies the outcome and recovery instructions. The conversation summary keeps its scrolling view through pauses, has a header and reply count, quotes original excerpts, and offers keyboard-focusable Show window actions on hover/focus when allowed. Delivery receipt accounting is unchanged.
 
@@ -55,6 +59,7 @@ These images come from the app's views, not the earlier static proposal.
 ![Running in dark appearance](implemented/running-dark.png)
 ![A side's details before a run](implemented/details.png)
 ![Claude's details while its window is minimized](implemented/details-held.png)
+![A turn limit, with its stepper](implemented/turn-limit.png)
 
 Regenerate locally:
 

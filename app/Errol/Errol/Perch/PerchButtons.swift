@@ -121,13 +121,16 @@ extension View {
 /// While a new value springs the chip to its width, the text rolls to it
 /// glyph by glyph, keeping in place what the two values share ("Ends ",
 /// " starts"), and stays inside its own frame, clear of the chevron. A
-/// plain crossfade laid the two phrases over each other.
+/// plain crossfade laid the two phrases over each other. A title that
+/// carries a number passes it as `value`, so its digits roll up as it grows
+/// and down as it shrinks.
 struct PerchChipLabel: View {
     let title: String
+    var value: Double? = nil
 
     var body: some View {
         HStack(spacing: Perch.s(3)) {
-            Text(title).contentTransition(.numericText()).clipped()
+            Text(title).contentTransition(value.map { .numericText(value: $0) } ?? .numericText()).clipped()
             Image(systemName: "chevron.down")
                 .font(Perch.text(8, .semibold))
                 .foregroundStyle(Perch.muted)
@@ -145,13 +148,80 @@ struct PerchChipLabel: View {
 /// redraws the label in the tint and snaps to each new width.
 struct PerchChipMenu<Items: View>: View {
     let title: String
+    var value: Double? = nil
     @ViewBuilder let items: () -> Items
 
     var body: some View {
-        Menu { items() } label: { PerchChipLabel(title: title) }
+        Menu { items() } label: { PerchChipLabel(title: title, value: value) }
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+    }
+}
+
+/// A count's stepper beside the chip that shows it: minus and plus in one
+/// small well, each half washing under the pointer. Holding a half repeats
+/// it, the arrow keys step it while it has focus, and VoiceOver adjusts it
+/// as one control.
+struct PerchStepper: View {
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    /// The accessible name, and the value read with its unit.
+    let label: String
+    let unit: (Int) -> String
+    var decrementHelp = "Fewer"
+    var incrementHelp = "More"
+
+    var body: some View {
+        HStack(spacing: 0) {
+            StepperHalf(symbol: "minus", help: decrementHelp) { step(-1) }
+                .disabled(value <= range.lowerBound)
+            Rectangle().fill(Perch.chipEdge)
+                .frame(width: 1, height: Perch.s(11))
+            StepperHalf(symbol: "plus", help: incrementHelp) { step(1) }
+                .disabled(value >= range.upperBound)
+        }
+        .buttonRepeatBehavior(.enabled)
+        .background(PerchChip.shape.fill(Perch.well))
+        .clipShape(PerchChip.shape)
+        .overlay(PerchChip.shape.strokeBorder(Perch.chipEdge, lineWidth: 1))
+        .onKeyPress(.upArrow) { step(1); return .handled }
+        .onKeyPress(.downArrow) { step(-1); return .handled }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(unit(value))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: step(1)
+            case .decrement: step(-1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func step(_ delta: Int) {
+        value = min(max(value + delta, range.lowerBound), range.upperBound)
+    }
+
+    private struct StepperHalf: View {
+        let symbol: String
+        let help: String
+        let action: () -> Void
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            Button(action: action) {
+                Image(systemName: symbol)
+                    .font(Perch.text(9, .bold))
+                    .foregroundStyle(Perch.secondary)
+                    .opacity(isEnabled ? 1 : 0.35)
+                    .frame(width: Perch.s(21), height: PerchChip.height)
+                    .contentShape(Rectangle())
+                    .perchHover(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(help)
+        }
     }
 }

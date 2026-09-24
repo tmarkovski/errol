@@ -117,7 +117,10 @@ final class RelayController {
     /// from scratch). A stored draft: it survives comparing other shapes, so
     /// coming back to Custom finds the writing where it was left.
     var customInstructions = ""
-    var limitTurns = config.limitTurns
+    /// How the next run ends, and its turn limit when it has one. Chosen on
+    /// the console's ending chip and stepper, and copied into config at
+    /// Start.
+    var ending = config.ending
     var turns = config.turns
     /// Which side sends the opening message. Chosen on the console's Send
     /// starter menu, and copied into config at Start, which is
@@ -474,7 +477,7 @@ final class RelayController {
     /// reply that is nothing else is only that.
     private func replyCaptured(_ reply: String, from side: Speaker) {
         guard isRunning else { return }
-        let signsOff = reply.contains(config.stopSequence)
+        let signsOff = config.ending.endsOnSignOff && reply.contains(config.stopSequence)
         let text = reply.replacingOccurrences(of: config.stopSequence, with: "")
         let flat = ReplySummarizer.flatten(text)
         guard !flat.isEmpty else {
@@ -581,7 +584,7 @@ final class RelayController {
         guard engine.preflight() else { return }
 
         config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        config.limitTurns = limitTurns
+        config.ending = ending
         turns = max(1, turns)
         config.turns = turns
         config.first = firstSpeaker

@@ -207,7 +207,7 @@ func main() {
     if wanted("07") {
         // Just started: the opening is on its way to the first side.
         let c = quick(connectedController(PerchPreviewEngine(pace: .seconds(120))))
-        c.limitTurns = true
+        c.ending = .turnLimit
         c.turns = 10
         c.start()
         scene("07-running-opening", c, transcript: true, settle: 0.8)
@@ -215,7 +215,7 @@ func main() {
     if wanted("08") {
         let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5)
         let c = quick(connectedController(engine))
-        c.limitTurns = true
+        c.ending = .turnLimit
         c.turns = 10
         c.start()
         pump(0.5)
@@ -321,6 +321,29 @@ func main() {
             c.lastRunDuration = 72
             scene("16-finished-" + name, c, transcript: true, settle: 0.2)
         }
+    }
+    if wanted("18") {
+        // The endings: a turn limit, with its stepper beside the chip, and a
+        // run that only Stop ends, before and during.
+        let limited = quick(connectedController())
+        limited.ending = .turnLimit
+        limited.turns = 12
+        scene("18-ending-turn-limit", limited)
+        let open = quick(connectedController())
+        open.ending = .whenStopped
+        scene("18-ending-when-stopped", open)
+        let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5)
+        let running = quick(connectedController(engine))
+        running.ending = .whenStopped
+        running.start()
+        pump(0.5)
+        play(engine, replies: 4, note: false)
+        scene("18-ending-when-stopped-running", running, transcript: true, settle: 0.5)
+        running.stop()
+        let narrow = quick(connectedController())
+        narrow.ending = .turnLimit
+        render("18-ending-turn-limit-narrow", Scene(controller: narrow, transcript: false, consoleWidth: 600),
+               size: CGSize(width: 672, height: 228), settle: 0.5)
     }
     if wanted("17") {
         let c = quick(connectedController())

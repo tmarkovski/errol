@@ -124,18 +124,46 @@ struct AppSelectors {
     var genericWindowTitles: [String] = []
 }
 
+/// How a run ends on its own, chosen on the console before Start. Stop ends
+/// any run, and so do a failure, a response timeout, an empty reply, or a
+/// lost window, whichever ending was chosen.
+enum RunEnding: Equatable, CaseIterable {
+    /// The mutual sign-off: both sides send the stop sequence in
+    /// consecutive replies.
+    case bothAgree
+    /// At most `Config.turns` replies are relayed. The mutual sign-off can
+    /// end the run sooner.
+    case turnLimit
+    /// Only Stop ends the run. The agents are told the human will end it and
+    /// get no sign-off, and a stop sequence that turns up in a reply is
+    /// relayed like any other text.
+    case whenStopped
+
+    /// Whether the agents are given the sign-off, and the loop acts on it.
+    var endsOnSignOff: Bool { self != .whenStopped }
+}
+
 struct Config {
     var chatgptBundleID = "com.openai.codex"   // standalone Codex / unified app; classic ChatGPT is com.openai.chat
     var claudeBundleID = "com.anthropic.claudefordesktop"
     /// End condition: by default a run continues until the conversation
     /// closes itself — the mutual stop-sequence sign-off, an empty reply, a
-    /// response timeout, or the Stop button. When true, `turns` additionally
-    /// caps how many responses get relayed.
-    var limitTurns = false
-    /// The optional turn cap, applied only when limitTurns is set — extra
+    /// response timeout, or the Stop button. A turn limit additionally caps
+    /// how many responses get relayed; ending when stopped leaves the
+    /// sign-off out altogether.
+    var ending = RunEnding.bothAgree
+    /// The turn cap, applied only with the turn-limit ending — extra
     /// protection, along with the message length cap, against two chatty
     /// models burning through usage limits.
     var turns = 10
+    /// The cap in force: `turns` with the turn-limit ending, else none.
+    var turnCap: Int? { ending == .turnLimit ? turns : nil }
+    /// The turn limit as an on/off switch, for callers that predate the
+    /// endings: on is the turn-limit ending, off the mutual sign-off.
+    var limitTurns: Bool {
+        get { ending == .turnLimit }
+        set { ending = newValue ? .turnLimit : .bothAgree }
+    }
     /// Which side sends the opening message; the other one answers it.
     var first = Speaker.chatgpt
     /// The human's initial message. The relay wraps it in a framing preamble

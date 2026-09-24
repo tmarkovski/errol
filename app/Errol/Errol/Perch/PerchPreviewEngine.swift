@@ -247,8 +247,8 @@ final class PerchPreviewEngine: RelayEngine {
         let play = PreviewRun(events: events, control: control, replyTime: replyTime,
                               names: (readiness.chatgpt.appName, readiness.claude.appName),
                               first: config.first,
-                              turnCap: config.limitTurns ? config.turns : nil,
-                              signOffAt: signOffAt,
+                              turnCap: config.turnCap,
+                              signOffAt: config.ending.endsOnSignOff ? signOffAt : nil,
                               startTurn: opening.turn, atHandoff: opening.atHandoff,
                               openingOperation: operation)
         run = Task { await play.play() }

@@ -59,17 +59,22 @@ struct PerchConsoleView: View {
 /// Before a run, the run's settings as chips that show their values; during
 /// and after one, the topic. The ··· app menu stands at the trailing end in
 /// every stage. A chip's width follows its value, so choosing another one
-/// springs the chip, and the chips after it, to the new width.
+/// springs the chip, and the chips after it, to the new width. With a turn
+/// limit, a stepper stands beside the ending chip and sets the count.
 struct PerchTopicLine: View {
     @Bindable var controller: RelayController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The turn limit's range: one reply at the least, and two digits at the
+    /// most. A run that should go on longer ends when you stop it.
+    static let turnRange = 1...99
 
     var body: some View {
         HStack(spacing: Perch.s(6)) {
             if controller.stage == .compose {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Perch.s(6)) { starterMenu; endingMenu; windowsMenu }.fixedSize()
-                    HStack(spacing: Perch.s(6)) { starterMenu; runOptionsMenu }.fixedSize()
+                    HStack(spacing: Perch.s(6)) { starterMenu; endingControl; windowsMenu }.fixedSize()
+                    HStack(spacing: Perch.s(6)) { endingControl; runOptionsMenu }.fixedSize()
                 }
             } else {
                 let topic = controller.topicSummary ?? controller.runPrompt ?? "Conversation"
@@ -89,7 +94,19 @@ struct PerchTopicLine: View {
     private var starterTitle: String { "\(controller.appName(controller.firstSpeaker)) starts" }
 
     private var endingTitle: String {
-        controller.limitTurns ? "Ends after \(controller.turns) turns" : "Ends when both agree"
+        switch controller.ending {
+        case .bothAgree: "Ends when both agree"
+        case .turnLimit: controller.turns == 1 ? "Ends after 1 turn" : "Ends after \(controller.turns) turns"
+        case .whenStopped: "Ends when you stop it"
+        }
+    }
+
+    private var endingHelp: String {
+        switch controller.ending {
+        case .bothAgree: "Ends when both assistants sign off"
+        case .turnLimit: "A maximum: if both assistants sign off sooner, the run ends then"
+        case .whenStopped: "Keeps going until you press Stop; the assistants are told there is no sign-off"
+        }
     }
 
     private var windowsTitle: String { controller.setup.state.layout.consoleTitle }
@@ -99,9 +116,20 @@ struct PerchTopicLine: View {
             .help("Who receives the topic first")
     }
 
-    private var endingMenu: some View {
-        PerchChipMenu(title: endingTitle) { endingItems }
-            .help("A turn limit is a maximum; mutual sign-off can end the relay sooner")
+    /// The ending chip, and the turn limit's stepper beside it while that is
+    /// the ending. Stepping rolls the chip's count.
+    private var endingControl: some View {
+        HStack(spacing: Perch.s(2)) {
+            PerchChipMenu(title: endingTitle,
+                          value: controller.ending == .turnLimit ? Double(controller.turns) : nil) { endingItems }
+                .help(endingHelp)
+            if controller.ending == .turnLimit {
+                PerchStepper(value: $controller.turns, range: Self.turnRange, label: "Turn limit",
+                             unit: { $0 == 1 ? "1 turn" : "\($0) turns" },
+                             decrementHelp: "Fewer turns", incrementHelp: "More turns")
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+            }
+        }
     }
 
     private var windowsMenu: some View {
@@ -110,15 +138,16 @@ struct PerchTopicLine: View {
             .disabled(controller.isShowingWindow)
     }
 
-    /// The narrow console's fallback: the ending and the arrangement as
-    /// submenus titled with their values.
+    /// The narrow console's fallback: who starts and the arrangement as
+    /// submenus titled with their values. The ending stays out on the row,
+    /// where its stepper can stand beside it.
     private var runOptionsMenu: some View {
         PerchChipMenu(title: "Run options") {
-            Menu(endingTitle) { endingItems }
+            Menu(starterTitle) { starterItems }
             Menu(windowsTitle) { windowsItems }
                 .disabled(controller.isShowingWindow)
         }
-        .help("\(endingTitle) \u{00B7} \(windowsTitle)")
+        .help("\(starterTitle) \u{00B7} \(windowsTitle)")
     }
 
     // Toggles, so the menu checks the value in force in its own column.
@@ -132,19 +161,13 @@ struct PerchTopicLine: View {
         }
     }
 
+    /// The three endings. The turn limit's count is set with the stepper
+    /// that appears beside the chip, not here.
     @ViewBuilder private var endingItems: some View {
-        Toggle("When both agree", isOn: Binding(
-            get: { !controller.limitTurns },
-            set: { if $0 { controller.limitTurns = false } }))
-        Divider()
-        ForEach(Array(Set([2, 4, 6, 8, 10, 12, 16, 20, controller.turns])).sorted(), id: \.self) { turns in
-            Toggle("After at most \(turns) turns", isOn: Binding(
-                get: { controller.limitTurns && controller.turns == turns },
-                set: {
-                    guard $0 else { return }
-                    controller.turns = turns
-                    controller.limitTurns = true
-                }))
+        ForEach(RunEnding.allCases, id: \.self) { ending in
+            Toggle(ending.menuTitle, isOn: Binding(
+                get: { controller.ending == ending },
+                set: { if $0 { controller.ending = ending } }))
         }
     }
 
@@ -251,9 +274,11 @@ struct PerchRunMetadata: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let turn = controller.limitTurns ? "Turn \(controller.currentTurn) of \(controller.turns)"
+            let turn = controller.ending == .turnLimit ? "Turn \(controller.currentTurn) of \(controller.turns)"
                 : "Turn \(controller.currentTurn)"
-            Text("\(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))")
+            // Nothing else says a run of this kind won't end by itself.
+            let until = controller.ending == .whenStopped ? " \u{00B7} until you stop it" : ""
+            Text("\(turn) · \(runClock(controller.elapsedRunDuration(at: context.date)))\(until)")
                 .font(Perch.text(11))
                 .foregroundStyle(Perch.muted)
                 .monospacedDigit()
@@ -444,6 +469,19 @@ struct PerchPromptBox: View {
 
 }
 
+// MARK: - The ending
+
+extension RunEnding {
+    /// Each ending as the menu lists it, completing the chip's "Ends …".
+    var menuTitle: String {
+        switch self {
+        case .bothAgree: "When both agree"
+        case .turnLimit: "After a set number of turns"
+        case .whenStopped: "When you stop it"
+        }
+    }
+}
+
 // MARK: - The window arrangement
 
 extension LayoutChoice {
@@ -631,7 +669,7 @@ private func canvas(_ controller: RelayController) -> some View {
     // first for a second, then the sentence a stand-in writes, as the
     // model would.
     let controller = connectedController(PerchPreviewEngine(turn: 4))
-    controller.limitTurns = true
+    controller.ending = .turnLimit
     controller.turns = 10
     controller.summarize = { _ in
         try? await Task.sleep(for: .seconds(1.2))
