@@ -80,10 +80,10 @@ struct WindowScan {
     /// chat, "/epitaxy/<id>" on a Claude Code session. nil on a fresh chat,
     /// a Cowork task, a project page, and everywhere ChatGPT.
     var conversationRoute: String?
-    /// The value and label of the window's last text input — the composer,
+    /// The value and label of the window's last text area — the composer,
     /// the way `composerElement` picks it — for judging what it holds
     /// (classifyComposer) without a second walk. nil when the window has
-    /// no text input.
+    /// no text area.
     var composerValue: String?
     var composerLabel = ""
     /// A stop control is mounted: the app is producing a reply.
@@ -150,13 +150,13 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
                 scan.composerSurface = selectors.composerSurfaceNames
                     .first { label.contains($0.key) }?.value
             }
+            // The last text area in tree order is the composer, exactly as
+            // composerElement picks it; each one seen overwrites the last.
+            scan.composerValue = element.stringValue
+            scan.composerLabel = label
         } else if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
             scan.isExcluded = true
         }
-        // The last text input in tree order is the composer, exactly as
-        // composerElement picks it; each one seen overwrites the last.
-        scan.composerValue = element.stringValue
-        scan.composerLabel = label
     } else if role == kAXRadioButtonRole as String, !scan.isExcluded,
               isExclusionMarker(element, role: role, selectors: selectors) {
         scan.isExcluded = true

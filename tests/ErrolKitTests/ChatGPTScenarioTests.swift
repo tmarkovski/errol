@@ -109,6 +109,27 @@ final class ChatGPTScenarioTests: XCTestCase {
         XCTAssertTrue(d.affordanceLabels.isEmpty)
     }
 
+    // MARK: Terminal panel
+
+    func testTerminalInputIsNotTheComposer() throws {
+        // With the terminal panel open, ChatGPT mounts its input as a text
+        // field below the composer in the tree (live Sep 24 2026). Taken
+        // for the composer, it got the relayed message, and the Return
+        // that sent it ran the message in the shell. The composer holds a
+        // draft here, so the terminal's empty value must not stand in for it.
+        var window = try XCTUnwrap(loadFixture("chatgpt-chat-conversation").first)
+        window.children.append(FixtureElement(role: "AXTextField", axDescription: "Terminal input",
+                                              title: "Terminal input", value: .string("")))
+        let composer = try XCTUnwrap(composerElement(under: window))
+        XCTAssertEqual(composer.role, "AXTextArea")
+        XCTAssertEqual(composer.label, "Message ChatGPT")
+        let scan = scanWindow(window, selectors: selectors)
+        XCTAssertEqual(scan.composerLabel, "Message ChatGPT")
+        XCTAssertEqual(classifyComposer(value: scan.composerValue, label: scan.composerLabel,
+                                        attachments: 0, replying: false),
+                       .draft(characters: 16))
+    }
+
     // MARK: Known hazard, pinned
 
     func testSidebarTitleContainingCopyInflatesTheCount() {

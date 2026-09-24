@@ -210,13 +210,16 @@ func pastedTextAttachmentCount<Node: ElementNode>(around input: Node,
     return pastedTextAttachmentCount(under: container, selectors: selectors)
 }
 
-/// The last text input in the window — composers sit at the bottom. The live
+/// The last text area in the window — composers sit at the bottom. The live
 /// inputArea prefers the focused element; this is its shared fallback.
+/// Every composer on every surface of both apps is an AXTextArea; a text
+/// field is something else, and it can come after the composer: ChatGPT's
+/// terminal panel mounts one ("Terminal input") below it in the tree (live
+/// Sep 24 2026), and a paste there, with the Return that sends it, runs the
+/// message as a shell command.
 func composerElement<Node: ElementNode>(under root: Node) -> Node? {
     var areas: [Node] = []
-    findAll(in: root, where: { el in
-        el.role == kAXTextAreaRole as String || el.role == kAXTextFieldRole as String
-    }, into: &areas)
+    findAll(in: root, where: { $0.role == kAXTextAreaRole as String }, into: &areas)
     return areas.last
 }
 
@@ -293,7 +296,7 @@ func pastedTextAttachmentCount(around input: AXUIElement,
 /// names the way alongside the element.
 enum InputAreaSource: String {
     case focused = "the focused element"
-    case lastTextInput = "the window's last text input"
+    case lastTextArea = "the window's last text area"
 }
 
 func resolveInputArea(in target: TargetApp) -> (element: AXUIElement, source: InputAreaSource)? {
@@ -308,7 +311,7 @@ func resolveInputArea(in target: TargetApp) -> (element: AXUIElement, source: In
             return (el, .focused)
         }
     }
-    return composerElement(under: LiveElement(ax: root)).map { ($0.ax, .lastTextInput) }
+    return composerElement(under: LiveElement(ax: root)).map { ($0.ax, .lastTextArea) }
 }
 
 func inputArea(in target: TargetApp) -> AXUIElement? {
