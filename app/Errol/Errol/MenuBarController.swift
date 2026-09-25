@@ -151,27 +151,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func buildStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = statusItem.button else { return }
-        button.image = statusIcon(running: false)
+        button.image = StatusIcon.image(running: false, palette: AppearanceStore.shared.theme.palette)
         button.target = self
         button.action = #selector(statusItemClicked)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-    }
-
-    private func statusIcon(running: Bool) -> NSImage? {
-        // Keep the original owl as a fallback; ErrolSymbol is the default mark.
-        let mark = NSImage(named: "ErrolSymbol") ?? NSImage(named: "MenuBarIcon")
-        if let image = mark?.copy() as? NSImage {
-            // The two bubbles make a square mark, and at 16 pt it stands as tall
-            // as the system's own menu bar glyphs; 18 pt towered over them.
-            image.size = NSSize(width: 16, height: 16)
-            image.isTemplate = true
-            image.accessibilityDescription = running ? "Errol is running" : "Errol"
-            return image
-        }
-
-        let bubbles = running ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right"
-        return NSImage(systemSymbolName: bubbles, accessibilityDescription: "Errol")
-            ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "Errol")
     }
 
     @objc private func statusItemClicked() {
@@ -411,10 +394,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     private func trackStatusIcon() {
         let rearm = MainQueueHop { [weak self] in self?.trackStatusIcon() }
-        let running = withObservationTracking { relay.isRunning } onChange: {
+        // The theme too: the icon a run lights takes its colors from it.
+        let (running, theme) = withObservationTracking {
+            (relay.isRunning, AppearanceStore.shared.theme)
+        } onChange: {
             rearm.run()
         }
-        statusItem.button?.image = statusIcon(running: running)
+        statusItem.button?.image = StatusIcon.image(running: running, palette: theme.palette)
         // A run reaching idle is when the updater can release what it held
         // back: a staged install, or an update it found but never presented.
         if wasRunning, !running { updater?.relayDidFinish() }

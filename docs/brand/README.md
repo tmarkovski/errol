@@ -10,7 +10,11 @@ strokes included, which comes out square.
 - The macOS status item uses `ErrolSymbol.imageset` in the app's asset catalog:
   the same paths in black, drawn at 16 pt with template rendering so macOS
   controls the color in light and dark menu bars. The mark is square, so 16 pt
-  keeps it as tall as the system's own menu bar glyphs.
+  keeps it as tall as the system's own menu bar glyphs. While a run lasts, the
+  status item lights the mark instead (`StatusIcon.swift`): the mark at 14 pt
+  on a 22 × 18 pt rounded rect of the theme's accent, colored like the
+  console's prominent button, the way macOS lights its microphone indicator
+  while the mic is in use.
 - The website uses `site/public/errol-symbol.svg`, a copy of this source, in
   the header, the closing section, the footer, and the demo's menu bar and
   closing card. The site recolors it in CSS.
