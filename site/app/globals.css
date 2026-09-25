@@ -19,14 +19,16 @@
   --muted-foreground: #a5a59b;
   --border: #ffffff18;
   --gold: #edba72;
-  --header-h: 88px;
+  --header-h: 76px;
+  --gutter: 48px;
 }
 * {
   box-sizing: border-box;
 }
+/* Proximity only: scrolling near the film settles it under the header, and nothing else holds. */
 html {
   scroll-behavior: smooth;
-  scroll-snap-type: y mandatory;
+  scroll-snap-type: y proximity;
 }
 body {
   margin: 0;
@@ -61,24 +63,19 @@ a:focus-visible {
   overflow: clip;
 }
 .shell {
-  width: min(1120px, calc(100% - 96px));
+  width: min(1200px, calc(100% - var(--gutter) * 2));
   margin-inline: auto;
+}
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  transition: color 0.2s;
 }
 .text-link:hover {
   color: var(--gold);
-}
-.eyebrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  margin: 0;
-  color: #b3b2a5;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  letter-spacing: 1.7px;
-  font-weight: 400;
 }
 .status-dot {
   display: inline-block;
@@ -89,64 +86,25 @@ a:focus-visible {
   background: var(--gold);
   box-shadow: 0 0 9px #edba7266;
 }
-em {
-  font-family:
-    'Iowan Old Style', 'Baskerville', 'Palatino Linotype', Georgia, serif;
-  color: var(--gold);
-  font-weight: 400;
-  letter-spacing: -0.055em;
-}
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 14px;
-  transition: color 0.2s;
-}
 .download-note {
+  margin: 0;
   color: #85867c;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 .download-note > span {
   margin: 0 8px;
-  color: #64645b;
-}
-h2 {
-  margin: 0;
-  font-size: clamp(32px, 3.6vw, 46px);
-  font-weight: 450;
-  line-height: 1.18;
-  letter-spacing: -2px;
+  color: #56574f;
 }
 @media (max-width: 1024px) {
-  .shell {
-    width: calc(100% - 64px);
+  :root {
+    --gutter: 32px;
   }
 }
 @media (max-width: 760px) {
-  .shell {
-    width: calc(100% - 40px);
-  }
-  .eyebrow {
-    font-size: 12px;
-    letter-spacing: 0.5px;
-  }
-  .text-link {
-    font-size: 14px;
-  }
-}
-@media (max-width: 560px) {
-  .shell {
-    width: calc(100% - 40px);
-  }
-  .download-note {
-    font-size: 12px;
-  }
-  .eyebrow {
-    font-size: 12px;
-    letter-spacing: 0.3px;
+  :root {
+    --header-h: 64px;
+    --gutter: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -158,105 +116,5 @@ h2 {
   *::after {
     animation: none !important;
     transition: none !important;
-  }
-}
-@supports (animation-timeline: view()) {
-  @keyframes scroll-appear {
-    from {
-      opacity: 0.25;
-      transform: translateY(26px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-}
-.landing[data-motion-paused='true'] *,
-.landing[data-motion-paused='true'] *::before,
-.landing[data-motion-paused='true'] *::after {
-  animation-play-state: paused !important;
-}
-.landing[data-motion-paused='true'] .section-heading,
-.landing[data-motion-paused='true'] .step,
-.landing[data-motion-paused='true'] .closing > * {
-  animation: none !important;
-  opacity: 1;
-  transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/* Section rhythm and copy alignment shared by the sections after the demo. */
-.eyebrow {
-  text-transform: uppercase;
-}
-.band {
-  position: relative;
-}
-.band-heading {
-  max-width: 640px;
-}
-.band-heading .eyebrow {
-  justify-content: flex-start;
-  color: #a59a83;
-  letter-spacing: 1.2px;
-  margin-bottom: 20px;
-}
-.band-heading > p:not(.eyebrow) {
-  margin: 18px 0 0;
-  max-width: 520px;
-  color: #9b9e90;
-  font-size: 16px;
-  line-height: 1.8;
-}
-/* Scroll-in for the new sections; the older ones keep their own selectors above. */
-@supports (animation-timeline: view()) {
-  .rise {
-    animation: scroll-appear linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 80%;
-  }
-}
-.landing[data-motion-paused='true'] .rise {
-  animation: none !important;
-  opacity: 1;
-  transform: none;
-}
-
-/* Every section is one viewport-high slide, and the page snaps to slide starts on every
-   viewport. Snapping stays mandatory on phones too: a slide taller than the screen is still
-   fully reachable, because any scroll position it covers counts as a snap position. */
-.slide {
-  box-sizing: border-box;
-  min-height: 100vh;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-top: var(--header-h);
-  padding-bottom: 32px;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-}
-.closing-slide {
-  padding-bottom: 0;
-}
-.closing-slide > .closing {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-@media (max-width: 760px) {
-  :root {
-    --header-h: 72px;
   }
 }

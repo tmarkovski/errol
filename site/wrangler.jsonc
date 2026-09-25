@@ -4,6 +4,9 @@
   "compatibility_date": "2026-09-05",
   "assets": {
     "directory": "./dist/client",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    // The films go through worker/index.ts, which answers Range requests.
+    "run_worker_first": ["/demos/*"]
   }
 }

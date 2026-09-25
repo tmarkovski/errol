@@ -1,0 +1,207 @@
+/* Wider than the text column above it: the film is the page's picture. */
+.film {
+  position: relative;
+  width: min(1360px, calc(100% - var(--gutter) * 2));
+  margin-inline: auto;
+  padding: 0 0 clamp(56px, 10svh, 112px);
+  view-timeline: --film block;
+}
+.film-glow {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: -12%;
+  width: 120%;
+  height: 90%;
+  translate: -50% 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    #b98a3a26 0%,
+    #8a6c2512 40%,
+    transparent 70%
+  );
+  filter: blur(20px);
+}
+/* Sized so the whole film fits under the header once it's scrolled into place. */
+.film-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc((100svh - var(--header-h) - 40px) * 16 / 9));
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #0d0d0c;
+  box-shadow:
+    0 0 0 1px #ffffff14,
+    0 1px 0 0 #ffffff14 inset,
+    0 50px 120px -30px #000d,
+    0 0 90px #edba720c;
+  isolation: isolate;
+  scroll-snap-align: start;
+  scroll-margin-top: calc(var(--header-h) + 12px);
+}
+.film-frame video,
+.film-poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #0d0d0c;
+}
+.film-frame video {
+  cursor: pointer;
+}
+.film-poster {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.film-frame[data-started='true'] .film-poster {
+  opacity: 0;
+}
+/* A quiet cue in the middle while the film waits for Play. */
+.film-cue {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  padding-left: 4px;
+  border-radius: 50%;
+  color: #201a12;
+  background: var(--gold);
+  box-shadow:
+    0 0 0 8px #edba7222,
+    0 12px 40px #0008;
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.9;
+  transition:
+    opacity 0.25s,
+    scale 0.25s;
+}
+.film-frame[data-mode='paused'] .film-cue {
+  opacity: 1;
+  scale: 1;
+}
+.film-controls {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.film-frame[data-playing='true']:not(:hover, :focus-within)
+  .film-button:not([data-invite='true']) {
+  opacity: 0.55;
+}
+.film-button {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid #ffffff1c;
+  border-radius: 999px;
+  color: #f1f0e9;
+  background: #1a1a18b8;
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    opacity 0.3s,
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+.film-button:hover {
+  background: #2a2925d0;
+  border-color: #ffffff30;
+}
+.film-button:focus-visible {
+  outline-offset: 3px;
+}
+/* Until sound has been heard, the sound button is the invitation. */
+.film-sound[data-invite='true'] {
+  padding-inline: 13px 15px;
+  color: #201a12;
+  background: var(--gold);
+  border-color: #f5cb8d;
+}
+.film-sound[data-invite='true']:hover {
+  background: #f4ca8e;
+}
+.film-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #ffffff0d;
+}
+.film-progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #edba7266, var(--gold));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+.film-error {
+  display: block;
+  margin: 16px 0 0;
+  color: #aaa99f;
+  font-size: 14px;
+  text-align: center;
+}
+.film-error a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* Rises and stands up as it scrolls into place. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .film-frame {
+      transform-origin: 50% 100%;
+      animation: film-rise linear both;
+      animation-timeline: --film;
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+@keyframes film-rise {
+  from {
+    transform: perspective(1800px) rotateX(9deg) scale(0.93);
+    opacity: 0.6;
+  }
+}
+@media (max-aspect-ratio: 2/3) {
+  .film-frame {
+    aspect-ratio: 9 / 16;
+    width: min(100%, calc((100svh - var(--header-h) - 24px) * 9 / 16));
+    border-radius: 20px;
+  }
+}
+@media (max-width: 760px) {
+  .film-controls {
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+  }
+  .film-cue {
+    width: 64px;
+    height: 64px;
+    margin: -32px 0 0 -32px;
+  }
+}

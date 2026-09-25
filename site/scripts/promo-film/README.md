@@ -30,6 +30,7 @@ uv run render.py build                    # both films, with sound
 uv run render.py build --format wide      # one of them
 uv run render.py stills 3.3 9.3 --sheet   # single frames and a contact sheet
 uv run render.py cues                     # the timeline the sound follows
+uv run render.py publish                  # put both films on the site
 uv run render.py hold 6.75 0.5            # add half a second at 6.75 s
 ```
 
@@ -41,6 +42,11 @@ the page, so nothing else needs changing.
 `errol-promo-9x16.mp4` and `errol-promo-16x9.mp4` with sound at -14 LUFS, a
 `-silent` cut of each for laying in licensed music, and a `-cover` PNG of each.
 The MP4s are H.264 High, yuv420p, tagged BT.709, with fast start.
+
+The landing page plays the films from `public/demos/`. After a `build`, `publish`
+re-encodes both for the web (CRF 23 and 128 kbps audio, about 4 MB each and
+indistinguishable on the page) and saves each one's first frame as a WebP poster,
+so playback starts without a jump. Commit the four files it writes.
 
 ## Editing
 

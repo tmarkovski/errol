@@ -13,7 +13,8 @@ const { d1, r2 } = hostingConfig;
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
 const localBindingConfig = {
-  main: 'vinext/server/fetch-handler',
+  // vinext's handler, plus Range support for the films; see worker/index.ts.
+  main: './worker/index.ts',
   // Match the bundled local Workers runtime; production uses wrangler.jsonc.
   compatibility_date: '2026-05-22',
   compatibility_flags: ['nodejs_compat'],

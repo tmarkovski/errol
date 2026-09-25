@@ -10,39 +10,31 @@
 .skip-link:focus {
   top: 14px;
 }
+/* Fixed, so the download stays in reach while the film plays further down. */
 .site-header {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0 0 auto;
   z-index: 20;
   height: var(--header-h);
+}
+.site-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -24px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, #111210 0%, #111210e0 55%, #11121000);
+}
+.site-header-bar {
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-/* Full-bleed fade so the bar stays legible over whatever slide is under it. */
-.site-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: -28px;
-  left: 50%;
-  width: 100vw;
-  translate: -50% 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    #111210 0%,
-    #111210e6 55%,
-    #11121000 100%
-  );
-}
-nav {
+.site-header nav {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 26px;
 }
 .nav-link {
   display: inline-flex;
@@ -55,18 +47,7 @@ nav {
 .nav-link:hover {
   color: var(--gold);
 }
-@media (max-width: 760px) {
-  nav {
-    gap: 21px;
-  }
-  .github-link {
-    display: none;
-  }
-  .nav-link {
-    font-size: 14px;
-  }
-}
-@media (max-width: 560px) {
+@media (max-width: 420px) {
   .nav-link {
     display: none;
   }

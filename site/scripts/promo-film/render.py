@@ -14,6 +14,7 @@
     uv run render.py build                    # both formats, with sound, into out/
     uv run render.py build --format wide      # one format
     uv run render.py stills 3.3 9.3 --sheet   # frames to check while editing
+    uv run render.py publish                  # web encodes of both films onto the site
 """
 import base64
 import json
@@ -31,6 +32,7 @@ from playwright.sync_api import sync_playwright
 HERE = pathlib.Path(__file__).resolve().parent
 PAGE = HERE / "promo.html"
 OUT = HERE / "out"
+SITE_DEMOS = HERE.parent.parent / "public" / "demos"
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 # format -> (file tag, width, height)
 FORMATS = {"tall": ("9x16", 1080, 1920), "wide": ("16x9", 1920, 1080)}
@@ -40,6 +42,12 @@ ENCODE = [
     "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv",
     "-c:v", "libx264", "-preset", "slow", "-crf", "15", "-profile:v", "high",
     "-x264-params", "colorprim=bt709:transfer=bt709:colormatrix=bt709", "-an",
+]
+# The site's copy: a fifth of the master's size and indistinguishable from it on the page.
+WEB_ENCODE = [
+    "-c:v", "libx264", "-preset", "veryslow", "-crf", "23", "-profile:v", "high", "-pix_fmt", "yuv420p",
+    "-x264-params", "colorprim=bt709:transfer=bt709:colormatrix=bt709",
+    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
 ]
 
 
@@ -187,6 +195,32 @@ def build(fmt, fps, workers, cover, silent):
         sound.synthesize(data, wav)
         lufs = mux(silent_mp4, wav, OUT / f"errol-promo-{tag}.mp4")
         click.echo(f"{f}: errol-promo-{tag}.mp4 at {lufs:.1f} LUFS, plus the silent cut and cover, in {time.time() - start:.0f}s")
+
+
+@cli.command()
+@FORMAT_OPTION
+def publish(fmt):
+    """Put web encodes of the films in out/ on the site, each with its first frame as a poster."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    SITE_DEMOS.mkdir(parents=True, exist_ok=True)
+    for f in selected(fmt):
+        tag = FORMATS[f][0]
+        master = OUT / f"errol-promo-{tag}.mp4"
+        if not master.exists():
+            raise click.ClickException(f"{master.name} is missing; run build first.")
+        film = SITE_DEMOS / master.name
+        subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", str(master), *WEB_ENCODE, str(film)],
+                       check=True)
+        # The poster is the film's own first frame, so playback starts without a jump.
+        frame = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(film), "-frames:v", "1",
+                                "-f", "image2pipe", "-c:v", "png", "-"], check=True, capture_output=True).stdout
+        poster = SITE_DEMOS / f"errol-promo-{tag}-poster.webp"
+        Image.open(BytesIO(frame)).convert("RGB").save(poster, quality=80, method=6)
+        click.echo(f"{f}: {film.name} ({film.stat().st_size / 1e6:.1f} MB), {poster.name} "
+                   f"({poster.stat().st_size / 1e3:.0f} kB)")
 
 
 @cli.command()

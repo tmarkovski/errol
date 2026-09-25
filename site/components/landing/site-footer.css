@@ -1,17 +1,19 @@
 .site-footer {
   border-top: 1px solid #ffffff12;
-  min-height: 108px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  /* A snap point of its own, or the film's would hold the page short of it. */
+  scroll-snap-align: end;
 }
 .site-footer .brand > span {
-  font-size: 24px;
+  font-size: 22px;
 }
 .site-footer .brand .errol-symbol {
-  width: 25px;
-  height: 25px;
+  width: 23px;
+  height: 23px;
 }
 .site-footer p {
   font-size: 12px;
@@ -19,23 +21,17 @@
   margin: 0;
 }
 .site-footer .text-link {
-  font-size: 14px;
   color: #b2b4a6;
 }
 @media (max-width: 760px) {
   .site-footer {
     flex-wrap: wrap;
-    min-height: 115px;
     padding-block: 24px;
-    row-gap: 18px;
+    row-gap: 14px;
   }
   .site-footer p {
     order: 3;
     width: 100%;
-    font-size: 12px;
     text-align: center;
-  }
-  .site-footer .text-link {
-    font-size: 14px;
   }
 }

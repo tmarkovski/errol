@@ -1,10 +1,26 @@
 .hero {
   position: relative;
-}
-.hero-copy {
+  padding-top: calc(var(--header-h) + clamp(24px, 5svh, 64px));
   text-align: center;
+}
+.hero > :not(.hero-glow) {
   position: relative;
-  z-index: 2;
+}
+.hero-glow {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 0;
+  width: min(1100px, 140vw);
+  height: 760px;
+  translate: -50% 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    #a27c301f 0%,
+    #8a6c250d 36%,
+    transparent 68%
+  );
 }
 .hero-pill {
   display: inline-flex;
@@ -25,134 +41,85 @@
 .pill-sep {
   color: #64645b;
 }
-h1 {
-  margin: 24px 0 22px;
-  font-size: clamp(56px, 6.6vw, 92px);
-  line-height: 1;
+.hero h1 {
+  margin: 24px 0 20px;
+  font-size: clamp(44px, 5.5vw, 84px);
+  line-height: 1.02;
   font-weight: 500;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.055em;
   text-wrap: balance;
 }
+/* The period is the courier dot: it lands after the headline, as it does on the film's wordmark. */
+.hero-dot {
+  display: inline-block;
+  color: var(--gold);
+  animation: dot-land 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) 0.75s both;
+}
 .hero-description {
-  max-width: 560px;
+  max-width: 540px;
   margin: 0 auto;
   color: #aaa99f;
   font-size: 18px;
-  line-height: 1.65;
+  line-height: 1.6;
   text-wrap: pretty;
 }
 .hero-actions {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 29px;
-  margin: 27px 0 13px;
+  margin: 28px 0 14px;
 }
-.atmosphere {
+.hero-actions .download-button {
+  min-width: 220px;
+}
+.courier {
+  --fall: clamp(36px, 6svh, 64px);
+  width: 1px;
+  height: var(--fall);
+  margin: clamp(18px, 3svh, 32px) auto 0;
+  background: linear-gradient(#edba7200, #edba7226);
+}
+.courier > span {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
+  left: -2px;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px #edba72b0;
+  opacity: 0;
+  animation: courier 3.8s cubic-bezier(0.5, 0, 0.3, 1) 1.6s infinite;
 }
-.atmosphere::after {
+/* A tapered wake that stretches while the dot falls and catches up as it stops. */
+.courier > span::before {
   content: '';
   position: absolute;
-  inset: 0;
-  opacity: 0.12;
-  background-image: radial-gradient(#c6b390 0.6px, transparent 0.6px);
-  background-size: 6px 6px;
-  mask-image: radial-gradient(ellipse at 50% 60%, #000, transparent 70%);
+  left: 0.5px;
+  bottom: 2.5px;
+  width: 4px;
+  height: 30px;
+  transform-origin: 50% 100%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: linear-gradient(#edba7200, #edba72cc);
+  animation: wake 3.8s cubic-bezier(0.5, 0, 0.3, 1) 1.6s infinite;
 }
-.ambient-glow {
-  position: absolute;
-  width: 1150px;
-  height: 950px;
-  top: 50%;
-  left: 50%;
-  margin: -455px 0 0 -575px;
-  background: radial-gradient(
-    ellipse at 50% 58%,
-    #a27c3023 0%,
-    #8a6c2512 30%,
-    transparent 66%
-  );
-}
-.orbit {
-  position: absolute;
-  width: 1560px;
-  height: 590px;
-  top: 50%;
-  left: 50%;
-  margin: -215px 0 0 -780px;
-  border-radius: 50%;
-  border: 1px solid #d9b16b12;
-}
-@media (max-width: 760px) {
-  h1 {
-    font-size: clamp(44px, 9.6vw, 72px);
-    margin: 22px 0;
-  }
-  .hero-description {
-    font-size: 16px;
-    max-width: 460px;
-  }
-  .hero-actions {
-    gap: 20px;
-  }
-}
-@media (max-width: 560px) {
-  .hero-pill {
-    letter-spacing: 0.8px;
-    padding-inline: 11px 12px;
-  }
-  h1 {
-    font-size: clamp(38px, 10.5vw, 54px);
-    letter-spacing: -0.045em;
-  }
-  h1 br {
-    display: none;
-  }
-  .hero-description {
-    max-width: 365px;
-    font-size: 16px;
-  }
-  .hero-actions {
-    flex-direction: column;
-    gap: 19px;
-    margin-bottom: 19px;
-  }
-  .hero-actions .download-button {
-    min-width: 219px;
-  }
-}
-.ambient-glow {
-  transform: translate3d(
-    var(--pointer-x, 0px),
-    calc(var(--pointer-y, 0px) + var(--scroll-shift, 0px)),
-    0
-  );
-}
-.orbit {
-  transform: translate3d(
-      calc(var(--pointer-x, 0px) * -1),
-      calc(var(--scroll-shift, 0px) * 0.7),
-      0
-    )
-    rotate(-19deg);
-}
-.hero-copy > * {
+.hero > * {
   animation: enter 0.85s cubic-bezier(0.2, 0.7, 0.25, 1) both;
 }
-.hero-copy > :nth-child(2) {
+.hero > .hero-glow {
+  animation: none;
+}
+.hero > :nth-child(3) {
   animation-delay: 0.08s;
 }
-.hero-copy > :nth-child(3) {
+.hero > :nth-child(4) {
   animation-delay: 0.16s;
 }
-.hero-copy > :nth-child(4) {
+.hero > :nth-child(5) {
   animation-delay: 0.24s;
 }
-.hero-copy > :nth-child(5) {
+.hero > :nth-child(6),
+.hero > :nth-child(7) {
   animation-delay: 0.3s;
 }
 @keyframes enter {
@@ -160,20 +127,84 @@ h1 {
     opacity: 0;
     transform: translateY(15px);
   }
-  to {
+}
+@keyframes dot-land {
+  from {
+    opacity: 0;
+    transform: translateY(-0.9em) scale(0.6);
+  }
+  60% {
     opacity: 1;
+  }
+}
+@keyframes courier {
+  0% {
+    opacity: 0;
     transform: translateY(0);
+  }
+  8% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 1;
+    transform: translateY(calc(var(--fall) - 5px));
+  }
+  60%,
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--fall) - 5px));
+  }
+}
+@keyframes wake {
+  0%,
+  6% {
+    transform: scaleY(0);
+  }
+  26% {
+    transform: scaleY(1);
+  }
+  46%,
+  100% {
+    transform: scaleY(0);
+  }
+}
+@media (max-height: 820px) and (min-width: 761px) {
+  .hero h1 {
+    font-size: clamp(44px, 5vw, 70px);
+    margin: 22px 0 18px;
+  }
+  .hero-actions {
+    margin: 24px 0 14px;
+  }
+}
+@media (max-width: 760px) {
+  .hero-description {
+    max-width: 440px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 560px) {
+  .hero-pill {
+    letter-spacing: 0.8px;
+    padding-inline: 11px 12px;
+  }
+  .hero h1 {
+    font-size: clamp(38px, 11vw, 54px);
+    letter-spacing: -0.05em;
+    margin: 22px 0 18px;
+  }
+  .hero h1 br {
+    display: none;
+  }
+  .hero-description {
+    max-width: 360px;
+  }
+  .hero-actions {
+    margin: 26px 0 14px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ambient-glow,
-  .orbit {
-    translate: none !important;
-  }
-  .ambient-glow {
-    transform: none;
-  }
-  .orbit {
-    transform: rotate(-19deg);
+  .courier > span {
+    display: none;
   }
 }

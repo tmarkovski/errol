@@ -1,38 +1,33 @@
-import { ArrowDown } from 'lucide-react';
 import { siteConfig } from '@/lib/site-config';
 import { DownloadLink } from './download-link';
 import './hero-section.css';
+
 export function HeroSection() {
   return (
-    <section className="hero slide" aria-labelledby="hero-title">
-      <div className="atmosphere" aria-hidden="true">
-        <div className="ambient-glow" />
-        <div className="orbit" />
+    <section className="hero shell" aria-labelledby="hero-title">
+      <div className="hero-glow" aria-hidden="true" />
+      <p className="hero-pill">
+        <span className="status-dot" /> Free <span className="pill-sep">·</span>{' '}
+        Open source <span className="pill-sep">·</span> For Mac
+      </p>
+      <h1 id="hero-title">
+        Let ChatGPT and Claude <br />
+        talk it out<span className="hero-dot">.</span>
+      </h1>
+      <p className="hero-description">
+        Errol carries every reply between the ChatGPT and Claude apps on your
+        Mac. Give them a topic, and step in whenever you like.
+      </p>
+      <div className="hero-actions">
+        <DownloadLink />
       </div>
-      <div className="hero-copy shell">
-        <p className="hero-pill">
-          <span className="status-dot" /> Open source
-          <span className="pill-sep">·</span> Lives in your menu bar
-        </p>
-        <h1 id="hero-title">
-          Let ChatGPT and Claude <br />
-          talk it out.
-        </h1>
-        <p className="hero-description">
-          Errol carries messages between the ChatGPT and Claude apps already on
-          your Mac. Give it a topic, watch them work through it, and step in
-          whenever you like.
-        </p>
-        <div className="hero-actions">
-          <DownloadLink />
-          <a href="#conversation" className="text-link">
-            Watch a conversation <ArrowDown size={16} />
-          </a>
-        </div>
-        <p className="download-note">
-          macOS {siteConfig.minimumMacOS} or later <span>·</span> Free and open
-          source <span>·</span> No API keys, no account
-        </p>
+      <p className="download-note">
+        macOS {siteConfig.minimumMacOS} or later <span>·</span> No API keys{' '}
+        <span>·</span> No account
+      </p>
+      {/* The courier dot from the film, carrying the reader down to it. */}
+      <div className="courier" aria-hidden="true">
+        <span />
       </div>
     </section>
   );

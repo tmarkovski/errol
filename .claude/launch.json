@@ -7,6 +7,13 @@
       "runtimeArgs": ["wrangler", "dev", "--port", "8787"],
       "cwd": "site",
       "port": 8787
+    },
+    {
+      "name": "site-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vinext", "dev", "--port", "3000"],
+      "cwd": "site",
+      "port": 3000
     }
   ]
 }

@@ -16,8 +16,7 @@ strokes included, which comes out square.
   capsule of the theme's accent that fills the item where the system's
   pressed highlight would.
 - The website uses `site/public/errol-symbol.svg`, a copy of this source, in
-  the header, the closing section, the footer, and the demo's menu bar and
-  closing card. The site recolors it in CSS.
+  the header and the footer. The site recolors it in CSS.
 - `site/public/errol-symbol-favicon.svg` uses the same paths on a 32 px canvas
   and adapts its color to the browser's light or dark appearance.
 - The promo film (`site/scripts/promo-film/promo.html`) inlines the paths so it

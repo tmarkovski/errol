@@ -4,9 +4,9 @@
   gap: 9px;
 }
 .brand > span {
-  font-size: 29px;
+  font-size: 27px;
   font-weight: 650;
-  letter-spacing: -1.6px;
+  letter-spacing: -1.5px;
 }
 .brand-dot {
   color: var(--gold);
@@ -17,8 +17,8 @@
     brightness(106%) contrast(95%);
 }
 .brand .errol-symbol {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 .download-button {
   min-height: 52px;
@@ -26,17 +26,17 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 0 24px;
+  padding: 0 26px;
   color: #201a12;
   background: var(--gold);
   border: 1px solid #f5cb8d;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 15px;
   font-weight: 600;
   box-shadow:
-    0 0 0 4px #edba7206,
-    0 5px 18px #0002,
-    inset 0 1px #ffffff30;
+    0 0 0 4px #edba7208,
+    0 8px 28px #edba7222,
+    inset 0 1px #ffffff40;
   transition:
     background 0.2s,
     box-shadow 0.2s,
@@ -46,16 +46,17 @@
   background: #f4ca8e;
   transform: translateY(-2px);
   box-shadow:
-    0 0 30px #edba721a,
-    0 5px 18px #0002;
+    0 0 0 5px #edba7212,
+    0 12px 36px #edba7233,
+    inset 0 1px #ffffff40;
 }
 .apple-glyph {
   margin-top: -2px;
 }
 .download-small {
   min-height: 38px;
-  padding-inline: 16px;
-  border-radius: 6px;
+  padding-inline: 15px;
+  border-radius: 8px;
   font-size: 13px;
   background: #25241f;
   border-color: #b6a28244;
@@ -64,68 +65,15 @@
 }
 .download-small:hover {
   color: #211b12;
-}
-
-/* Cards shared by the shapes and the why-the-apps sections. */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.feature-card {
-  display: flex;
-  flex-direction: column;
-  padding: 26px 26px 28px;
-  border: 1px solid #ffffff12;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff08, #ffffff03);
-}
-.feature-card .card-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-bottom: 18px;
-  border-radius: 9px;
-  background: #edba7214;
-  color: #e2bd83;
-}
-.feature-card h3 {
-  margin: 0 0 9px;
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: -0.3px;
-}
-.feature-card p {
-  margin: 0;
-  color: #9b9e90;
-  font-size: 15px;
-  line-height: 1.7;
-  text-wrap: pretty;
-}
-@media (max-width: 900px) {
-  .card-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .feature-card {
-    padding: 22px 22px 24px;
-  }
+  transform: none;
+  box-shadow: none;
 }
 @media (max-width: 760px) {
   .brand > span {
-    font-size: 26px;
+    font-size: 24px;
   }
-  .download-button {
-    padding-inline: 17px;
-    font-size: 14px;
-  }
-  .download-small {
-    font-size: 14px;
-    padding-inline: 13px;
+  .brand .errol-symbol {
+    width: 25px;
+    height: 25px;
   }
 }
