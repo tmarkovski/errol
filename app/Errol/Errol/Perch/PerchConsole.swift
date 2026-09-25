@@ -380,7 +380,10 @@ struct PerchPromptBox: View {
                         .font(Perch.text(11)).foregroundStyle(Perch.secondary).lineLimit(2)
                 }
                 if controller.stage == .running { PerchRunMetadata(controller: controller) }
-                if !controller.steeringQueued && !controller.stopRequested {
+                // While a stop is under way the headline says so, and the
+                // note's line waits for the run's end: a note the stop left
+                // unsent shows then.
+                if !controller.steeringQueued && !(controller.stopRequested && controller.stage == .running) {
                     if controller.steeringInFlight != nil {
                         PerchRunLine(controller: controller)
                     } else if let receipt = controller.lastReceipt,
