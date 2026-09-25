@@ -24,6 +24,10 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
   - With a turn limit, a minus/plus stepper stands beside the chip, and its count rolls as it steps. It holds to repeat, takes the arrow keys, and adjusts as one control in VoiceOver.
   - When you stop it, the assistants are told the human will end the conversation, and a sign-off marker no longer ends the run. The status line reads "until you stop it".
   - In the narrow console, the ending and its stepper stay on the row, while who starts and the arrangement fold into Run options.
+- **Who starts swaps with a click.** With only two choices, the starter chip has no menu: a click hands the first turn to the other app.
+  - Swap arrows stand where a menu's chevron would, and make a half turn as the names change places.
+  - The tooltip names what a click will do ("Let Claude start instead"), and VoiceOver reads "Who starts, ChatGPT" with the hint "Switches to Claude".
+  - In the narrow console, Run options offers the same swap as one command.
 - **A solid window instead of glass.** The panel fills with a new theme color, the shell, and the prompt box and the conversation summary stand lighter than it in both appearances.
   - In light themes, the shell is a tinted gray a step under the well. Paper and the well keep their values, and the hairline darkens enough to show on the shell.
   - In dark themes, the old paper became the shell, the well stays, and a new, lighter paper sits a step over it. Popovers and the round buttons are paper too, so they lighten with it.

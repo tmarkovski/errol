@@ -59,8 +59,10 @@ struct PerchConsoleView: View {
 /// Before a run, the run's settings as chips that show their values; during
 /// and after one, the topic. The ··· app menu stands at the trailing end in
 /// every stage. A chip's width follows its value, so choosing another one
-/// springs the chip, and the chips after it, to the new width. With a turn
-/// limit, a stepper stands beside the ending chip and sets the count.
+/// springs the chip, and the chips after it, to the new width. Who starts is
+/// a choice of two, so its chip swaps with a click instead of opening a
+/// menu. With a turn limit, a stepper stands beside the ending chip and sets
+/// the count.
 struct PerchTopicLine: View {
     @Bindable var controller: RelayController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -73,7 +75,7 @@ struct PerchTopicLine: View {
         HStack(spacing: Perch.s(6)) {
             if controller.stage == .compose {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Perch.s(6)) { starterMenu; endingControl; windowsMenu }.fixedSize()
+                    HStack(spacing: Perch.s(6)) { starterSwap; endingControl; windowsMenu }.fixedSize()
                     HStack(spacing: Perch.s(6)) { endingControl; runOptionsMenu }.fixedSize()
                 }
             } else {
@@ -93,6 +95,9 @@ struct PerchTopicLine: View {
 
     private var starterTitle: String { "\(controller.appName(controller.firstSpeaker)) starts" }
 
+    /// The side a click on the starter hands the first turn to.
+    private var otherStarter: Speaker { controller.firstSpeaker == .chatgpt ? .claude : .chatgpt }
+
     private var endingTitle: String {
         switch controller.ending {
         case .bothAgree: "Ends when both agree"
@@ -111,9 +116,14 @@ struct PerchTopicLine: View {
 
     private var windowsTitle: String { controller.setup.state.layout.consoleTitle }
 
-    private var starterMenu: some View {
-        PerchChipMenu(title: starterTitle) { starterItems }
-            .help("Who receives the topic first")
+    private var starterSwap: some View {
+        PerchChipSwap(title: starterTitle, turned: controller.firstSpeaker == .claude) {
+            controller.firstSpeaker = otherStarter
+        }
+        .help("Let \(controller.appName(otherStarter)) start instead")
+        .accessibilityLabel("Who starts")
+        .accessibilityValue(controller.appName(controller.firstSpeaker))
+        .accessibilityHint("Switches to \(controller.appName(otherStarter))")
     }
 
     /// The ending chip, and the turn limit's stepper beside it while that is
@@ -138,12 +148,15 @@ struct PerchTopicLine: View {
             .disabled(controller.isShowingWindow)
     }
 
-    /// The narrow console's fallback: who starts and the arrangement as
-    /// submenus titled with their values. The ending stays out on the row,
-    /// where its stepper can stand beside it.
+    /// The narrow console's fallback: who starts as one command that swaps
+    /// it, like the chip, and the arrangement as a submenu titled with its
+    /// value. The ending stays out on the row, where its stepper can stand
+    /// beside it.
     private var runOptionsMenu: some View {
         PerchChipMenu(title: "Run options") {
-            Menu(starterTitle) { starterItems }
+            Button { controller.firstSpeaker = otherStarter } label: {
+                Label("Let \(controller.appName(otherStarter)) start", systemImage: PerchChipSwap.symbol)
+            }
             Menu(windowsTitle) { windowsItems }
                 .disabled(controller.isShowingWindow)
         }
@@ -152,14 +165,6 @@ struct PerchTopicLine: View {
 
     // Toggles, so the menu checks the value in force in its own column.
     // Choosing the checked one again changes nothing.
-
-    @ViewBuilder private var starterItems: some View {
-        ForEach([Speaker.chatgpt, .claude], id: \.self) { speaker in
-            Toggle("\(controller.appName(speaker)) starts", isOn: Binding(
-                get: { controller.firstSpeaker == speaker },
-                set: { if $0 { controller.firstSpeaker = speaker } }))
-        }
-    }
 
     /// The three endings. The turn limit's count is set with the stepper
     /// that appears beside the chip, not here.

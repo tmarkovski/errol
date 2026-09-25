@@ -117,23 +117,30 @@ extension View {
     }
 }
 
-/// A menu's face in the console's rows: its current value and a chevron.
-/// While a new value springs the chip to its width, the text rolls to it
-/// glyph by glyph, keeping in place what the two values share ("Ends ",
-/// " starts"), and stays inside its own frame, clear of the chevron. A
+/// A chip's face in the console's rows: its current value, and a symbol
+/// for what a click does — a menu's chevron, unless the chip names its
+/// own. While a new value springs the chip to its width, the text rolls to
+/// it glyph by glyph, keeping in place what the two values share ("Ends ",
+/// " starts"), and stays inside its own frame, clear of the symbol. A
 /// plain crossfade laid the two phrases over each other. A title that
 /// carries a number passes it as `value`, so its digits roll up as it grows
 /// and down as it shrinks.
 struct PerchChipLabel: View {
     let title: String
     var value: Double? = nil
+    var symbol = "chevron.down"
+    var symbolAngle = Angle.zero
 
     var body: some View {
         HStack(spacing: Perch.s(3)) {
             Text(title).contentTransition(value.map { .numericText(value: $0) } ?? .numericText()).clipped()
-            Image(systemName: "chevron.down")
+            // Set in a text run: as an image inside the console, the swap
+            // arrows came out white in the offscreen renders (as the ···
+            // symbol did), while a symbol in text keeps its ink.
+            Text(Image(systemName: symbol))
                 .font(Perch.text(8, .semibold))
                 .foregroundStyle(Perch.muted)
+                .rotationEffect(symbolAngle)
         }
         .font(Perch.text(11.5))
         .foregroundStyle(Perch.secondary)
@@ -157,6 +164,27 @@ struct PerchChipMenu<Items: View>: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+    }
+}
+
+/// A choice of two worn as a chip: a click takes the other value, with no
+/// menu to open in between. Swap arrows stand where a menu's chevron would,
+/// and a half turn as the value changes plays the swap; the arrows look the
+/// same either way up, so they come to rest as they were.
+struct PerchChipSwap: View {
+    static let symbol = "arrow.left.arrow.right"
+
+    let title: String
+    /// Which of the two values is in force, for the arrows' half turn.
+    let turned: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            PerchChipLabel(title: title, symbol: Self.symbol, symbolAngle: .degrees(turned ? 180 : 0))
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
     }
 }
 
