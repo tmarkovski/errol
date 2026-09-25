@@ -66,7 +66,7 @@ jobs:
           else
             echo "hit=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         if: steps.stored.outputs.hit != 'true'
       - name: Render the films
         if: steps.stored.outputs.hit != 'true'
