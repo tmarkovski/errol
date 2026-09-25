@@ -106,6 +106,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
+    /// The capsule that lights the status item while a run lasts.
+    private let statusLight = StatusItemLight()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // LSUIElement in the Info.plist already hides the Dock icon; this
@@ -151,7 +153,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func buildStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = statusItem.button else { return }
-        button.image = StatusIcon.image(running: false, palette: AppearanceStore.shared.theme.palette)
+        button.image = StatusIcon.image(running: false)
         button.target = self
         button.action = #selector(statusItemClicked)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -400,7 +402,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         } onChange: {
             rearm.run()
         }
-        statusItem.button?.image = StatusIcon.image(running: running, palette: theme.palette)
+        statusItem.button?.image = StatusIcon.image(running: running)
+        statusLight.show(running, accent: theme.palette.accent, behind: statusItem.button)
         // A run reaching idle is when the updater can release what it held
         // back: a staged install, or an update it found but never presented.
         if wasRunning, !running { updater?.relayDidFinish() }
