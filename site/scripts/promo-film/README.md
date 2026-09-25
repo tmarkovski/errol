@@ -30,7 +30,7 @@ uv run render.py build                    # both films, with sound
 uv run render.py build --format wide      # one of them
 uv run render.py stills 3.3 9.3 --sheet   # single frames and a contact sheet
 uv run render.py cues                     # the timeline the sound follows
-uv run render.py publish                  # put both films on the site
+uv run render.py publish                  # web encodes of both into the site's public/demos/
 uv run render.py hold 6.75 0.5            # add half a second at 6.75 s
 ```
 
@@ -46,7 +46,23 @@ The MP4s are H.264 High, yuv420p, tagged BT.709, with fast start.
 The landing page plays the films from `public/demos/`. After a `build`, `publish`
 re-encodes both for the web (CRF 23 and 128 kbps audio, about 4 MB each and
 indistinguishable on the page) and saves each one's first frame as a WebP poster,
-so playback starts without a jump. Commit the four files it writes.
+so playback starts without a jump.
+
+Those four files aren't committed. The site's deploy workflow renders them on a
+GitHub runner and keeps them in R2 under a hash of this folder's `promo.html`,
+`render.py`, and `sound.py` plus the two app icons the film loads, so a render
+happens once per change to the source, and every deploy fetches the films for
+the commit it's shipping. `films.sh` does the R2 side:
+
+```sh
+./films.sh key      # the hash of the source
+./films.sh fetch    # the films for this source, into public/demos/
+./films.sh store    # upload what's in public/demos/ under the hash
+```
+
+`store` lets a local render stand in for the runner's: render and publish on
+your Mac, commit the source, then store, and CI finds the films already there.
+It needs `npx wrangler login` first, as `fetch` does.
 
 ## Editing
 

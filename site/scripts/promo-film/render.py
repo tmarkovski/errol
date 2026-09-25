@@ -113,7 +113,8 @@ def render_video(fmt, fps, workers, dur, dest):
     segdir = OUT / "segments" / fmt
     segdir.mkdir(parents=True, exist_ok=True)
     jobs = [(fmt, list(range(w * step, min(total, (w + 1) * step))), fps, segdir / f"{w}.mp4") for w in range(workers)]
-    with mp.Pool(workers) as pool:
+    # Spawned rather than forked, as on macOS: on Linux a fork would copy this process's Playwright state.
+    with mp.get_context("spawn").Pool(workers) as pool:
         segs = pool.map(_slice, jobs)
     listing = segdir / "list.txt"
     listing.write_text("".join(f"file '{s}'\n" for s in segs))

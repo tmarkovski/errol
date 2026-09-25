@@ -7,6 +7,12 @@ name: Deploy Errol site
 #
 # Wrangler is called directly rather than through cloudflare/wrangler-action so
 # the deploy uses the exact version pinned in site/package-lock.json.
+#
+# The promo films on the page aren't in git. The films job keeps them in R2
+# under a hash of their source (site/scripts/promo-film/films.sh) and renders
+# them only when that hash is new; the deploy job fetches them before the build.
+# Dispatched on a branch other than main, the workflow runs only the films job,
+# which renders a changed film without shipping it.
 
 on:
   push:
@@ -19,18 +25,20 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: errol-site-production
-  cancel-in-progress: true
+env:
+  # Wrangler reads these two directly; no action-specific inputs needed.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  WRANGLER_SEND_METRICS: "false"
 
 jobs:
-  deploy:
+  films:
     runs-on: ubuntu-latest
-    env:
-      # Wrangler reads these two directly; no action-specific inputs needed.
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WRANGLER_SEND_METRICS: "false"
+    timeout-minutes: 60
+    # A newer run waits for a render in progress instead of cancelling it, then finds the films stored.
+    concurrency:
+      group: errol-promo-films
+      cancel-in-progress: false
     defaults:
       run:
         working-directory: site
@@ -48,6 +56,47 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: npm ci
+      - name: Look for this source's films in R2
+        id: stored
+        run: |
+          scripts/promo-film/films.sh bucket
+          if scripts/promo-film/films.sh stored; then
+            echo "Films for $(scripts/promo-film/films.sh key) are stored; nothing to render."
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@v10
+        if: steps.stored.outputs.hit != 'true'
+      - name: Render the films
+        if: steps.stored.outputs.hit != 'true'
+        run: |
+          uv run scripts/promo-film/render.py build --workers 4
+          uv run scripts/promo-film/render.py publish
+      - name: Store the films in R2
+        if: steps.stored.outputs.hit != 'true'
+        run: scripts/promo-film/films.sh store
+
+  deploy:
+    needs: films
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: errol-site-production
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - name: Fetch the promo films
+        run: scripts/promo-film/films.sh fetch
       - run: npm run build
       - name: Deploy to Cloudflare
         run: npx wrangler deploy

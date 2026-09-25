@@ -37,3 +37,6 @@ next-env.d.ts
 /outputs/
 /work/
 *.tsbuildinfo
+
+# The promo films, fetched from R2 or rendered locally (scripts/promo-film/films.sh)
+/public/demos/

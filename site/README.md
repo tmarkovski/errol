@@ -18,8 +18,11 @@ stylesheet in `components/landing/`:
 preferences. `lib/site-config.ts` is the single place for metadata, release
 links, and the minimum macOS version.
 
-The film is the 23-second promo from `scripts/promo-film/`, which renders it and
-copies web encodes into `public/demos/` (see that folder's README). Wide screens
+The film is the 23-second promo from `scripts/promo-film/`. The films the page
+plays aren't in git: CI renders them from that source and keeps them in R2 (see
+Deploy below), and the page expects them in `public/demos/`. To run the site
+locally, fetch them with `scripts/promo-film/films.sh fetch` after
+`npx wrangler login`, or render them yourself (see that folder's README). Wide screens
 get the 16:9 cut. Screens taller than 2:3, which means phones held upright, get
 the 9:16 cut, whose captions stay legible at that width; turning the phone
 switches cuts in place. The player:
@@ -66,9 +69,20 @@ The workflow needs both of these repository secrets and fails if either is missi
 - `CLOUDFLARE_API_TOKEN`: an API token created from the "Edit Cloudflare Workers" template
 - `CLOUDFLARE_ACCOUNT_ID`: the account ID shown on the Workers & Pages overview page
 
+The films job comes first. It hashes the films' source, and when R2 has no films
+under that hash, it renders both cuts on the runner and stores them in the
+`errol-promo-films` bucket, which it creates if it's missing. Any other run finds
+them there in seconds, so a film renders once per change to its source. The
+deploy job then fetches them into `public/demos/`, builds, and deploys. The token
+needs Workers R2 Storage edit access, which the "Edit Cloudflare Workers" template
+includes. Dispatching the workflow on a branch other than `main` runs only the
+films job, which renders a changed film without shipping it; fetch it with
+`films.sh fetch` on that branch to watch it first.
+
 For a one-off deploy from a machine that has run `wrangler login`:
 
 ```sh
+scripts/promo-film/films.sh fetch
 npm run deploy
 ```
 
