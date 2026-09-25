@@ -28,6 +28,9 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
   - Swap arrows stand where a menu's chevron would, and make a half turn as the names change places.
   - The tooltip names what a click will do ("Let Claude start instead"), and VoiceOver reads "Who starts, ChatGPT" with the hint "Switches to Claude".
   - In the narrow console, Run options offers the same swap as one command.
+- **A shorter ending.** The finished panel had repeated what the conversation summary shows.
+  - It now keeps the headline and why the run ended ("both signed off", or what a stopped run was standing on). The reply count and the run's time moved to the summary's header, as "9 replies in 1:21".
+  - A note's receipt stays on the panel only when the note never went: not sent, unconfirmed, or still being written when the run ended. The summary already lists a note that was sent, and a note the run ended with in the queue has no line there.
 - **A solid window instead of glass.** The panel fills with a new theme color, the shell, and the prompt box and the conversation summary stand lighter than it in both appearances.
   - In light themes, the shell is a tinted gray a step under the well. Paper and the well keep their values, and the hairline darkens enough to show on the shell.
   - In dark themes, the old paper became the shell, the well stays, and a new, lighter paper sits a step over it. Popovers and the round buttons are paper too, so they lighten with it.

@@ -71,15 +71,15 @@ struct RunReport: Equatable {
         }
     }
 
-    /// The line under it: the count, the clock, and the context.
-    func detail(names: (chatgpt: String, claude: String), duration: TimeInterval?,
-                timeout: TimeInterval) -> String {
+    /// The line under it: why the run ended, where the headline doesn't
+    /// already say, and what it stood on. Empty when there is nothing to
+    /// add. The reply count and the run's time are the conversation
+    /// summary's to show (PerchTranscript), not this line's.
+    func detail(names: (chatgpt: String, claude: String), timeout: TimeInterval) -> String {
         var parts: [String] = []
         if case .failedStart(let reason) = outcome {
             return reason
         }
-        parts.append("\(repliesCaptured) \(repliesCaptured == 1 ? "reply" : "replies") relayed")
-        if let duration { parts.append("ran \(runClock(duration))") }
         switch outcome {
         case .completed:
             parts.append("both signed off")

@@ -58,7 +58,11 @@ struct PerchTranscript: View {
                 Text("Conversation summary").font(Perch.text(11, .semibold))
                 Spacer()
                 let replies = entries.filter { if case .side = $0.author { return true }; return false }.count
-                Text("\(replies) \(replies == 1 ? "reply" : "replies")").font(Perch.text(11))
+                let count = "\(replies) \(replies == 1 ? "reply" : "replies")"
+                // Once the run is over, the time it took joins the count;
+                // the finished panel leaves both to this header.
+                let took = controller.stage == .finished ? controller.lastRunDuration : nil
+                Text(took.map { "\(count) in \(runClock($0))" } ?? count).font(Perch.text(11))
             }
             .foregroundStyle(Perch.secondary)
             .padding(.top, Perch.s(8)).padding(.bottom, Perch.s(5))

@@ -357,9 +357,11 @@ struct PerchPromptBox: View {
                     .lineLimit(2).help(headline)
                 if controller.stage == .finished {
                     let detail = controller.lastReport?.detail(names: controller.names,
-                        duration: controller.lastRunDuration, timeout: config.timeout) ?? ""
-                    Text(detail).font(Perch.text(11)).foregroundStyle(Perch.secondary)
-                        .lineLimit(3).help(detail)
+                                                               timeout: config.timeout) ?? ""
+                    if !detail.isEmpty {
+                        Text(detail).font(Perch.text(11)).foregroundStyle(Perch.secondary)
+                            .lineLimit(3).help(detail)
+                    }
                 } else if let block = controller.block, !controller.stopRequested {
                     let recovery = block.recovery(names: controller.names)
                     Text(recovery).font(Perch.text(11)).foregroundStyle(Perch.secondary)
@@ -376,7 +378,12 @@ struct PerchPromptBox: View {
                 if !controller.steeringQueued && !controller.stopRequested {
                     if controller.steeringInFlight != nil {
                         PerchRunLine(controller: controller)
-                    } else if let receipt = controller.lastReceipt {
+                    } else if let receipt = controller.lastReceipt,
+                              controller.stage != .finished || receipt.outcome != .sent {
+                        // After the run, a note that went is on its line in
+                        // the conversation summary. One that didn't stays
+                        // here: a queued note the run ended with, or words
+                        // never sent, is on no line there.
                         PerchReceiptLine(controller: controller, receipt: receipt)
                     }
                 }
