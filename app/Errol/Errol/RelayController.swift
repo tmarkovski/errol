@@ -166,6 +166,9 @@ final class RelayController {
     var isSteering = false
     private(set) var isSteeringPending = false
     @ObservationIgnored let steeringEditor = TextEditorSession()
+    /// The prompt box's mic: speaking into the field the box shows
+    /// (toggleVoice). Sending or clearing that field closes it.
+    let voice: VoiceInput
     /// Whether the worker has parked at a capture or delivery gate. A hold
     /// requested during an operation stays pending until that operation ends.
     var isHolding = false
@@ -281,6 +284,7 @@ final class RelayController {
         self.engine = engine
         self.veils = veils
         self.transferOverlay = transferOverlay
+        voice = VoiceInput(transcriber: engine.transcriber)
         setup = SetupController(engine: engine)
         setup.onArranged = { [weak self] in self?.focusPanelHandler?() }
         setup.onBroughtForward = { [weak self] in self?.focusPanelHandler?() }
@@ -414,10 +418,29 @@ final class RelayController {
         conversation = name
     }
 
+    /// The mic button: speak into the field the prompt box shows — the note
+    /// during a pause, else the topic, or the opening written from scratch
+    /// under Custom — or finish the listening under way. The words land
+    /// after what the field holds.
+    func toggleVoice() {
+        if consoleAccess.pauseGranted {
+            voice.toggle(read: { [weak self] in self?.steeringText ?? "" },
+                         write: { [weak self] in self?.setSteeringText($0) })
+        } else if stage == .compose, showsFullInstructionsEditor {
+            voice.toggle(read: { [weak self] in self?.customInstructions ?? "" },
+                         write: { [weak self] in self?.customInstructions = $0 })
+        } else if stage == .compose {
+            voice.toggle(read: { [weak self] in self?.topic ?? "" },
+                         write: { [weak self] in self?.topic = $0 })
+        }
+    }
+
     /// The readiness strip only scans while someone can see it, and never
     /// while a run owns the apps' AX trees and the machine's focus.
     func setPanelVisible(_ visible: Bool) {
         panelVisible = visible
+        // No one hears into a field they can't see.
+        if !visible { voice.cancel() }
         updateScanner()
     }
 
@@ -571,6 +594,8 @@ final class RelayController {
 
     func start() {
         guard !isRunning, !isShowingWindow, stage == .compose else { return }
+        // What is sent is what the box shows, words still forming included.
+        voice.cancel()
 
         // Rechecked at the click, against the last sweep: the destinations
         // must read ready and the opening content must exist. A refusal
@@ -775,6 +800,7 @@ final class RelayController {
     /// flag releases is one that finds the note.
     func sendSteering() {
         guard consoleAccess.canResume, !control.isCancelled else { return }
+        voice.cancel()
         // The outgoing SwiftUI view can survive its fade. Stop its NSTextView
         // synchronously, including any marked text, before opening either gate.
         if let text = steeringEditor.end() { steeringText = text }
@@ -796,6 +822,8 @@ final class RelayController {
     /// note was there, queued before or not.
     func escapeSteering() {
         guard isRunning, isSteering else { return }
+        // While the mic is open, Esc closes it and keeps the words.
+        if voice.isActive { return voice.cancel() }
         if steeringText.isEmpty {
             sendSteering()
         } else {

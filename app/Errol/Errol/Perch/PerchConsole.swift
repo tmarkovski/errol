@@ -254,6 +254,17 @@ extension RelayController {
             ?? "Write a note \u{00B7} Return or Esc resumes without one"
     }
 
+    /// The line under the box while the mic is open, or why the last
+    /// listening broke off; nil leaves the line to the hints above.
+    var voiceHint: String? {
+        switch voice.phase {
+        case .starting: "Getting the microphone ready\u{2026}"
+        case .listening: "Listening \u{00B7} press the mic when you\u{2019}re done"
+        case .finishing: "Finishing the last words\u{2026}"
+        case .idle: voice.problem
+        }
+    }
+
     /// The status panel headline follows the actual relay state.
     var runHeadline: String {
         if stopRequested { return "Ending at the next safe point\u{2026}" }
@@ -321,9 +332,10 @@ struct PerchPromptBox: View {
                     HStack(alignment: .bottom, spacing: Perch.s(8)) {
                         Text(editorHint)
                             .font(Perch.text(11))
-                            .foregroundStyle(controller.failedStart == nil ? Perch.secondary : Perch.red)
+                            .foregroundStyle(hintIsProblem ? Perch.red : Perch.secondary)
                             .lineLimit(2).help(editorHint)
                         Spacer(minLength: 0)
+                        PerchMicButton(controller: controller)
                         PerchConsoleActions(controller: controller)
                     }
                     .padding(.leading, Self.textInset)
@@ -348,9 +360,15 @@ struct PerchPromptBox: View {
     }
 
     private var editorHint: String {
+        if let voiceHint = controller.voiceHint { return voiceHint }
         if controller.consoleAccess.pauseGranted { return controller.steeringHint }
         return controller.failedStart ?? controller.setup.problem ?? controller.setup.state.layoutProblem
             ?? controller.sendBlocker ?? ""
+    }
+
+    private var hintIsProblem: Bool {
+        if controller.voiceHint != nil { return controller.voice.problem != nil && !controller.voice.isActive }
+        return controller.failedStart != nil
     }
 
     private var statusPanel: some View {

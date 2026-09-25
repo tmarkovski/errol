@@ -1,11 +1,12 @@
 // The seam between the panel's model and the machinery that drives the
 // apps. RelayController owns what the panel shows; an engine owns
 // everything that reaches outside the process — the Accessibility
-// permission, the two apps, the readiness sweeps, the relay worker — and
-// reports back over its event stream. The app runs LiveRelayEngine. The
-// canvases run PerchPreviewEngine (Perch/PerchPreviewEngine.swift), which
-// plays a run without touching any app, so a preview's Start starts
-// something and its Stop stops it while nothing is relayed anywhere.
+// permission, the two apps, the readiness sweeps, the relay worker, the
+// microphone — and reports back over its event stream. The app runs
+// LiveRelayEngine. The canvases run PerchPreviewEngine
+// (Perch/PerchPreviewEngine.swift), which plays a run without touching any
+// app, so a preview's Start starts something and its Stop stops it while
+// nothing is relayed anywhere.
 //
 // Setup goes through the same seam: the engine opens an app, offers the
 // windows it finds, binds the one the human chose, arranges the two, and
@@ -48,6 +49,10 @@ protocol RelayEngine: AnyObject {
     /// The debug dump of both apps' windows, buttons, and selector matches
     /// into the log. Does its own preflight.
     func inspect()
+    /// What hears the microphone for the prompt box's mic button
+    /// (VoiceInput.swift): SpeechTranscriber in the app, a script in the
+    /// canvases, which never open the microphone.
+    var transcriber: VoiceTranscriber { get }
 
     // MARK: Setup
 
@@ -80,6 +85,7 @@ protocol RelayEngine: AnyObject {
 final class LiveRelayEngine: RelayEngine {
     let events = relayEvents
     let control = relayControl
+    let transcriber: VoiceTranscriber = SpeechAnalyzerTranscriber()
     var onReadiness: ((ReadinessReport) -> Void)? {
         get { scanner.onUpdate }
         set { scanner.onUpdate = newValue }

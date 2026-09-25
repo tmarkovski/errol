@@ -20,6 +20,7 @@ final class PerchPreviewEngine: RelayEngine {
     /// relay reads are never touched.
     let events = RelayEventBus()
     let control = RelayControl()
+    let transcriber: VoiceTranscriber = PerchPreviewTranscriber()
     /// Nothing sweeps; the picture is fixed and handed over as soon as the
     /// controller asks for it — a canvas never says the panel is visible.
     var onReadiness: ((ReadinessReport) -> Void)? {
