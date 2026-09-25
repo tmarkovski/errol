@@ -1,4 +1,4 @@
-// The settings card: the console's own idiom — the panel's glass, system
+// The settings card: the console's own idiom — the panel's shell, system
 // type, soft wells, capsule buttons — as a screen inside the main panel.
 // The native header provides Back. Appearance preferences sit above the
 // retained conversation-shape implementation. The shapes editor stays hidden

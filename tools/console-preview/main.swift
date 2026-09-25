@@ -1,14 +1,18 @@
 // Scratchpad harness for a UX review: renders Errol's console (Perch) in each
 // stage, offscreen, from the app's own sources, driven by PerchPreviewEngine.
 // Nothing here touches either chat app, the Errol bundle, or its signing.
-// Liquid Glass does not render offscreen, so the capsule wears a near-white
-// stand-in fill with a soft shadow, over a light backdrop like a chat window.
+// The capsule wears the theme's shell, as the panel does; AppKit's window
+// shadow gets a stand-in, over a backdrop like a chat window. `-appTheme
+// warm-stone` renders another theme: UserDefaults reads it from the
+// arguments, so nothing is saved.
 
 import AppKit
 import SwiftUI
 
 let outDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "."
 let dark = CommandLine.arguments.contains("--dark")
+/// What stands behind the console, like a chat window in either appearance.
+let backdrop = dark ? Color(white: 0.11) : Color(red: 0.925, green: 0.93, blue: 0.94)
 
 @MainActor
 func pump(_ seconds: Double) {
@@ -36,7 +40,7 @@ struct Scene: View {
     var body: some View {
         VStack(spacing: PerchTranscript.gap) {
             PerchConsoleView(controller: controller, width: consoleWidth)
-                .background(Capsule().fill(surface))
+                .background(Capsule().fill(Perch.shell))
                 .overlay(Capsule().stroke(Color.black.opacity(dark ? 0.5 : 0.10), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
             if transcript {
@@ -52,9 +56,6 @@ struct Scene: View {
                alignment: .top)
         .background(backdrop)
     }
-
-    private var surface: Color { dark ? Color(white: 0.17) : Color(white: 0.975) }
-    private var backdrop: Color { dark ? Color(white: 0.11) : Color(red: 0.925, green: 0.93, blue: 0.94) }
 }
 
 /// A side's details where the app puts them: the card under the console,
@@ -84,7 +85,7 @@ struct DetailsScene: View {
             .offset(x: 36 + x, y: 36 + 156 + Perch.s(4))
         }
         .frame(width: Perch.widgetWidth + 72, height: Self.height, alignment: .topLeading)
-        .background(dark ? Color(white: 0.11) : Color(red: 0.925, green: 0.93, blue: 0.94))
+        .background(backdrop)
         .onAppear { placement.arrowX = speaker == .chatgpt ? lead : cardWidth - lead }
         .onChange(of: cardWidth) { _, width in placement.arrowX = speaker == .chatgpt ? lead : width - lead }
     }
@@ -161,7 +162,14 @@ func main() {
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     app.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-    let only = CommandLine.arguments.dropFirst(1).filter { !$0.hasPrefix("--") && $0 != outDir }
+    // Scene names, leaving out the flags and each `-key value` default.
+    var only: [String] = []
+    var arguments = CommandLine.arguments.dropFirst(2).makeIterator()
+    while let argument = arguments.next() {
+        if argument.hasPrefix("--") { continue }
+        if argument.hasPrefix("-") { _ = arguments.next(); continue }
+        only.append(argument)
+    }
     func wanted(_ name: String) -> Bool { only.isEmpty || only.contains { name.hasPrefix($0) } }
 
     try! FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
@@ -281,12 +289,12 @@ func main() {
         render("13-permission",
                PermissionOnboardingView(width: Perch.widgetWidth)
                    .frame(width: Perch.widgetWidth, height: 156)
-                   .background(Capsule().fill(dark ? Color(white: 0.17) : Color(white: 0.975)))
+                   .background(Capsule().fill(Perch.shell))
                    .clipShape(Capsule())
                    .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
                    .padding(36)
                    .frame(width: Perch.widgetWidth + 72, height: height, alignment: .top)
-                   .background(Color(red: 0.925, green: 0.93, blue: 0.94)),
+                   .background(backdrop),
                size: CGSize(width: Perch.widgetWidth + 72, height: height), settle: 1.0)
     }
     if wanted("14") {
@@ -356,6 +364,24 @@ func main() {
         report.candidates = [.chatgpt: [left], .claude: [right]]
         c.setup.apply(report)
         scene("17-long-destinations", c, settle: 0.3)
+    }
+    if wanted("19") {
+        // Settings, in the card the panel turns into: the shell, with its
+        // fields in wells.
+        let navigation = PanelNavigation(accessibilityGranted: true)
+        navigation.showsSettings = true
+        let card = PanelRootView(controller: quick(RelayController(engine: PerchPreviewEngine())),
+                                 navigation: navigation)
+            .background(Perch.shell)
+            .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
+        let height = 36 + NSHostingView(rootView: card).fittingSize.height + 36
+        render("19-settings",
+               card
+                   .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
+                   .padding(36)
+                   .frame(width: Perch.cardWidth + 72, height: height, alignment: .top)
+                   .background(backdrop),
+               size: CGSize(width: Perch.cardWidth + 72, height: height), settle: 1.0)
     }
 
 }

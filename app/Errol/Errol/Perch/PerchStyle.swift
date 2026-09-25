@@ -11,8 +11,9 @@ enum Perch {
 
     private static var palette: PerchPalette { AppearanceStore.shared.theme.palette }
 
-    static var paper: Color { Color(nsColor: palette.paper) }
+    static var shell: Color { Color(nsColor: palette.shell) }
     static var well: Color { Color(nsColor: palette.well) }
+    static var paper: Color { Color(nsColor: palette.paper) }
     static var panelEdge: Color { Color(nsColor: palette.panelEdge) }
     static var chipEdge: Color { Color(nsColor: palette.chipEdge) }
     static var hairline: Color { Color(nsColor: palette.hairline) }
@@ -30,7 +31,7 @@ enum Perch {
     static var chatgptFeather: Color { Color(nsColor: palette.chatgptFeather) }
     static var claudeFeather: Color { Color(nsColor: palette.claudeFeather) }
 
-    static var paperNS: NSColor { palette.paper }
+    static var shellNS: NSColor { palette.shell }
     static var inkNS: NSColor { palette.ink }
     static var accentTextNS: NSColor { palette.accentText }
     static var placeholderNS: NSColor { palette.placeholder }

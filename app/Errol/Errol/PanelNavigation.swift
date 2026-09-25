@@ -57,20 +57,13 @@ struct PanelScreenPresentation: ViewModifier {
 /// Fill and clip to the current native frame throughout a resize, while the
 /// card inside continues to measure its destination size independently.
 ///
-/// The fill is regular Liquid Glass in the surface's own shape. The window
-/// behind it is transparent (MenuBarController.buildPanel), so what shows
-/// through is the desktop and the chat windows, blurred; AppKit's native
-/// shadow sits around the silhouette, thin rim and all. Regular rather
-/// than clear glass, tried and rejected: the panel floats over mostly white
-/// chat windows, where clear glass all but disappears and dark-appearance
-/// text loses its ground. The bare surface still drags the window.
-///
-/// The glass goes on the background layer, not on the content. Wrapping the
-/// content in `.glassEffect` made AppKit treat every drag inside the panel
-/// as a window move (isMovableByWindowBackground), even one that started
-/// on a view that opts out of moving the window. Glass behind the content
-/// leaves such opt-outs in force, while the same layer carries the drag
-/// gesture for the bare surface.
+/// The fill is the theme's shell, a solid color: the prompt box and the
+/// conversation summary stand lighter than it (ConsolePalette.Colors). The
+/// window is transparent outside the surface's shape
+/// (MenuBarController.buildPanel), and AppKit's native shadow sits around
+/// the silhouette, thin rim and all. The fill is also the bare surface,
+/// which drags the window: it sits behind the content, so a view that opts
+/// out of moving the window keeps that opt-out.
 struct PanelWindowSurface: ViewModifier {
     var navigation: PanelNavigation? = nil
 
@@ -79,8 +72,7 @@ struct PanelWindowSurface: ViewModifier {
         content
             .frame(minWidth: 0, maxWidth: .infinity,
                    minHeight: 0, maxHeight: .infinity, alignment: .top)
-            .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture())
-                .glassEffect(.regular, in: shape))
+            .background(Perch.shell.contentShape(Rectangle()).gesture(WindowDragGesture()))
             .clipShape(shape)
             .ignoresSafeArea()
     }
@@ -154,14 +146,14 @@ struct PanelRootView: View {
     navigation.showsSettings = true
     return PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                          navigation: navigation)
-        .background(Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: Perch.shellCorner)))
+        .background(Perch.shell)
         .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
 }
 
 #Preview("Accessibility setup") {
     PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                   navigation: PanelNavigation(accessibilityGranted: false))
-        .background(Color.clear.glassEffect(.regular, in: Capsule()))
+        .background(Perch.shell)
         .clipShape(Capsule())
 }
 #endif

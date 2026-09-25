@@ -110,9 +110,9 @@ enum ParticipantState {
     var mark: Color { self == .replying ? Perch.onAccent : .white }
 }
 
-/// A state as a badge: the state's mark on its color, ringed in paper where
-/// it sits over an icon so it stands clear of the artwork. A new state
-/// replaces the mark in place.
+/// A state as a badge: the state's mark on its color, ringed in the
+/// window's shell where it sits over an icon, so it reads as cut out of the
+/// artwork. A new state replaces the mark in place.
 struct ParticipantBadge: View {
     let state: ParticipantState
     var size = Perch.s(12)
@@ -130,7 +130,7 @@ struct ParticipantBadge: View {
             .font(.system(size: size, weight: .bold))
             .contentTransition(.symbolEffect(.replace))
             .background {
-                if ringed { Circle().fill(Perch.paper).padding(-Perch.s(0.5)) }
+                if ringed { Circle().fill(Perch.shell).padding(-Perch.s(0.5)) }
             }
             .animation(Perch.fade, value: state)
             .accessibilityLabel(state.title)

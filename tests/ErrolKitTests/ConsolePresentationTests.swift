@@ -71,11 +71,17 @@ final class ConsolePresentationTests: XCTestCase {
         for theme in AppTheme.allCases {
             for (appearance, colors) in [("light", theme.consolePalette.light), ("dark", theme.consolePalette.dark)] {
                 let pairs: [(String, UInt32, UInt32)] = [
+                    ("ink/shell", colors.ink, colors.shell),
+                    ("secondary/shell", colors.secondary, colors.shell),
+                    ("muted/shell", colors.muted, colors.shell),
+                    ("accentText/shell", colors.accentText, colors.shell),
+                    ("red/shell", colors.red, colors.shell),
                     ("ink/paper", colors.ink, colors.paper),
                     ("secondary/paper", colors.secondary, colors.paper),
                     ("placeholder/paper", colors.placeholder, colors.paper),
                     ("accentText/paper", colors.accentText, colors.paper),
                     ("muted/paper", colors.muted, colors.paper),
+                    ("previewInk/paper", colors.previewInk, colors.paper),
                     ("muted/well", colors.muted, colors.well),
                     ("secondary/well", colors.secondary, colors.well),
                     ("ink/well", colors.ink, colors.well),
@@ -88,6 +94,25 @@ final class ConsolePresentationTests: XCTestCase {
                     let light = luminance(foreground), dark = luminance(background)
                     let contrast = (max(light, dark) + 0.05) / (min(light, dark) + 0.05)
                     XCTAssertGreaterThanOrEqual(contrast, 4.5, "\(theme) \(appearance) \(pair): \(contrast)")
+                }
+            }
+        }
+    }
+
+    /// The window's own fill is the darkest of the three surfaces in both
+    /// appearances, so the prompt box and the conversation summary stand
+    /// lighter than it, by a step you can see.
+    func testTheBoxesStandLighterThanTheWindow() {
+        for theme in AppTheme.allCases {
+            for (appearance, colors) in [("light", theme.consolePalette.light), ("dark", theme.consolePalette.dark)] {
+                let steps: [(String, UInt32, UInt32, Double)] = [
+                    ("well over shell", colors.well, colors.shell, 1.05),
+                    ("paper over well", colors.paper, colors.well, 1.05),
+                    ("paper over shell", colors.paper, colors.shell, 1.15),
+                ]
+                for (step, lighter, darker, least) in steps {
+                    let ratio = (luminance(lighter) + 0.05) / (luminance(darker) + 0.05)
+                    XCTAssertGreaterThanOrEqual(ratio, least, "\(theme) \(appearance) \(step): \(ratio)")
                 }
             }
         }

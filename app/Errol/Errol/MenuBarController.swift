@@ -143,7 +143,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             rearm.run()
         }
         NSApp.appearance = selection.1.nativeAppearance
-        logWindow?.backgroundColor = selection.0.palette.paper
+        logWindow?.backgroundColor = selection.0.palette.shell
     }
 
     // MARK: Status item
@@ -293,15 +293,15 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     // MARK: Panel
 
     /// A borderless panel removes AppKit's title bar and window buttons.
-    /// SwiftUI provides the glass surface (PanelWindowSurface) and the
+    /// SwiftUI provides the solid surface (PanelWindowSurface) and the
     /// header controls; AppKit casts the native shadow around the content's
     /// alpha silhouette. That shadow is also the thin rim along the edge:
     /// the window server draws a dark contact line just outside the alpha
-    /// edge and a one-point highlight just inside it, and over a
-    /// translucent surface the pair reads as a border. Accepted for now in
-    /// exchange for the separation the shadow gives over white chat
-    /// windows; turning `hasShadow` off removes the rim along with it.
-    /// Nothing else draws that line, the style mask included.
+    /// edge and a one-point highlight just inside it, and the pair reads
+    /// as a border. Accepted for now in exchange for the separation the
+    /// shadow gives over white chat windows; turning `hasShadow` off
+    /// removes the rim along with it. Nothing else draws that line, the
+    /// style mask included.
     ///
     /// Esc hides it; the bare surface drags it; the frame follows the card
     /// (fitPanel).
@@ -310,10 +310,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                              styleMask: [.borderless, .nonactivatingPanel],
                              backing: .buffered, defer: false)
         panel.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? true }
-        // Transparent, so the glass refracts what lies behind the window.
-        // The shadow follows the content's alpha silhouette, so it has to
-        // be invalidated whenever that silhouette changes (order-front,
-        // every frame of a resize).
+        // Transparent, so the capsule's rounded ends and the card's corners
+        // show what lies behind the window. The shadow follows the
+        // content's alpha silhouette, so it has to be invalidated whenever
+        // that silhouette changes (order-front, every frame of a resize).
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -678,7 +678,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             window.isFloatingPanel = true
             window.hidesOnDeactivate = false
             window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = Perch.paperNS
+            window.backgroundColor = Perch.shellNS
             window.contentView = FirstMouseHostingView(
                 rootView: PerchLogWindowView(controller: relay))
             window.center()

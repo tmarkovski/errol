@@ -7,7 +7,7 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
 ## Refinements after review
 
 - **The top row's menus read as text, not links.** They use the secondary ink rather than the accent, with a rounded-rectangle wash under the pointer. The ··· App menu and each side's destination line use the same chip. A chip hugs its value. Choosing another value springs the chip, and the chips after it, to the new width, while the text rolls to the new value and keeps the words the two values share in place. With Reduce Motion, the change is immediate.
-- **Badges straddle the icon's corner.** Each badge is centered on the rounded corner of the app icon, not inside the artwork. Every state is a filled circle with a mark in it, set in a paper ring:
+- **Badges straddle the icon's corner.** Each badge is centered on the rounded corner of the app icon, not inside the artwork. Every state is a filled circle with a mark in it, set in a ring of the window's color:
   - ready is a white check on the system green;
   - needs attention is a white exclamation mark on the system orange;
   - replying is an ellipsis on the theme's accent, in the theme's on-accent ink;
@@ -24,6 +24,11 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
   - With a turn limit, a minus/plus stepper stands beside the chip, and its count rolls as it steps. It holds to repeat, takes the arrow keys, and adjusts as one control in VoiceOver.
   - When you stop it, the assistants are told the human will end the conversation, and a sign-off marker no longer ends the run. The status line reads "until you stop it".
   - In the narrow console, the ending and its stepper stay on the row, while who starts and the arrangement fold into Run options.
+- **A solid window instead of glass.** The panel fills with a new theme color, the shell, and the prompt box and the conversation summary stand lighter than it in both appearances.
+  - In light themes, the shell is a tinted gray a step under the well. Paper and the well keep their values, and the hairline darkens enough to show on the shell.
+  - In dark themes, the old paper became the shell, the well stays, and a new, lighter paper sits a step over it. Popovers and the round buttons are paper too, so they lighten with it.
+  - Muted text is a shade darker in light themes, and the dark placeholder a shade lighter, so every text pair still meets 4.5:1 on all three surfaces.
+  - Settings, the permission screen, and the log window take the shell as well. The icons no longer carry the white halo that lifted them off the glass.
 
 Only the prompt and an acknowledged steering pause mount editors. Running, pending pause, queued note, recovery, and finished states use status panels. RunReport supplies the outcome and recovery instructions. The conversation summary keeps its scrolling view through pauses, has a header and reply count, quotes original excerpts, and offers keyboard-focusable Show window actions on hover/focus when allowed. Delivery receipt accounting is unchanged.
 
@@ -43,10 +48,11 @@ Finder and Inspect are disabled during a run, as are update checks. Settings and
 - `swift test` passed: 237 tests across both targets, with 2 opt-in live tests skipped and no failures. New checks cover focus/action availability, outcome symbols and warnings, current-window metadata, and 12 text/background pairs across seven palettes in both appearances.
 - The refinements after review were typechecked against the whole app target, Sparkle included, with the project's concurrency settings, and rendered with the preview harness in both appearances. The hover wash and the details panel's live placement, fade, and dismissal still need a hands-on check.
 - The [native preview harness](../../../tools/console-preview/main.swift) compiles the actual views and controllers. Its assertions check pending versus granted pauses, refusal to show a window before the grant, preservation of the note and hold, and blocking Resume until Show window completes. Its fake engine sends no messages.
-- Light and dark renders cover setup choices, app closed, Code destination, ready, running, pause pending, paused, queued note, held, completed, stopped, interrupted delivery, long titles, and the compact 600-point console. Images use a flat stand-in for Liquid Glass.
+- Light and dark renders cover setup choices, app closed, Code destination, ready, running, pause pending, paused, queued note, held, completed, stopped, interrupted delivery, long titles, and the compact 600-point console. Images use the theme's own window color; only the window shadow is a stand-in.
+- The solid window's colors are tested in every theme and both appearances: text pairs now include the shell, and a test keeps paper lighter than the well and the well lighter than the shell.
 - `git diff --check` passed.
 
-Live copy/send interactions with the desktop apps, VoiceOver navigation, and Liquid Glass appearance still need hands-on validation. The renders and preview assertions do not establish end-to-end macOS activation behavior.
+Live copy/send interactions with the desktop apps, VoiceOver navigation, and how the native shadow's rim sits on the solid window still need hands-on validation. The renders and preview assertions do not establish end-to-end macOS activation behavior.
 
 ## Rendered implementation
 

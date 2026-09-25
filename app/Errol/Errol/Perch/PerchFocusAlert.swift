@@ -60,7 +60,7 @@ struct PerchFocusAlert: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The wash takes every click the console would have, and still
         // drags the window like the bare surface under it.
-        .background(Perch.paper.opacity(0.74).contentShape(Rectangle()).gesture(WindowDragGesture()))
+        .background(Perch.shell.opacity(0.74).contentShape(Rectangle()).gesture(WindowDragGesture()))
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
     }

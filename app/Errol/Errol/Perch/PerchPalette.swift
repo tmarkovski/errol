@@ -4,7 +4,7 @@ import AppKit
 /// NSColors share that definition with SwiftUI, the native editors, and window
 /// chrome; their provider uses the appearance passed by the drawing view.
 struct PerchPalette {
-    let paper, well, panelEdge, chipEdge, hairline: NSColor
+    let shell, well, paper, panelEdge, chipEdge, hairline: NSColor
     let ink, secondary, muted, placeholder, previewInk: NSColor
     let accent, accentText, accentBack, onAccent: NSColor
     let red, redBack: NSColor
@@ -21,8 +21,9 @@ struct PerchPalette {
     private init(_ palette: ConsolePalette) {
         let light = palette.light
         let dark = palette.dark
-        paper = Self.adaptive(light.paper, dark.paper)
+        shell = Self.adaptive(light.shell, dark.shell)
         well = Self.adaptive(light.well, dark.well)
+        paper = Self.adaptive(light.paper, dark.paper)
         panelEdge = Self.adaptive(light.panelEdge, dark.panelEdge)
         chipEdge = Self.adaptive(light.chipEdge, dark.chipEdge)
         hairline = Self.adaptive(light.hairline, dark.hairline)

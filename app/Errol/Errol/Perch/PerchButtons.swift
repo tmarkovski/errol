@@ -1,5 +1,5 @@
 // The console's buttons, drawn flat: filled capsules and circles on the
-// panel's glass, with no material of their own. The running actions are
+// panel's shell, with no material of their own. The running actions are
 // bare icons in circles — pause and stop say themselves; editors,
 // permission setup, and the ending keep their labeled pills.
 
