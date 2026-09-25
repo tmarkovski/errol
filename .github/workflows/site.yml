@@ -35,7 +35,7 @@ env:
 jobs:
   films:
     name: films (${{ matrix.format }})
-    # The cuts render side by side, each on its own runner, in about 15 minutes.
+    # The cuts render side by side, each on its own runner, in about 17 minutes.
     strategy:
       matrix:
         format: [tall, wide]

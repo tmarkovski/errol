@@ -72,8 +72,9 @@ The workflow needs both of these repository secrets and fails if either is missi
 The films jobs come first, one per cut, side by side. Each hashes the films'
 source, and when R2 has no film of its cut under that hash, renders it on the
 runner and stores it in the `errol-promo-films` bucket, which it creates if it's
-missing. Any other run finds them there in seconds, so a film renders once per
-change to its source. The
+missing. A render takes about 17 minutes on a GitHub runner, against about two
+on a Mac, because the runner has no GPU and four slower cores. Any other run finds
+the films there in seconds, so a film renders once per change to its source. The
 deploy job then fetches them into `public/demos/`, builds, and deploys. The token
 needs Workers R2 Storage edit access, which the "Edit Cloudflare Workers" template
 includes. Dispatching the workflow on a branch other than `main` runs only the
