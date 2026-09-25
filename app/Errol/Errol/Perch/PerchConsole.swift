@@ -117,7 +117,8 @@ struct PerchTopicLine: View {
     private var windowsTitle: String { controller.setup.state.layout.consoleTitle }
 
     private var starterSwap: some View {
-        PerchChipSwap(title: starterTitle, turned: controller.firstSpeaker == .claude) {
+        PerchChipSwap(title: controller.appName(controller.firstSpeaker), suffix: " starts",
+                      turned: controller.firstSpeaker == .claude) {
             controller.firstSpeaker = otherStarter
         }
         .help("Let \(controller.appName(otherStarter)) start instead")
@@ -198,7 +199,6 @@ struct PerchAppMenuButton: View {
 
     var body: some View {
         Button {
-            controller.presentedParticipant = nil
             guard let view = anchor.view, let menu = controller.appMenuProvider?() else { return }
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.maxY + Perch.s(4)), in: view)
         } label: {

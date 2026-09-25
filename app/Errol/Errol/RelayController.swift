@@ -248,7 +248,6 @@ final class RelayController {
     /// The native shell builds the same menu for the console and status item.
     @ObservationIgnored var appMenuProvider: (() -> NSMenu)?
     private(set) var isShowingWindow = false
-    var presentedParticipant: Speaker?
 
     var consoleAccess: ConsoleAccess {
         ConsoleAccess(running: isRunning, steering: isSteering, pending: isSteeringPending,
@@ -256,12 +255,17 @@ final class RelayController {
                       focusOperationActive: control.hasFocusOperation)
     }
 
-    func showWindow(_ side: Speaker) {
+    /// Brings a side's window forward. Show window hands the keyboard back
+    /// to the console once the window is up, and to the note during a pause;
+    /// a click on the side's icon focuses the app, so it leaves the keyboard
+    /// there (`returningKeyboard: false`).
+    func showWindow(_ side: Speaker, returningKeyboard: Bool = true) {
         guard consoleAccess.canShowWindow else { return }
         isShowingWindow = true
         setup.bringForward(side) { [weak self] in
             guard let self else { return }
             isShowingWindow = false
+            guard returningKeyboard else { return }
             focusPanelHandler?()
             if consoleAccess.pauseGranted { steeringEditor.restoreFocus() }
         }

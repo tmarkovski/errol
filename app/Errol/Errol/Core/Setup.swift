@@ -110,7 +110,7 @@ func windowCandidates(_ scans: [WindowScan], ids: [WindowID], selectors: AppSele
 // MARK: - Presence
 
 /// What an app is, before any window in it is chosen: the state that names
-/// the next useful action under its icon.
+/// the next useful action on its line under the box.
 enum AppPresence: Equatable {
     case checking
     case notInstalled
@@ -289,7 +289,7 @@ struct SideSetup: Equatable {
     var isConnected: Bool { connection != nil }
     var isReady: Bool { connection?.readiness.isReady ?? false }
     /// Several windows could be connected and none has been named: the
-    /// human chooses one from the icon.
+    /// human chooses one from the side's line under the box.
     var needsConversationChoice: Bool { !isConnected && eligible.count > 1 }
 
     /// The connected window as the latest sweep saw it. The connection
@@ -478,7 +478,7 @@ struct SetupState: Equatable {
                 return SetupNotice(text: "\(name(side)) has no conversation to relay into. Open a chat in it.",
                                    isProblem: false)
             case .available(let windows) where windows > 1:
-                return SetupNotice(text: "\(name(side)) has \(windows) conversations open. Click its icon to choose one.",
+                return SetupNotice(text: "\(name(side)) has \(windows) conversations open. Click the line below to choose one.",
                                    isProblem: false)
             case .available, .notInstalled, .notRunning:
                 return SetupNotice(text: "Connecting \(name(side))\u{2026}", isProblem: false)

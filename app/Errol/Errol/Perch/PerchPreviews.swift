@@ -2,10 +2,10 @@
 // so the canvas lists them together. Each stands the console the way the
 // panel does (PerchPreviewScene), and each runs on PerchPreviewEngine: the
 // controls do what they do in the app, and nothing reaches either app. An
-// icon opens an app or connects a conversation, Start relay starts a run,
-// Stop ends it at the next handoff, Pause to steer holds it and opens the
-// field, and Return sends the note. The render harness (tools/console-preview)
-// draws the same states in the same scene.
+// icon opens its app, a destination line connects a conversation, Start
+// relay starts a run, Stop ends it at the next handoff, Pause to steer
+// holds it and opens the field, and Return sends the note. The render
+// harness (tools/console-preview) draws the same states in the same scene.
 
 #if DEBUG
 import SwiftUI
@@ -16,21 +16,20 @@ import SwiftUI
 /// the capsule on the theme's shell (PanelWindowSurface), with a stand-in
 /// for the window's shadow and rim. From a run's start until New topic, the
 /// conversation summary stands under it, as MenuBarController shows that
-/// window. A side's details card can stand there too, where the app puts
-/// it, over the summary during a run.
+/// window. A side's tip, which the pointer on its icon brings up, can
+/// stand there too, where the app puts it, over the summary during a run.
 struct PerchPreviewScene: View {
     let controller: RelayController
     var consoleWidth: CGFloat = Perch.widgetWidth
-    /// The side whose details card stands under the console.
+    /// The side whose tip stands under the console.
     var details: Speaker? = nil
     @Environment(\.colorScheme) private var colorScheme
-    @State private var placement = PerchDetailsPlacement()
-    @State private var cardWidth = PerchParticipantPopover.width
+    @State private var tipWidth: CGFloat = 0
 
     /// The backdrop's margin around the windows.
     static let margin: CGFloat = 36
-    /// The room a details card takes under the console.
-    static let detailsRoom: CGFloat = 330
+    /// The room a tip takes under the console.
+    static let detailsRoom: CGFloat = 170
 
     /// The scene's size, which the render harness sizes its window to.
     static func size(summary: Bool, details: Bool = false,
@@ -63,26 +62,21 @@ struct PerchPreviewScene: View {
                 }
             }
             .padding(Self.margin)
-            if let details { card(details) }
+            if let details { tip(details) }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .background(Self.backdrop(colorScheme))
     }
 
-    /// The card where PerchDetailsAnchor puts its panel: a step under the
-    /// console, running inward from the side's end, its arrow on the icon.
-    private func card(_ side: Speaker) -> some View {
-        let icon = PerchConsoleView.endInset + Perch.participantWidth / 2
-        let lead = Perch.s(50)
-        let x = side == .chatgpt ? icon - lead : consoleWidth - icon + lead - cardWidth
-        return PerchDetailsCallout(placement: placement,
-                                   content: PerchParticipantPopover(controller: controller, speaker: side)) { size in
-            cardWidth = size.width
+    /// The tip where PerchTipAnchor puts its panel: a step under the
+    /// console, its outer edge on the icon's, running inward.
+    private func tip(_ side: Speaker) -> some View {
+        let edge = PerchConsoleView.endInset + (Perch.participantWidth - PerchAvatar.slot) / 2
+        let x = side == .chatgpt ? edge : consoleWidth - edge - tipWidth
+        return PerchTip(content: PerchParticipantTip(controller: controller, speaker: side)) { size in
+            tipWidth = size.width
         }
-        .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
-        .offset(x: Self.margin + x, y: Self.margin + Perch.widgetHeight + Perch.s(4))
-        .onAppear { placement.arrowX = side == .chatgpt ? lead : cardWidth - lead }
-        .onChange(of: cardWidth) { _, width in placement.arrowX = side == .chatgpt ? lead : width - lead }
+        .offset(x: Self.margin + x, y: Self.margin + Perch.widgetHeight + PerchTipAnchor<EmptyView>.Coordinator.gap)
     }
 }
 
@@ -130,7 +124,7 @@ enum PerchPreviewState: CaseIterable {
     case severalConversations, bothConnected, noTopic, codeSession, stillReplying,
          chatgptClosed, claudeNotInstalled, longTopic, longDestinations,
          turnLimit, untilStopped, narrow
-    // A side's details.
+    // A side's tip.
     case details, detailsChoosing, detailsClosed, detailsHeld
     // A run.
     case opening, running, runningUntilStopped, modelUnavailable, pausePending, paused,
@@ -157,7 +151,7 @@ enum PerchPreviewState: CaseIterable {
         switch self {
         case .severalConversations, .detailsChoosing:
             // Two windows on each side, so neither is connected until one
-            // is chosen from its icon.
+            // is chosen from its line under the box.
             return freshController()
         case .bothConnected, .details:
             return connectedController()
@@ -354,10 +348,10 @@ enum PerchPreviewState: CaseIterable {
 #Preview("Compose · ends when you stop it") { PerchPreviewState.untilStopped.scene }
 #Preview("Compose · narrow console") { PerchPreviewState.narrow.scene }
 
-#Preview("Details · ChatGPT") { PerchPreviewState.details.scene }
-#Preview("Details · choosing a conversation") { PerchPreviewState.detailsChoosing.scene }
-#Preview("Details · ChatGPT closed") { PerchPreviewState.detailsClosed.scene }
-#Preview("Details · Claude minimized mid-run") { PerchPreviewState.detailsHeld.scene }
+#Preview("Tip · ChatGPT") { PerchPreviewState.details.scene }
+#Preview("Tip · no conversation chosen") { PerchPreviewState.detailsChoosing.scene }
+#Preview("Tip · ChatGPT closed") { PerchPreviewState.detailsClosed.scene }
+#Preview("Tip · Claude minimized mid-run") { PerchPreviewState.detailsHeld.scene }
 
 #Preview("Running · first reply") { PerchPreviewState.opening.scene }
 #Preview("Running · mid-run") { PerchPreviewState.running.scene }

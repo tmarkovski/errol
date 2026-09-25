@@ -150,7 +150,7 @@ final class SetupStateTests: XCTestCase {
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
         XCTAssertNil(state.automaticConnection(for: .chatgpt), "a connected side is left alone")
         XCTAssertEqual(state.notice(names: names)?.text,
-                       "Claude has 2 conversations open. Click its icon to choose one.")
+                       "Claude has 2 conversations open. Click the line below to choose one.")
 
         state.connected(.claude, window: named.id, identity: named.identity, model: nil,
                         observation: observation(named))

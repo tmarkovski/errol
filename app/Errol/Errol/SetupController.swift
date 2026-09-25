@@ -5,8 +5,8 @@
 //
 // Connecting has one entry point, `connect(_:to:)`. A side with one window
 // a run could target is connected to it as a sweep sees it; a side with
-// several waits for the human to choose one from its icon. Both come
-// through `connect(_:to:)`.
+// several waits for the human to choose one from its line under the box.
+// Both come through `connect(_:to:)`.
 
 import AppKit
 import Foundation
@@ -203,7 +203,7 @@ final class SetupController {
 
     private func missingWindowProblem(_ side: Speaker) -> String {
         state[side].needsConversationChoice
-            ? "Choose which \(name(side)) conversation to connect: click its icon."
+            ? "Choose which \(name(side)) conversation to connect: click the line below."
             : "Open a conversation in \(name(side)) first."
     }
 

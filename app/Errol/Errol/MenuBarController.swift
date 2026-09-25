@@ -379,10 +379,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let showing = panel.isVisible && panel.occlusionState.contains(.visible)
             && navigation.screen == .console
         relay.setPanelVisible(showing)
-        // A child panel stays up when its parent is ordered out, so a side's
-        // details close with the console, and when Settings or the
-        // permission ask takes its place.
-        if !showing { relay.presentedParticipant = nil }
     }
 
     // MARK: Observation bridges

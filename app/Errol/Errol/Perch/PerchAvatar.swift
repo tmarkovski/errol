@@ -18,7 +18,8 @@ struct PerchAvatar: View {
 
     /// The layout slot: the same for the icon and the fallback so the head
     /// does not shift depending on which apps are installed.
-    private var slot: CGFloat { Perch.s(46) }
+    static var slot: CGFloat { Perch.s(46) }
+    private var slot: CGFloat { Self.slot }
 
     var body: some View {
         Group {

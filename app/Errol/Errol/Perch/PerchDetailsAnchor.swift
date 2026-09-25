@@ -1,15 +1,14 @@
 // Details float in a panel of their own under the console: a paper card
-// with an arrow on what opened it, like a popover. A side's details point
-// at its icon, a note's receipt at its line. A native popover would take
+// with an arrow on what opened it, like a popover. A note's receipt opens
+// one from its line, with the note in full. A native popover would take
 // key status whenever it appears, and with it the keyboard a copy or
 // delivery needs, so this is a non-activating panel that becomes key only
 // when the relay's focus contract allows it (ConsoleAccess.canTakeFocus).
 //
-// It fades in and out. A click anywhere else closes it, except on a
-// control that opens and closes the details itself (the icon, the
-// destination line, the receipt line), which is left to toggle them. Esc
-// closes it too, and so does the console going away: a child panel would
-// otherwise stay on screen without it.
+// It fades in and out. A click anywhere else closes it, except on the
+// control that opens and closes the details itself (the receipt line),
+// which is left to toggle them. Esc closes it too, and so does the console
+// going away: a child panel would otherwise stay on screen without it.
 
 import AppKit
 import Observation
@@ -294,9 +293,4 @@ final class DetailsToggleRegionView: NSView {
         }
         return false
     }
-}
-
-struct PerchDetailsToggleRegion: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { DetailsToggleRegionView() }
-    func updateNSView(_ view: NSView, context: Context) {}
 }

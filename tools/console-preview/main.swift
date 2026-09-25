@@ -31,8 +31,9 @@ func pumpUntil(_ timeout: Double, _ done: () -> Bool) {
     }
 }
 
-/// A side's details where the app puts them: the card under the console,
-/// its arrow on the side's icon, over the transcript during a run.
+/// A side's tip where the app puts it, as the pointer on its icon brings it
+/// up: under the console, its outer edge on the icon's, over the transcript
+/// during a run.
 @MainActor
 func details(_ name: String, _ controller: RelayController, _ speaker: Speaker) {
     render(name, PerchPreviewScene(controller: controller, details: speaker),
