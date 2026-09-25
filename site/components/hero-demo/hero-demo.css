@@ -147,8 +147,8 @@
   gap: 18px;
 }
 #errol-hero-film .ef-menubar img {
-  width: 21px;
-  height: 21px;
+  width: 16px;
+  height: 16px;
   object-fit: contain;
 }
 #errol-hero-film .ef-window {
@@ -776,8 +776,8 @@
   color: var(--ef-ink);
 }
 #errol-hero-film .ef-ending img {
-  width: 71px;
-  height: 71px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
 }
 #errol-hero-film .ef-ending strong {
@@ -837,7 +837,7 @@
 }
 #errol-hero-film .ef-menubar img,
 #errol-hero-film .ef-ending img {
-  filter: invert(0.9);
+  filter: brightness(0) invert(0.9);
 }
 #errol-hero-film .ef-app-icon {
   width: 23px;

@@ -78,7 +78,7 @@ const Scene = memo(function Scene() {
             <span>Edit</span>
             <span>View</span>
             <div className="ef-right">
-              <img src="/errol.svg" alt="" />
+              <img src="/errol-symbol.svg" alt="" />
               <Wifi size={16} aria-hidden="true" />
               <BatteryFull size={16} aria-hidden="true" />
               <span>Sat 9:41</span>
@@ -260,7 +260,7 @@ const Scene = memo(function Scene() {
           </div>
         </div>
         <div className="ef-ending">
-          <img src="/errol.svg" alt="Errol" />
+          <img src="/errol-symbol.svg" alt="Errol" />
           <strong>Let your AIs talk.</strong>
           <span>You can step in whenever you want.</span>
         </div>

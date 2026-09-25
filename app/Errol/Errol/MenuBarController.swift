@@ -161,13 +161,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // Keep the original owl as a fallback; ErrolSymbol is the default mark.
         let mark = NSImage(named: "ErrolSymbol") ?? NSImage(named: "MenuBarIcon")
         if let image = mark?.copy() as? NSImage {
-            image.size = NSSize(width: 18, height: 18)
+            // The two bubbles make a square mark, and at 16 pt it stands as tall
+            // as the system's own menu bar glyphs; 18 pt towered over them.
+            image.size = NSSize(width: 16, height: 16)
             image.isTemplate = true
             image.accessibilityDescription = running ? "Errol is running" : "Errol"
             return image
         }
 
-        return NSImage(systemSymbolName: running ? "bird.fill" : "bird", accessibilityDescription: "Errol")
+        let bubbles = running ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right"
+        return NSImage(systemSymbolName: bubbles, accessibilityDescription: "Errol")
             ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "Errol")
     }
 
