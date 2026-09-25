@@ -130,6 +130,7 @@ body.play{display:grid;place-items:center;height:100vh;overflow:hidden}
 #cursor,.ghost{position:absolute;left:0;top:0;width:44px;height:64px;transform-origin:3px 3px}
 #cursor svg,.ghost svg{width:44px;height:64px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.45))}
 .ripple{position:absolute;left:0;top:0;width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:50%;border:3px solid rgba(255,255,255,.9)}
+.key svg{width:.78em;height:.78em;flex:none}.key svg.ret{width:1.02em;height:1.02em}
 .key{position:absolute;left:0;top:0;height:92px;width:108px;box-sizing:border-box;border-radius:22px;background:linear-gradient(#34352f,#262723);box-shadow:0 0 0 1.5px rgba(255,255,255,.14) inset,0 -3px 0 rgba(0,0,0,.35) inset,0 12px 26px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;gap:4px;font-size:36px;font-weight:600;color:#f1f0e9;white-space:nowrap}
 
 /* end card */
@@ -360,6 +361,9 @@ const I={
   person:(c='#edba72')=>`<svg viewBox="0 0 24 24" fill="${c}"><circle cx="12" cy="7.8" r="4.3"/><path d="M3.8 21c.6-4.6 4-7.3 8.2-7.3s7.6 2.7 8.2 7.3z"/></svg>`,
   cursor:`<svg viewBox="0 0 22 32"><path d="M1.5 1.5v23.2l5.6-5.4 3.9 9.2 3.6-1.5-3.8-9h7.8z" fill="#0b0b0a" stroke="#fff" stroke-width="1.7" stroke-linejoin="round"/></svg>`,
   wifi:`<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#e6e5de" stroke-width="2.3" stroke-linecap="round"><path d="M2.5 9.2a13.5 13.5 0 0 1 19 0M5.8 12.6a8.8 8.8 0 0 1 12.4 0M9.1 16a4.1 4.1 0 0 1 5.8 0"/><circle cx="12" cy="19.2" r="1.3" fill="#e6e5de" stroke="none"/></svg>`,
+  // Geist has no ⌘ or ↩, and each system's fallback font draws them differently, so the keycaps draw them.
+  cmd:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg>`,
+  ret:`<svg class="ret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 10L2.5 15l5 5M2.5 15h14.5a5 5 0 0 0 0-10h-3"/></svg>`,
   batt:`<svg viewBox="0 0 34 18" width="44" height="23" fill="none"><rect x="1" y="1" width="28" height="16" rx="5" stroke="#e6e5de" stroke-opacity=".55" stroke-width="1.6"/><rect x="3.5" y="3.5" width="21" height="11" rx="3" fill="#e6e5de"/><path d="M31.3 6.5v5" stroke="#e6e5de" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/></svg>`,
 };
 const ICON={A:'../../public/app-icons/chatgpt.png',B:'../../public/app-icons/claude.png'};
@@ -432,7 +436,7 @@ const cring=mk('div','',cbox);cring.id='cring';
 const ghosts=[0,1,2].map(()=>mk('div','ghost',cam,I.cursor));
 const cursor=mk('div','',cam,I.cursor);cursor.id='cursor';
 const ripples=CLICKS.map(()=>mk('div','ripple',cam));
-const keys=HOOK.keys.map(k=>mk('div','key',cam,k.label));
+const keys=HOOK.keys.map(k=>mk('div','key',cam,k.label.replace('⌘',I.cmd).replace('↩',I.ret)));
 const fxCam=mk('canvas','L',cam);fxCam.width=L.W;fxCam.height=L.H;box(fxCam,0,0,L.W,L.H);
 
 // HUD: menu bar, logo, captions, end card
