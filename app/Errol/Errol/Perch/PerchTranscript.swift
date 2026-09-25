@@ -291,15 +291,7 @@ private func playedController(replies: Int, note: Bool = true,
     let controller = connectedController(engine)
     if let summarize { controller.summarizeReply = summarize }
     controller.start()
-    let text = "Push on the pricing question before you wrap up."
-    for turn in stride(from: 1, through: replies, by: 1) {
-        engine.events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: PerchPreviewEngine.reply(turn: turn)))
-        if note, turn == 3 {
-            engine.events.post(.steeringCommitted(note: text, recipient: .claude, turn: 3))
-            engine.events.post(.steering(SteeringDelivery(leg: .note, note: text, recipient: .claude, turn: 3,
-                                                          outcome: .delivered)))
-        }
-    }
+    engine.postReplies(replies, note: note)
     return controller
 }
 

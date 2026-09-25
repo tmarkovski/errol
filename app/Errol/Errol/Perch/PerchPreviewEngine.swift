@@ -112,10 +112,15 @@ final class PerchPreviewEngine: RelayEngine {
 
     private var readiness: (chatgpt: SideStatus, claude: SideStatus)
     private var installed: [Speaker: Bool] = [.chatgpt: true, .claude: true]
+    private let replying: Speaker?
     private var bindings: [Speaker: WindowCandidate] = [:]
     private var restorable = false
     private let replyTime: Duration
+    private let handoffTime: Duration
     private let signOffAt: Int?
+    /// A run that is already over, posted whole when Start is pressed
+    /// instead of played (`ended`).
+    private var script: [RelayEvent]?
     /// Where the first run stands when Start is pressed, for canvases that
     /// open mid-run. Runs started by hand after it start from the top.
     private var opening: (turn: Int, atHandoff: Bool)?
@@ -124,6 +129,7 @@ final class PerchPreviewEngine: RelayEngine {
 
     /// - Parameters:
     ///   - replyTime: How long each reply takes to write.
+    ///   - handoffTime: How long each copy, and each paste and send, takes.
     ///   - turn: The turn the first run opens on. Who is writing it follows
     ///     from the first speaker, as in a run: odd turns are the opener's.
     ///   - atHandoff: Whether that turn's reply is already ready and the
@@ -138,17 +144,72 @@ final class PerchPreviewEngine: RelayEngine {
     ///   - readiness: What the perches show for the two apps. A side
     ///     reported missing offers no windows and can be "opened".
     ///   - installed: Whether each app is on this Mac at all.
-    init(pace replyTime: Duration = .seconds(4),
+    ///   - replying: A side still replying to something the relay did not
+    ///     send: its windows' composers show Stop, as the apps' do then.
+    init(pace replyTime: Duration = .seconds(4), handoff handoffTime: Duration = .milliseconds(700),
          turn: Int = 1, atHandoff: Bool = false, signOffAt: Int? = nil,
          openingOperation: FocusOperation? = nil,
          readiness: (chatgpt: SideStatus, claude: SideStatus) = PerchPreviewEngine.bothReady,
-         installed: [Speaker: Bool] = [.chatgpt: true, .claude: true]) {
+         installed: [Speaker: Bool] = [.chatgpt: true, .claude: true],
+         replying: Speaker? = nil) {
         self.replyTime = replyTime
+        self.handoffTime = handoffTime
         self.signOffAt = signOffAt
         self.readiness = readiness
         self.installed = installed
+        self.replying = replying
         opening = (max(1, turn), atHandoff)
         self.openingOperation = openingOperation
+    }
+
+    /// A run that is already over, for a canvas that opens on its ending:
+    /// Start posts it whole instead of playing it. The replies take turns
+    /// from ChatGPT's, a note rides the third handoff to Claude and is
+    /// echoed with the fourth, and a completed run's last two replies sign
+    /// off, as a played run's would.
+    static func ended(_ outcome: RunOutcome, replies: Int = 6, note: Bool = true) -> PerchPreviewEngine {
+        let engine = PerchPreviewEngine()
+        let text = Self.note
+        let completed = outcome == .completed
+        var events: [RelayEvent] = []
+        for turn in 1...max(1, replies) {
+            let side: Speaker = turn % 2 == 1 ? .chatgpt : .claude
+            events.append(.turn(turn))
+            let signsOff = completed && turn >= replies - 1
+            events.append(.reply(side: side, text: signsOff ? "\(reply(turn: turn))\n\n\(config.stopSequence)"
+                                                            : reply(turn: turn)))
+            if note, turn == 3 {
+                events.append(.steeringCommitted(note: text, recipient: .claude, turn: 3))
+                events.append(.steering(SteeringDelivery(leg: .note, note: text, recipient: .claude, turn: 3,
+                                                         outcome: .delivered)))
+            }
+            if note, turn == 4 {
+                events.append(.steering(SteeringDelivery(leg: .echo, note: text, recipient: .chatgpt, turn: 4,
+                                                         outcome: .delivered)))
+            }
+        }
+        let end: ConversationStatus = completed ? .ended : .notStarted
+        events.append(.conversation(chatgpt: end, claude: end))
+        events.append(.ended(RunReport(outcome: outcome, repliesCaptured: replies)))
+        events.append(.finished)
+        engine.script = events
+        return engine
+    }
+
+    /// The note the canvases write.
+    static let note = "Push on the pricing question before you wrap up."
+
+    /// Replies already in hand when a canvas opens mid-run, posted as a run
+    /// posts them, and a note sent to Claude with the third handoff.
+    func postReplies(_ count: Int, note: Bool = true) {
+        for turn in stride(from: 1, through: count, by: 1) {
+            events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: Self.reply(turn: turn)))
+            if note, turn == 3 {
+                events.post(.steeringCommitted(note: Self.note, recipient: .claude, turn: 3))
+                events.post(.steering(SteeringDelivery(leg: .note, note: Self.note, recipient: .claude, turn: 3,
+                                                       outcome: .delivered)))
+            }
+        }
     }
 
     deinit {
@@ -160,7 +221,11 @@ final class PerchPreviewEngine: RelayEngine {
     private func windows(_ side: Speaker) -> [WindowCandidate] {
         let status = side == .chatgpt ? readiness.chatgpt : readiness.claude
         guard status.state != .missing else { return [] }
-        return side == .chatgpt ? Self.chatgptWindows : Self.claudeWindows
+        var windows = side == .chatgpt ? Self.chatgptWindows : Self.claudeWindows
+        if side == replying {
+            for index in windows.indices { windows[index].composer = .replying }
+        }
+        return windows
     }
 
     /// The fixed picture, as a sweep would report it.
@@ -238,13 +303,20 @@ final class PerchPreviewEngine: RelayEngine {
     func startRun() {
         control.reset()
         run?.cancel()
+        if let script {
+            self.script = nil
+            events.post(.log("Preview run: nothing is sent to either app."))
+            script.forEach(events.post)
+            control.finishRun()
+            return
+        }
         let opening = self.opening ?? (1, false)
         self.opening = nil
         let operation = openingOperation
         openingOperation = nil
         if let operation { _ = control.beginOperation(operation) }
         events.post(.log("Preview run: nothing is sent to either app."))
-        let play = PreviewRun(events: events, control: control, replyTime: replyTime,
+        let play = PreviewRun(events: events, control: control, replyTime: replyTime, handoffTime: handoffTime,
                               names: (readiness.chatgpt.appName, readiness.claude.appName),
                               first: config.first,
                               turnCap: config.turnCap,
@@ -270,6 +342,7 @@ private final class PreviewRun {
     private let events: RelayEventBus
     private let control: RelayControl
     private let replyTime: Duration
+    private let handoffTime: Duration
     private let names: (chatgpt: String, claude: String)
     private let first: Speaker
     private let turnCap: Int?
@@ -282,13 +355,14 @@ private final class PreviewRun {
     private var chatgpt = ConversationStatus.notStarted
     private var claude = ConversationStatus.notStarted
 
-    nonisolated init(events: RelayEventBus, control: RelayControl, replyTime: Duration,
+    nonisolated init(events: RelayEventBus, control: RelayControl, replyTime: Duration, handoffTime: Duration,
                      names: (chatgpt: String, claude: String), first: Speaker, turnCap: Int?,
                      signOffAt: Int?, startTurn: Int, atHandoff: Bool,
                      openingOperation: FocusOperation?) {
         self.events = events
         self.control = control
         self.replyTime = replyTime
+        self.handoffTime = handoffTime
         self.names = names
         self.first = first
         self.turnCap = turnCap
@@ -348,7 +422,7 @@ private final class PreviewRun {
                 }
                 guard capture == .proceed else { break }
                 operationActive = true
-                try? await Task.sleep(for: .milliseconds(700))
+                try? await Task.sleep(for: handoffTime)
                 if Task.isCancelled { return }
             }
 
@@ -404,7 +478,7 @@ private final class PreviewRun {
             }
             // The paste and the send: a beat, so a committed note is seen
             // in flight before its receipt lands.
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: handoffTime)
             if Task.isCancelled { return }
             if let note {
                 report(.note, note, to: listener, turn: turn, outcome: .delivered)

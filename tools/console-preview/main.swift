@@ -1,18 +1,19 @@
 // Scratchpad harness for a UX review: renders Errol's console (Perch) in each
 // stage, offscreen, from the app's own sources, driven by PerchPreviewEngine.
 // Nothing here touches either chat app, the Errol bundle, or its signing.
-// The capsule wears the theme's shell, as the panel does; AppKit's window
-// shadow gets a stand-in, over a backdrop like a chat window. `-appTheme
-// warm-stone` renders another theme: UserDefaults reads it from the
-// arguments, so nothing is saved.
+// Each stage stands in the Xcode canvases' scene (PerchPreviewScene): the
+// capsule on the theme's shell, as the panel has it, with stand-ins for
+// AppKit's window shadows, over a backdrop like a chat window. `canvas`
+// renders every canvas's state (PerchPreviewState). `-appTheme warm-stone`
+// renders another theme: UserDefaults reads it from the arguments, so
+// nothing is saved.
 
 import AppKit
 import SwiftUI
 
 let outDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "."
 let dark = CommandLine.arguments.contains("--dark")
-/// What stands behind the console, like a chat window in either appearance.
-let backdrop = dark ? Color(white: 0.11) : Color(red: 0.925, green: 0.93, blue: 0.94)
+let backdrop = PerchPreviewScene.backdrop(dark ? .dark : .light)
 
 @MainActor
 func pump(_ seconds: Double) {
@@ -30,71 +31,12 @@ func pumpUntil(_ timeout: Double, _ done: () -> Bool) {
     }
 }
 
-/// The capsule and, during a run, the transcript window under it, the way
-/// MenuBarController stands them: centered, a gap apart.
-struct Scene: View {
-    let controller: RelayController
-    let transcript: Bool
-    var consoleWidth: CGFloat = Perch.widgetWidth
-
-    var body: some View {
-        VStack(spacing: PerchTranscript.gap) {
-            PerchConsoleView(controller: controller, width: consoleWidth)
-                .background(Capsule().fill(Perch.shell))
-                .overlay(Capsule().stroke(Color.black.opacity(dark ? 0.5 : 0.10), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
-            if transcript {
-                PerchTranscript(controller: controller)
-                    .frame(width: PerchConsoleView.promptBoxWidth(consoleWidth: consoleWidth),
-                           height: PerchTranscript.height)
-                    .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(36)
-        .frame(width: consoleWidth + 72, height: 36 + 156 + (transcript ? PerchTranscript.gap + PerchTranscript.height : 0) + 36,
-               alignment: .top)
-        .background(backdrop)
-    }
-}
-
 /// A side's details where the app puts them: the card under the console,
-/// its arrow on the side's icon (PerchDetailsAnchor.Coordinator.place), over
-/// the transcript during a run. The panel's own shadow gets a stand-in.
-struct DetailsScene: View {
-    let controller: RelayController
-    let speaker: Speaker
-    var transcript = false
-    @State private var placement = PerchDetailsPlacement()
-    @State private var cardWidth = PerchParticipantPopover.width
-
-    static let height: CGFloat = 36 + 156 + 330 + 36
-
-    var body: some View {
-        let icon = PerchConsoleView.endInset + Perch.participantWidth / 2
-        let lead = Perch.s(50)
-        let x = speaker == .chatgpt ? icon - lead : Perch.widgetWidth - icon + lead - cardWidth
-        ZStack(alignment: .topLeading) {
-            Scene(controller: controller, transcript: transcript)
-                .frame(height: Self.height, alignment: .top)
-            PerchDetailsCallout(placement: placement,
-                                content: PerchParticipantPopover(controller: controller, speaker: speaker)) { size in
-                cardWidth = size.width
-            }
-            .shadow(color: .black.opacity(0.2), radius: 14, y: 5)
-            .offset(x: 36 + x, y: 36 + 156 + Perch.s(4))
-        }
-        .frame(width: Perch.widgetWidth + 72, height: Self.height, alignment: .topLeading)
-        .background(backdrop)
-        .onAppear { placement.arrowX = speaker == .chatgpt ? lead : cardWidth - lead }
-        .onChange(of: cardWidth) { _, width in placement.arrowX = speaker == .chatgpt ? lead : width - lead }
-    }
-}
-
+/// its arrow on the side's icon, over the transcript during a run.
 @MainActor
-func details(_ name: String, _ controller: RelayController, _ speaker: Speaker, transcript: Bool = false) {
-    render(name, DetailsScene(controller: controller, speaker: speaker, transcript: transcript),
-           size: CGSize(width: Perch.widgetWidth + 72, height: DetailsScene.height), settle: 0.6)
+func details(_ name: String, _ controller: RelayController, _ speaker: Speaker) {
+    render(name, PerchPreviewScene(controller: controller, details: speaker),
+           size: PerchPreviewScene.size(summary: controller.stage != .compose, details: true), settle: 0.6)
 }
 
 @MainActor
@@ -125,26 +67,13 @@ func render(_ name: String, _ view: some View, size: CGSize, settle: Double) {
     window.close()
 }
 
+/// The console, and the transcript under it once a run has begun.
 @MainActor
-func scene(_ name: String, _ controller: RelayController, transcript: Bool = false, settle: Double = 1.5) {
-    let height = 36 + 156 + (transcript ? PerchTranscript.gap + PerchTranscript.height : 0) + 36
-    render(name, Scene(controller: controller, transcript: transcript),
-           size: CGSize(width: Perch.widgetWidth + 72, height: height), settle: settle)
-}
-
-/// Replies already in the transcript, and a note sent with the third
-/// handoff, as PerchTranscript's canvases play them.
-@MainActor
-func play(_ engine: PerchPreviewEngine, replies: Int, note: Bool = true) {
-    let text = "Push on the pricing question before you wrap up."
-    for turn in stride(from: 1, through: replies, by: 1) {
-        engine.events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: PerchPreviewEngine.reply(turn: turn)))
-        if note, turn == 3 {
-            engine.events.post(.steeringCommitted(note: text, recipient: .claude, turn: 3))
-            engine.events.post(.steering(SteeringDelivery(leg: .note, note: text, recipient: .claude, turn: 3,
-                                                          outcome: .delivered)))
-        }
-    }
+func scene(_ name: String, _ controller: RelayController, consoleWidth: CGFloat = Perch.widgetWidth,
+           settle: Double = 1.5) {
+    render(name, PerchPreviewScene(controller: controller, consoleWidth: consoleWidth),
+           size: PerchPreviewScene.size(summary: controller.stage != .compose, consoleWidth: consoleWidth),
+           settle: settle)
 }
 
 @MainActor
@@ -187,8 +116,7 @@ func main() {
     if wanted("03") {
         let c = quick(connectedController())
         scene("03-compose-connected-topic", c)
-        render("03-narrow", Scene(controller: c, transcript: false, consoleWidth: 600),
-               size: CGSize(width: 672, height: 228), settle: 0.5)
+        scene("03-narrow", c, consoleWidth: 600, settle: 0.5)
         details("03-participant", c, .chatgpt)
     }
     if wanted("04") {
@@ -218,7 +146,7 @@ func main() {
         c.ending = .turnLimit
         c.turns = 10
         c.start()
-        scene("07-running-opening", c, transcript: true, settle: 0.8)
+        scene("07-running-opening", c, settle: 0.8)
     }
     if wanted("08") {
         let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5)
@@ -227,21 +155,21 @@ func main() {
         c.turns = 10
         c.start()
         pump(0.5)
-        play(engine, replies: 4)
-        scene("08-running-mid", c, transcript: true, settle: 0.5)
+        engine.postReplies(4)
+        scene("08-running-mid", c, settle: 0.5)
         precondition(!c.consoleAccess.canShowWindow)
-        details("08-participant", c, .chatgpt, transcript: true)
+        details("08-participant", c, .chatgpt)
     }
     if wanted("09") {
         let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5, atHandoff: true)
         let c = quick(connectedController(engine))
         c.start()
         pump(0.5)
-        play(engine, replies: 4, note: false)
+        engine.postReplies(4, note: false)
         c.beginSteering()
         pumpUntil(3) { c.consoleAccess.pauseGranted }
         c.setSteeringText("Push on the pricing question before you wrap up.")
-        scene("09-paused-writing-note", c, transcript: true, settle: 0.5)
+        scene("09-paused-writing-note", c, settle: 0.5)
         precondition(c.consoleAccess.canShowWindow)
         precondition(!c.consoleAccess.canChangeDestination)
         c.showWindow(.chatgpt)
@@ -260,21 +188,21 @@ func main() {
         let c = quick(connectedController(engine))
         c.start()
         pump(0.5)
-        play(engine, replies: 4, note: false)
+        engine.postReplies(4, note: false)
         c.beginSteering()
         pumpUntil(3) { c.consoleAccess.pauseGranted }
         c.setSteeringText("Push on the pricing question before you wrap up.")
         c.sendSteering()
-        scene("10-note-queued", c, transcript: true, settle: 2.5)
+        scene("10-note-queued", c, settle: 2.5)
     }
     if wanted("11") {
         let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5)
         let c = quick(connectedController(engine))
         c.start()
         pump(0.5)
-        play(engine, replies: 4)
+        engine.postReplies(4)
         engine.events.post(.blocked(.notInFront(side: .claude)))
-        scene("11-focus-alert", c, transcript: true, settle: 2.0)
+        scene("11-focus-alert", c, settle: 2.0)
     }
     if wanted("12") {
         // A short run played to its mutual sign-off.
@@ -282,7 +210,7 @@ func main() {
         let c = quick(connectedController(engine))
         c.start()
         pumpUntil(60) { c.stage == .finished }
-        scene("12-finished", c, transcript: true, settle: 2.0)
+        scene("12-finished", c, settle: 2.0)
     }
     if wanted("13") {
         let height: CGFloat = 36 + 156 + 36
@@ -306,7 +234,7 @@ func main() {
         precondition(!c.consoleAccess.canShowWindow)
         c.showWindow(.claude)
         precondition(!c.isShowingWindow)
-        scene("14-pause-pending", c, transcript: true, settle: 0.01)
+        scene("14-pause-pending", c, settle: 0.01)
         pumpUntil(3) { c.consoleAccess.pauseGranted }
         precondition(c.consoleAccess.pauseGranted)
         c.stop()
@@ -316,8 +244,8 @@ func main() {
         let c = quick(connectedController(engine))
         c.start()
         engine.events.post(.blocked(.windowHidden(side: .claude, seen: "minimized")))
-        scene("15-held", c, transcript: true, settle: 0.3)
-        details("15-participant-held", c, .claude, transcript: true)
+        scene("15-held", c, settle: 0.3)
+        details("15-participant-held", c, .claude)
         c.stop()
     }
     if wanted("16") {
@@ -327,7 +255,7 @@ func main() {
             c.setup.runStarted()
             c.lastReport = RunReport(outcome: outcome, repliesCaptured: 6)
             c.lastRunDuration = 72
-            scene("16-finished-" + name, c, transcript: true, settle: 0.2)
+            scene("16-finished-" + name, c, settle: 0.2)
         }
     }
     if wanted("18") {
@@ -345,13 +273,12 @@ func main() {
         running.ending = .whenStopped
         running.start()
         pump(0.5)
-        play(engine, replies: 4, note: false)
-        scene("18-ending-when-stopped-running", running, transcript: true, settle: 0.5)
+        engine.postReplies(4, note: false)
+        scene("18-ending-when-stopped-running", running, settle: 0.5)
         running.stop()
         let narrow = quick(connectedController())
         narrow.ending = .turnLimit
-        render("18-ending-turn-limit-narrow", Scene(controller: narrow, transcript: false, consoleWidth: 600),
-               size: CGSize(width: 672, height: 228), settle: 0.5)
+        scene("18-ending-turn-limit-narrow", narrow, consoleWidth: 600, settle: 0.5)
     }
     if wanted("17") {
         let c = quick(connectedController())
@@ -384,6 +311,20 @@ func main() {
                size: CGSize(width: Perch.cardWidth + 72, height: height), settle: 1.0)
     }
 
+    // The canvases' states, as Xcode draws them (PerchPreviews.swift): asked
+    // for by name, `canvas` for all of them or `canvas-05` for one.
+    if only.contains(where: { $0.hasPrefix("canvas") }) {
+        for (index, state) in PerchPreviewState.allCases.enumerated() {
+            let name = String(format: "canvas-%02d-", index + 1) + "\(state)"
+            guard wanted(name) else { continue }
+            let controller = state.controller()
+            render(name, PerchPreviewScene(controller: controller, consoleWidth: state.consoleWidth,
+                                           details: state.details),
+                   size: PerchPreviewScene.size(summary: controller.stage != .compose, details: state.details != nil,
+                                                consoleWidth: state.consoleWidth),
+                   settle: 2.5)
+        }
+    }
 }
 
 MainActor.assumeIsolated { main() }

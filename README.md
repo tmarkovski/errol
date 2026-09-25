@@ -109,7 +109,7 @@ The console is **Perch** (`app/Errol/Errol/Perch/`), implementing the [console l
 - **Closing:** drag the capsule's bare surface to move it. Click the menu-bar icon, use Escape on the console, or press ⌘W to put it away. Quit ends the process. The summary follows the console; transfer animations remain enabled and the waiting-window veils are currently disabled.
 - **Debugging:** Show Last Run Log opens a floating window with the current run's in-memory log. Show Debug Logs in Finder reveals the latest file under `~/Library/Logs/Errol/` (the last twenty runs are kept). Inspect Apps dumps detected windows, controls, and selector matches into that log. Failed paste verification also records diagnostic snapshots alongside the log.
 
-To render the actual views without touching the installed app, run `tools/console-preview/render /tmp/errol-preview`; add `--dark` for dark appearance. It uses the preview engine and sends no messages. The renderer also checks pause and window-action behavior.
+To render the actual views without touching the installed app, run `tools/console-preview/render /tmp/errol-preview`; add `--dark` for dark appearance. It uses the preview engine and sends no messages. The renderer also checks pause and window-action behavior. In Xcode, `Perch/PerchPreviews.swift` has a canvas for each of the console's states, before, during, and after a run, standing as the panel does; `render /tmp/errol-preview canvas` draws the same states.
 Settings without UI — bundle IDs, timeouts, the stop sequence, the per-message length cap, selector keywords — live at the top of `Core/Config.swift`.
 
 ## Status and known brittleness
