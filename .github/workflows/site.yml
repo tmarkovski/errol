@@ -8,9 +8,10 @@ name: Deploy Errol site
 # Wrangler is called directly rather than through cloudflare/wrangler-action so
 # the deploy uses the exact version pinned in site/package-lock.json.
 #
-# The promo films on the page aren't in git. The films job keeps them in R2
-# under a hash of their source (site/scripts/promo-film/films.sh) and renders
-# them only when that hash is new; the deploy job fetches them before the build.
+# The promo films on the page aren't in git. The films jobs, one per cut, keep
+# them in R2 under a hash of their source (site/scripts/promo-film/films.sh) and
+# render them only when that hash is new; the deploy job fetches them before the
+# build.
 # Dispatched on a branch other than main, the workflow runs only the films job,
 # which renders a changed film without shipping it.
 
@@ -33,11 +34,16 @@ env:
 
 jobs:
   films:
+    name: films (${{ matrix.format }})
+    # The cuts render side by side, each on its own runner, in about 15 minutes.
+    strategy:
+      matrix:
+        format: [tall, wide]
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # A newer run waits for a render in progress instead of cancelling it, then finds the films stored.
+    # A newer run waits for a render in progress instead of cancelling it, then finds the film stored.
     concurrency:
-      group: errol-promo-films
+      group: errol-promo-films-${{ matrix.format }}
       cancel-in-progress: false
     defaults:
       run:
@@ -56,31 +62,31 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: npm ci
-      - name: Look for this source's films in R2
+      - name: Look for this source's film in R2
         id: stored
         run: |
           scripts/promo-film/films.sh bucket
-          if scripts/promo-film/films.sh stored; then
-            echo "Films for $(scripts/promo-film/films.sh key) are stored; nothing to render."
+          if scripts/promo-film/films.sh stored ${{ matrix.format }}; then
+            echo "The ${{ matrix.format }} film for $(scripts/promo-film/films.sh key) is stored; nothing to render."
             echo "hit=true" >> "$GITHUB_OUTPUT"
           else
             echo "hit=false" >> "$GITHUB_OUTPUT"
           fi
       - uses: astral-sh/setup-uv@v10.2.0
         if: steps.stored.outputs.hit != 'true'
-      - name: Render the films
+      - name: Render the film
         if: steps.stored.outputs.hit != 'true'
         run: |
-          uv run scripts/promo-film/render.py build --workers 4
-          uv run scripts/promo-film/render.py publish
-      - name: Store the films in R2
+          uv run scripts/promo-film/render.py build --format ${{ matrix.format }} --workers 4
+          uv run scripts/promo-film/render.py publish --format ${{ matrix.format }}
+      - name: Store the film in R2
         if: steps.stored.outputs.hit != 'true'
-        run: scripts/promo-film/films.sh store
+        run: scripts/promo-film/films.sh store ${{ matrix.format }}
       # The render is also on the run's page, to watch without R2 access.
       - uses: actions/upload-artifact@v7
         if: steps.stored.outputs.hit != 'true'
         with:
-          name: promo-films
+          name: promo-film-${{ matrix.format }}
           path: site/public/demos/
           retention-days: 14
           compression-level: 0

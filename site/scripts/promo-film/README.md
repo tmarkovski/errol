@@ -57,11 +57,12 @@ the commit it's shipping. `films.sh` does the R2 side:
 ```sh
 ./films.sh key      # the hash of the source
 ./films.sh fetch    # the films for this source, into public/demos/
-./films.sh store    # upload what's in public/demos/ under the hash
+./films.sh store wide   # upload the wide film and poster in public/demos/ under the hash
 ```
 
 `store` lets a local render stand in for the runner's: render and publish on
-your Mac, commit the source, then store, and CI finds the films already there.
+your Mac, commit the source, then store both formats, and CI finds the films
+already there.
 It needs `npx wrangler login` first, as `fetch` does.
 
 ## Editing

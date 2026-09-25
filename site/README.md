@@ -69,10 +69,11 @@ The workflow needs both of these repository secrets and fails if either is missi
 - `CLOUDFLARE_API_TOKEN`: an API token created from the "Edit Cloudflare Workers" template
 - `CLOUDFLARE_ACCOUNT_ID`: the account ID shown on the Workers & Pages overview page
 
-The films job comes first. It hashes the films' source, and when R2 has no films
-under that hash, it renders both cuts on the runner and stores them in the
-`errol-promo-films` bucket, which it creates if it's missing. Any other run finds
-them there in seconds, so a film renders once per change to its source. The
+The films jobs come first, one per cut, side by side. Each hashes the films'
+source, and when R2 has no film of its cut under that hash, renders it on the
+runner and stores it in the `errol-promo-films` bucket, which it creates if it's
+missing. Any other run finds them there in seconds, so a film renders once per
+change to its source. The
 deploy job then fetches them into `public/demos/`, builds, and deploys. The token
 needs Workers R2 Storage edit access, which the "Edit Cloudflare Workers" template
 includes. Dispatching the workflow on a branch other than `main` runs only the
