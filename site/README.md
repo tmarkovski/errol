@@ -69,6 +69,10 @@ Reduced motion shows its poster until the visitor chooses Play.
 The MP4 and poster are in `public/demos/`; the standalone macOS renderer and
 regeneration instructions are in `scripts/short-demo/`.
 
+A 23-second promo film, rendered at 9:16 for social video and at 16:9, is not on
+the page yet. Its source, a browser-drawn timeline with a synthesized sound track,
+and the command that renders both formats are in `scripts/promo-film/`.
+
 The full walkthrough remains in `components/hero-demo/`.
 It opens with a typed introduction, switches from Free chat to Debate, and types
 the topic into a simplified composer. The camera pulls back near the end of typing.

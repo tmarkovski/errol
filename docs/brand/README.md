@@ -20,6 +20,8 @@ strokes included, which comes out square.
   closing card. The site recolors it in CSS.
 - `site/public/errol-symbol-favicon.svg` uses the same paths on a 32 px canvas
   and adapts its color to the browser's light or dark appearance.
+- The promo film (`site/scripts/promo-film/promo.html`) inlines the paths so it
+  can draw the mark stroke by stroke and slide its two bubbles together.
 
 The previous owl remains available in `MenuBarIcon.imageset`,
 `site/public/errol.svg`, and `site/public/favicon.svg`. The traced bird that

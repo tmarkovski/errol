@@ -29,3 +29,5 @@ xcuserdata/
 # Swift Package Manager build products
 .build/
 .artifacts/
+
+site/scripts/promo-film/__pycache__/
