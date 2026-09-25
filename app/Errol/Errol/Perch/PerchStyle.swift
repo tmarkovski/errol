@@ -66,6 +66,16 @@ enum Perch {
     /// its label.
     static let spring = Animation.spring(response: 0.32, dampingFraction: 0.82)
 
+    // MARK: Depth
+
+    /// The ink of the console's soft shadows, the same in every theme: a
+    /// faint darkening on a light shell, and a deeper one on a dark shell,
+    /// where a faint one would not show.
+    static var shadow: Color { Color(nsColor: shadowNS) }
+    private static let shadowNS = NSColor(name: nil) { appearance in
+        NSColor.black.withAlphaComponent(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.5 : 0.12)
+    }
+
     /// The window is the composer's only outer edge. Shape tabs use a
     /// smaller radius so their selection reads as a rounded rectangle.
     static let shellCorner = s(18)

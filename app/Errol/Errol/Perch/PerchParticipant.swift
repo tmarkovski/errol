@@ -23,6 +23,10 @@ struct PerchParticipant: View {
                     // The icon answers the pointer the way a Dock icon does:
                     // it darkens a little. The badge keeps its color.
                     .brightness(hovering ? -0.06 : 0)
+                    // A little shadow lifts the icon off the shell, as the
+                    // prompt box's lifts the box. The badge is cut out of
+                    // the artwork, so it takes none of its own.
+                    .shadow(color: Perch.shadow, radius: Perch.s(2), y: Perch.s(1))
                     .overlay(alignment: .bottomTrailing) {
                         ParticipantBadge(state: presentation.state)
                             .alignmentGuide(.trailing) { $0[HorizontalAlignment.center] + ParticipantBadge.cornerInset }

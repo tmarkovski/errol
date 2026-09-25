@@ -316,7 +316,9 @@ struct PerchPromptBox: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.horizontal, Self.textInset)
-                    HStack(spacing: Perch.s(8)) {
+                    // The hint starts where the text above it does, and its
+                    // bottom lines up with the buttons'.
+                    HStack(alignment: .bottom, spacing: Perch.s(8)) {
                         Text(editorHint)
                             .font(Perch.text(11))
                             .foregroundStyle(controller.failedStart == nil ? Perch.secondary : Perch.red)
@@ -324,7 +326,8 @@ struct PerchPromptBox: View {
                         Spacer(minLength: 0)
                         PerchConsoleActions(controller: controller)
                     }
-                    .padding(.horizontal, Perch.s(7))
+                    .padding(.leading, Self.textInset)
+                    .padding(.trailing, Perch.s(7))
                 }
             } else {
                 statusPanel
@@ -332,7 +335,9 @@ struct PerchPromptBox: View {
         }
         .padding(.vertical, Self.verticalInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: Self.corner).fill(editing ? Perch.paper : Perch.well))
+        // A very soft shadow all around lifts the box off the shell.
+        .background(RoundedRectangle(cornerRadius: Self.corner).fill(editing ? Perch.paper : Perch.well)
+            .shadow(color: Perch.shadow, radius: Perch.s(7), y: Perch.s(1.5)))
         .overlay(RoundedRectangle(cornerRadius: Self.corner)
             .stroke(controller.consoleAccess.pauseGranted ? Perch.accent : Perch.chipEdge,
                     lineWidth: controller.consoleAccess.pauseGranted ? 1.5 : 1))

@@ -31,6 +31,8 @@ The capsule keeps its footprint and the two app icons. Participant names and bad
 - **A shorter ending.** The finished panel had repeated what the conversation summary shows.
   - It now keeps the headline and why the run ended ("both signed off", or what a stopped run was standing on). The reply count and the run's time moved to the summary's header, as "9 replies in 1:21".
   - A note's receipt stays on the panel only when the note never went: not sent, unconfirmed, or still being written when the run ended. The summary already lists a note that was sent, and a note the run ended with in the queue has no line there.
+- **Soft shadows.** A very soft shadow all around lifts the prompt box off the shell, and a small one lifts each app icon. The badge is cut out of the icon's corner, so it takes no shadow of its own. The shadows are the same in every theme, a faint darkening on a light shell and a deeper one on a dark shell.
+- **The line under the box lines up.** Its text starts where the prompt's does, as the top row's chips and the destinations do, and its bottom meets the buttons' bottom instead of centering on them.
 - **A solid window instead of glass.** The panel fills with a new theme color, the shell, and the prompt box and the conversation summary stand lighter than it in both appearances.
   - In light themes, the shell is a tinted gray a step under the well. Paper and the well keep their values, and the hairline darkens enough to show on the shell.
   - In dark themes, the old paper became the shell, the well stays, and a new, lighter paper sits a step over it. Popovers and the round buttons are paper too, so they lighten with it.
