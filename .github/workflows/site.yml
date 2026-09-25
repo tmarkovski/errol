@@ -76,6 +76,14 @@ jobs:
       - name: Store the films in R2
         if: steps.stored.outputs.hit != 'true'
         run: scripts/promo-film/films.sh store
+      # The render is also on the run's page, to watch without R2 access.
+      - uses: actions/upload-artifact@v7
+        if: steps.stored.outputs.hit != 'true'
+        with:
+          name: promo-films
+          path: site/public/demos/
+          retention-days: 14
+          compression-level: 0
 
   deploy:
     needs: films
