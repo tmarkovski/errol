@@ -83,6 +83,12 @@ Errol starts with two apps, supported well. Other desktop assistants may join la
 
 Errol is a messenger owl at heart: not the fastest courier, known to fly into the odd window, but the message always gets delivered. The name stuck after the very first test run, when the opening message missed its app and landed in the window where Errol was being written, introducing itself to its own author.
 
----
+## License
+
+Copyright © 2026 Tomislav Markovski.
+
+Errol is free software under version 3 of the [GNU General Public License](LICENSE). You can use it, change it, and share it, commercially too, as long as anything you distribute stays under the same license with its source available.
+
+The license covers the code. It grants no rights to the Errol name or symbol, so a version you ship needs a name of its own. The ChatGPT and Claude icons in `site/public/app-icons/` belong to OpenAI and Anthropic and aren't covered either.
 
 Errol is an independent project and isn't affiliated with or endorsed by OpenAI or Anthropic. ChatGPT and Codex are trademarks of OpenAI. Claude is a trademark of Anthropic.
