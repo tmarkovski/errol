@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Errol link preview</title>
+    <!--
+      The image shared links show: 1200 × 630. render.py captures it into
+      public/og.png. Open this file in Chrome to see it at full size.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;650&family=Geist+Mono&display=block"
+    />
+    <style>
+      :root {
+        --gold: #edba72;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #0b0b0a;
+      }
+      .card {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        padding: 56px 72px 60px;
+        background: #111210;
+        color: #f1f0e9;
+        font-family: 'Geist', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        isolation: isolate;
+      }
+      /* The warm light and the dotted field from the site, behind the art. */
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background:
+          radial-gradient(
+            ellipse 46% 55% at 74% 70%,
+            #b98a3a2e 0%,
+            transparent 70%
+          ),
+          radial-gradient(ellipse 60% 50% at 20% 10%, #a27c3014, transparent 70%);
+      }
+      .card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background-image: radial-gradient(#ffffff1a 1px, transparent 1.3px);
+        background-size: 20px 20px;
+        mask-image: radial-gradient(
+          ellipse 40% 42% at 74% 72%,
+          #000 10%,
+          transparent 75%
+        );
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .brand img {
+        width: 76px;
+        height: 76px;
+        margin: -8px;
+      }
+      .brand span {
+        font-size: 40px;
+        font-weight: 650;
+        letter-spacing: -2px;
+      }
+      .dot {
+        color: var(--gold);
+      }
+      .pill {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 18px 10px 16px;
+        border: 1px solid #ffffff17;
+        border-radius: 999px;
+        background: #ffffff06;
+        color: #b3b2a5;
+        font-family: 'Geist Mono', monospace;
+        font-size: 15px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .pill i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--gold);
+        box-shadow: 0 0 12px #edba7288;
+      }
+      .pill b {
+        font-weight: 400;
+        color: #64645b;
+      }
+      h1 {
+        margin: 62px 0 0;
+        font-size: 92px;
+        line-height: 1.02;
+        font-weight: 500;
+        letter-spacing: -0.055em;
+      }
+      h1 .turn {
+        color: #f5dfb9;
+      }
+      .note {
+        position: absolute;
+        left: 72px;
+        bottom: 60px;
+        max-width: 470px;
+        margin: 0;
+        color: #aaa99f;
+        font-size: 25px;
+        line-height: 1.45;
+      }
+      .art {
+        position: absolute;
+        right: 56px;
+        bottom: 34px;
+        width: 600px;
+      }
+      .art svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .app rect {
+        fill: #1c1b18;
+        stroke: #ffffff26;
+        stroke-width: 1;
+      }
+      .app text {
+        fill: #ece8dc;
+        font-family: 'Geist', sans-serif;
+        font-size: 15.5px;
+        font-weight: 500;
+        letter-spacing: -0.2px;
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="top">
+        <div class="brand">
+          <img src="../../../docs/brand/errol-app-icon.svg" alt="" />
+          <span>errol<span class="dot">.</span></span>
+        </div>
+        <div class="pill">
+          <i></i> Free <b>·</b> Open source <b>·</b> For Mac
+        </div>
+      </div>
+      <h1>
+        Let ChatGPT and Claude<br />
+        <span class="turn">talk it out</span><span class="dot">.</span>
+      </h1>
+      <p class="note">
+        Errol carries every reply between the ChatGPT and Claude apps on your
+        Mac.
+      </p>
+      <!-- The harness art from the site's third screen, stopped mid-flight. -->
+      <div class="art">
+        <svg viewBox="0 -20 560 210">
+          <defs>
+            <linearGradient id="lens" x1="102" y1="0" x2="458" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#fff" stop-opacity="0.12" />
+              <stop offset="0.5" stop-color="#edba72" stop-opacity="0.55" />
+              <stop offset="1" stop-color="#fff" stop-opacity="0.12" />
+            </linearGradient>
+            <linearGradient id="fade" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#f5cb8d" stop-opacity="0.95" />
+              <stop offset="0.35" stop-color="#edba72" stop-opacity="0.45" />
+              <stop offset="1" stop-color="#edba72" stop-opacity="0" />
+            </linearGradient>
+            <radialGradient id="halo">
+              <stop offset="0" stop-color="#edba72" stop-opacity="0.6" />
+              <stop offset="1" stop-color="#edba72" stop-opacity="0" />
+            </radialGradient>
+            <filter id="shadow" x="-30%" y="-60%" width="160%" height="260%">
+              <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity="0.5" />
+            </filter>
+          </defs>
+          <g fill="none" stroke-linecap="round">
+            <path d="M102 85 C182 -30 378 -30 458 85" stroke="#ffffff12" stroke-dasharray="1 7" />
+            <path d="M102 85 C182 200 378 200 458 85" stroke="#ffffff12" stroke-dasharray="1 7" />
+            <path d="M102 85 C200 48 360 48 458 85" stroke="#ffffff0d" />
+            <path d="M102 85 C200 122 360 122 458 85" stroke="#ffffff0d" />
+            <path id="loop" d="M102 85 C194 3 366 3 458 85 C366 167 194 167 102 85" stroke="url(#lens)" stroke-width="1.4" />
+          </g>
+          <!-- The two apps by name only: a shared image shouldn't carry their marks. -->
+          <g class="app" filter="url(#shadow)">
+            <rect x="12" y="67" width="90" height="36" rx="18" />
+            <text x="57" y="90.5">ChatGPT</text>
+            <rect x="458" y="67" width="90" height="36" rx="18" />
+            <text x="503" y="90.5">Claude</text>
+          </g>
+          <path id="tail" fill="url(#fade)" />
+          <g id="head">
+            <circle r="12" fill="url(#halo)" />
+            <circle r="3.8" fill="#f5cb8d" />
+          </g>
+        </svg>
+      </div>
+    </div>
+    <script>
+      // The comet as harness-art.tsx draws it, frozen past the top of the loop.
+      const loop = document.getElementById('loop');
+      const total = loop.getTotalLength();
+      const at = (f) => loop.getPointAtLength(total * f);
+      const head = 0.33;
+      const reach = 0.13;
+      const count = 40;
+      const points = Array.from({ length: count + 1 }, (_, i) =>
+        at(head - reach * (i / count) ** 1.3),
+      );
+      const left = [];
+      const right = [];
+      points.forEach((p, i) => {
+        const a = points[Math.max(0, i - 1)];
+        const b = points[Math.min(count, i + 1)];
+        const len = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        const nx = -(a.y - b.y) / len;
+        const ny = (a.x - b.x) / len;
+        const w = 2.5 * (1 - i / count);
+        left.push(`${p.x + nx * w} ${p.y + ny * w}`);
+        right.unshift(`${p.x - nx * w} ${p.y - ny * w}`);
+      });
+      document.getElementById('tail').setAttribute('d', `M${left.join('L')}L${right.join('L')}Z`);
+      const fade = document.getElementById('fade');
+      const front = points[0];
+      const end = points[count];
+      fade.setAttribute('x1', front.x);
+      fade.setAttribute('y1', front.y);
+      fade.setAttribute('x2', end.x);
+      fade.setAttribute('y2', end.y);
+      document.getElementById('head').setAttribute('transform', `translate(${front.x} ${front.y})`);
+      document.body.dataset.ready = 'true';
+    </script>
+  </body>
+</html>

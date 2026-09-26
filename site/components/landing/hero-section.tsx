@@ -1,5 +1,7 @@
 import { siteConfig } from '@/lib/site-config';
+import { Courier } from './courier';
 import { DownloadLink } from './download-link';
+import { RotatingPhrase } from './rotating-phrase';
 import './hero-section.css';
 
 export function HeroSection() {
@@ -11,8 +13,10 @@ export function HeroSection() {
         Open source <span className="pill-sep">·</span> For Mac
       </p>
       <h1 id="hero-title">
-        Let ChatGPT and Claude <br />
-        talk it out<span className="hero-dot">.</span>
+        <span className="hero-line">Let ChatGPT and Claude</span>{' '}
+        <span className="hero-line">
+          <RotatingPhrase />
+        </span>
       </h1>
       <p className="hero-description">
         Errol carries every reply between the ChatGPT and Claude apps on your
@@ -26,9 +30,7 @@ export function HeroSection() {
         <span>·</span> No account
       </p>
       {/* The courier dot from the film, carrying the reader down to it. */}
-      <div className="courier" aria-hidden="true">
-        <span />
-      </div>
+      <Courier />
     </section>
   );
 }

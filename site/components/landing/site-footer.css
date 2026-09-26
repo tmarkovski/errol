@@ -1,5 +1,5 @@
-/* Pulled up into the bottom of the film's screen, which leaves room for it,
-   so the page stays exactly two screens and both snap cleanly. */
+/* Pulled up into the bottom of the last screen, which leaves room for it,
+   so the page stays exactly three screens and each snaps cleanly. */
 .site-footer {
   position: relative;
   height: var(--footer-h);
@@ -9,6 +9,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  /* The page's last snap position. Where the last screen runs taller than the
+     window, a scroll that would pass the end otherwise stops short of it. */
+  scroll-snap-align: end;
 }
 .site-footer .brand > span {
   font-size: 22px;

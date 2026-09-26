@@ -1,7 +1,9 @@
-/* The second screen: the film between the header and the footer. Wider than the
-   text column above it, because the film is the page's picture. */
+/* The second screen: the film centered under the header, with as much room left
+   free below it for the courier. Wider than the text columns above and below it,
+   because the film is the page's picture. */
 .film {
   --film-gap: clamp(12px, 3svh, 32px);
+  --fall: clamp(36px, 6svh, 64px);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -10,8 +12,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   margin-inline: auto;
-  padding: calc(var(--header-h) + var(--film-gap)) 0
-    calc(var(--footer-h) + var(--film-gap));
+  padding: calc(var(--header-h) + var(--film-gap)) 0;
   view-timeline: --film block;
   scroll-snap-align: start;
   scroll-snap-stop: always;
@@ -33,11 +34,9 @@
   );
   filter: blur(20px);
 }
-/* Sized so the whole film fits between the header and the footer. */
+/* Sized so the whole film fits between the header and the room below it. */
 .film-frame {
-  --room: calc(
-    100svh - var(--header-h) - var(--footer-h) - var(--film-gap) * 2
-  );
+  --room: calc(100svh - var(--header-h) * 2 - var(--film-gap) * 2);
   position: relative;
   aspect-ratio: 16 / 9;
   width: min(100%, calc(var(--room) * 16 / 9));

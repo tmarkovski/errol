@@ -1,0 +1,49 @@
+/* The phrases share one cell. The script gives the box the width of the one
+   showing, so the period after it glides from one phrase's end to the next. */
+.turn {
+  display: inline-grid;
+  grid-template-columns: 100%;
+  color: #f5dfb9;
+  transition: width 0.7s cubic-bezier(0.65, 0, 0.25, 1);
+}
+.turn-phrase {
+  grid-area: 1 / 1;
+  justify-self: center;
+  white-space: nowrap;
+}
+/* Until the script has measured them, only the first phrase takes up room. */
+.turn:not([data-ready='true']) .turn-phrase:not(:first-child) {
+  display: none;
+}
+/* Words rise into focus one after another; the leaving phrase lifts away
+   and blurs out a little quicker. */
+.turn-phrase > span {
+  display: inline-block;
+  transition:
+    opacity 0.55s cubic-bezier(0.2, 0.7, 0.25, 1),
+    transform 0.75s cubic-bezier(0.2, 0.7, 0.25, 1),
+    filter 0.55s cubic-bezier(0.2, 0.7, 0.25, 1);
+  transition-delay: calc(0.12s + var(--word) * 0.07s);
+}
+.turn-phrase[data-state='idle'] > span {
+  opacity: 0;
+  transform: translateY(0.32em);
+  filter: blur(10px);
+  transition: none;
+}
+.turn-phrase[data-state='out'] > span {
+  opacity: 0;
+  transform: translateY(-0.26em);
+  filter: blur(10px);
+  transition-duration: 0.4s;
+  transition-delay: calc(var(--word) * 0.04s);
+}
+/* The period hops as it glides to the new phrase's end. */
+.hero-dot[data-hop='true'] {
+  animation: dot-hop 0.7s cubic-bezier(0.45, 0, 0.3, 1) both;
+}
+@keyframes dot-hop {
+  45% {
+    transform: translateY(-0.3em);
+  }
+}

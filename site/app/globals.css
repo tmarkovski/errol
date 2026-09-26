@@ -26,7 +26,7 @@
 * {
   box-sizing: border-box;
 }
-/* Two screens, the headline and the film, and every scroll settles on one of them. */
+/* Three screens, the headline, the film, and why Errol, and every scroll settles on one of them. */
 html {
   scroll-behavior: smooth;
   scroll-snap-type: y mandatory;

@@ -13,7 +13,7 @@
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
-.hero > :not(.hero-glow) {
+.hero > :not(.hero-glow, .courier) {
   position: relative;
 }
 .hero-glow {
@@ -59,6 +59,10 @@
   letter-spacing: -0.055em;
   text-wrap: balance;
 }
+/* "Let ChatGPT and Claude" and then the phrase that changes, each on its own line. */
+.hero-line {
+  display: block;
+}
 /* The period is the courier dot: it lands after the headline, as it does on the film's wordmark. */
 .hero-dot {
   display: inline-block;
@@ -80,39 +84,6 @@
 }
 .hero-actions .download-button {
   min-width: 220px;
-}
-.hero > .courier {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 1px;
-  height: var(--fall);
-  background: linear-gradient(#edba7200, #edba7226);
-}
-.courier > span {
-  position: absolute;
-  left: -2px;
-  top: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 10px #edba72b0;
-  opacity: 0;
-  animation: courier 3.8s cubic-bezier(0.5, 0, 0.3, 1) 1.6s infinite;
-}
-/* A tapered wake that stretches while the dot falls and catches up as it stops. */
-.courier > span::before {
-  content: '';
-  position: absolute;
-  left: 0.5px;
-  bottom: 2.5px;
-  width: 4px;
-  height: 30px;
-  transform-origin: 50% 100%;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  background: linear-gradient(#edba7200, #edba72cc);
-  animation: wake 3.8s cubic-bezier(0.5, 0, 0.3, 1) 1.6s infinite;
 }
 .hero > * {
   animation: enter 0.85s cubic-bezier(0.2, 0.7, 0.25, 1) both;
@@ -148,37 +119,6 @@
     opacity: 1;
   }
 }
-@keyframes courier {
-  0% {
-    opacity: 0;
-    transform: translateY(0);
-  }
-  8% {
-    opacity: 1;
-  }
-  46% {
-    opacity: 1;
-    transform: translateY(calc(var(--fall) - 5px));
-  }
-  60%,
-  100% {
-    opacity: 0;
-    transform: translateY(calc(var(--fall) - 5px));
-  }
-}
-@keyframes wake {
-  0%,
-  6% {
-    transform: scaleY(0);
-  }
-  26% {
-    transform: scaleY(1);
-  }
-  46%,
-  100% {
-    transform: scaleY(0);
-  }
-}
 @media (max-height: 820px) and (min-width: 761px) {
   .hero h1 {
     font-size: clamp(44px, 5vw, 70px);
@@ -204,18 +144,10 @@
     letter-spacing: -0.05em;
     margin: 22px 0 18px;
   }
-  .hero h1 br {
-    display: none;
-  }
   .hero-description {
     max-width: 360px;
   }
   .hero-actions {
     margin: 26px 0 14px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .courier > span {
-    display: none;
   }
 }

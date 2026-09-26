@@ -1,0 +1,47 @@
+/* The loop between the two apps, over a dotted field that fades out at its edges. */
+.harness {
+  position: relative;
+  isolation: isolate;
+}
+.harness::before,
+.harness::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.harness::before {
+  inset: -14% -6%;
+  background-image: radial-gradient(#ffffff1c 1px, transparent 1.3px);
+  background-size: 18px 18px;
+  background-position: center;
+  mask-image: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    #000 15%,
+    transparent 75%
+  );
+}
+.harness::after {
+  inset: 0 12%;
+  background: radial-gradient(
+    ellipse 50% 45% at 50% 50%,
+    #b98a3a24 0%,
+    transparent 70%
+  );
+  filter: blur(16px);
+}
+.harness svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 560 / 210;
+}
+/* On phones the frame crops to the loop itself, trimming the outer field lines. */
+@media (max-width: 760px) {
+  .harness svg {
+    aspect-ratio: 560 / 130;
+  }
+  .harness::before {
+    inset: -30% -4%;
+  }
+}

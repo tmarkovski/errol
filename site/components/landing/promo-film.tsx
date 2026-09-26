@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Courier } from './courier';
 import './promo-film.css';
 
 /** Screens this tall get the 9:16 cut, whose captions stay legible at phone width. */
@@ -88,13 +89,16 @@ export function PromoFilm() {
     syncRef.current = sync;
 
     // The root is the top 1% of the screen, so the section meets it only once
-    // it has scrolled all the way in and snapped under the header.
+    // it has scrolled all the way in and snapped under the header. The root
+    // starts a pixel down: with the next screen snapped in, the section's bottom
+    // edge sits exactly on the screen's top edge, and an edge that only touches
+    // the root still counts as intersecting.
     const observer = new IntersectionObserver(
       ([entry]) => {
         inPlace = entry.isIntersecting;
         sync();
       },
-      { rootMargin: '0px 0px -99% 0px' },
+      { rootMargin: '-1px 0px -99% 0px' },
     );
     observer.observe(section);
     // Rotating a phone picks the other cut: load() runs source selection again.
@@ -367,6 +371,8 @@ export function PromoFilm() {
         from one app to the other. A note typed during a pause joins the next
         reply. It ends on “Let your AIs talk.”
       </p>
+      {/* Carries the reader on to why Errol exists. */}
+      <Courier />
     </section>
   );
 }

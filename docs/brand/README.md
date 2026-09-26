@@ -17,10 +17,30 @@ strokes included, which comes out square.
   pressed highlight would.
 - The website uses `site/public/errol-symbol.svg`, a copy of this source, in
   the header and the footer. The site recolors it in CSS.
-- `site/public/errol-symbol-favicon.svg` uses the same paths on a 32 px canvas
-  and adapts its color to the browser's light or dark appearance.
+- The app icon and the website's icons put the mark on a tile; see below.
 - The promo film (`site/scripts/promo-film/promo.html`) inlines the paths so it
   can draw the mark stroke by stroke and slide its two bubbles together.
+
+## App icon
+
+The app icon is the mark on a deep charcoal tile, the front bubble in cream
+and the rear bubble in courier gold, with a soft light along the tile's top
+edge and a faint gold glow low down. `render_icons.py` draws it and every
+variant from one function, so the app and the site change together. Run it
+from this folder with `uv run render_icons.py`; it renders through Google
+Chrome and writes:
+
+- `errol-app-icon.svg`, the macOS icon at 1024 px on Apple's grid: an 824 px
+  rounded square with continuous corners, a 100 px margin, and a drop shadow.
+- The PNGs in the app's `AppIcon.appiconset`, from 16 to 1024 px, and its
+  `Contents.json`.
+- The site's `icon.svg` and `favicon.ico` (16, 32, and 48 px): the tile fills
+  the square, and the mark is larger and its strokes heavier, so it still reads
+  in a browser tab.
+- The site's `apple-touch-icon.png`, 180 px, square and opaque, since iOS rounds
+  the corners itself.
+
+Don't edit those files by hand; change the script and render again.
 
 The previous owl remains available in `MenuBarIcon.imageset`,
 `site/public/errol.svg`, and `site/public/favicon.svg`. The traced bird that
