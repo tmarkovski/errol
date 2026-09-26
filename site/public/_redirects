@@ -1,0 +1,9 @@
+# Cloudflare applies these before serving the site's files.
+#
+# Installed copies of Errol check errol.chat/appcast.xml for updates. It points
+# at the feed in the latest release on GitHub, which never counts a prerelease,
+# so a tagged build reaches people only once it's published as a full release.
+/appcast.xml https://github.com/tmarkovski/errol/releases/latest/download/appcast.xml 302
+# The download buttons. Errol.dmg is the latest release's disk image under a
+# name without its version.
+/download https://github.com/tmarkovski/errol/releases/latest/download/Errol.dmg 302

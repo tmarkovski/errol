@@ -11,10 +11,17 @@
 	     workflow sets the two version numbers from the git tag and commit
 	     count. Duplicating them here would let them drift. -->
 
-	<!-- The update feed. Published only after a release passes its manual
-	     smoke test, so tagging a build never exposes it to installed copies. -->
+	<!-- The update feed, on a domain we own so it outlives any move of the
+	     repository. The site redirects it to the feed in the latest GitHub
+	     release (site/public/_redirects). A tagged build goes out as a
+	     prerelease, which GitHub never counts as the latest, so installed
+	     copies only see it once its update has been tried and it's published.
+
+	     To try a prerelease, point a copy at that release's own feed:
+	     defaults write com.t7m8.Errol SUFeedURL <its appcast.xml URL>
+	     A value in the user defaults wins over this one; delete it afterwards. -->
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/tmarkovski/errol/main/appcast.xml</string>
+	<string>https://errol.chat/appcast.xml</string>
 
 	<!-- The public half of the EdDSA pair that signs updates. Public by
 	     design: it belongs in the shipped bundle, and committing it is how

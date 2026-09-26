@@ -1,56 +1,74 @@
 name: Release
 
-# Tag push builds, signs, notarizes and verifies -- then stops at a DRAFT
-# release. Publishing is a separate, manually approved job, because the one
-# thing CI cannot check is whether a real Sparkle update preserves a real
-# user's Accessibility grant. That smoke test happens between the two jobs.
+# Pushing a v* tag builds Errol, signs it with Developer ID, notarizes it,
+# checks it, and publishes it as a prerelease on GitHub. Installed copies don't
+# see a prerelease: their feed, errol.chat/appcast.xml, redirects to the feed
+# in the latest release, and GitHub never counts a prerelease as the latest.
+#
+# That leaves room to try the update on a real Mac before anyone else gets it.
+# Point a copy of Errol at the prerelease's own feed, check for updates, and
+# confirm the Accessibility grant survived and a relay still runs:
+#
+#   defaults write com.t7m8.Errol SUFeedURL https://github.com/tmarkovski/errol/releases/download/vX.Y.Z/appcast.xml
+#
+# (and `defaults delete com.t7m8.Errol SUFeedURL` afterwards). Then approve the
+# publish job, which makes the prerelease the latest release. From that moment
+# every installed copy is offered the update.
+#
+# Run by hand from the Actions tab, it's a dry run: it builds with ad hoc
+# signing, needs no credentials, and keeps the app, ZIP, and DMG as workflow
+# artifacts instead of making a release.
+#
+# scripts/release/release.py does the work in each step, so every step can also
+# be run on a Mac.
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to build, without the leading v (e.g. 0.1.0)"
-        required: true
+
+# Actions are pinned to commits, since this workflow handles the signing
+# secrets. The comment beside each names the release it came from.
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
-  # Pinned deliberately. Bump it as a reviewed change, never with a floating tag.
-  SPARKLE_VERSION: "2.9.6"
-  APP_NAME: "Errol"
-  BUNDLE_ID: "com.t7m8.Errol"
-  XCODE_PROJECT: "app/Errol/Errol.xcodeproj"
+  APP_NAME: Errol
+  # Pinned deliberately: the runner image also carries betas, and a release
+  # shouldn't be built with one. Change it as a reviewed change.
+  XCODE: /Applications/Xcode_27.0.app
 
 jobs:
   build:
     name: Build, sign, notarize
-    runs-on: macos-latest
+    runs-on: xcode-27
+    permissions:
+      contents: write
     outputs:
-      marketing_version: ${{ steps.version.outputs.marketing }}
-      build_number: ${{ steps.version.outputs.build }}
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+    env:
+      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
       # fetch-depth: 0 is required, not cosmetic. The build number is the
-      # commit count, and GitHub's default shallow checkout would make it 1
-      # on every release -- a CFBundleVersion that never advances and a
-      # Sparkle feed that silently never offers an update.
-      - uses: actions/checkout@v4  # TODO pin to a commit SHA
+      # commit count, and a shallow checkout would make it 1 on every release,
+      # a CFBundleVersion that never advances and a feed that never offers an
+      # update.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Select the newest installed Xcode
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+      - name: Select Xcode
         run: |
-          set -euo pipefail
-          # Do not pin an exact app path -- runner images rename these often.
-          NEWEST="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-          sudo xcode-select -switch "$NEWEST"
+          sudo xcode-select --switch "$XCODE"
           xcodebuild -version
 
-      # Tests run before anything is signed. A build that cannot pass its own
-      # detection contract has no business being notarized.
+      # Tests run before anything is signed. A build that fails its own
+      # detection tests has no business being notarized.
       - name: Run contract tests
         run: swift test
 
@@ -58,34 +76,43 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            MARKETING="${{ inputs.version }}"
-          else
-            MARKETING="${GITHUB_REF_NAME#v}"
-          fi
           BUILD="$(git rev-list --count HEAD)"
-
           if [[ "$BUILD" -le 1 ]]; then
-            echo "::error::Build number is $BUILD -- the checkout is shallow. fetch-depth: 0 is missing."
+            echo "::error::Build number is $BUILD, so the checkout is shallow. fetch-depth: 0 is missing."
             exit 1
           fi
 
-          # Sparkle compares CFBundleVersion. If this release does not exceed
-          # what the live feed already advertises, clients would never see it.
-          LIVE_FEED="https://raw.githubusercontent.com/${{ github.repository }}/main/appcast.xml"
-          LATEST="$(curl -fsSL "$LIVE_FEED" 2>/dev/null \
-            | grep -oE 'sparkle:version="[0-9]+"' \
+          if [[ "$RELEASE" == "true" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME isn't a version like v1.2.3."
+              exit 1
+            fi
+            git fetch origin main
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "::error::$GITHUB_REF_NAME isn't on main. Releases are cut from main."
+              exit 1
+            fi
+          else
+            VERSION="0.0.0"
+          fi
+
+          # Sparkle compares build numbers. A release that doesn't exceed the
+          # published one would never be offered to anyone.
+          LATEST="$(curl -fsSL https://errol.chat/appcast.xml 2>/dev/null \
+            | grep -oE '<sparkle:version>[0-9]+</sparkle:version>' \
             | grep -oE '[0-9]+' | sort -n | tail -1 || true)"
-          if [[ -n "${LATEST:-}" && "$BUILD" -le "$LATEST" ]]; then
-            echo "::error::Build number $BUILD does not exceed the published feed's $LATEST."
+          if [[ -n "$LATEST" && "$BUILD" -le "$LATEST" ]]; then
+            echo "::error::Build $BUILD doesn't exceed the published build $LATEST."
             exit 1
           fi
 
-          echo "marketing=$MARKETING" >> "$GITHUB_OUTPUT"
-          echo "build=$BUILD"         >> "$GITHUB_OUTPUT"
-          echo "Building $MARKETING (build $BUILD), previous published build: ${LATEST:-none}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Building $VERSION (build $BUILD). The published build is ${LATEST:-none}."
 
-      - name: Import Developer ID certificate
+      - name: Import the Developer ID certificate
+        if: env.RELEASE == 'true'
         env:
           CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
@@ -94,214 +121,158 @@ jobs:
           KEYCHAIN="$RUNNER_TEMP/build.keychain"
           KEYCHAIN_PASSWORD="$(uuidgen)"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security set-keychain-settings -lut 900 "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/cert.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
-          rm -f "$RUNNER_TEMP/cert.p12"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
       - name: Archive
         run: |
-          set -euo pipefail
-          # Config/Release.xcconfig is the single source for the distribution
-          # identity, but the target already sets CODE_SIGN_IDENTITY and
-          # DEVELOPMENT_TEAM in project.pbxproj and target settings beat a base
-          # configuration file. Command-line settings beat both, so the config
-          # is parsed into arguments here rather than passed with -xcconfig.
-          SETTINGS=()
-          while IFS= read -r line; do
-            [[ "$line" =~ ^[A-Z_]+[[:space:]]*= ]] || continue
-            key="${line%%=*}"; value="${line#*=}"
-            SETTINGS+=("$(echo "$key" | xargs)=$(echo "$value" | xargs)")
-          done < Config/Release.xcconfig
+          uv run scripts/release/release.py archive \
+            --version "${{ steps.version.outputs.version }}" \
+            --build "${{ steps.version.outputs.build }}" \
+            --signing "$([[ "$RELEASE" == "true" ]] && echo developer-id || echo adhoc)" \
+            --out "$RUNNER_TEMP/build"
 
-          xcodebuild archive \
-            -project "$XCODE_PROJECT" \
-            -scheme "$APP_NAME" \
-            -configuration Release \
-            -destination "generic/platform=macOS" \
-            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
-            MARKETING_VERSION="${{ steps.version.outputs.marketing }}" \
-            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build }}" \
-            "${SETTINGS[@]}" \
-            | { command -v xcbeautify >/dev/null && xcbeautify || cat; }
-          exit "${PIPESTATUS[0]}"
-
-      - name: Export
-        run: |
-          set -euo pipefail
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>developer-id</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>teamID</key><string>JN3SN725AZ</string>
-            <key>destination</key><string>export</string>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$RUNNER_TEMP/export"
-
-      # Order matters: notarize the app, staple the app, and only then build
-      # the ZIP. A ZIP cannot carry a stapled ticket itself -- it has to
-      # contain an app that already has one.
-      - name: Notarize and staple the app
+      # Order matters: notarize the app and staple its ticket, and only then
+      # pack the ZIP and the DMG around it, so both carry a stapled app.
+      - name: Notarize the app
+        if: env.RELEASE == 'true'
         env:
-          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
-          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$RUNNER_TEMP/export/$APP_NAME.app" "$RUNNER_TEMP/notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
-            --key "$RUNNER_TEMP/notary.p8" \
-            --key-id "$NOTARY_KEY_ID" \
-            --issuer "$NOTARY_ISSUER_ID" \
-            --wait --timeout 30m
-          xcrun stapler staple "$RUNNER_TEMP/export/$APP_NAME.app"
-          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/notarize.zip"
-
-      - name: Package ZIP for Sparkle and DMG for humans
-        env:
-          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: uv run scripts/release/release.py notarize "$RUNNER_TEMP/build/$APP_NAME.app"
+
+      - name: Package the ZIP and the DMG
         run: |
           set -euo pipefail
-          mkdir -p dist
-          V="${{ steps.version.outputs.marketing }}"
-
-          # ZIP: the Sparkle enclosure. Contains the already-stapled app.
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$RUNNER_TEMP/export/$APP_NAME.app" "dist/$APP_NAME-$V.zip"
-
-          # DMG: the first-run install experience, with a drop target.
-          STAGE="$RUNNER_TEMP/dmg"
-          mkdir -p "$STAGE"
-          cp -R "$RUNNER_TEMP/export/$APP_NAME.app" "$STAGE/"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" \
-            -ov -format UDZO "dist/$APP_NAME-$V.dmg"
-
-          # The DMG is notarized and stapled in its own right, so a downloaded
-          # disk image opens without a network round trip.
-          codesign --sign "Developer ID Application" --timestamp "dist/$APP_NAME-$V.dmg"
-          printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
-          xcrun notarytool submit "dist/$APP_NAME-$V.dmg" \
-            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" \
-            --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m
-          xcrun stapler staple "dist/$APP_NAME-$V.dmg"
-          rm -f "$RUNNER_TEMP/notary.p8"
-
-      - name: Verify artifacts
-        run: |
-          set -euo pipefail
-          V="${{ steps.version.outputs.marketing }}"
-          GOLDEN=""
-          if [[ -f Config/designated-requirement.txt ]]; then
-            GOLDEN="--golden Config/designated-requirement.txt"
+          V="${{ steps.version.outputs.version }}"
+          uv run scripts/release/release.py zip "$RUNNER_TEMP/build/$APP_NAME.app" "dist/$APP_NAME-$V.zip"
+          if [[ "$RELEASE" == "true" ]]; then
+            uv run scripts/release/release.py dmg "$RUNNER_TEMP/build/$APP_NAME.app" "dist/$APP_NAME-$V.dmg" --sign
+          else
+            uv run scripts/release/release.py dmg "$RUNNER_TEMP/build/$APP_NAME.app" "dist/$APP_NAME-$V.dmg"
           fi
-          # shellcheck disable=SC2086
-          scripts/verify-artifact.sh "$RUNNER_TEMP/export/$APP_NAME.app" $GOLDEN
+
+      # The DMG is notarized in its own right too, so a downloaded image opens
+      # without a trip to Apple's servers.
+      - name: Notarize the DMG
+        if: env.RELEASE == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          uv run scripts/release/release.py notarize "dist/$APP_NAME-$V.dmg"
+          # A name without the version, so the site can always link to
+          # releases/latest/download/Errol.dmg.
+          cp "dist/$APP_NAME-$V.dmg" "dist/$APP_NAME.dmg"
+
+      - name: Verify
+        if: env.RELEASE == 'true'
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          if [[ -f Config/designated-requirement.txt ]]; then
+            scripts/verify-artifact.sh "$RUNNER_TEMP/build/$APP_NAME.app" --golden Config/designated-requirement.txt
+          else
+            scripts/verify-artifact.sh "$RUNNER_TEMP/build/$APP_NAME.app"
+          fi
           scripts/verify-artifact.sh "dist/$APP_NAME-$V.dmg"
 
-      - name: Preserve dSYMs
+      - name: Keep the dSYMs
         run: |
-          set -euo pipefail
-          V="${{ steps.version.outputs.marketing }}"
           ditto -c -k --sequesterRsrc --keepParent \
-            "$RUNNER_TEMP/$APP_NAME.xcarchive/dSYMs" "dist/$APP_NAME-$V-dSYMs.zip"
+            "$RUNNER_TEMP/build/$APP_NAME.xcarchive/dSYMs" \
+            "dist/$APP_NAME-${{ steps.version.outputs.version }}-dSYMs.zip"
 
-      - name: Generate appcast
+      - name: Write the update feed
+        if: env.RELEASE == 'true'
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # TODO: add a checksum assertion on this download before first use:
-          #   shasum -a 256 Sparkle.tar.xz
-          curl -fsSL -o "$RUNNER_TEMP/sparkle.tar.xz" \
-            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
-          mkdir -p "$RUNNER_TEMP/sparkle" && tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
-          BIN="$RUNNER_TEMP/sparkle/bin"
+          V="${{ steps.version.outputs.version }}"
+          # Release notes in docs/release-notes/ show in the update window.
+          NOTES="docs/release-notes/$V.md"
+          [[ -f "$NOTES" ]] || NOTES=""
+          # The key goes in on standard input, so it's never written to disk
+          # where a later step could pick it up.
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | uv run scripts/release/release.py appcast \
+            "dist/$APP_NAME-$V.zip" --tag "v$V" --out dist --key-file - ${NOTES:+--notes "$NOTES"}
+          xmllint --noout dist/appcast.xml
 
-          # generate_appcast needs every archive it should describe, so pull
-          # the previously published ZIPs alongside the new one.
-          mkdir -p "$RUNNER_TEMP/updates"
-          cp dist/*.zip "$RUNNER_TEMP/updates/" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/updates/"*-dSYMs.zip
-          for tag in $(gh release list --limit 20 --json tagName --jq '.[].tagName'); do
-            gh release download "$tag" --dir "$RUNNER_TEMP/updates" --pattern "*.zip" --clobber 2>/dev/null || true
-          done
-          rm -f "$RUNNER_TEMP/updates/"*-dSYMs.zip
-
-          # --ed-key-file - reads the key from stdin, so the private half is
-          # never written to the runner's disk where a later step, a cache
-          # action, or an uploaded artifact could pick it up.
-          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$BIN/generate_appcast" \
-            --ed-key-file - \
-            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.marketing }}/" \
-            --maximum-versions 5 \
-            "$RUNNER_TEMP/updates"
-          cp "$RUNNER_TEMP/updates/appcast.xml" dist/appcast.xml
-          xmllint --noout dist/appcast.xml && echo "appcast well-formed"
-
-      - name: Create draft release
+      - name: Publish the prerelease
+        if: env.RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          V="${{ steps.version.outputs.marketing }}"
-          gh release create "v$V" \
-            --draft \
-            --title "Errol $V" \
-            --notes "Build ${{ steps.version.outputs.build }}. Draft pending the manual update smoke test." \
-            "dist/$APP_NAME-$V.zip" \
-            "dist/$APP_NAME-$V.dmg" \
-            "dist/$APP_NAME-$V-dSYMs.zip" \
-            "dist/appcast.xml"
+          V="${{ steps.version.outputs.version }}"
+          if [[ -f "docs/release-notes/$V.md" ]]; then
+            gh release create "v$V" --prerelease --verify-tag --title "Errol $V" \
+              --notes-file "docs/release-notes/$V.md" dist/*
+          else
+            gh release create "v$V" --prerelease --verify-tag --title "Errol $V" --generate-notes dist/*
+          fi
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Errol $V is a prerelease
 
-  promote:
-    name: Publish (manual gate)
+          Before approving the publish job, update a real copy of Errol to it:
+
+          \`\`\`
+          defaults write com.t7m8.Errol SUFeedURL https://github.com/${{ github.repository }}/releases/download/v$V/appcast.xml
+          \`\`\`
+
+          Then choose Check for Updates, confirm the Accessibility grant survived and a relay runs, and run
+          \`defaults delete com.t7m8.Errol SUFeedURL\`.
+          EOF
+
+      - name: Keep the dry run's builds
+        if: env.RELEASE != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: errol-dry-run
+          path: dist/
+
+  publish:
+    name: Publish (after the update test)
     needs: build
-    runs-on: macos-latest
-    # This environment must require a reviewer. The approval IS the smoke test:
-    # install the drafted build over the previous one through Sparkle on a real
-    # Mac, confirm the Accessibility grant survived and a relay still runs, then
-    # approve. Approving without doing that defeats the entire design.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # The environment requires a reviewer, and the approval is the update
+    # test: approving without trying the prerelease defeats the point of it.
     environment: release-publish
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4  # TODO pin to a commit SHA
-        with:
-          ref: main
-
-      - name: Publish release and update the live feed
+      - name: Make the prerelease the latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          V="${{ needs.build.outputs.marketing_version }}"
-          gh release download "v$V" --pattern "appcast.xml" --dir . --clobber
-          gh release edit "v$V" --draft=false
+          gh release edit "v${{ needs.build.outputs.version }}" \
+            --repo "${{ github.repository }}" --prerelease=false --latest
 
-          # The feed is published last. Until this commit lands, no installed
-          # copy of Errol can see the new version.
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add appcast.xml
-          git commit -m "Publish appcast for $V" || { echo "appcast unchanged"; exit 0; }
-          git push origin main
+      - name: Check the live feed
+        run: |
+          set -euo pipefail
+          BUILD="${{ needs.build.outputs.build }}"
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsSL https://errol.chat/appcast.xml | grep -q "<sparkle:version>$BUILD</sparkle:version>"; then
+              echo "errol.chat/appcast.xml offers build $BUILD."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::errol.chat/appcast.xml doesn't offer build $BUILD yet."
+          exit 1

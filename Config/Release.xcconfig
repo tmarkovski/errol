@@ -4,20 +4,21 @@
 // It is NOT wired into the Xcode project on purpose: the target already sets
 // CODE_SIGN_IDENTITY and DEVELOPMENT_TEAM in project.pbxproj, and target-level
 // settings win over a base configuration file, so attaching it would silently
-// do nothing. Instead the release workflow parses these lines and passes them
-// to xcodebuild as command-line build settings, which have the highest
-// precedence and definitively override the project. Local Xcode builds are
-// untouched, which matters here: re-signing the app invalidates its
+// do nothing. Instead `scripts/release/release.py archive` parses these lines
+// and passes them to xcodebuild as command-line build settings, which have the
+// highest precedence and definitively override the project. Local Xcode builds
+// are untouched, which matters here: re-signing the app invalidates its
 // Accessibility grant.
 //
 // Once a Developer ID certificate exists and someone is at Xcode, the tidier
 // end state is to delete the signing settings from project.pbxproj and attach
 // this file as the target's Release base configuration.
 
-// The team the app publishes under. Currently pending Apple Developer Program
-// enrollment; project.pbxproj still carries ABWMP9KRVE at the target level and
-// JN3SN725AZ at the project level. Nothing has shipped, so changing this is
-// still free -- it stops being free the moment the first release is public.
+// The team the app publishes under, TM Code & Co. LLC, the same team the
+// project uses for development. A Developer ID signature ties the app's
+// designated requirement to this team rather than to one certificate, so a
+// new certificate is harmless, but changing the team after the first public
+// release would cost every installed copy its Accessibility grant.
 DEVELOPMENT_TEAM = JN3SN725AZ
 
 CODE_SIGN_STYLE = Manual

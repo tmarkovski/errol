@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Errol disk image background</title>
+    <!--
+      The picture behind the Finder window the DMG opens: 640 points wide,
+      with 400 points showing below the title bar and 20 more to spare in
+      case a macOS version draws a shorter title bar. render_background.py
+      captures it at 1× and 2× into background.png and background@2x.png,
+      and make_dmg.py lays the two icons over it at the spots marked below,
+      so the two files have to agree on those positions.
+
+      Finder always draws the icons' labels in black over a background
+      picture, even in Dark Mode, so the picture has to stay light.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&display=block"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      .window {
+        position: relative;
+        width: 640px;
+        height: 420px;
+        overflow: hidden;
+        background: linear-gradient(#f8f5ee, #efe9dc);
+        font-family: 'Geist', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        isolation: isolate;
+      }
+      /* A warm light behind the path, and the site's dotted field, faded out
+         toward the edges. */
+      .window::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: radial-gradient(
+          ellipse 42% 40% at 50% 44%,
+          #edba7224 0%,
+          transparent 72%
+        );
+      }
+      .window::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background-image: radial-gradient(#5a46231c 1px, transparent 1.3px);
+        background-size: 16px 16px;
+        background-position: 8px 8px;
+        mask-image: radial-gradient(
+          ellipse 62% 58% at 50% 45%,
+          #000 20%,
+          transparent 80%
+        );
+      }
+      svg {
+        position: absolute;
+        inset: 0;
+      }
+      .caption {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 322px;
+        margin: 0;
+        text-align: center;
+        color: #7a7262;
+        font-size: 14px;
+        font-weight: 400;
+        letter-spacing: -0.1px;
+      }
+      .caption b {
+        color: #3b372f;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <svg width="640" height="420" viewBox="0 0 640 420">
+        <defs>
+          <linearGradient id="fade" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#d9973f" stop-opacity="0.95" />
+            <stop offset="0.4" stop-color="#e2a856" stop-opacity="0.45" />
+            <stop offset="1" stop-color="#e2a856" stop-opacity="0" />
+          </linearGradient>
+          <radialGradient id="halo">
+            <stop offset="0" stop-color="#edba72" stop-opacity="0.55" />
+            <stop offset="1" stop-color="#edba72" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <!-- The app sits at (170, 176) and Applications at (470, 176). The
+             path runs between them, clear of the 112-point icons. -->
+        <path
+          id="path"
+          d="M242 170 C 288 130 346 130 398 152"
+          fill="none"
+          stroke="#c8913f"
+          stroke-opacity="0.55"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-dasharray="0.1 6"
+        />
+        <path id="tail" fill="url(#fade)" />
+        <path
+          id="arrow"
+          d="M-9 -4 L1.5 0 L-9 4 Z"
+          fill="#c8913f"
+          stroke="#c8913f"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        />
+        <g id="head">
+          <circle r="11" fill="url(#halo)" />
+          <circle r="3.6" fill="#d9973f" />
+        </g>
+      </svg>
+      <p class="caption">Drag <b>Errol</b> into your Applications folder</p>
+    </div>
+    <script>
+      // The courier from the site, stopped a little past the top of its path,
+      // with its tail tapering off behind it.
+      const path = document.getElementById('path');
+      const total = path.getTotalLength();
+      const at = (f) => path.getPointAtLength(total * f);
+      const head = 0.66;
+      const reach = 0.36;
+      const count = 40;
+      const points = Array.from({ length: count + 1 }, (_, i) =>
+        at(head - reach * (i / count) ** 1.25),
+      );
+      const left = [];
+      const right = [];
+      points.forEach((p, i) => {
+        const a = points[Math.max(0, i - 1)];
+        const b = points[Math.min(count, i + 1)];
+        const len = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        const nx = -(a.y - b.y) / len;
+        const ny = (a.x - b.x) / len;
+        const w = 2.3 * (1 - i / count);
+        left.push(`${p.x + nx * w} ${p.y + ny * w}`);
+        right.unshift(`${p.x - nx * w} ${p.y - ny * w}`);
+      });
+      document
+        .getElementById('tail')
+        .setAttribute('d', `M${left.join('L')}L${right.join('L')}Z`);
+      const fade = document.getElementById('fade');
+      const front = points[0];
+      const end = points[count];
+      fade.setAttribute('x1', front.x);
+      fade.setAttribute('y1', front.y);
+      fade.setAttribute('x2', end.x);
+      fade.setAttribute('y2', end.y);
+      document
+        .getElementById('head')
+        .setAttribute('transform', `translate(${front.x} ${front.y})`);
+
+      // The arrowhead at the end of the path, pointed along it.
+      const tip = at(1);
+      const before = at(0.97);
+      const angle = Math.atan2(tip.y - before.y, tip.x - before.x);
+      document
+        .getElementById('arrow')
+        .setAttribute(
+          'transform',
+          `translate(${tip.x} ${tip.y}) rotate(${(angle * 180) / Math.PI})`,
+        );
+      document.body.dataset.ready = 'true';
+    </script>
+  </body>
+</html>
