@@ -92,6 +92,10 @@ struct WindowScan {
     /// composer-scoped count needs the live parent walk — so a chip left in
     /// the history can count; a connection's readiness reads the precise one.
     var attachmentChips = 0
+    /// The name of the dialog standing over the conversation, when the
+    /// window has no composer because one does (coveringDialog); "" for a
+    /// dialog with no name.
+    var coveredBy: String?
     /// Messages in the window's tree by their affordances (copy buttons and
     /// collapsed action bars, the count the relay's baselines use).
     var messageAffordances = 0
@@ -114,6 +118,11 @@ func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> W
     var scan = WindowScan()
     scan.title = window.title ?? ""
     visit(window, depth: 0, into: &scan, selectors: selectors)
+    // Only a window without a composer is walked again, and a covered one
+    // is a small tree: the dialog hides everything behind it.
+    if !scan.hasComposer, let dialog = openDialog(under: window) {
+        scan.coveredBy = dialogName(dialog)
+    }
     return scan
 }
 

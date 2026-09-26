@@ -325,6 +325,7 @@ private final class Node: ElementNode {
     var bounds: CGRect?
     weak var parent: Node?
     let children: [Node]
+    var subrole: String? { nil }
     var title: String? { nil }
     var stringValue: String? { nil }
     var numberValue: Int? { nil }

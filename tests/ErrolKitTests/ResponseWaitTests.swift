@@ -22,6 +22,30 @@ final class ResponseWaitTests: XCTestCase {
                                     selectors: config.claudeSelectors, at: 902.4), .complete)
     }
 
+    func testAHoldStartsTheConfirmingPairOver() {
+        // Sep 24 2026, from the run log: Claude streaming, then one poll
+        // taken as the image viewer opened over the conversation — nothing
+        // mounted, Stop gone — which reads as the streaming transition. The
+        // next poll finds the dialog and holds the wait; that dark poll must
+        // not stand as half of the pair that completes it afterwards.
+        let baseline = ResponseBaseline(affordances: 2, lastOrdinal: nil)
+        let streaming = ResponseSighting(affordances: 2, lastOrdinal: 5, streaming: true)
+        let covered = ResponseSighting(affordances: 0, lastOrdinal: nil, streaming: false)
+        let finished = ResponseSighting(affordances: 3, lastOrdinal: 6, streaming: false)
+        var wait = ResponseWaitState(timeout: 300, startedAt: 0)
+        XCTAssertEqual(wait.observe(streaming, since: baseline,
+                                    selectors: config.claudeSelectors, at: 0), .waiting)
+        XCTAssertEqual(wait.observe(covered, since: baseline,
+                                    selectors: config.claudeSelectors, at: 1.2), .waiting)
+        wait.suspend(at: 2.4)
+        wait.resume(at: 30)
+        XCTAssertEqual(wait.observe(finished, since: baseline,
+                                    selectors: config.claudeSelectors, at: 31.2), .waiting,
+                       "one poll after the hold is not yet a finished reply")
+        XCTAssertEqual(wait.observe(finished, since: baseline,
+                                    selectors: config.claudeSelectors, at: 32.4), .complete)
+    }
+
     // MARK: The capture gate
 
     func testAnOrdinalSurfacingAfterTheWaitIsNotAMessageSince() {

@@ -223,6 +223,45 @@ func composerElement<Node: ElementNode>(under root: Node) -> Node? {
     return areas.last
 }
 
+/// The subroles Chromium gives role="dialog" and role="alertdialog". Neither
+/// app's windows carry one at rest.
+let dialogSubroles: Set<String> = ["AXApplicationDialog", "AXApplicationAlertDialog"]
+
+/// The dialog open in the window, if any: the last in tree order, since a
+/// dialog mounts at the end of the document, over what came before it.
+func openDialog<Node: ElementNode>(under root: Node) -> Node? {
+    var dialogs: [Node] = []
+    findAll(in: root, where: { element in
+        element.role == kAXGroupRole as String
+            && element.subrole.map(dialogSubroles.contains) == true
+    }, into: &dialogs)
+    return dialogs.last
+}
+
+/// The dialog standing over the conversation, when one does. Claude's image
+/// viewer is a modal dialog ("Image preview"), and while it is open Chromium
+/// exposes nothing behind it: no composer, no copy buttons, no "Message N",
+/// no Stop (live Sep 25 2026, the claude-code-image-viewer fixture — about
+/// 870 elements down to 66). Read as it stands, that tree says the reply
+/// is over and has nothing to copy, which is how a run on Sep 24 2026
+/// ended on "Couldn't copy Claude's reply" with the reply still streaming
+/// behind the viewer. Both signals are required: a dialog alone can be a
+/// popover that leaves the conversation readable (and pressable — AXPress
+/// does not hit-test), and a missing composer alone says nothing the human
+/// could close.
+func coveringDialog<Node: ElementNode>(under window: Node) -> Node? {
+    guard !hasTextArea(window) else { return nil }
+    return openDialog(under: window)
+}
+
+/// What a dialog is called, for the human: its title, which is where
+/// Claude's viewer keeps "Image preview", else its joined label; empty
+/// when it has neither.
+func dialogName<Node: ElementNode>(_ dialog: Node) -> String {
+    let title = (dialog.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    return title.isEmpty ? dialog.label.trimmingCharacters(in: .whitespacesAndNewlines) : title
+}
+
 // MARK: - Live entry points
 
 func isExcludedWindow(_ window: AXUIElement, selectors: AppSelectors) -> Bool {
@@ -278,6 +317,15 @@ func hasStopButton(in target: TargetApp) -> Bool {
 func sendButton(in target: TargetApp) -> AXUIElement? {
     guard let root = chatWindow(in: target) else { return nil }
     return sendButton(under: LiveElement(ax: root), selectors: target.selectors)?.ax
+}
+
+/// The name of the dialog covering the target's conversation (see
+/// coveringDialog) — "" when it has none — or nil when nothing covers it.
+/// One walk while the composer is there; the dialog is looked for only in
+/// a window without one, which is a small tree when it is covered.
+func coveringDialogName(in target: TargetApp) -> String? {
+    guard let root = chatWindow(in: target) else { return nil }
+    return coveringDialog(under: LiveElement(ax: root)).map(dialogName)
 }
 
 /// ChatGPT's remove buttons are siblings of the input; Claude nests its

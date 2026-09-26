@@ -934,9 +934,14 @@ struct ResponseWaitState {
 
     /// Stop the inactivity clock: the window is showing something other
     /// than the conversation being waited on, so nothing seen means
-    /// nothing. Idempotent.
+    /// nothing — the poll just before the hold included, which may have
+    /// been taken as a dialog was opening over the conversation and seen
+    /// it gone, Stop button and all. So the confirming pair starts over:
+    /// completion needs two polls of the conversation after the hold.
+    /// Idempotent.
     mutating func suspend(at now: TimeInterval) {
         if suspendedAt == nil { suspendedAt = now }
+        stableTicks = 0
     }
 
     /// The conversation is back: the time it was out of view is taken off

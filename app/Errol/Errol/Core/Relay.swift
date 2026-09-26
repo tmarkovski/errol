@@ -356,10 +356,13 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         }
         // From here every read of the side goes through the bound window.
         let scoped = bound.target
-        guard inputArea(in: scoped) != nil else {
+        // A composer under a dialog is not missing; the refusal says what
+        // to close (composerState).
+        let composer = composerState(in: scoped)
+        if composer == .unreadable, inputArea(in: scoped) == nil {
             return failedStart("\(target.name)'s chat window has no message field.")
         }
-        if let refusal = deliveryBlock(for: composerState(in: scoped), side: side(target)) {
+        if let refusal = deliveryBlock(for: composer, side: side(target)) {
             return failedStart(refusal.startRefusal(name: target.name))
         }
         bindings[side(target)] = bound
@@ -401,7 +404,15 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     func destinationGuard(_ target: TargetApp) -> GuardVerdict {
         let destination = bound(target)
         switch destination.check() {
-        case .same: return frontGuard(target)
+        case .same:
+            // A dialog over the conversation hides all of it, the Stop
+            // button too, so nothing read there is evidence: the wait is
+            // suspended, the copy and the paste held, until the human
+            // closes it (coveringDialog).
+            if let cover = coveringDialogName(in: target) {
+                return .block(.covered(side: side(target), by: cover))
+            }
+            return frontGuard(target)
         case .hidden(let seen): return .block(.windowHidden(side: side(target), seen: seen))
         case .lost(let detail): return .lost(detail)
         }
@@ -657,6 +668,16 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                         // the copy is tried again from the gate once it is.
                         if !isFrontmost(speaker) {
                             setBlock(.notInFront(side: side(speaker)))
+                            endOperation(continuingRun: true)
+                            continue
+                        }
+                        // A dialog opening over the conversation can be
+                        // caught before it is in the tree, with the
+                        // conversation already gone from it (seen live
+                        // Sep 25 2026), so an empty-handed copy looks for
+                        // it once more before the run ends on it.
+                        usleep(800_000)
+                        if case .block = destinationGuard(speaker) {
                             endOperation(continuingRun: true)
                             continue
                         }

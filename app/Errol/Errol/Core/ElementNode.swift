@@ -4,16 +4,18 @@
 // through the exact detection code the relay runs, no apps open.
 //
 // The protocol carries only the primitives detection actually reads: role,
-// the joined label every selector match goes through, the title (surface
-// tabs match on AXTitle alone), the value in its two used shapes (composer
-// text, toggle state), the web-area URL, and children. Live-only concerns —
-// focus, AXPress, window identity — stay on AXUIElement in the live wrappers.
+// subrole (a dialog is a group told apart by it), the joined label every
+// selector match goes through, the title (surface tabs match on AXTitle
+// alone), the value in its two used shapes (composer text, toggle state),
+// the web-area URL, and children. Live-only concerns — focus, AXPress,
+// window identity — stay on AXUIElement in the live wrappers.
 
 import ApplicationServices
 import Foundation
 
 protocol ElementNode {
     var role: String? { get }
+    var subrole: String? { get }
     var title: String? { get }
     /// Joined description/title/help/AXLabel — see axLabel in Accessibility.swift.
     var label: String { get }
@@ -43,6 +45,7 @@ struct LiveElement: ElementNode {
     let ax: AXUIElement
 
     var role: String? { axAttribute(ax, kAXRoleAttribute) as? String }
+    var subrole: String? { axAttribute(ax, kAXSubroleAttribute) as? String }
     var title: String? { axAttribute(ax, kAXTitleAttribute) as? String }
     var label: String { axLabel(ax) }
     var stringValue: String? { axAttribute(ax, kAXValueAttribute) as? String }

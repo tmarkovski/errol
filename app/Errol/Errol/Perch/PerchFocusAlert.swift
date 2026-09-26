@@ -3,7 +3,10 @@
 // run stands until the human clicks its window, and nothing else on the
 // console matters meanwhile. So the ask covers the capsule, with the
 // console showing faintly through it, and fades out once the app is in
-// front and the run moves on.
+// front and the run moves on. A dialog over a side's conversation — an
+// image opened in Claude's viewer (RunBlock.covered) — is asked about the
+// same way: the app is in front, but its conversation is hidden from
+// Errol until the human closes what covers it.
 //
 // There is no countdown: the wait has no timeout of its own, and the
 // reply timeout does not count while a run stands on a block. Stop stays
@@ -14,22 +17,48 @@ import SwiftUI
 
 struct PerchFocusAlert: View {
     let controller: RelayController
-    let side: Speaker
+    let ask: Ask
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// What the human is asked to do about a side: bring its app forward,
+    /// or close what covers its conversation.
+    struct Ask: Equatable {
+        let side: Speaker
+        /// The covering dialog's name, "" when it has none; nil when the
+        /// app is to be brought forward.
+        let cover: String?
+    }
 
     /// How the alert comes and goes over the console.
     static let fade = Animation.easeInOut(duration: 0.3)
 
-    /// The side to bring forward, while the run stands on it and the alert
-    /// would cover nothing the human needs: not while the note is being
-    /// written, whose editor it would hide, and not once Stop is pressed.
-    static func side(for controller: RelayController) -> Speaker? {
-        guard controller.stage == .running, !controller.isSteering, !controller.stopRequested,
-              case .notInFront(let side)? = controller.block else { return nil }
-        return side
+    /// The ask, while the run stands on it and the alert would cover
+    /// nothing the human needs: not while the note is being written, whose
+    /// editor it would hide, and not once Stop is pressed.
+    static func ask(for controller: RelayController) -> Ask? {
+        guard controller.stage == .running, !controller.isSteering, !controller.stopRequested else { return nil }
+        switch controller.block {
+        case .notInFront(let side)?: return Ask(side: side, cover: nil)
+        case .covered(let side, let by)?: return Ask(side: side, cover: by)
+        default: return nil
+        }
     }
 
+    private var side: Speaker { ask.side }
     private var name: String { controller.appName(side) }
+
+    private var title: String {
+        guard let cover = ask.cover else { return "Please focus \(name) to continue the conversation" }
+        return cover.isEmpty ? "Please close the dialog in \(name) to continue"
+            : "Please close \u{201C}\(cover)\u{201D} in \(name) to continue"
+    }
+
+    private var detail: String {
+        guard ask.cover != nil else {
+            return "Click \(name)\u{2019}s window. Errol continues on its own once it is in front."
+        }
+        return "It hides the conversation from Errol, which continues once it is closed."
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -39,10 +68,10 @@ struct PerchFocusAlert: View {
             HStack(spacing: Perch.s(18)) {
                 beacon
                 VStack(alignment: .leading, spacing: Perch.s(5)) {
-                    Text("Please focus \(name) to continue the conversation")
+                    Text(title)
                         .font(Perch.text(19, .medium))
                         .foregroundStyle(Perch.ink)
-                    Text("Click \(name)\u{2019}s window. Errol continues on its own once it is in front.")
+                    Text(detail)
                         .font(Perch.text(12))
                         .foregroundStyle(Perch.secondary)
                 }

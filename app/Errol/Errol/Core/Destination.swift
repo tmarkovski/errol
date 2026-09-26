@@ -81,8 +81,16 @@ enum ComposerState: Equatable {
     case attachments(Int)
     case replying
     case unreadable
+    /// Out of the tree because a dialog stands over the conversation
+    /// (coveringDialog), named as the dialog names itself: unreadable, with
+    /// the one thing that makes it readable again.
+    case covered(by: String)
 
     var isEmpty: Bool { self == .empty }
+    var isCovered: Bool {
+        if case .covered = self { return true }
+        return false
+    }
 }
 
 /// The classification, pure. A composer's empty value is not always empty
@@ -104,9 +112,12 @@ func classifyComposer(value: String?, label: String, attachments: Int, replying:
 
 /// The composer's state in the target's chosen window, read now. The
 /// element is resolved the way the paste resolves it, so what is judged is
-/// what would be pasted into.
+/// what would be pasted into. A composer that is not there is looked for
+/// under a dialog before it is called unreadable.
 func composerState(in target: TargetApp) -> ComposerState {
-    guard let input = inputArea(in: target) else { return .unreadable }
+    guard let input = inputArea(in: target) else {
+        return coveringDialogName(in: target).map { .covered(by: $0) } ?? .unreadable
+    }
     let value = axAttribute(input, kAXValueAttribute) as? String
     let attachments = pastedTextAttachmentCount(around: input, selectors: target.selectors)
     return classifyComposer(value: value, label: axLabel(input), attachments: attachments,
@@ -147,14 +158,26 @@ enum RunBlock: Equatable {
     /// the clipboard only from a focused window — so the human brings it
     /// forward, and the relay goes on from where it stood.
     case notInFront(side: Speaker)
+    /// A dialog stands over the side's conversation — Claude's image viewer
+    /// is one — and hides it from the tree: nothing can be read from or
+    /// typed into it until the human closes the dialog (coveringDialog).
+    /// `by` is the dialog's name, empty when it has none.
+    case covered(side: Speaker, by: String)
 
     var side: Speaker {
         switch self {
         case .windowHidden(let side, _), .draft(let side, _), .attachments(let side, _),
              .replying(let side), .composerUnreadable(let side), .historyChanged(let side),
-             .notInFront(let side):
+             .notInFront(let side), .covered(let side, _):
             return side
         }
+    }
+
+    /// A covering dialog as the lines name it: by its own name where it
+    /// has one, else as a dialog — at the start of a sentence, and after
+    /// "Close".
+    private static func cover(_ by: String) -> (subject: String, object: String) {
+        by.isEmpty ? ("A dialog", "the dialog") : ("\u{201C}\(by)\u{201D}", "\u{201C}\(by)\u{201D}")
     }
 
     /// The one line that says what is wrong.
@@ -168,6 +191,7 @@ enum RunBlock: Equatable {
         case .composerUnreadable: return "Paused: \(name)'s composer can't be read"
         case .historyChanged: return "Paused: \(name)'s conversation moved on"
         case .notInFront: return "Paused: \(name) couldn't be brought to the front"
+        case .covered: return "Paused: \(name)'s conversation is covered"
         }
     }
 
@@ -189,6 +213,8 @@ enum RunBlock: Equatable {
             return "Messages were added in \(name) since the reply Errol was waiting for. Errol cannot tell what to relay now; Stop, or undo the change to continue."
         case .notInFront:
             return "Click \(name)'s window to bring it to the front. Errol continues once it is in front, or Stop."
+        case .covered(_, let by):
+            return "Close \(Self.cover(by).object) in \(name) to continue, or Stop. Errol resumes once the conversation is showing."
         }
     }
 
@@ -210,6 +236,8 @@ enum RunBlock: Equatable {
             return "\(name)'s conversation changed. Send again."
         case .notInFront:
             return "\(name) couldn't be brought to the front. Click its window, then send again."
+        case .covered(_, let by):
+            return "\(Self.cover(by).subject) is open over \(name)'s conversation. Close it, then send again."
         }
     }
 
@@ -230,6 +258,8 @@ enum RunBlock: Equatable {
             return "Paused — \(name)'s conversation has messages the relay did not expect since its reply completed."
         case .notInFront:
             return "Paused — \(name) would not come to the front. Click its window to bring it forward; the relay continues from there, or Stop."
+        case .covered(_, let by):
+            return "Paused — \(Self.cover(by).subject) is open over \(name)'s conversation, which hides it from Errol. Close it to continue, or Stop."
         }
     }
 }
@@ -243,6 +273,7 @@ func deliveryBlock(for state: ComposerState, side: Speaker) -> RunBlock? {
     case .attachments(let count): return .attachments(side: side, count: count)
     case .replying: return .replying(side: side)
     case .unreadable: return .composerUnreadable(side: side)
+    case .covered(let by): return .covered(side: side, by: by)
     }
 }
 

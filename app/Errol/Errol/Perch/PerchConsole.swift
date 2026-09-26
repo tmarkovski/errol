@@ -21,7 +21,7 @@ struct PerchConsoleView: View {
     }
 
     var body: some View {
-        let focusSide = PerchFocusAlert.side(for: controller)
+        let focusAsk = PerchFocusAlert.ask(for: controller)
         HStack(spacing: Self.columnGap) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
             VStack(alignment: .leading, spacing: Perch.s(5)) {
@@ -37,15 +37,15 @@ struct PerchConsoleView: View {
         .padding(.vertical, Perch.s(8))
         // Under the alert, the console is only something to see through,
         // softened so its lines do not compete with the ask.
-        .blur(radius: focusSide != nil ? Perch.s(6) : 0)
-        .accessibilityHidden(focusSide != nil)
+        .blur(radius: focusAsk != nil ? Perch.s(6) : 0)
+        .accessibilityHidden(focusAsk != nil)
         .overlay {
-            if let focusSide {
-                PerchFocusAlert(controller: controller, side: focusSide)
+            if let focusAsk {
+                PerchFocusAlert(controller: controller, ask: focusAsk)
                     .transition(.opacity)
             }
         }
-        .animation(PerchFocusAlert.fade, value: focusSide)
+        .animation(PerchFocusAlert.fade, value: focusAsk)
         .frame(width: width, height: Perch.widgetHeight)
         .tint(Perch.accent)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))

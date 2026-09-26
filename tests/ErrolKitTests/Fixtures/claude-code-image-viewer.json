@@ -1,0 +1,400 @@
+[
+  {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "role": "AXGroup",
+                                    "subrole": "AXEmptyGroup",
+                                    "value": ""
+                                  }
+                                ],
+                                "role": "AXWebArea",
+                                "url": "file:///Applications/Claude.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html",
+                                "value": ""
+                              }
+                            ],
+                            "role": "AXGroup",
+                            "value": ""
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "children": [
+                                                      {
+                                                        "children": [
+                                                          {
+                                                            "children": [
+                                                              {
+                                                                "children": [
+                                                                  {
+                                                                    "role": "AXGroup",
+                                                                    "subrole": "AXApplicationStatus",
+                                                                    "value": ""
+                                                                  }
+                                                                ],
+                                                                "role": "AXGroup",
+                                                                "subrole": "AXEmptyGroup",
+                                                                "value": ""
+                                                              }
+                                                            ],
+                                                            "role": "AXGroup",
+                                                            "subrole": "AXEmptyGroup",
+                                                            "value": ""
+                                                          }
+                                                        ],
+                                                        "description": "Sidebar",
+                                                        "role": "AXGroup",
+                                                        "subrole": "AXEmptyGroup",
+                                                        "value": ""
+                                                      },
+                                                      {
+                                                        "children": [
+                                                          {
+                                                            "children": [
+                                                              {
+                                                                "children": [
+                                                                  {
+                                                                    "children": [
+                                                                      {
+                                                                        "children": [
+                                                                          {
+                                                                            "children": [
+                                                                              {
+                                                                                "children": [
+                                                                                  {
+                                                                                    "children": [
+                                                                                      {
+                                                                                        "children": [
+                                                                                          {
+                                                                                            "children": [
+                                                                                              {
+                                                                                                "children": [
+                                                                                                  {
+                                                                                                    "children": [
+                                                                                                      {
+                                                                                                        "children": [
+                                                                                                          {
+                                                                                                            "children": [
+                                                                                                              {
+                                                                                                                "role": "AXGroup",
+                                                                                                                "subrole": "AXApplicationStatus",
+                                                                                                                "value": ""
+                                                                                                              },
+                                                                                                              {
+                                                                                                                "children": [
+                                                                                                                  {
+                                                                                                                    "children": [
+                                                                                                                      {
+                                                                                                                        "children": [
+                                                                                                                          {
+                                                                                                                            "children": [
+                                                                                                                              {
+                                                                                                                                "children": [
+                                                                                                                                  {
+                                                                                                                                    "role": "AXGroup",
+                                                                                                                                    "subrole": "AXApplicationStatus",
+                                                                                                                                    "value": ""
+                                                                                                                                  }
+                                                                                                                                ],
+                                                                                                                                "role": "AXGroup",
+                                                                                                                                "subrole": "AXEmptyGroup",
+                                                                                                                                "value": ""
+                                                                                                                              }
+                                                                                                                            ],
+                                                                                                                            "role": "AXGroup",
+                                                                                                                            "value": ""
+                                                                                                                          },
+                                                                                                                          {
+                                                                                                                            "role": "AXGroup",
+                                                                                                                            "subrole": "AXEmptyGroup",
+                                                                                                                            "value": ""
+                                                                                                                          }
+                                                                                                                        ],
+                                                                                                                        "role": "AXGroup",
+                                                                                                                        "value": ""
+                                                                                                                      }
+                                                                                                                    ],
+                                                                                                                    "role": "AXGroup",
+                                                                                                                    "value": ""
+                                                                                                                  }
+                                                                                                                ],
+                                                                                                                "role": "AXGroup",
+                                                                                                                "value": ""
+                                                                                                              },
+                                                                                                              {
+                                                                                                                "children": [
+                                                                                                                  {
+                                                                                                                    "children": [
+                                                                                                                      {
+                                                                                                                        "role": "AXStaticText",
+                                                                                                                        "value": "Fast mode off"
+                                                                                                                      }
+                                                                                                                    ],
+                                                                                                                    "role": "AXGroup",
+                                                                                                                    "subrole": "AXApplicationStatus",
+                                                                                                                    "value": ""
+                                                                                                                  },
+                                                                                                                  {
+                                                                                                                    "role": "AXGroup",
+                                                                                                                    "subrole": "AXApplicationStatus",
+                                                                                                                    "value": ""
+                                                                                                                  }
+                                                                                                                ],
+                                                                                                                "role": "AXGroup",
+                                                                                                                "value": ""
+                                                                                                              }
+                                                                                                            ],
+                                                                                                            "role": "AXGroup",
+                                                                                                            "value": ""
+                                                                                                          }
+                                                                                                        ],
+                                                                                                        "role": "AXGroup",
+                                                                                                        "value": ""
+                                                                                                      }
+                                                                                                    ],
+                                                                                                    "role": "AXGroup",
+                                                                                                    "value": ""
+                                                                                                  }
+                                                                                                ],
+                                                                                                "role": "AXGroup",
+                                                                                                "value": ""
+                                                                                              }
+                                                                                            ],
+                                                                                            "role": "AXGroup",
+                                                                                            "value": ""
+                                                                                          }
+                                                                                        ],
+                                                                                        "role": "AXGroup",
+                                                                                        "value": ""
+                                                                                      }
+                                                                                    ],
+                                                                                    "role": "AXGroup",
+                                                                                    "value": ""
+                                                                                  }
+                                                                                ],
+                                                                                "role": "AXGroup",
+                                                                                "value": ""
+                                                                              }
+                                                                            ],
+                                                                            "role": "AXGroup",
+                                                                            "value": ""
+                                                                          }
+                                                                        ],
+                                                                        "role": "AXGroup",
+                                                                        "value": ""
+                                                                      }
+                                                                    ],
+                                                                    "role": "AXGroup",
+                                                                    "value": ""
+                                                                  }
+                                                                ],
+                                                                "description": "Primary pane",
+                                                                "role": "AXGroup",
+                                                                "subrole": "AXLandmarkRegion",
+                                                                "value": ""
+                                                              }
+                                                            ],
+                                                            "role": "AXGroup",
+                                                            "value": ""
+                                                          }
+                                                        ],
+                                                        "role": "AXGroup",
+                                                        "subrole": "AXLandmarkMain",
+                                                        "value": ""
+                                                      }
+                                                    ],
+                                                    "role": "AXGroup",
+                                                    "value": ""
+                                                  }
+                                                ],
+                                                "role": "AXGroup",
+                                                "value": ""
+                                              }
+                                            ],
+                                            "role": "AXGroup",
+                                            "value": ""
+                                          },
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "children": [
+                                                      {
+                                                        "children": [
+                                                          {
+                                                            "children": [
+                                                              {
+                                                                "role": "AXStaticText",
+                                                                "value": "Image preview"
+                                                              }
+                                                            ],
+                                                            "role": "AXHeading",
+                                                            "title": "Image preview",
+                                                            "value": 2
+                                                          },
+                                                          {
+                                                            "children": [
+                                                              {
+                                                                "description": "Close",
+                                                                "role": "AXButton",
+                                                                "value": ""
+                                                              }
+                                                            ],
+                                                            "role": "AXGroup",
+                                                            "value": ""
+                                                          },
+                                                          {
+                                                            "children": [
+                                                              {
+                                                                "children": [
+                                                                  {
+                                                                    "description": "errol-overlay-test.png",
+                                                                    "role": "AXImage",
+                                                                    "url": "data:image/png;base64,iVBORw0KGgo=",
+                                                                    "value": ""
+                                                                  }
+                                                                ],
+                                                                "description": "Zoom image: errol-overlay-test.png",
+                                                                "role": "AXCheckBox",
+                                                                "subrole": "AXToggleButton",
+                                                                "value": 0
+                                                              }
+                                                            ],
+                                                            "role": "AXGroup",
+                                                            "value": ""
+                                                          }
+                                                        ],
+                                                        "description": "Image preview",
+                                                        "role": "AXGroup",
+                                                        "subrole": "AXApplicationDialog",
+                                                        "title": "Image preview",
+                                                        "value": ""
+                                                      }
+                                                    ],
+                                                    "role": "AXGroup",
+                                                    "value": ""
+                                                  }
+                                                ],
+                                                "role": "AXGroup",
+                                                "value": ""
+                                              }
+                                            ],
+                                            "role": "AXGroup",
+                                            "value": ""
+                                          },
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "children": [
+                                                      {
+                                                        "description": "Notifications",
+                                                        "role": "AXGroup",
+                                                        "subrole": "AXLandmarkRegion",
+                                                        "value": ""
+                                                      }
+                                                    ],
+                                                    "role": "AXGroup",
+                                                    "value": ""
+                                                  }
+                                                ],
+                                                "role": "AXGroup",
+                                                "value": ""
+                                              }
+                                            ],
+                                            "role": "AXGroup",
+                                            "value": ""
+                                          }
+                                        ],
+                                        "role": "AXGroup",
+                                        "value": ""
+                                      }
+                                    ],
+                                    "role": "AXWebArea",
+                                    "title": "Claude",
+                                    "url": "https://claude.ai/epitaxy/local_0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
+                                    "value": ""
+                                  }
+                                ],
+                                "role": "AXGroup",
+                                "value": ""
+                              }
+                            ],
+                            "role": "AXGroup",
+                            "value": ""
+                          }
+                        ],
+                        "role": "AXGroup",
+                        "value": ""
+                      }
+                    ],
+                    "role": "AXGroup",
+                    "value": ""
+                  }
+                ],
+                "role": "AXGroup",
+                "value": ""
+              }
+            ],
+            "role": "AXGroup",
+            "value": ""
+          }
+        ],
+        "role": "AXGroup",
+        "title": "Claude",
+        "value": ""
+      },
+      {
+        "role": "AXButton",
+        "subrole": "AXCloseButton"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "role": "AXGroup"
+              }
+            ],
+            "role": "AXGroup"
+          }
+        ],
+        "help": "this button also has an action to zoom the window",
+        "role": "AXButton",
+        "subrole": "AXFullScreenButton"
+      },
+      {
+        "role": "AXButton",
+        "subrole": "AXMinimizeButton"
+      }
+    ],
+    "role": "AXWindow",
+    "subrole": "AXStandardWindow",
+    "title": "Claude"
+  }
+]

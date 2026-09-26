@@ -62,5 +62,7 @@ final class ComposerStateTests: XCTestCase {
         XCTAssertEqual(deliveryBlock(for: .attachments(1), side: .chatgpt), .attachments(side: .chatgpt, count: 1))
         XCTAssertEqual(deliveryBlock(for: .replying, side: .claude), .replying(side: .claude))
         XCTAssertEqual(deliveryBlock(for: .unreadable, side: .chatgpt), .composerUnreadable(side: .chatgpt))
+        XCTAssertEqual(deliveryBlock(for: .covered(by: "Image preview"), side: .claude),
+                       .covered(side: .claude, by: "Image preview"))
     }
 }

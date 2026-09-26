@@ -128,7 +128,7 @@ enum PerchPreviewState: CaseIterable {
     case details, detailsChoosing, detailsClosed, detailsHeld
     // A run.
     case opening, running, runningUntilStopped, modelUnavailable, pausePending, paused,
-         noteQueued, waitingForFocus, held, handoffs
+         noteQueued, waitingForFocus, conversationCovered, held, handoffs
     // Its ending.
     case complete, stopped, turnLimitReached, interrupted, noteNotSent
 
@@ -265,6 +265,10 @@ enum PerchPreviewState: CaseIterable {
             // Claude would not come to the front: the alert covers the
             // console until its window is clicked.
             return Self.midRun(blocked: .notInFront(side: .claude))
+        case .conversationCovered:
+            // An image is open in Claude's viewer, which hides the
+            // conversation from Errol: the alert asks for it to be closed.
+            return Self.midRun(blocked: .covered(side: .claude, by: "Image preview"))
         case .held:
             // Claude's window went to the Dock mid-run, and the run stands
             // until it comes back.
@@ -361,6 +365,7 @@ enum PerchPreviewState: CaseIterable {
 #Preview("Running · paused, writing a note") { PerchPreviewState.paused.scene }
 #Preview("Running · note queued") { PerchPreviewState.noteQueued.scene }
 #Preview("Running · waiting for focus") { PerchPreviewState.waitingForFocus.scene }
+#Preview("Running · Claude's conversation covered") { PerchPreviewState.conversationCovered.scene }
 #Preview("Running · Claude minimized") { PerchPreviewState.held.scene }
 #Preview("Running · handoffs, animated") { PerchPreviewState.handoffs.scene }
 

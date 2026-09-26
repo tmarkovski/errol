@@ -65,6 +65,7 @@ extension RunBlock {
         case .composerUnreadable: "check message field"
         case .historyChanged: "conversation changed"
         case .notInFront: "bring window forward"
+        case .covered: "conversation covered"
         }
     }
 }

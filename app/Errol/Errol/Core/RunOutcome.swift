@@ -129,6 +129,7 @@ extension RunBlock {
         case .composerUnreadable: return "\(name)'s composer could not be read"
         case .historyChanged: return "\(name)'s conversation had moved on"
         case .notInFront: return "\(name) would not come to the front"
+        case .covered: return "\(name)'s conversation was covered"
         }
     }
 }

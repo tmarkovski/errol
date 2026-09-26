@@ -42,8 +42,9 @@ struct WindowCandidate: Identifiable, Equatable {
         self.id = id
         identity = DestinationIdentity(scan: scan, selectors: selectors)
         hasComposer = scan.hasComposer
-        composer = classifyComposer(value: scan.composerValue, label: scan.composerLabel,
-                                    attachments: scan.attachmentChips, replying: scan.isReplying)
+        composer = scan.coveredBy.map { .covered(by: $0) }
+            ?? classifyComposer(value: scan.composerValue, label: scan.composerLabel,
+                                attachments: scan.attachmentChips, replying: scan.isReplying)
         model = scan.model
         if let effort = scan.effort {
             model = model.map { "\($0) \u{00B7} \(effort)" } ?? effort
@@ -74,13 +75,14 @@ struct WindowCandidate: Identifiable, Equatable {
     /// The window's state as a place to paste into, one short phrase.
     var stateLine: String {
         if isMinimized { return "Minimized" }
-        guard hasComposer else { return "No message field" }
+        guard hasComposer || composer.isCovered else { return "No message field" }
         switch composer {
         case .empty: return "Ready"
         case .draft(let characters): return "Unsent draft (\(characters) characters)"
         case .attachments(let count): return count == 1 ? "Unsent attachment" : "\(count) unsent attachments"
         case .replying: return "Replying"
         case .unreadable: return "Message field can't be read"
+        case .covered(let by): return by.isEmpty ? "Covered by a dialog" : "Covered by \u{201C}\(by)\u{201D}"
         }
     }
 }
