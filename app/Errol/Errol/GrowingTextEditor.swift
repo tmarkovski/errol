@@ -128,6 +128,10 @@ struct GrowingTextEditor: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
         textView.textContainer?.lineFragmentPadding = 0
+        // macOS 27 pins an "Ask Siri" tag to the caret, which is part of
+        // Writing Tools and would sit over the console. Opting out of
+        // Writing Tools takes it away along with the Writing Tools menu.
+        textView.writingToolsBehavior = .none
         textView.font = font
         textView.textColor = textColor
         textView.insertionPointColor = caretColor ?? textColor

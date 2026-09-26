@@ -122,6 +122,9 @@ struct PanelRootView: View {
         }
         .frame(width: screen == .settings ? Perch.cardWidth : navigation.consoleWidth)
         .fixedSize(horizontal: false, vertical: true)
+        // Settings' fields, like the console's editors (GrowingTextEditor),
+        // stay out of Writing Tools and so out of macOS 27's "Ask Siri" tag.
+        .writingToolsBehavior(.disabled)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .overlay(alignment: .top) {
             if screen == .settings {
