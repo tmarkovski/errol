@@ -1,6 +1,6 @@
 // Contract tests for the pure detection logic — the parts of ErrolKit that
 // don't need a live app. Each test pins an invariant that was established
-// against real trees (dates in the README's field notes); if a selector or
+// against real trees (dates in docs/how-it-works.md's field notes); if a selector or
 // parsing change breaks one, the harness tiers (tools/verify) are the next
 // stop to find the new live shape.
 

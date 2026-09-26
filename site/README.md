@@ -92,4 +92,4 @@ Cloudflare assigns a `workers.dev` address on the first deployment. A custom dom
 
 The film uses simplified interfaces and illustrative dialogue. Download buttons point to `https://github.com/tmarkovski/errol/releases`; change `downloadUrl` in `lib/site-config.ts` when a direct installer URL is available. The minimum macOS version matches the app's current Xcode deployment target (26.4).
 
-The default symbol, two overlapping speech bubbles, comes from `docs/brand/errol-symbol.svg`. The app uses a monochrome template of the same paths in `ErrolSymbol.imageset`, and the film draws the symbol as well. The previous owl assets remain in `public/errol.svg` and `public/favicon.svg`. Product facts were checked against the root README and current Swift configuration.
+The default symbol, two overlapping speech bubbles, comes from `docs/brand/errol-symbol.svg`. The app uses a monochrome template of the same paths in `ErrolSymbol.imageset`, and the film draws the symbol as well. The previous owl assets remain in `public/errol.svg` and `public/favicon.svg`. Product facts were checked against `docs/how-it-works.md` and current Swift configuration.

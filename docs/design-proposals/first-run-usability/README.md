@@ -232,7 +232,7 @@ evidence conclusive.
 ### What the checked fixtures establish
 
 The table below describes repository fixtures, not universal capabilities of
-the live apps. The README identifies the two captured home screens and the
+the live apps. [How Errol works](../../how-it-works.md) identifies the two captured home screens and the
 virtualized Claude Code conversation as real captures, and most other fixtures
 as synthesized. Missing data in a synthesized tree does not prove that the live
 app cannot expose it. These files are under

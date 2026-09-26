@@ -1,7 +1,7 @@
 // ChatGPT fixture scenarios: every surface and screen the detection has to
 // classify — Chat and Work, home screen (new chat) and open conversation
 // (plugging into an existing chat), Codex mode, and mid-stream. The trees are
-// synthesized from the live-verified shapes in the README's field notes
+// synthesized from the live-verified shapes in docs/how-it-works.md's field notes
 // (Aug 2026); recapture with `tools/ax-dump.swift chatgpt --capture` when an
 // app update moves them. ERROL_TEST_LOG=1 dumps each tree and what detection
 // concluded.
@@ -80,7 +80,7 @@ final class ChatGPTScenarioTests: XCTestCase {
     }
 
     func testWorkConversationKeepsPlaceholderSurface() {
-        // Expected shape, not yet observed live (README): a Work conversation
+        // Expected shape, not yet observed live (docs/how-it-works.md): a Work conversation
         // keeps the "Work with ChatGPT" placeholder after the toggles unmount.
         let d = detectChatGPT("chatgpt-work-conversation")
         XCTAssertEqual(d.status.surface, "Work")
@@ -133,11 +133,11 @@ final class ChatGPTScenarioTests: XCTestCase {
     // MARK: Known hazard, pinned
 
     func testSidebarTitleContainingCopyInflatesTheCount() {
-        // HAZARD (documented in the README's open threads): the finders walk
+        // HAZARD (documented in docs/how-it-works.md's open threads): the finders walk
         // the whole window, so a sidebar conversation titled with a bare
         // "Copy..." registers as a message affordance. One real response plus
         // one poisoned title = 2. If this assertion starts failing at 1, the
-        // finders learned to scope past the sidebar — update the README too.
+        // finders learned to scope past the sidebar — update docs/how-it-works.md too.
         let d = detectChatGPT("chatgpt-sidebar-copy-trap")
         XCTAssertEqual(d.copyLabels.count, 2)
         XCTAssertEqual(d.copyLabels.first, "Copy editing tips")

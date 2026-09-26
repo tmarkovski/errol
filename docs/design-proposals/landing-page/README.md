@@ -10,7 +10,7 @@ Sources: the brand story ([errol-brand-story-and-vision.md](../../errol-brand-st
 the naming session Errol carried for itself
 ([brand-session-errol-vs-togo.md](../../brand-session-errol-vs-togo.md)), the
 logo concepts ([logo-concepts](../../logo-concepts/README.md)), and the shipped
-Perch console ([README.md, Controls](../../../README.md#controls)).
+Perch console ([How Errol works, Controls](../../how-it-works.md#controls)).
 
 ## The brief in one line
 

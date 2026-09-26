@@ -545,7 +545,7 @@ Errol does not need to make AI feel more powerful by making it more obscure. Its
 
 ## Source notes
 
-- Project behavior and design decision: [README.md](../README.md)
+- Project behavior and design decision: [how-it-works.md](how-it-works.md)
 - Converged UI brainstorm and conversation-appliance direction: [ui-brainstorm-conversation-appliance.md](ui-brainstorm-conversation-appliance.md)
 - Naming exploration and founding incident: [brand-exploration.md](brand-exploration.md)
 - Live Errol-vs.-Togo relay and decision: [brand-session-errol-vs-togo.md](brand-session-errol-vs-togo.md)

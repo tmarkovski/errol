@@ -10,7 +10,7 @@ final class ConversationTemplateTests: XCTestCase {
     func testTemplateNames() {
         XCTAssertEqual(defaultConversationTemplates.map(\.name),
                        ["Brainstorm", "Debate", "Code review", "Adversary"],
-                       "the picker's display order; renames ripple into the README's Controls section")
+                       "the picker's display order; renames ripple into docs/how-it-works.md's Controls section")
     }
 
     func testComposedAppendsTopicAfterTheBody() {

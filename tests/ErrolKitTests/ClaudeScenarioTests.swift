@@ -1,9 +1,9 @@
 // Claude Desktop fixture scenarios for the claude.ai surfaces: Chat and
 // Cowork (home and open conversation), a project chat, and the sidebar
-// hazard. Trees are synthesized from the live-verified shapes in the README's
-// field notes (Aug 2026); recapture with `tools/ax-dump.swift claude
-// --capture` when an update moves them. The Claude Code surface has its own
-// scenario file.
+// hazard. Trees are synthesized from the live-verified shapes in the field
+// notes of docs/how-it-works.md (Aug 2026); recapture with
+// `tools/ax-dump.swift claude --capture` when an update moves them. The
+// Claude Code surface has its own scenario file.
 
 import XCTest
 @testable import ErrolKit
@@ -91,12 +91,12 @@ final class ClaudeScenarioTests: XCTestCase {
     // MARK: Known hazard, pinned
 
     func testSidebarTitleContainingStopReadsAsStreaming() {
-        // HAZARD (documented in the README's open threads): hasStopButton
+        // HAZARD (documented in docs/how-it-works.md's open threads): hasStopButton
         // matches any button label containing "stop" anywhere in the window,
         // so a sidebar conversation titled "Stop ..." makes an idle chat look
         // mid-stream — waitForResponse would sit at "streaming" until the
         // timeout. If this assertion starts failing (false), stop detection
-        // learned to scope past the sidebar — update the README too.
+        // learned to scope past the sidebar — update docs/how-it-works.md too.
         let d = detectClaude("claude-sidebar-stop-trap")
         XCTAssertTrue(d.streaming)
         XCTAssertEqual(d.affordanceLabels, ["Copy newest"])

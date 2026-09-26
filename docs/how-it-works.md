@@ -1,10 +1,10 @@
-# Errol
+# How Errol works
 
-Relays a conversation between the OpenAI Codex desktop app and Claude Desktop on macOS by automating their UIs: it presses each app's "Copy" button and pastes the response into the other app's composer, exactly like a human relaying messages between two chat windows.
+The engineering notes behind Errol: how the relay drives the two apps, the safeguards that keep it from typing into the wrong place, how the code is laid out and tested, and what has been observed about each app's accessibility tree. For what Errol is and how to install it, see the [README](../README.md). Paths below are relative to the repository root.
+
+Errol relays a conversation between the ChatGPT app (the unified ChatGPT and Codex app) and Claude Desktop on macOS by automating their UIs: it presses each app's "Copy" button and pastes the response into the other app's composer, exactly like a human relaying messages between two chat windows.
 
 It is a menu bar app: the Errol symbol sits in the status bar, and clicking it opens a floating panel where you type the instruction that seeds the conversation into the composer and press **Start relay**. There is no CLI; **Inspect Apps** in the icon's right-click menu covers the selector debugging the old command-line flags used to.
-
-Named for the Weasleys' owl: not the fastest courier, has been known to hit the wrong window, but the message always gets delivered. (The naming candidates that lost are recorded in `docs/brand-exploration.md`.)
 
 ## What we're building and why
 
@@ -82,7 +82,7 @@ Errol keeps an in-memory conversation summary until **New topic in these chats**
 For guided checks against the installed desktop apps, run
 `tools/verify --guided --suite desktop-smoke`. The harness walks through Chat,
 Work, Codex, Claude Chat, Cowork, and Code with disposable conversations and
-records delivery evidence. See [Live desktop compatibility tests](docs/desktop-verification.md)
+records delivery evidence. See [Live desktop compatibility tests](desktop-verification.md)
 for the full scenario matrix, prerequisites, reports, and verification limits.
 
 1. Open `app/Errol/Errol.xcodeproj` in Xcode and run, or build and copy `Errol.app` wherever you keep apps.
@@ -94,7 +94,7 @@ The machine is effectively unusable while a run is active (shared clipboard and 
 
 ## Controls
 
-The console is **Perch** (`app/Errol/Errol/Perch/`), implementing the [console layout proposal](docs/design-proposals/console-layout/README.md). It keeps the 860 × 156 capsule, two participants at the ends, and a separate summary beneath it.
+The console is **Perch** (`app/Errol/Errol/Perch/`), implementing the [console layout proposal](design-proposals/console-layout/README.md). It keeps the 860 × 156 capsule, two participants at the ends, and a separate summary beneath it.
 
 - **Participants and destinations:** stable app names and badges distinguish ready, attention, replying, and waiting. Click an icon to focus its app, with the connected window in front, or to open the app while it is closed. Rest the pointer on an icon for its tip: what a click does, then the window's mode, model, effort, conversation, and status. The line under the box names each side's destination, with no chevron. Click it to choose among the app's conversations, or to open the app, while that is possible; during a run it is only a label. Remembered, unverified destinations say **Last used**.
 - **Session options:** before a run, the top row names who starts, how the run ends, and the window arrangement. Who starts is a choice of two, so a click swaps it, with no menu; swap arrows stand where the other chips' chevrons are. A run ends **when both agree** (the mutual sign-off), **after a set number of turns**, or **when you stop it**.
