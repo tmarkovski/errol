@@ -505,6 +505,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.makeFirstResponder(nil)
         navigation.accessibilityGranted = granted
         updateNavigation()
+        // The grant came through the guide under System Settings: put it
+        // away and bring the console up, even if it was hidden meanwhile,
+        // since setup is the next step. The permission timer and the menu
+        // both call this on the main thread, where the guide lives.
+        if granted, MainActor.assumeIsolated({ PermissionGuide.dismiss() }) { showPanel() }
     }
 
     private func updateNavigation() {

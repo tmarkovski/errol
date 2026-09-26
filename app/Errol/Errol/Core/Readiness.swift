@@ -340,7 +340,7 @@ struct ReadinessReport: Equatable {
     static func blocked(installed: [Speaker: Bool]) -> ReadinessReport {
         func status(_ name: String) -> SideStatus {
             SideStatus(appName: name, state: .missing, headline: "No access",
-                       detail: "grant Accessibility permission")
+                       detail: "turn on Errol in \(AccessPermission.listName)")
         }
         return ReadinessReport(chatgpt: status("ChatGPT"), claude: status("Claude"), installed: installed)
     }
@@ -443,7 +443,7 @@ func scanBothSides() -> (chatgpt: SideStatus, claude: SideStatus) {
     guard AXIsProcessTrusted() else {
         func blocked(_ name: String) -> SideStatus {
             SideStatus(appName: name, state: .missing, headline: "No access",
-                       detail: "grant Accessibility permission")
+                       detail: "turn on Errol in \(AccessPermission.listName)")
         }
         return (blocked("ChatGPT"), blocked("Claude"))
     }

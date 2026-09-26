@@ -62,7 +62,7 @@ You'll need:
 Then:
 
 1. [Download the latest DMG](https://errol.chat/download), open it, and drag Errol into Applications. Earlier versions are on the [Releases](https://github.com/tmarkovski/errol/releases) page.
-2. Open Errol. Its icon appears in the menu bar, and the panel asks for Accessibility access. Click **Open Accessibility Settings…** and turn Errol on. The panel moves on to setup by itself.
+2. Open Errol. Its icon appears in the menu bar, and the panel asks for permission to control your apps. Click **Open System Settings**, then drag Errol from the small panel under the System Settings window into the list above it, which is Device Control and Data Access on macOS 27 or Accessibility on macOS 26. Errol moves on to setup by itself.
 3. Open a conversation in each app, type a topic, and press **Start relay**.
 
 Errol checks for updates on its own and offers them between runs, never during one.
@@ -88,6 +88,8 @@ Errol is a messenger owl at heart: not the fastest courier, known to fly into th
 Copyright © 2026 Tomislav Markovski.
 
 Errol is free software under version 3 of the [GNU General Public License](LICENSE). You can use it, change it, and share it, commercially too, as long as anything you distribute stays under the same license with its source available.
+
+The app includes [Sparkle](https://github.com/sparkle-project/Sparkle) and code adapted from [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow), both of which come under their own licenses. Their notices are in [THIRD_PARTY_NOTICES.txt](app/Errol/Errol/THIRD_PARTY_NOTICES.txt), and a copy ships inside Errol.app.
 
 The license covers the code. It grants no rights to the Errol name or symbol, so a version you ship needs a name of its own. The ChatGPT and Claude icons in `site/public/app-icons/` belong to OpenAI and Anthropic and aren't covered either.
 

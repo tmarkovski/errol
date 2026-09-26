@@ -145,7 +145,7 @@ final class LiveRelayEngine: RelayEngine {
 
     func preflight() -> Bool {
         guard ensureTrusted() else {
-            failStart("Accessibility permission missing. Grant Errol in System Settings > Privacy & Security > Accessibility, then send again.")
+            failStart("Errol isn\u{2019}t turned on in \(AccessPermission.settingsPath). Turn it on, then send again.")
             return false
         }
         let bindings = registry.bindings
@@ -329,7 +329,7 @@ final class LiveRelayEngine: RelayEngine {
     private func ensureTrusted() -> Bool {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         if AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) { return true }
-        report("Accessibility permission missing. Grant Errol in System Settings > Privacy & Security > Accessibility, then try again.")
+        report("Errol isn\u{2019}t turned on in \(AccessPermission.settingsPath). Turn it on, then try again.")
         return false
     }
 

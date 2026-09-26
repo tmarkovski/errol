@@ -1,7 +1,7 @@
 // The console's buttons, drawn flat: filled capsules and circles on the
 // panel's shell, with no material of their own. The running actions are
 // bare icons in circles — pause and stop say themselves; editors,
-// permission setup, and the ending keep their labeled pills.
+// permission setup, and the ending keep their labeled pills, all one size.
 
 import SwiftUI
 
@@ -40,22 +40,14 @@ struct PerchCapsuleButton: View {
         case secondary
     }
 
-    enum Size {
-        /// The console's bands.
-        case regular
-        /// The permission screen's one action.
-        case large
-    }
-
     let title: String
     var style = Style.prominent
-    var size = Size.regular
     var icon: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            PerchCapsuleLabel(title: title, style: style, size: size, icon: icon)
+            PerchCapsuleLabel(title: title, style: style, icon: icon)
         }
         .buttonStyle(.plain)
     }
@@ -67,7 +59,6 @@ struct PerchCapsuleButton: View {
 struct PerchCapsuleLabel: View {
     let title: String
     var style = PerchCapsuleButton.Style.prominent
-    var size = PerchCapsuleButton.Size.regular
     var icon: String? = nil
     @Environment(\.isEnabled) private var isEnabled
 
@@ -77,15 +68,15 @@ struct PerchCapsuleLabel: View {
         HStack(spacing: Perch.s(6)) {
             if let icon {
                 Image(systemName: icon)
-                    .font(Perch.text(size == .large ? 12 : 11, .semibold))
+                    .font(Perch.text(11, .semibold))
             }
             Text(title)
-                .font(size == .large ? Perch.text(13, .semibold) : Perch.text(12, .medium))
+                .font(Perch.text(12, .medium))
                 .lineLimit(1)
         }
         .foregroundStyle(prominent ? Perch.onAccent : Perch.ink)
-        .padding(.horizontal, Perch.s(size == .large ? 18 : 13))
-        .frame(height: Perch.s(size == .large ? 42 : 29))
+        .padding(.horizontal, Perch.s(13))
+        .frame(height: Perch.s(29))
         .background(Capsule().fill(prominent ? Perch.accent : Perch.well))
         .overlay(Capsule().stroke(prominent ? Color.clear : Perch.chipEdge, lineWidth: 1))
         .perchHover(Capsule(), tint: prominent ? .white : Perch.ink, opacity: prominent ? 0.12 : 0.06)
