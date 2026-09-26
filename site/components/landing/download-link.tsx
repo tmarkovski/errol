@@ -26,8 +26,6 @@ export function DownloadLink({ small = false }: { small?: boolean }) {
     <a
       className={`download-button ${small ? 'download-small' : ''}`}
       href={siteConfig.downloadUrl}
-      target="_blank"
-      rel="noopener noreferrer"
     >
       {small ? (
         <ArrowDownToLine size={15} strokeWidth={1.8} />

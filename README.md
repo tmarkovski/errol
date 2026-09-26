@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tmarkovski/errol/releases"><strong>Download for Mac</strong></a>
+  <a href="https://errol.chat/download"><strong>Download for Mac</strong></a>
   &nbsp;·&nbsp;
   <a href="https://errol.chat">Watch the 23-second film</a>
 </p>
@@ -61,7 +61,7 @@ You'll need:
 
 Then:
 
-1. Download the latest DMG from [Releases](https://github.com/tmarkovski/errol/releases), open it, and drag Errol into Applications.
+1. [Download the latest DMG](https://errol.chat/download), open it, and drag Errol into Applications. Earlier versions are on the [Releases](https://github.com/tmarkovski/errol/releases) page.
 2. Open Errol. Its icon appears in the menu bar, and the panel asks for Accessibility access. Click **Open Accessibility Settings…** and turn Errol on. The panel moves on to setup by itself.
 3. Open a conversation in each app, type a topic, and press **Start relay**.
 

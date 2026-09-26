@@ -115,7 +115,7 @@ npm run deploy
 
 Cloudflare assigns a `workers.dev` address on the first deployment. A custom domain can be attached afterward in the Worker settings.
 
-The film uses simplified interfaces and illustrative dialogue. Download buttons point to `https://github.com/tmarkovski/errol/releases`; change `downloadUrl` in `lib/site-config.ts` when a direct installer URL is available. The minimum macOS version matches the app's current Xcode deployment target (26.4).
+The film uses simplified interfaces and illustrative dialogue. Download buttons point to `https://errol.chat/download`, which `public/_redirects` sends to `Errol.dmg` in the latest GitHub release, so they always start the newest disk image downloading. The same file redirects `/appcast.xml`, the update feed installed copies of Errol check, to the latest release's feed. The minimum macOS version matches the app's current Xcode deployment target (26.4).
 
 Link previews use `public/og.png`, a 1200 × 630 card with the headline and the
 harness art. Its source is `scripts/og/og.html`; render it again with

@@ -13,6 +13,7 @@ export const siteConfig = {
     alt: 'Errol. Let ChatGPT and Claude talk it out. A gold dot carries a reply along a loop from the ChatGPT app to the Claude app.',
   },
   repositoryUrl: 'https://github.com/tmarkovski/errol',
-  downloadUrl: 'https://github.com/tmarkovski/errol/releases',
+  /** The latest release's disk image, through the redirect in public/_redirects. */
+  downloadUrl: 'https://errol.chat/download',
   minimumMacOS: '26.4',
 } as const;
