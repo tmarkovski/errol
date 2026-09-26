@@ -6,9 +6,9 @@
 // its sidebar, where the list is. It never becomes key or activates Errol,
 // so System Settings keeps the focus while the user drags Errol from the
 // panel into the list. PermissionGuide tells it where the Settings window
-// is. The panel sizes itself to the card PermissionGuideView draws, flies
-// in from the button that opened it, and steps aside while a drag is under
-// way.
+// is. The panel sizes itself to the card PermissionGuideView draws, rises
+// into place under the window once the window is on screen, and steps
+// aside while a drag is under way.
 
 import AppKit
 import QuartzCore
@@ -30,16 +30,11 @@ final class GuidePanel: NSPanel {
     /// at. It is the most current measure, since the sizing copy picks up a
     /// change in the model a moment later than the displayed card does.
     private var displayedCard: (panelWidth: CGFloat, height: CGFloat)?
-    /// Whether the panel is waiting at the button that opened it for the
-    /// Settings window to appear.
-    private var isWaitingAtSource = false
     private var isPassingThrough = false
-
-    private var launchTimer: Timer?
-    private var launchStart: CFTimeInterval = 0
-    private var launchFrom = NSRect.zero
-    private var launchTo = NSRect.zero
-    private var isLaunching = false
+    /// When the panel's entrance ends. Until then, a move of the Settings
+    /// window steers the entrance to the new place instead of cutting it
+    /// short.
+    private var entranceEnds: CFTimeInterval = 0
 
     private static let initialWidth: CGFloat = 420
     /// System Settings' sidebar. The panel lines up with the pane beside
@@ -51,14 +46,12 @@ final class GuidePanel: NSPanel {
     private static let screenInset: CGFloat = 12
     /// The space between the Settings window's bottom edge and the panel.
     private static let gapBelowSettings: CGFloat = 3
-    /// The fly-in is quick enough to feel like a response to the click and
-    /// long enough to show where the panel went. It never overshoots, so it
-    /// doesn't jitter while the Settings window is still settling.
-    private static let launchDuration: TimeInterval = 0.72
-    private static let springResponse: Double = 0.72
-    private static let launchAlpha: CGFloat = 0.9
-    /// The panel starts the fly-in at this fraction of its size.
-    private static let launchScale: CGFloat = 0.58
+    /// The panel comes in the way a popover does, with a short rise and a
+    /// fade, rather than traveling from the button that opened it. It has
+    /// its final size the whole way, so the card is laid out once and
+    /// nothing in it reflows while it moves.
+    private static let entranceDuration: TimeInterval = 0.3
+    private static let entranceRise: CGFloat = 16
     private static let draggingAlpha: CGFloat = 0.72
 
     init(model: PermissionGuideModel, onPress: @escaping () -> Void) {
@@ -126,82 +119,50 @@ final class GuidePanel: NSPanel {
         super.sendEvent(event)
     }
 
-    /// Stops the fly-in with the panel, whose timer would otherwise keep
-    /// running after it closed mid-flight.
-    override func close() {
-        stopLaunch()
-        super.close()
-    }
-
     // MARK: Placement
 
-    /// Shows the panel where it is.
-    func show() {
-        orderFrontRegardless()
-    }
-
-    /// Shows the panel at the button that opened it, where it waits until
-    /// the Settings window appears and it can fly there.
-    func show(at source: CGRect) {
-        stopLaunch()
-        isLaunching = false
-        alphaValue = 1
-        setContentSize(NSSize(width: frame.width, height: cardHeight(for: frame.width)))
-        setFrame(launchSourceFrame(around: source), display: false)
-        isWaitingAtSource = true
-        orderFrontRegardless()
-    }
-
-    /// Flies the panel from the button that opened it to its place under
-    /// the Settings window.
-    func present(from source: CGRect, to settingsFrame: CGRect) {
-        stopLaunch()
+    /// Brings the panel in under the Settings window the first time it is
+    /// placed there: it appears a little low and clear, and rises into
+    /// place as it fades in. Under Reduce Motion it only fades in.
+    func present(under settingsFrame: CGRect) {
         self.settingsFrame = settingsFrame
         let target = targetFrame(for: settingsFrame)
-        let startsWhereItWaits = isWaitingAtSource
-        isWaitingAtSource = false
-
-        guard !source.isEmpty else {
-            isLaunching = false
-            alphaValue = 1
-            setFrame(target, display: false)
-            orderFrontRegardless()
-            return
-        }
-
-        isLaunching = true
-        // A panel already waiting at the button starts from there, so it
-        // doesn't jump to a new size as it sets off.
-        launchFrom = startsWhereItWaits ? frame : launchSourceFrame(around: source)
-        launchTo = target
-        launchStart = CACurrentMediaTime()
-        alphaValue = Self.launchAlpha
-        setFrame(launchFrom, display: false)
+        let rise = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : Self.entranceRise
+        alphaValue = 0
+        setFrame(target.offsetBy(dx: 0, dy: -rise), display: true)
         orderFrontRegardless()
-        stepLaunch()
-
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            // The timer runs on the main run loop, where it was added.
-            MainActor.assumeIsolated { self?.stepLaunch() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        launchTimer = timer
+        glide(to: target, over: Self.entranceDuration)
     }
 
     /// Moves the panel under the Settings window's latest frame. During
-    /// the fly-in, only the destination changes, so the motion carries on
-    /// toward wherever the window went.
+    /// the entrance, the panel glides on to the new place in the time the
+    /// entrance has left, since the window can still be settling as it
+    /// opens.
     func snap(to settingsFrame: CGRect) {
         self.settingsFrame = settingsFrame
-        isWaitingAtSource = false
         let target = targetFrame(for: settingsFrame)
-        if isLaunching {
-            launchTo = target
+        let remaining = entranceEnds - CACurrentMediaTime()
+        if remaining > 0 {
+            glide(to: target, over: remaining)
             return
         }
-        stopLaunch()
         setFrame(target, display: false)
         if !isPassingThrough { orderFrontRegardless() }
+    }
+
+    /// Animates the panel to a frame and to full opacity, quick off the
+    /// mark and slowing into place. AppKit runs the animation at the
+    /// display's rate. The shadow is taken again at the end, from the card
+    /// drawn whole, since the panel came in before its first frame had
+    /// drawn.
+    private func glide(to target: CGRect, over duration: TimeInterval) {
+        entranceEnds = CACurrentMediaTime() + duration
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+            animator().setFrame(target, display: true)
+            animator().alphaValue = isPassingThrough ? Self.draggingAlpha : 1
+        }, completionHandler: { [weak self] in self?.invalidateShadow() })
     }
 
     /// While the tile is dragged, the pointer passes through the panel so
@@ -233,15 +194,6 @@ final class GuidePanel: NSPanel {
         return CGRect(origin: origin, size: CGSize(width: width, height: height))
     }
 
-    /// The panel shrunk around the button that opened it, where the fly-in
-    /// starts.
-    private func launchSourceFrame(around source: CGRect) -> CGRect {
-        let size = CGSize(width: max(source.width, frame.width * Self.launchScale),
-                          height: max(source.height, frame.height * Self.launchScale))
-        return CGRect(x: source.midX - size.width / 2, y: source.midY - size.height / 2,
-                      width: size.width, height: size.height)
-    }
-
     // MARK: Sizing
 
     /// The card's height at a panel width. The displayed card's own report
@@ -263,65 +215,12 @@ final class GuidePanel: NSPanel {
         DispatchQueue.main.async { [weak self] in self?.refit() }
     }
 
-    /// Only a panel that has arrived under the Settings window refits. On
-    /// the way there, the card is laid out at the fly-in's sizes.
+    /// Only a panel that has been placed under the Settings window refits.
     private func refit() {
-        guard !isLaunching, !isWaitingAtSource, let settingsFrame, let displayedCard,
+        guard let settingsFrame, let displayedCard,
               abs(displayedCard.panelWidth - frame.width) < 0.5,
               abs(displayedCard.height - frame.height) >= 0.5 else { return }
         snap(to: settingsFrame)
-    }
-
-    // MARK: The fly-in
-
-    /// Advances the fly-in by one frame, and ends it once the panel has
-    /// arrived.
-    private func stepLaunch() {
-        let elapsed = max(0, CACurrentMediaTime() - launchStart)
-        guard elapsed < Self.launchDuration else {
-            isLaunching = false
-            stopLaunch()
-            alphaValue = 1
-            setFrame(launchTo, display: true)
-            return
-        }
-        let progress = springProgress(at: elapsed)
-        alphaValue = Self.launchAlpha + (1 - Self.launchAlpha) * progress
-        setFrame(curvedFrame(from: launchFrom, to: launchTo, progress: progress), display: true)
-    }
-
-    private func stopLaunch() {
-        launchTimer?.invalidate()
-        launchTimer = nil
-    }
-
-    /// A critically damped spring: the panel speeds away and settles
-    /// without a hard stop or an overshoot.
-    private func springProgress(at elapsed: TimeInterval) -> CGFloat {
-        let omega = 2 * Double.pi / Self.springResponse
-        let progress = 1 - exp(-omega * elapsed) * (1 + omega * elapsed)
-        return min(max(progress, 0), 1)
-    }
-
-    /// The frame at a point along the fly-in. The center follows a
-    /// quadratic curve that bows upward over the straight line, which reads
-    /// as the panel being thrown to its place rather than slid there, and
-    /// the size grows from the start's to the end's along the way.
-    private func curvedFrame(from start: CGRect, to end: CGRect, progress: CGFloat) -> CGRect {
-        let size = CGSize(width: start.width + (end.width - start.width) * progress,
-                          height: start.height + (end.height - start.height) * progress)
-        let startCenter = CGPoint(x: start.midX, y: start.midY)
-        let endCenter = CGPoint(x: end.midX, y: end.midY)
-        let distance = hypot(endCenter.x - startCenter.x, endCenter.y - startCenter.y)
-        let lift = min(140, max(44, distance * 0.18))
-        let control = CGPoint(x: (startCenter.x + endCenter.x) / 2,
-                              y: max(startCenter.y, endCenter.y) + lift)
-        let rest = 1 - progress
-        let center = CGPoint(
-            x: rest * rest * startCenter.x + 2 * rest * progress * control.x + progress * progress * endCenter.x,
-            y: rest * rest * startCenter.y + 2 * rest * progress * control.y + progress * progress * endCenter.y)
-        return CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2,
-                      width: size.width, height: size.height)
     }
 }
 

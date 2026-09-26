@@ -7,15 +7,19 @@
 //
 // Where a generic panel would point up with an arrow, the courier that
 // carries Errol's messages between the two apps (TransferDrawing) rises
-// from the tile's column toward the list, so the one moving thing on the
-// panel is the one the console has already shown. The header is laid out
-// on the tile's measures, so the dot stands over the icon and the words
-// start where the name does.
+// out of Errol's icon on the tile, stops beside the instruction, and goes
+// on toward the list, so the one moving thing on the panel is the one the
+// console has already shown, and it traces the drag the user is asked to
+// make. The header is laid out on the tile's measures, so the dot keeps to
+// the icon's column and the words start where the name does.
 //
 // The window gives the card the width of the Settings window's content
 // column and takes its height from the card, which sizes itself to what it
 // holds: the instruction, wrapped to as many lines as that width needs,
-// over the tile. At the usual widths that is one line or two.
+// over the tile. At the usual widths that is one line or two. When System
+// Settings goes behind other windows, the way back to it takes the
+// instruction's place and keeps its room, so the card doesn't change
+// height.
 
 import AppKit
 import SwiftUI
@@ -33,6 +37,10 @@ struct PermissionGuideView: View {
     }
 
     var body: some View {
+        // Read here, so a change in either redraws the courier, which is
+        // built later, once the marks it hangs from are placed.
+        let showsCourier = model.isSettingsFrontmost
+        let isDragging = model.isDragging
         VStack(alignment: .leading, spacing: Perch.s(9)) {
             header
             // The closure reads the model's action when a drag reports in,
@@ -41,41 +49,60 @@ struct PermissionGuideView: View {
             GuideDragArea(appURL: model.appURL,
                           onDragStateChange: { [model] dragging in model.dragStateChanged(dragging) },
                           content: AnyView(GuideTile(model: model, icon: icon)))
+                .anchorPreference(key: CourierMarks.self, value: .bounds) { CourierMarks(tile: $0) }
         }
         .padding(.horizontal, GuideMetrics.cardInset)
         .padding(.top, Perch.s(10))
         .padding(.bottom, GuideMetrics.cardInset)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .fixedSize(horizontal: false, vertical: true)
+        .overlayPreferenceValue(CourierMarks.self) { marks in
+            courier(marks, shown: showsCourier, isDragging: isDragging)
+        }
         // No border of its own: the window's shadow draws a rim around the
         // card, the same one the console wears, and a stroke inside it
         // would read as a second line.
         .background(GuideMetrics.card.fill(Perch.shell))
     }
 
-    /// The instruction with the courier before it and the panel's controls
-    /// after it, all on the first line's baseline. The courier's column is
-    /// the icon's, and the gap after it is the gap after the icon, so the
-    /// header and the tile share one grid. The trailing edge is pulled out
-    /// by the chips' wash margin, which puts the close glyph over the
-    /// tile's grip.
+    /// The instruction and the close button, on the first line's baseline.
+    /// The instruction starts after a column as wide as the icon, with the
+    /// gap the tile leaves after the icon, so the header and the tile share
+    /// one grid. The trailing edge is pulled out by the chips' wash margin,
+    /// which puts the close glyph over the tile's grip.
+    ///
+    /// When System Settings has gone behind other windows, the list above
+    /// has gone with it, so the instruction has nothing to point at. It
+    /// fades out, the courier with it, and the way back fades in at the
+    /// start of the line, in the accent because it is the thing to do
+    /// next. The instruction keeps its room while it is hidden, so the card
+    /// keeps its height and nothing under it moves.
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: GuideMetrics.nameGap) {
-            // A zero-height anchor on the baseline, for the courier to hang
-            // from. The courier's canvas is an overlay, so it reaches up to
-            // the card's top edge and a little below the line without
-            // taking any room from the text.
-            Color.clear
-                .frame(width: GuideMetrics.iconSlot, height: 0)
-                .overlay(alignment: .bottom) {
-                    GuideCourier(isDragging: model.isDragging)
-                        .offset(y: CourierMetrics.belowBaseline)
+            HStack(alignment: .firstTextBaseline, spacing: GuideMetrics.nameGap) {
+                // A zero-height mark on the baseline, in the icon's column,
+                // where the courier comes to rest (courier(_:shown:isDragging:)).
+                Color.clear
+                    .frame(width: GuideMetrics.iconSlot, height: 0)
+                    .anchorPreference(key: CourierMarks.self, value: .bounds) { CourierMarks(rest: $0) }
+                instruction
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .opacity(model.isSettingsFrontmost ? 1 : 0)
+            .accessibilityHidden(!model.isSettingsFrontmost)
+            .overlay(alignment: .leadingFirstTextBaseline) {
+                if !model.isSettingsFrontmost {
+                    // Pulled out by the wash margin, so the words start at
+                    // the icon's edge.
+                    showSettingsButton
+                        .offset(x: -PerchChip.inset)
+                        .transition(.opacity)
                 }
-            instruction
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .layoutPriority(1)
-            controls
+            }
+            .layoutPriority(1)
+            closeButton
         }
+        .animation(Perch.fade, value: model.isSettingsFrontmost)
         .padding(.leading, GuideMetrics.tileLead)
         .padding(.trailing, GuideMetrics.tileTrail - PerchChip.inset)
     }
@@ -88,56 +115,73 @@ struct PermissionGuideView: View {
     private var instruction: some View {
         let name = Text(model.appName).fontWeight(.medium).foregroundStyle(Perch.ink)
         let list = Text(AccessPermission.listName).fontWeight(.medium).foregroundStyle(Perch.ink)
-        return Text("Drag \(name) to the list above to allow \(list).")
+        return Text("Drag \(name) to the list above to enable \(list).")
             .font(Perch.text(13))
             .foregroundStyle(Perch.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// The panel's controls, worn as the console's chips: text or a glyph
-    /// with no fill at rest, and the panel's wash under the pointer. When
-    /// System Settings has gone behind other windows, the list above is
-    /// gone too, so a way back to it stands before the close button, in
-    /// the accent because it is the thing to do next.
-    private var controls: some View {
-        HStack(spacing: Perch.s(2)) {
-            Group {
-                if !model.isSettingsFrontmost {
-                    Button { model.reopenSettings() } label: {
-                        HStack(spacing: Perch.s(3)) {
-                            Text("Show System Settings")
-                            // Symbols go in a text run, as the console's
-                            // chips set theirs, so they keep their ink.
-                            Text(Image(systemName: "arrow.up.right"))
-                                .font(Perch.text(8, .semibold))
-                        }
-                        .font(Perch.text(11.5, .medium))
-                        .foregroundStyle(Perch.accentText)
-                        .lineLimit(1)
-                        .perchChip()
-                    }
-                    .buttonStyle(.plain)
-                    .help("System Settings went behind another window. This brings it back.")
-                    .transition(.opacity)
-                }
+    /// The panel's controls are worn as the console's chips: text or a
+    /// glyph with no fill at rest, and the panel's wash under the pointer.
+    private var showSettingsButton: some View {
+        Button { model.reopenSettings() } label: {
+            HStack(spacing: Perch.s(3)) {
+                Text("Show System Settings")
+                // Symbols go in a text run, as the console's chips set
+                // theirs, so they keep their ink.
+                Text(Image(systemName: "arrow.up.right"))
+                    .font(Perch.text(8, .semibold))
             }
-            .animation(Perch.fade, value: model.isSettingsFrontmost)
-            Button { model.close() } label: {
-                Text(Image(systemName: "xmark"))
-                    .font(Perch.text(10, .semibold))
-                    .foregroundStyle(Perch.secondary)
-                    .perchChip()
-            }
-            .buttonStyle(.plain)
-            .help("Close")
-            .accessibilityLabel("Close the guide")
+            .font(Perch.text(11.5, .medium))
+            .foregroundStyle(Perch.accentText)
+            .lineLimit(1)
+            .perchChip()
         }
+        .buttonStyle(.plain)
         .fixedSize()
+        .help("System Settings went behind another window. This brings it back.")
+    }
+
+    private var closeButton: some View {
+        Button { model.close() } label: {
+            Text(Image(systemName: "xmark"))
+                .font(Perch.text(10, .semibold))
+                .foregroundStyle(Perch.secondary)
+                .perchChip()
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help("Close")
+        .accessibilityLabel("Close the guide")
+    }
+
+    /// The courier, drawn over the whole card so it can rise out of the
+    /// icon on the tile and pass the instruction on its way to the list.
+    /// Its canvas keeps to the icon's column and runs from the card's top
+    /// edge to a little below the icon's middle, enough for the glow. The
+    /// track is measured from the rest mark in the header and from the
+    /// tile, whose icon sits at the middle of its height.
+    private func courier(_ marks: CourierMarks, shown: Bool, isDragging: Bool) -> some View {
+        GeometryReader { proxy in
+            if shown, let rest = marks.rest, let tile = marks.tile {
+                let mark = proxy[rest]
+                let track = CourierTrack(start: proxy[tile].midY,
+                                         rest: mark.minY - Perch.s(3.8),
+                                         top: Perch.s(2))
+                GuideCourier(isDragging: isDragging, track: track)
+                    .frame(width: CourierMetrics.width, height: track.start + CourierMetrics.reachBelow)
+                    .offset(x: mark.midX - CourierMetrics.width / 2)
+                    .transition(.opacity)
+            }
+        }
+        .allowsHitTesting(false)
+        .animation(Perch.fade, value: shown)
     }
 }
 
 /// The card's and the tile's measures. The header borrows the tile's, so
-/// its dot stands over the icon and its words start where the name does.
+/// its dot keeps to the icon's column and its words start where the name
+/// does.
 private enum GuideMetrics {
     /// The Settings card's corner, which the guide shares as the other card
     /// Errol shows outside the console.
@@ -224,14 +268,14 @@ private struct GuideGrip: View {
 
 // MARK: - The courier
 
-/// The courier dot beside the instruction, the same lit dot that flies a
-/// message to its app (TransferDrawing), scaled from its 4.5-point radius
-/// to sit beside a line of text: a core of the accent lightened with white,
-/// the accent's glow around it, and a wake that tapers to nothing behind
-/// it. Here it climbs rather than crosses the screen. Each loop it rises
-/// from under the line to rest beside the words, waits there, then leaves
-/// upward toward the list, speeding up and fading before the card's top
-/// edge, and after a short pause the next one rises.
+/// The courier dot, the same lit dot that flies a message to its app
+/// (TransferDrawing), scaled from its 4.5-point radius to sit beside a
+/// line of text: a core of the accent lightened with white, the accent's
+/// glow around it, and a wake that tapers to nothing behind it. Here it
+/// climbs rather than crosses the screen. Each loop it lifts out of Errol's
+/// icon on the tile, rises to rest beside the instruction, waits there,
+/// then leaves upward toward the list, speeding up and fading before the
+/// card's top edge, and after a short pause the next one lifts off.
 ///
 /// While the user drags the tile, the dot stays at rest and slowly swells
 /// and settles, so the panel shows it noticed the drag without pulling the
@@ -240,6 +284,7 @@ private struct GuideGrip: View {
 /// beside the words, and glows a little wider during a drag.
 private struct GuideCourier: View {
     let isDragging: Bool
+    let track: CourierTrack
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// When the current loop began, or the pulse, during a drag.
     @State private var epoch = Date.now
@@ -261,7 +306,6 @@ private struct GuideCourier: View {
                 }
             }
         }
-        .frame(width: CourierMetrics.size.width, height: CourierMetrics.size.height)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onChange(of: isDragging) { _, dragging in
@@ -274,18 +318,51 @@ private struct GuideCourier: View {
 
     private func canvas(_ pose: CourierPose, _ colors: CourierColors) -> some View {
         Canvas { context, size in
-            CourierLoop.draw(pose, colors, in: &context, size: size)
+            CourierLoop.draw(pose, colors, along: track, in: &context, size: size)
         }
     }
 }
 
-/// The courier's canvas and where the climb runs in it. The canvas hangs
-/// from the instruction's baseline, reaching `belowBaseline` under it and
-/// up to about the card's top edge, and is wide enough that the glow is
-/// never cut off at its sides.
+/// The two places the courier's track is measured from: the zero-height
+/// mark on the instruction's first baseline, in the icon's column, and the
+/// tile. The tile is drawn inside the drag source's own view, so the icon
+/// can't report its place itself, but it sits at the middle of the tile's
+/// height, in the same column as the mark.
+private struct CourierMarks: PreferenceKey {
+    var rest: Anchor<CGRect>?
+    var tile: Anchor<CGRect>?
+
+    static let defaultValue = CourierMarks()
+
+    static func reduce(value: inout CourierMarks, nextValue: () -> CourierMarks) {
+        let next = nextValue()
+        value.rest = value.rest ?? next.rest
+        value.tile = value.tile ?? next.tile
+    }
+}
+
+/// Where the climb runs, in the card's coordinates, which are the canvas's
+/// too, since the canvas starts at the card's top edge. Along the climb, 0
+/// is the start at the middle of Errol's icon, 1 the rest beside the
+/// instruction's first line at the middle of its lowercase letters, and 2
+/// the top at the card's edge, where the dot has faded out.
+private struct CourierTrack {
+    var start: CGFloat
+    var rest: CGFloat
+    var top: CGFloat
+
+    func y(_ climb: Double) -> CGFloat {
+        climb <= 1 ? start + (rest - start) * climb : rest + (top - rest) * (climb - 1)
+    }
+}
+
+/// The courier's canvas and the dot's measures.
 private enum CourierMetrics {
-    static let size = CGSize(width: Perch.s(40), height: Perch.s(36))
-    static let belowBaseline = Perch.s(11)
+    /// Wide enough that the glow is never cut off at the canvas's sides.
+    static let width = Perch.s(40)
+    /// How far the canvas reaches below the start, for the glow of a dot
+    /// that is still over the icon.
+    static let reachBelow = Perch.s(12)
     /// The dot and its wake, the transfer's measures scaled by the same
     /// factor: the wake is a little narrower than the dot at the head, and
     /// the glow reaches about twice the dot's radius. Any smaller, and the
@@ -294,18 +371,6 @@ private enum CourierMetrics {
     static let glow = Perch.s(7)
     static let wakeWidth = Perch.s(2.5)
     static let wakeGlow = Perch.s(5.5)
-
-    /// The canvas's y at a point along the climb: 0 is the low start under
-    /// the line, 1 the rest beside the text at the middle of its lowercase
-    /// letters, and 2 the top, near the card's edge, where the dot has
-    /// faded out.
-    static func y(_ climb: Double, height: CGFloat) -> CGFloat {
-        let baseline = height - belowBaseline
-        let low = baseline + Perch.s(8)
-        let rest = baseline - Perch.s(3.8)
-        let top = Perch.s(4)
-        return climb <= 1 ? low + (rest - low) * climb : rest + (top - rest) * (climb - 1)
-    }
 }
 
 /// The accent and the dot's lit core, resolved by the canvas for the
@@ -317,7 +382,7 @@ private struct CourierColors {
 
 /// One frame of the courier.
 private struct CourierPose {
-    /// Where the dot is along the climb (CourierMetrics.y).
+    /// Where the dot is along the climb (CourierTrack).
     var climb: Double
     var opacity: Double
     /// How far the pulse has swollen the dot and its glow, from 0 to 1.
@@ -331,15 +396,15 @@ private struct CourierPose {
 /// loop's start: the dot rises into its rest by `arrived`, leaves it at
 /// `departs`, is gone by `gone`, and the loop starts again at `period`.
 private enum CourierLoop {
-    static let period: TimeInterval = 2.8
-    static let arrived: TimeInterval = 0.45
-    static let departs: TimeInterval = 1.55
-    static let gone: TimeInterval = 2.1
+    static let period: TimeInterval = 3.0
+    static let arrived: TimeInterval = 0.7
+    static let departs: TimeInterval = 1.8
+    static let gone: TimeInterval = 2.35
     /// The wake is the path of the recent past, as the transfer's is. The
     /// transfer looks back 0.18 seconds, but it crosses hundreds of points
-    /// in that time and this dot climbs a couple of dozen, so the window is
+    /// in that time and this dot climbs a few dozen, so the window is
     /// longer here to give the wake a length that reads.
-    static let wakeSpan: TimeInterval = 0.28
+    static let wakeSpan: TimeInterval = 0.24
     static let wakeSamples = 24
     /// One swell and settle of the pulse during a drag.
     static let pulse: TimeInterval = 1.1
@@ -355,18 +420,18 @@ private enum CourierLoop {
         return CourierPose(climb: now.climb, opacity: now.opacity, wake: wake)
     }
 
-    /// The climb and opacity at a moment in the loop. The rise eases out
-    /// into the rest, and the departure eases in, so the dot leaves the
-    /// way a launch does, and its wake lengthens as it speeds up. Between
-    /// loops the dot waits, unseen, at the low start, so the wake of the
-    /// next rise trails from there.
+    /// The climb and opacity at a moment in the loop. The rise starts
+    /// slowly and lights up quickly, so the dot is seen coming out of the
+    /// icon, and it slows into the rest. The departure eases in, so the dot
+    /// leaves the way a launch does, and its wake lengthens as it speeds
+    /// up. Between loops the dot waits, unseen, on the icon, so the wake of
+    /// the next rise trails from there.
     private static func stage(at age: TimeInterval) -> (climb: Double, opacity: Double) {
         var t = age.truncatingRemainder(dividingBy: period)
         if t < 0 { t += period }
         switch t {
         case ..<arrived:
-            let progress = t / arrived
-            return (1 - pow(1 - progress, 3), min(1, t / 0.3))
+            return (smoothstep(0, 1, t / arrived), min(1, t / 0.18))
         case ..<departs:
             return (1, 1)
         case ..<gone:
@@ -385,13 +450,13 @@ private enum CourierLoop {
     /// Draws the wake, then the dot over it, each with its glow, in the
     /// transfer's proportions: the wake at a little over half the dot's
     /// opacity with a softer glow, and the dot with a strong one.
-    static func draw(_ pose: CourierPose, _ colors: CourierColors,
+    static func draw(_ pose: CourierPose, _ colors: CourierColors, along track: CourierTrack,
                      in context: inout GraphicsContext, size: CGSize) {
         guard pose.opacity > 0.001 else { return }
         let x = size.width / 2
-        let head = CourierMetrics.y(pose.climb, height: size.height)
+        let head = track.y(pose.climb)
 
-        if let wake = wakePath(pose.wake, x: x, height: size.height) {
+        if let wake = wakePath(pose.wake, x: x, along: track) {
             context.drawLayer { layer in
                 layer.opacity = pose.opacity * 0.55
                 layer.addFilter(.shadow(color: colors.accent.opacity(0.65), radius: CourierMetrics.wakeGlow))
@@ -414,15 +479,15 @@ private enum CourierLoop {
     /// both sides by an amount that grows from nothing at the oldest to the
     /// full width at the head. The climb is straight up, so the sides are
     /// plain horizontal offsets. A dot at rest has no wake.
-    private static func wakePath(_ climbs: [Double], x: CGFloat, height: CGFloat) -> Path? {
+    private static func wakePath(_ climbs: [Double], x: CGFloat, along track: CourierTrack) -> Path? {
         guard let first = climbs.first, let last = climbs.last,
-              abs(CourierMetrics.y(last, height: height) - CourierMetrics.y(first, height: height)) > 0.5
+              abs(track.y(last) - track.y(first)) > 0.5
         else { return nil }
         let steps = Double(climbs.count - 1)
         var left: [CGPoint] = []
         var right: [CGPoint] = []
         for (index, climb) in climbs.enumerated() {
-            let y = CourierMetrics.y(climb, height: height)
+            let y = track.y(climb)
             let width = CourierMetrics.wakeWidth * pow(Double(index) / steps, 1.5)
             left.append(CGPoint(x: x - width, y: y))
             right.append(CGPoint(x: x + width, y: y))

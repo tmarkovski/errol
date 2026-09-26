@@ -41,9 +41,6 @@ enum PermissionGuide {
     }()
 
     private static var panel: GuidePanel?
-    /// Where the click that opened the guide landed, until the panel has
-    /// flown out from there.
-    private static var flyInSource: CGRect?
     /// The app that was in front before the guide opened System Settings,
     /// which the guide's close button returns to.
     private static var previousApp: (pid: pid_t, bundleID: String?)?
@@ -54,15 +51,17 @@ enum PermissionGuide {
     /// makes by hand in the list still brings the console back.
     private static var isStarted = false
 
-    /// Opens the list and docks the panel under System Settings, flying it
-    /// out from the pointer when a click started it.
+    /// Opens the list and docks the panel under System Settings. The panel
+    /// comes in once the tracker finds the Settings window on screen, so
+    /// it never shows anywhere but under it.
     static func show() {
         isStarted = true
         rememberFrontmostApp()
-        flyInSource = clickFrame()
         openList()
         followFrontmostApp()
-        showPanel()
+        if panel == nil {
+            panel = GuidePanel(model: model, onPress: { keepSettingsInFront() })
+        }
         tracker.start()
     }
 
@@ -76,43 +75,17 @@ enum PermissionGuide {
         return true
     }
 
-    /// Where the pointer pressed, for the panel to fly out from. Return,
-    /// the button's default action, starts the guide without a click, and
-    /// the panel then appears in place.
-    private static func clickFrame() -> CGRect? {
-        guard let event = NSApp.currentEvent,
-              event.type == .leftMouseDown || event.type == .leftMouseUp else { return nil }
-        let mouse = NSEvent.mouseLocation
-        return CGRect(x: mouse.x - 16, y: mouse.y - 16, width: 32, height: 32)
-    }
-
     // MARK: The panel
 
-    /// Shows the panel under the Settings window when its frame is already
-    /// known. Otherwise the panel waits at the click, or in the middle of
-    /// the screen, until the tracker finds the window.
-    private static func showPanel() {
-        let panel = self.panel ?? GuidePanel(model: model, onPress: { keepSettingsInFront() })
-        self.panel = panel
-        if let frame = tracker.currentFrame {
-            place(under: frame)
-        } else if let source = flyInSource {
-            panel.show(at: source)
-        } else {
-            panel.center()
-            panel.show()
-        }
-    }
-
-    /// Flies the panel to the Settings window the first time it is placed
-    /// after a click, and moves it straight there after that.
+    /// Brings the panel in under the Settings window the first time the
+    /// window is found, and moves it straight along with the window after
+    /// that.
     private static func place(under settingsFrame: CGRect) {
         guard let panel else { return }
-        if let source = flyInSource {
-            flyInSource = nil
-            panel.present(from: source, to: settingsFrame)
-        } else {
+        if panel.isVisible {
             panel.snap(to: settingsFrame)
+        } else {
+            panel.present(under: settingsFrame)
         }
     }
 
@@ -123,7 +96,6 @@ enum PermissionGuide {
         stopFollowingFrontmostApp()
         panel?.close()
         panel = nil
-        flyInSource = nil
         model.isDragging = false
         if returningToPreviousApp { reactivatePreviousApp() }
     }

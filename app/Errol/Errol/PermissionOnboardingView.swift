@@ -73,7 +73,7 @@ struct PermissionOnboardingView: View {
     /// within the same fixed capsule.
     private var explanation: some View {
         VStack(alignment: .leading, spacing: Perch.s(5)) {
-            Text(AccessPermission.isRenamed ? "Allow Device Control and Data Access" : "Allow Accessibility access")
+            Text(AccessPermission.isRenamed ? "Enable Device Control and Data Access" : "Enable Accessibility access")
                 .font(Perch.text(19, .medium))
                 .foregroundStyle(Perch.ink)
                 .lineLimit(2)
