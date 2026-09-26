@@ -1,12 +1,14 @@
+/* Pulled up into the bottom of the film's screen, which leaves room for it,
+   so the page stays exactly two screens and both snap cleanly. */
 .site-footer {
+  position: relative;
+  height: var(--footer-h);
+  margin-top: calc(var(--footer-h) * -1);
   border-top: 1px solid #ffffff12;
-  min-height: 96px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  /* A snap point of its own, or the film's would hold the page short of it. */
-  scroll-snap-align: end;
 }
 .site-footer .brand > span {
   font-size: 22px;
@@ -23,15 +25,9 @@
 .site-footer .text-link {
   color: #b2b4a6;
 }
+/* One row on phones, where the film needs the height more than the tagline does. */
 @media (max-width: 760px) {
-  .site-footer {
-    flex-wrap: wrap;
-    padding-block: 24px;
-    row-gap: 14px;
-  }
   .site-footer p {
-    order: 3;
-    width: 100%;
-    text-align: center;
+    display: none;
   }
 }

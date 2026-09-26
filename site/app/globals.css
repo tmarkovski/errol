@@ -20,15 +20,16 @@
   --border: #ffffff18;
   --gold: #edba72;
   --header-h: 76px;
+  --footer-h: 72px;
   --gutter: 48px;
 }
 * {
   box-sizing: border-box;
 }
-/* Proximity only: scrolling near the film settles it under the header, and nothing else holds. */
+/* Two screens, the headline and the film, and every scroll settles on one of them. */
 html {
   scroll-behavior: smooth;
-  scroll-snap-type: y proximity;
+  scroll-snap-type: y mandatory;
 }
 body {
   margin: 0;
@@ -104,6 +105,7 @@ a:focus-visible {
 @media (max-width: 760px) {
   :root {
     --header-h: 64px;
+    --footer-h: 60px;
     --gutter: 16px;
   }
 }

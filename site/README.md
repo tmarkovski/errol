@@ -4,8 +4,9 @@ Errol's public landing page, built with React and Vinext.
 
 ## Making changes
 
-The page is two sections: a headline with the download button, and the promo
-film under it. `app/page.tsx` composes them; each has its component and
+The page is two screens, each as tall as the window: a headline with the
+download button, and the promo film under it, with the footer along the film
+screen's bottom edge. Scrolling snaps to one screen or the other, never between. `app/page.tsx` composes them; each has its component and
 stylesheet in `components/landing/`:
 
 - `site-header.tsx` — the brand, the GitHub link, and the compact download link, fixed at the top.
@@ -22,22 +23,36 @@ The film is the 23-second promo from `scripts/promo-film/`. The films the page
 plays aren't in git: CI renders them from that source and keeps them in R2 (see
 Deploy below), and the page expects them in `public/demos/`. To run the site
 locally, fetch them with `scripts/promo-film/films.sh fetch` after
-`npx wrangler login`, or render them yourself (see that folder's README). Wide screens
+`npx wrangler login`, or render them yourself (see that folder's README).
+
+Keep the films once you have them. `public/demos/` (the web encodes the page
+plays) and `scripts/promo-film/out/` (the full renders with sound, the silent
+cuts, and the covers) are both ignored by git, so the films stay out of the
+repository but stay on disk between sessions, and there's no reason to render
+or fetch them again until their source changes. `scripts/promo-film/films.sh key`
+prints the hash of that source, which is also the R2 key CI stores them under.
+Don't `git clean -x` the site folder, or you'll be rendering again. Wide screens
 get the 16:9 cut. Screens taller than 2:3, which means phones held upright, get
 the 9:16 cut, whose captions stay legible at that width; turning the phone
 switches cuts in place. The player:
 
-- Plays muted and on a loop once a quarter of it is on screen, and pauses when
-  it's scrolled away or the tab is hidden.
+- Plays muted once its screen has scrolled all the way in and snapped under the
+  header, not while it's on the way, and pauses when it's scrolled away or the
+  tab is hidden. Coming back resumes where it left off.
+- Plays once and holds its end card, with a gold Replay in the corner.
+- Has a scrubber between the play and sound buttons: drag anywhere along it and
+  the film holds still under the pointer, then plays on from where it's
+  dropped. A drag back from the end card plays on too; a paused film stays
+  paused. Arrow keys, Page Up and Down, Home, and End seek from the keyboard.
 - Shows each cut's first frame as its poster, so playback starts without a jump.
-- Offers "Play with sound", which starts the film over with sound; with sound
-  on it plays once and holds its end card, with Replay in the corner.
+- Offers "Play with sound", which starts the film over with sound.
 - Waits for Play when the visitor prefers reduced motion or the browser refuses
   autoplay, and keeps a text description of the film for screen readers.
 
-The film rises into place as it scrolls in, and the page snaps it just under the
-header with proximity snapping; the footer is a snap point too, so it stays
-reachable.
+The film rises into place as its screen scrolls in. The footer is pulled up
+into the bottom of that screen, which leaves room for it, so the page is exactly
+two screens tall. On narrow frames the scrubber takes a row of its own above
+the buttons, and on phones the footer drops its tagline to stay one row.
 
 The earlier interactive walkthrough, the 10.5-second short film, and the
 sections that explained the product at length (how it works, conversation

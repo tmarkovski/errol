@@ -1,19 +1,29 @@
-/* Wider than the text column above it: the film is the page's picture. */
+/* The second screen: the film between the header and the footer. Wider than the
+   text column above it, because the film is the page's picture. */
 .film {
+  --film-gap: clamp(12px, 3svh, 32px);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   width: min(1360px, calc(100% - var(--gutter) * 2));
+  min-height: 100vh;
+  min-height: 100dvh;
   margin-inline: auto;
-  padding: 0 0 clamp(56px, 10svh, 112px);
+  padding: calc(var(--header-h) + var(--film-gap)) 0
+    calc(var(--footer-h) + var(--film-gap));
   view-timeline: --film block;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 .film-glow {
   position: absolute;
   z-index: -1;
   left: 50%;
-  top: -12%;
+  top: 50%;
   width: 120%;
-  height: 90%;
-  translate: -50% 0;
+  height: 70%;
+  translate: -50% -50%;
   pointer-events: none;
   background: radial-gradient(
     ellipse at 50% 50%,
@@ -23,11 +33,14 @@
   );
   filter: blur(20px);
 }
-/* Sized so the whole film fits under the header once it's scrolled into place. */
+/* Sized so the whole film fits between the header and the footer. */
 .film-frame {
+  --room: calc(
+    100svh - var(--header-h) - var(--footer-h) - var(--film-gap) * 2
+  );
   position: relative;
   aspect-ratio: 16 / 9;
-  width: min(100%, calc((100svh - var(--header-h) - 40px) * 16 / 9));
+  width: min(100%, calc(var(--room) * 16 / 9));
   margin-inline: auto;
   overflow: hidden;
   border-radius: 18px;
@@ -38,8 +51,7 @@
     0 50px 120px -30px #000d,
     0 0 90px #edba720c;
   isolation: isolate;
-  scroll-snap-align: start;
-  scroll-margin-top: calc(var(--header-h) + 12px);
+  container-type: inline-size;
 }
 .film-frame video,
 .film-poster img {
@@ -85,77 +97,143 @@
     opacity 0.25s,
     scale 0.25s;
 }
-.film-frame[data-mode='paused'] .film-cue {
+.film-frame[data-mode='paused']:not([data-scrubbing='true']) .film-cue {
   opacity: 1;
   scale: 1;
 }
+/* Play, the scrubber, and sound in one row along the bottom. */
 .film-controls {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: 18px;
+  bottom: 16px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 10px;
   pointer-events: none;
 }
 .film-frame[data-playing='true']:not(:hover, :focus-within)
-  .film-button:not([data-invite='true']) {
+  :is(.film-button:not([data-invite='true']), .film-scrub) {
   opacity: 0.55;
 }
-.film-button {
+.film-button,
+.film-scrub {
   pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 36px;
   height: 36px;
-  padding: 0 11px;
   border: 1px solid #ffffff1c;
   border-radius: 999px;
-  color: #f1f0e9;
   background: #1a1a18b8;
   backdrop-filter: blur(12px) saturate(140%);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
-  font-size: 13px;
-  font-weight: 500;
   transition:
     opacity 0.3s,
     background 0.2s,
     border-color 0.2s,
     color 0.2s;
 }
-.film-button:hover {
+.film-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 36px;
+  padding: 0 11px;
+  color: #f1f0e9;
+  font-size: 13px;
+  font-weight: 500;
+}
+.film-button:hover,
+.film-scrub:hover {
   background: #2a2925d0;
   border-color: #ffffff30;
 }
-.film-button:focus-visible {
+.film-button:focus-visible,
+.film-scrub:focus-visible {
+  outline: 2px solid var(--gold);
   outline-offset: 3px;
 }
-/* Until sound has been heard, the sound button is the invitation. */
-.film-sound[data-invite='true'] {
+/* The gold pill is the invitation: sound until it's been heard, Replay on the end card. */
+.film-button[data-invite='true'] {
   padding-inline: 13px 15px;
   color: #201a12;
   background: var(--gold);
   border-color: #f5cb8d;
 }
-.film-sound[data-invite='true']:hover {
+.film-button[data-invite='true']:hover {
   background: #f4ca8e;
 }
-.film-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: #ffffff0d;
+/* The pill's padding is part of the grab area; the track inside it is what maps to time. */
+.film-scrub {
+  --at: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.film-progress > span {
-  display: block;
-  height: 100%;
+.film-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #ffffff24;
+}
+.film-fill {
+  position: absolute;
+  inset: 0 calc((1 - var(--at)) * 100%) 0 0;
+  border-radius: inherit;
   background: linear-gradient(90deg, #edba7266, var(--gold));
-  transform: scaleX(0);
-  transform-origin: 0 50%;
+}
+.film-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--at) * 100%);
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow:
+    0 0 0 3px #edba7233,
+    0 2px 6px #0008;
+  opacity: 0;
+  scale: 0.5;
+  transition:
+    opacity 0.15s,
+    scale 0.15s;
+}
+.film-scrub:is(:hover, :focus-visible) .film-thumb,
+.film-frame[data-scrubbing='true'] .film-thumb {
+  opacity: 1;
+  scale: 1;
+}
+.film-frame[data-scrubbing='true'] .film-scrub {
+  cursor: grabbing;
+}
+/* Touch screens have no hover to reveal the thumb. */
+@media (hover: none) {
+  .film-thumb {
+    opacity: 1;
+    scale: 1;
+  }
+}
+/* On a narrow frame the scrubber takes a row of its own above the buttons. */
+@container (max-width: 520px) {
+  .film-controls {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .film-scrub {
+    order: -1;
+    flex-basis: 100%;
+    height: 30px;
+  }
 }
 .film-error {
   display: block;
@@ -169,7 +247,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* Rises and stands up as it scrolls into place. */
+/* Rises and stands up as its screen scrolls in. */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .film-frame {
@@ -189,7 +267,7 @@
 @media (max-aspect-ratio: 2/3) {
   .film-frame {
     aspect-ratio: 9 / 16;
-    width: min(100%, calc((100svh - var(--header-h) - 24px) * 9 / 16));
+    width: min(100%, calc(var(--room) * 9 / 16));
     border-radius: 20px;
   }
 }
@@ -197,7 +275,7 @@
   .film-controls {
     left: 12px;
     right: 12px;
-    bottom: 14px;
+    bottom: 12px;
   }
   .film-cue {
     width: 64px;

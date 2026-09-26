@@ -1,7 +1,17 @@
+/* The first screen: the headline centered under the header, the courier at the bottom edge. */
 .hero {
+  --fall: clamp(36px, 6svh, 64px);
   position: relative;
-  padding-top: calc(var(--header-h) + clamp(24px, 5svh, 64px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--header-h) 0 calc(var(--fall) + 16px);
   text-align: center;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 .hero > :not(.hero-glow) {
   position: relative;
@@ -10,10 +20,10 @@
   position: absolute;
   z-index: -1;
   left: 50%;
-  top: 0;
+  top: 50%;
   width: min(1100px, 140vw);
   height: 760px;
-  translate: -50% 0;
+  translate: -50% -50%;
   pointer-events: none;
   background: radial-gradient(
     ellipse at 50% 42%,
@@ -71,11 +81,12 @@
 .hero-actions .download-button {
   min-width: 220px;
 }
-.courier {
-  --fall: clamp(36px, 6svh, 64px);
+.hero > .courier {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
   width: 1px;
   height: var(--fall);
-  margin: clamp(18px, 3svh, 32px) auto 0;
   background: linear-gradient(#edba7200, #edba7226);
 }
 .courier > span {
