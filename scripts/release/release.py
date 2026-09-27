@@ -429,6 +429,9 @@ def appcast(
             "--download-url-prefix", prefix,
             "--link", WEBSITE,
             "--full-release-notes-url", f"https://github.com/{GITHUB_REPO}/releases",
+            # Without it the notes become a link built on --link, errol.chat/<zip>.md,
+            # which the site answers with its home page, shown raw in the window.
+            "--embed-release-notes",
             "--maximum-deltas", str(previous),
         ]  # fmt: skip
         if key_file:
