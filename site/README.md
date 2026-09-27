@@ -14,8 +14,7 @@ between. `app/page.tsx` composes them; each has its component and stylesheet in
 - `hero-section.tsx` — the pill, headline, introduction, download button, and the gold courier dot that drops toward the film.
 - `rotating-phrase.tsx` — the headline's last line, which cycles through what the two can do together (talk it out, debate it, compare notes, review your code, brainstorm, pressure-test it), word by word, while the gold period hops to each phrase's end. Screen readers hear "talk it out"; the phrase holds still when the visitor prefers reduced motion and waits while the headline is off screen. On phones the headline balances over three lines so the longest phrase fits.
 - `promo-film.tsx` — the film and its player, with a courier dot of its own that drops toward the next screen.
-- `why-errol.tsx` — what Errol is and why it exists: a headline, one sentence on the copying and pasting it replaces, and three one-line reasons (it drives your Mac on purpose, each app keeps its own context, nothing sits in the middle). Keep it short enough to fit one screen on a phone; the page is checked at 375×667.
-- `harness-art.tsx` — the picture beside that headline: the courier carrying replies around a loop between the ChatGPT and Claude icons, waiting at each app while it answers, which glows warmly as a reply lands. The loop is an inline SVG, and a small script moves the dot each frame and draws its tail as one tapered shape through where the dot has been, so the tail fades along its length, stretches with speed, and draws in as the dot stops. The script runs only while the art is on screen, and not at all when the visitor prefers reduced motion, which leaves the dot at the top of the loop.
+- `why-errol.tsx` — an explicit “Why Errol?” heading, the benefit “More perspective. Less copy-paste.”, and three numbered reasons: automatic handoffs, the context in each app, and the ability to steer. A short note explains that Errol runs on your Mac without API keys or an Errol account. There are no icons or relay illustration. Keep it short enough to fit one screen on a phone; check at 375×667.
 - `site-footer.tsx` — the footer and repository link.
 - `courier.tsx` — the falling courier dot the first two screens end with.
 - `brand.tsx`, `download-link.tsx`, and `shared.css` — the brand and button treatments they share.
@@ -54,9 +53,11 @@ switches cuts in place. The player:
 - Waits for Play when the visitor prefers reduced motion or the browser refuses
   autoplay, and keeps a text description of the film for screen readers.
 
-The film rises into place as its screen scrolls in, and the why screen's
-headline, art, and reasons rise in turn as it arrives, with a gold stroke
-drawing across each reason's hairline. The footer is pulled up into the bottom
+The film rises into place as its screen scrolls in. The why screen keeps all
+its text still and readable while a faint warm wash highlights each reason
+once, in order, over 4.8 seconds. It waits until the section is in view, pauses
+off screen or in a hidden tab, and is disabled for reduced motion. Hovering a
+reason gently warms its heading. The footer is pulled up into the bottom
 of the last screen, which leaves room for it, so the page is exactly three
 screens tall, and the footer's bottom edge is a snap position of its own, so a
 last screen that runs taller than the window can still be scrolled to its end.

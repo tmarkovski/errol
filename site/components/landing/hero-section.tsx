@@ -27,7 +27,7 @@ export function HeroSection() {
       </div>
       <p className="download-note">
         macOS {siteConfig.minimumMacOS} or later <span>·</span> No API keys{' '}
-        <span>·</span> No account
+        <span>·</span> No Errol account
       </p>
       {/* The courier dot from the film, carrying the reader down to it. */}
       <Courier />

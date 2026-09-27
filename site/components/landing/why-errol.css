@@ -1,242 +1,214 @@
-/* The third screen: what Errol is and why it exists, with the footer along its
-   bottom edge. Short enough to fit one screen on a phone as well. */
+/* The final screen answers why, while the film above shows how. */
 .why {
-  --why-gap: clamp(16px, 4svh, 48px);
+  --why-gap: clamp(24px, 5svh, 56px);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
   min-height: 100vh;
   min-height: 100dvh;
   padding: calc(var(--header-h) + var(--why-gap)) 0
     calc(var(--footer-h) + var(--why-gap));
-  view-timeline: --why block;
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
-/* The headline beside the art. */
-.why-top {
+.why-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
   align-items: center;
-  column-gap: clamp(32px, 5vw, 72px);
-}
-.why-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 22px;
-  color: #b3b2a5;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 11px;
-  line-height: 1.4;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
+  gap: clamp(48px, 7vw, 108px);
+  width: 100%;
 }
 .why h2 {
-  margin: 0;
-  font-size: clamp(34px, 3.9vw, 56px);
-  line-height: 1.04;
+  margin: 0 0 28px;
+  font-size: clamp(42px, 4.5vw, 64px);
+  line-height: 1.05;
   font-weight: 500;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
+  letter-spacing: -0.055em;
 }
-.why-quiet {
-  color: #8e9184;
+.why-promise {
+  margin: 0;
+  font-size: clamp(26px, 2.7vw, 36px);
+  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: -0.035em;
 }
-.why-dot {
+.why-promise span {
   color: var(--gold);
 }
 .why-lead {
-  max-width: 440px;
-  margin: 22px 0 0;
+  max-width: 370px;
+  margin: 20px 0 0;
   color: #aaa99f;
   font-size: 17px;
   line-height: 1.65;
   text-wrap: pretty;
 }
+.why-note {
+  max-width: 340px;
+  margin: 28px 0 0;
+  color: #929487;
+  font-size: 12px;
+  line-height: 1.65;
+}
 .why-reasons {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(24px, 3vw, 44px);
-  margin: clamp(36px, 7svh, 76px) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
-/* A hairline over each reason, with a gold stroke that draws in from the left. */
 .why-reasons > li {
   position: relative;
+  isolation: isolate;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  column-gap: 14px;
-  padding-top: 22px;
-  border-top: 1px solid #ffffff12;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 22px;
+  padding: 30px 20px;
+  border-top: 1px solid #ffffff17;
 }
+.why-reasons > li:last-child {
+  border-bottom: 1px solid #ffffff17;
+}
+/* A soft wash and a fine gold edge guide the eye without moving the text. */
 .why-reasons > li::before {
   content: '';
   position: absolute;
-  top: -1px;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, var(--gold), #edba7200 60%);
-  transform-origin: 0 50%;
+  z-index: -1;
+  inset: -1px 0;
+  border-left: 1px solid #edba7270;
+  background: linear-gradient(90deg, #edba7210, #edba7200 90%);
+  opacity: 0;
 }
-.why-chip {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #ffffff14;
-  border-radius: 9px;
-  color: var(--gold);
-  background: linear-gradient(#ffffff0e, #ffffff03);
-  box-shadow:
-    inset 0 1px #ffffff0d,
-    0 6px 16px #0006;
-  transition:
-    border-color 0.25s,
-    box-shadow 0.25s;
-}
-.why-reasons > li:hover .why-chip {
-  border-color: #edba7255;
-  box-shadow:
-    inset 0 1px #ffffff0d,
-    0 0 0 4px #edba720d,
-    0 6px 22px #edba7222;
+.why-number {
+  padding-top: 4px;
+  color: #96988b;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
 }
 .why-reasons h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 21px;
   line-height: 1.3;
   font-weight: 500;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.025em;
+  transition: color 300ms ease;
 }
 .why-reasons p {
-  margin: 4px 0 0;
-  color: #939788;
-  font-size: 14.5px;
-  line-height: 1.5;
+  max-width: 380px;
+  margin: 8px 0 0;
+  color: #aaa99f;
+  font-size: 15px;
+  line-height: 1.6;
   text-wrap: pretty;
 }
-/* Rises as the screen scrolls in, the headline, the art, then each reason, and
-   has settled by the time the screen snaps into place. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .why-heading,
-    .why .harness,
-    .why-reasons > li {
-      animation: why-rise linear both;
-      animation-timeline: --why;
-    }
-    .why-reasons > li::before {
-      animation: why-draw linear both;
-      animation-timeline: --why;
-    }
-    .why-heading {
-      animation-range: entry 10% entry 70%;
-    }
-    .why .harness {
-      animation-name: why-arrive;
-      animation-range: entry 20% entry 85%;
-    }
-    .why-reasons > li:nth-child(1),
-    .why-reasons > li:nth-child(1)::before {
-      animation-range: entry 35% entry 90%;
-    }
-    .why-reasons > li:nth-child(2),
-    .why-reasons > li:nth-child(2)::before {
-      animation-range: entry 42% entry 95%;
-    }
-    .why-reasons > li:nth-child(3),
-    .why-reasons > li:nth-child(3)::before {
-      animation-range: entry 49% entry 100%;
-    }
+@media (hover: hover) {
+  .why-reasons > li:hover h3 {
+    color: var(--gold);
   }
 }
-@keyframes why-rise {
-  from {
+@media (prefers-reduced-motion: no-preference) {
+  .why-reasons > li::before {
+    animation: why-highlight 1.6s ease-in-out both;
+    animation-delay: calc(var(--reason) * 1.6s);
+    animation-play-state: paused;
+  }
+  .why[data-visible='true'] .why-reasons > li::before {
+    animation-play-state: running;
+  }
+}
+@keyframes why-highlight {
+  0%,
+  100% {
     opacity: 0;
-    transform: translateY(32px);
+  }
+  25%,
+  65% {
+    opacity: 1;
   }
 }
-@keyframes why-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.94);
-  }
-}
-@keyframes why-draw {
-  from {
-    transform: scaleX(0);
-  }
-}
-@media (max-height: 820px) and (min-width: 901px) {
-  .why h2 {
-    font-size: clamp(34px, 3.5vw, 48px);
-  }
-  .why-lead {
-    margin-top: 18px;
-    font-size: 16px;
-  }
-}
-/* Stacked: the headline, the art under it, then the reasons as rows. */
 @media (max-width: 900px) {
-  .why-top {
-    display: block;
+  .why-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    max-width: 640px;
+    margin-inline: auto;
   }
-  .why .harness {
-    margin-top: 28px;
+  .why h2 {
+    margin-bottom: 20px;
   }
   .why-lead {
-    max-width: 560px;
+    max-width: 470px;
   }
-  .why-reasons {
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-top: 28px;
+  .why-note {
+    max-width: none;
+    margin-top: 18px;
   }
   .why-reasons > li {
-    padding-top: 16px;
+    padding-block: 23px;
+  }
+  .why-reasons p {
+    max-width: 480px;
   }
 }
 @media (max-width: 760px) {
-  .why-eyebrow {
-    margin-bottom: 14px;
+  .why {
+    --why-gap: 24px;
+  }
+  .why-layout {
+    gap: 24px;
   }
   .why h2 {
-    font-size: clamp(30px, 8.2vw, 40px);
+    margin-bottom: 16px;
+    font-size: 38px;
+  }
+  .why-promise {
+    font-size: 27px;
   }
   .why-lead {
-    margin-top: 12px;
+    margin-top: 14px;
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.55;
   }
-  .why .harness {
+  .why-note {
     margin-top: 14px;
+    font-size: 11px;
   }
-  .why-reasons {
-    gap: 12px;
-    margin-top: 14px;
-  }
-  /* Rows without hairlines, which the phone's height can't spare. */
   .why-reasons > li {
-    padding-top: 0;
-    border-top: 0;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px 10px;
   }
-  .why-reasons > li::before {
-    display: none;
-  }
-  .why-chip {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+  .why-number {
+    padding-top: 2px;
+    font-size: 10px;
   }
   .why-reasons h3 {
-    font-size: 15px;
+    font-size: 18px;
   }
   .why-reasons p {
-    margin-top: 2px;
+    margin-top: 6px;
     font-size: 14px;
+    line-height: 1.5;
+  }
+}
+@media (max-width: 760px) and (max-height: 740px) {
+  .why {
+    --why-gap: 16px;
+  }
+  .why-layout {
+    gap: 18px;
+  }
+  .why h2 {
+    margin-bottom: 12px;
+    font-size: 34px;
+  }
+  .why-promise {
+    font-size: 24px;
+  }
+  .why-lead,
+  .why-note {
+    margin-top: 10px;
+  }
+  .why-reasons > li {
+    padding-block: 13px;
   }
 }
