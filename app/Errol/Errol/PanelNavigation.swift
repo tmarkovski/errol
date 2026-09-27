@@ -1,26 +1,22 @@
 import Observation
 import SwiftUI
 
-/// Settings and permission setup share the console's window. A missing
-/// permission takes precedence over navigation, including after revocation.
+/// Permission setup shares the console's window, and a missing permission
+/// covers the console, including after revocation.
 @Observable
 final class PanelNavigation {
     enum Screen {
-        case console, settings, accessibility
+        case console, accessibility
     }
 
     var accessibilityGranted: Bool
-    var showsSettings = false
     var consoleWidth = Perch.widgetWidth
 
     init(accessibilityGranted: Bool) {
         self.accessibilityGranted = accessibilityGranted
     }
 
-    var screen: Screen {
-        guard accessibilityGranted else { return .accessibility }
-        return showsSettings ? .settings : .console
-    }
+    var screen: Screen { accessibilityGranted ? .console : .accessibility }
 }
 
 /// The screen and native frame use the same smoothstep timing curve.
@@ -65,28 +61,15 @@ struct PanelScreenPresentation: ViewModifier {
 /// which drags the window: it sits behind the content, so a view that opts
 /// out of moving the window keeps that opt-out.
 struct PanelWindowSurface: ViewModifier {
-    var navigation: PanelNavigation? = nil
-
     func body(content: Content) -> some View {
-        let shape = PanelSurfaceShape(isCard: navigation?.screen == .settings)
         content
             .frame(minWidth: 0, maxWidth: .infinity,
                    minHeight: 0, maxHeight: .infinity, alignment: .top)
             .background(Perch.shell.contentShape(Rectangle()).gesture(WindowDragGesture()))
-            .clipShape(shape)
+            // The console and permission setup share one capsule, whose
+            // ends follow the current frame.
+            .clipShape(Capsule())
             .ignoresSafeArea()
-    }
-}
-
-/// The console and permission setup share one capsule, whose corners follow
-/// the current frame. Editors scroll inside that fixed height; Settings
-/// retains its conventional corners and separate content size.
-struct PanelSurfaceShape: Shape {
-    var isCard: Bool
-
-    func path(in rect: CGRect) -> Path {
-        let radius = isCard ? Perch.shellCorner : min(rect.width, rect.height) / 2
-        return Path(roundedRect: rect, cornerRadius: radius)
     }
 }
 
@@ -94,49 +77,29 @@ struct PanelRootView: View {
     let controller: RelayController
     let navigation: PanelNavigation
     var onCardResize: ((CGSize) -> Void)? = nil
-    var onBack: (() -> Void)? = nil
 
     var body: some View {
         let screen = navigation.screen
         ZStack(alignment: .top) {
-            // Keep every screen mounted: navigating, changing appearance, or
-            // losing the grant must not discard the native editor, its
-            // selection, or drafts.
+            // Keep both screens mounted: changing appearance or losing the
+            // grant must not discard the native editor, its selection, or
+            // drafts. Setup shares the console's capsule, so the two only
+            // crossfade.
             PerchConsoleView(controller: controller, width: navigation.consoleWidth)
-                // Settings slides the console aside as it comes in. Setup
-                // shares the console's capsule, so the two only crossfade.
-                .modifier(PanelScreenPresentation(
-                    isVisible: screen == .console,
-                    hiddenOffset: screen == .settings ? -Perch.s(18) : 0))
+                .modifier(PanelScreenPresentation(isVisible: screen == .console, hiddenOffset: 0))
                 .frame(width: 0, height: screen == .console ? nil : 0, alignment: .top)
-
-            SettingsView(isPresented: screen == .settings)
-                .modifier(PanelScreenPresentation(isVisible: screen == .settings,
-                                                  hiddenOffset: Perch.s(24)))
-                .frame(width: 0, height: screen == .settings ? nil : 0, alignment: .top)
 
             PermissionOnboardingView(width: navigation.consoleWidth)
                 .modifier(PanelScreenPresentation(isVisible: screen == .accessibility,
                                                   hiddenOffset: 0))
                 .frame(width: 0, height: screen == .accessibility ? nil : 0, alignment: .top)
         }
-        .frame(width: screen == .settings ? Perch.cardWidth : navigation.consoleWidth)
+        .frame(width: navigation.consoleWidth)
         .fixedSize(horizontal: false, vertical: true)
-        // Settings' fields, like the console's editors (GrowingTextEditor),
-        // stay out of Writing Tools and so out of macOS 27's "Ask Siri" tag.
+        // Like the console's editors (GrowingTextEditor), everything here
+        // stays out of Writing Tools and so out of macOS 27's "Ask Siri" tag.
         .writingToolsBehavior(.disabled)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
-        .overlay(alignment: .top) {
-            if screen == .settings {
-              PerchChrome(controller: controller, screen: screen) {
-                if let onBack {
-                    onBack()
-                } else {
-                    navigation.showsSettings = false
-                }
-              }
-            }
-        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             onCardResize?(size)
         }
@@ -144,15 +107,6 @@ struct PanelRootView: View {
 }
 
 #if DEBUG
-#Preview("Settings navigation") {
-    let navigation = PanelNavigation(accessibilityGranted: true)
-    navigation.showsSettings = true
-    return PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
-                         navigation: navigation)
-        .background(Perch.shell)
-        .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
-}
-
 #Preview("Accessibility setup") {
     PanelRootView(controller: RelayController(engine: PerchPreviewEngine()),
                   navigation: PanelNavigation(accessibilityGranted: false))

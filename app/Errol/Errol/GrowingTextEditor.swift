@@ -168,8 +168,8 @@ struct GrowingTextEditor: NSViewRepresentable {
         if textView.insertionPointColor != caretColor { textView.insertionPointColor = caretColor }
         textView.placeholderColor = placeholderColor
         textView.trailingPlaceholder = placeholder
-        // A retained composer is disabled while Settings or permission
-        // setup covers it. SwiftUI's disabled state must reach AppKit too.
+        // A retained composer is disabled while permission setup covers
+        // it. SwiftUI's disabled state must reach AppKit too.
         textView.isEditable = context.environment.isEnabled && (session?.acceptsInput ?? true)
         textView.isSelectable = textView.isEditable
         if textView.string != text {

@@ -93,6 +93,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var permissionTimer: Timer?
     /// The debug log window, behind the status item's "Show Last Run Log".
     private var logWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     /// The run's transcript (PerchTranscript), in a window under the
     /// console: a child of the panel, so it goes where the console is
     /// dragged and is put away with it. Made at the first run.
@@ -120,7 +121,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         trackStatusIcon()
         trackTranscript()
         relay.appMenuProvider = { [weak self] in self?.makeAppMenu() ?? NSMenu() }
-        relay.openSettingsHandler = { [weak self] in self?.showSettings() }
         relay.focusPanelHandler = { [weak self] in self?.showPanel() }
         // A menu-bar app with no window gives a first-time user nothing to
         // discover the permission need from, so while the grant is missing
@@ -146,6 +146,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
         NSApp.appearance = selection.1.nativeAppearance
         logWindow?.backgroundColor = selection.0.palette.shell
+        aboutWindow?.backgroundColor = selection.0.palette.shell
     }
 
     // MARK: Status item
@@ -170,12 +171,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         togglePanel()
     }
 
+    /// The status item's menu, which the console's ··· button also shows.
+    /// There is no settings screen: the appearance and the color palette
+    /// are chosen here, and apply at once.
     private func makeAppMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
-        addAppearanceOptions(to: menu)
-        menu.addItem(.separator())
+        menu.addItem(withTitle: "About Errol", action: #selector(showAbout), keyEquivalent: "").target = self
         let checkForUpdatesItem = menu.addItem(
             withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         checkForUpdatesItem.target = self
@@ -183,29 +185,29 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // surface Sparkle's window later, at a moment nobody chose.
         checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
         menu.addItem(.separator())
-        // The debug pair. The console dropped its log well and Inspect
-        // button; the in-memory run log and the inspector live here.
+        addAppearanceOptions(to: menu)
+        menu.addItem(.separator())
+        // The logs, for a report of what went wrong. The console dropped
+        // its log well; the in-memory run log lives here.
         menu.addItem(withTitle: "Show Last Run Log", action: #selector(showRunLog),
                  keyEquivalent: "").target = self
         let finderItem = menu.addItem(withTitle: "Show Debug Logs in Finder", action: #selector(showDebugLogs),
                                      keyEquivalent: "")
         finderItem.target = self
         finderItem.isEnabled = relay.consoleAccess.canChangeDestination
+        #if DEBUG
+        // The selector inspector is for working on Errol, so only a debug
+        // build offers it.
         let inspectItem = menu.addItem(
             withTitle: "Inspect Apps", action: #selector(inspectApps), keyEquivalent: "")
         inspectItem.target = self
         // A run owns the apps' AX trees; inspecting mid-run would fight it.
         inspectItem.isEnabled = relay.consoleAccess.canChangeDestination
-        let restore = menu.addItem(withTitle: "Restore Window Positions",
-                                   action: #selector(restoreWindowPositions), keyEquivalent: "")
-        restore.target = self
-        restore.isEnabled = relay.consoleAccess.canChangeDestination && relay.setup.canRestoreLayout
+        #endif
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
         return menu
     }
-
-    @objc private func openSettingsFromMenu() { relay.openSettings() }
 
     @objc private func checkForUpdates() {
         updater.checkForUpdates()
@@ -256,11 +258,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         AppearanceStore.shared.theme = theme
     }
 
-    @objc private func restoreWindowPositions() {
-        guard relay.consoleAccess.canChangeDestination else { return }
-        relay.setup.restoreLayout()
-    }
-
     @objc private func quit() {
         relayControl.cancel()
         NSApp.terminate(nil)
@@ -306,7 +303,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         // The card covers its whole window, so it names its own drag region
-        // (PanelRootView and PerchChrome); this catches whatever they leave.
+        // (PanelRootView); this catches whatever it leaves.
         panel.isMovableByWindowBackground = true
         panel.title = "Errol"
         // Ordering and occlusion combine into one effective visibility: a
@@ -318,12 +315,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             if visible { self?.refreshAccessibility() }
             self?.pushPanelVisibility()
             self?.updateTranscript()
-        }
-        panel.onCancel = { [weak self] in
-            guard let self else { return false }
-            guard self.navigation.screen == .settings else { return false }
-            self.showConsole()
-            return true
         }
         _ = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,
@@ -350,9 +341,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 // The report lands mid-layout; the hop keeps the window's
                 // frame change out of the pass that measured the card.
                 DispatchQueue.main.async { self?.fitPanel(to: size) }
-            },
-            onBack: { [weak self] in self?.showConsole() })
-            .modifier(PanelWindowSurface(navigation: navigation)))
+            })
+            .modifier(PanelWindowSurface()))
         // fitPanel is the one thing that sizes this window. Left to its
         // default, the hosting view also gives itself an intrinsic size and
         // can fight the shell's animated resize. With no intrinsic size the
@@ -361,8 +351,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.contentView = host
     }
 
-    /// Console and permission report the same fixed footprint. Settings
-    /// reports its own content size, applied through an anchored resize.
+    /// Console and permission report the same fixed footprint; its width
+    /// follows the screen (positionPanel), applied through an anchored
+    /// resize.
     private func fitPanel(to size: CGSize) {
         guard size.width.isFinite, size.height.isFinite,
               size.width > 0, size.height > 0 else { return }
@@ -480,25 +471,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     // MARK: Navigation
 
-    @objc func showSettings() {
-        refreshAccessibility()
-        if navigation.accessibilityGranted {
-            panel.makeFirstResponder(nil)
-            navigation.showsSettings = true
-            updateNavigation()
-        }
-        showPanel()
-    }
-
-    private func showConsole() {
-        panel.makeFirstResponder(nil)
-        navigation.showsSettings = false
-        updateNavigation()
-        if relay.consoleAccess.pauseGranted {
-            DispatchQueue.main.async { [weak self] in self?.relay.steeringEditor.restoreFocus() }
-        }
-    }
-
     private func refreshAccessibility() {
         let granted = AXIsProcessTrusted()
         guard granted != navigation.accessibilityGranted else { return }
@@ -520,7 +492,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     /// The transcript stands under the console from a run's start until
     /// New topic clears its ending, while the console is up and on its
-    /// own screen (not Settings or the permission ask). Read again at each
+    /// own screen (not the permission ask). Read again at each
     /// change of stage or screen, and at each showing or hiding of the
     /// console.
     private func trackTranscript() {
@@ -598,9 +570,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     /// The transcript comes in with a fade, under the console's own frame:
-    /// while Settings is closing, the panel is still the card's size or
-    /// on its way back from it, and the resize's end calls back here. A
-    /// transcript still fading out is turned around.
+    /// while the panel is still resizing, the resize's end calls back
+    /// here. A transcript still fading out is turned around.
     private func showTranscript() {
         guard panelResizeTimer == nil, panel.frame.height == Perch.widgetHeight else { return }
         let transcript = transcriptPanel ?? makeTranscriptPanel()
@@ -696,6 +667,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         }
     }
 
+    #if DEBUG
     /// Inspect from the menu: open the log window first, so the report —
     /// and anything that stops it, a missing app or permission — lands
     /// somewhere visible.
@@ -703,6 +675,39 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard relay.consoleAccess.canChangeDestination else { return }
         showRunLog()
         relay.runInspect()
+    }
+    #endif
+
+    // MARK: About
+
+    /// Errol's About window (AboutView): a small window of its own, not
+    /// the console, in the theme's shell. Its chrome follows the log
+    /// window's: non-activating and floating a level above the console, so
+    /// opening it mid-run never takes the keyboard from an app the relay
+    /// is typing into. Esc and the close button put it away.
+    @objc func showAbout() {
+        if aboutWindow == nil {
+            let host = FirstMouseHostingView(rootView: AboutView())
+            let window = KeyablePanel(contentRect: NSRect(origin: .zero, size: host.fittingSize),
+                                      styleMask: [.titled, .closable, .fullSizeContentView,
+                                                  .nonactivatingPanel],
+                                      backing: .buffered, defer: false)
+            window.title = "About Errol"
+            window.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+            window.isFloatingPanel = true
+            window.hidesOnDeactivate = false
+            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            window.backgroundColor = Perch.shellNS
+            window.contentView = host
+            window.center()
+            aboutWindow = window
+        }
+        if relay.consoleAccess.canTakeFocus { aboutWindow?.makeKeyAndOrderFront(nil) }
+        else { aboutWindow?.orderFront(nil) }
     }
 
     /// The console, forward and key. Besides its own callers, this is the

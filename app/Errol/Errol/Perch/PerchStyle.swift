@@ -94,24 +94,15 @@ enum Perch {
     /// this less its inset, so the two corners are concentric.
     static let controlCorner = s(10)
 
-    /// Settings keeps its separate content-sized card.
-    static let cardWidth = s(464)
     /// The capsule's footprint: the reference is 860 × 156 CSS pixels at
     /// full desktop width, taken as points and not put through `s` — here
     /// the mockup's own measure is the panel's, and every screen from
-    /// permission to the ending shares it. Settings keeps its card width.
+    /// permission to the ending shares it.
     static let widgetWidth: CGFloat = 860
     static let widgetHeight: CGFloat = 156
     /// A participant's column: the app's icon over a destination name,
     /// kept to one line and truncated in the middle.
     static let participantWidth = s(72)
-    /// The content header keeps the familiar 52pt height of a unified
-    /// toolbar. The borderless panel draws its controls here (PerchChrome).
-    static let chromeBand: CGFloat = 52
-    /// The card's top padding: the strip, plus breathing room before the
-    /// avatars — the app icons' squircles read heavier than the initial
-    /// circles did and crowded the wordmark with only a hair of gap.
-    static let chromeInset = chromeBand + s(10)
 
     // MARK: The composer's measures
 
@@ -150,7 +141,6 @@ enum Perch {
 }
 
 /// The console and permission screen keep this height through every state.
-/// Settings reports its own content size to MenuBarController.fitPanel.
 enum PerchMetrics {
     static let initialPanel = CGSize(width: Perch.widgetWidth, height: Perch.widgetHeight)
 }

@@ -103,13 +103,13 @@ final class RelayController {
     /// The picker tag for an open conversation with no preset structure: the
     /// topic is the whole opening message. Not a ConversationTemplate — a
     /// template with an empty body would still frame the topic as "below",
-    /// and Settings should not offer its body for editing.
+    /// and a shapes editor should not offer its body for editing.
     static let freeConversation = "Free chat"
     /// The selected template's name, customConversation, or freeConversation.
     /// Free chat for now (Sep 2026): the shape choice is off the composer
     /// and the session settings, so every opening is the bare topic. The
-    /// templates, their Settings editor, and selectConversation stay for
-    /// when the choice comes back.
+    /// templates and selectConversation stay for when the choice comes
+    /// back; the shapes editor went with the settings screen (Sep 2026).
     var conversation = RelayController.freeConversation
     /// Completes the selected template ("What to brainstorm about").
     var topic = ""
@@ -242,9 +242,6 @@ final class RelayController {
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
     @ObservationIgnored private var panelVisible = false
-    /// Set by the AppKit shell; the panel's Settings… item routes here to
-    /// navigate to Settings inside the panel.
-    @ObservationIgnored var openSettingsHandler: (() -> Void)?
     /// The native shell builds the same menu for the console and status item.
     @ObservationIgnored var appMenuProvider: (() -> NSMenu)?
     private(set) var isShowingWindow = false
@@ -355,7 +352,7 @@ final class RelayController {
                 finishRun()
             }
         }
-        // A shape deleted or renamed in Settings can leave the picker
+        // A shape deleted or renamed in the store can leave the picker
         // pointing at nothing; follow the list to its first shape (which
         // always exists — the store refuses to empty the list).
         templatesWatcher = SettingsStore.shared.$templates
@@ -367,10 +364,6 @@ final class RelayController {
                 else { return }
                 selectConversation(templates.first?.name ?? Self.customConversation)
             }
-    }
-
-    func openSettings() {
-        openSettingsHandler?()
     }
 
     /// nil means the picker is on Custom or Free chat.

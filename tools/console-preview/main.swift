@@ -282,22 +282,18 @@ func main() {
         scene("18-ending-turn-limit-narrow", narrow, consoleWidth: 600, settle: 0.5)
     }
     if wanted("19") {
-        // Settings, in the card the panel turns into: the shell, with its
-        // fields in wells.
-        let navigation = PanelNavigation(accessibilityGranted: true)
-        navigation.showsSettings = true
-        let card = PanelRootView(controller: quick(RelayController(engine: PerchPreviewEngine())),
-                                 navigation: navigation)
-            .background(Perch.shell)
+        // The About window: its view on the theme's shell, with a stand-in
+        // for the window's shadow.
+        let about = AboutView()
             .clipShape(RoundedRectangle(cornerRadius: Perch.shellCorner))
-        let height = 36 + NSHostingView(rootView: card).fittingSize.height + 36
-        render("19-settings",
-               card
+        let height = 36 + NSHostingView(rootView: AboutView()).fittingSize.height + 36
+        render("19-about",
+               about
                    .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
                    .padding(36)
-                   .frame(width: Perch.cardWidth + 72, height: height, alignment: .top)
+                   .frame(width: AboutView.width + 72, height: height, alignment: .top)
                    .background(backdrop),
-               size: CGSize(width: Perch.cardWidth + 72, height: height), settle: 1.0)
+               size: CGSize(width: AboutView.width + 72, height: height), settle: 0.5)
     }
 
     // The canvases' states, as Xcode draws them (PerchPreviews.swift): asked
