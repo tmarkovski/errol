@@ -1,7 +1,9 @@
-// The console's buttons, drawn flat: filled capsules and circles on the
-// panel's shell, with no material of their own. The running actions are
-// bare icons in circles — pause and stop say themselves; editors,
-// permission setup, and the ending keep their labeled pills, all one size.
+// The console's buttons, capsules and circles of Liquid Glass on the
+// panel's shell: the one action that goes forward tints its glass with the
+// accent, the one beside it leaves the glass clear, and the glass answers a
+// press and draws its own rim. The running actions are bare icons in
+// circles — pause and stop say themselves; editors, permission setup, and
+// the ending keep their labeled pills, all one size.
 
 import SwiftUI
 
@@ -22,8 +24,7 @@ struct PerchRoundButton: View {
                 .font(Perch.text(13, .semibold))
                 .foregroundStyle(ink)
                 .frame(width: Perch.actionDiameter, height: Perch.actionDiameter)
-                .background(Circle().fill(prominent ? Perch.accent : Perch.paper))
-                .overlay(Circle().stroke(prominent ? Perch.accent : Perch.chipEdge, lineWidth: 1))
+                .perchGlass(prominent: prominent, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -34,9 +35,9 @@ struct PerchRoundButton: View {
 
 struct PerchCapsuleButton: View {
     enum Style {
-        /// The accent, for the one action that goes forward.
+        /// Glass tinted with the accent, for the one action that goes forward.
         case prominent
-        /// The well, for the action beside it.
+        /// Clear glass, for the action beside it.
         case secondary
     }
 
@@ -77,12 +78,19 @@ struct PerchCapsuleLabel: View {
         .foregroundStyle(prominent ? Perch.onAccent : Perch.ink)
         .padding(.horizontal, Perch.s(13))
         .frame(height: Perch.s(29))
-        .background(Capsule().fill(prominent ? Perch.accent : Perch.well))
-        .overlay(Capsule().stroke(prominent ? Color.clear : Perch.chipEdge, lineWidth: 1))
+        .perchGlass(prominent: prominent, in: Capsule())
         .perchHover(Capsule(), tint: prominent ? .white : Perch.ink, opacity: prominent ? 0.12 : 0.06)
         .contentShape(Capsule())
         .opacity(isEnabled ? 1 : 0.45)
         .animation(Perch.fade, value: isEnabled)
+    }
+}
+
+extension View {
+    /// A button's glass in its own shape: tinted with the accent when
+    /// prominent, clear otherwise, and answering a press either way.
+    func perchGlass(prominent: Bool, in shape: some Shape) -> some View {
+        glassEffect(prominent ? .regular.tint(Perch.accent).interactive() : .regular.interactive(), in: shape)
     }
 }
 

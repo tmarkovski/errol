@@ -1,8 +1,8 @@
 // The prompt box's mic, beside Start relay and Resume: a press fills the
 // field above it with what the human says (VoiceInput), and another press
-// finishes. At rest it is a circle of the well, the size of the capsule
-// beside it; while the microphone is open it takes the accent, the mark
-// filled, and a ring breathes out from it, so it reads as live the way the
+// finishes. It is a circle of Liquid Glass the size of the capsule beside
+// it, clear at rest; while the microphone is open the glass takes the
+// accent, the mark filled, and a ring breathes out from it, so it reads as live the way the
 // menu bar's orange dot does. The line under the box says what it is doing.
 
 import SwiftUI
@@ -27,8 +27,7 @@ struct PerchMicButton: View {
                 .font(Perch.text(12, .semibold))
                 .foregroundStyle(live ? Perch.onAccent : phase == .starting ? Perch.accentText : Perch.secondary)
                 .frame(width: Self.diameter, height: Self.diameter)
-                .background(Circle().fill(live ? Perch.accent : Perch.well))
-                .overlay(Circle().stroke(live ? Perch.accent : Perch.chipEdge, lineWidth: 1))
+                .perchGlass(prominent: live, in: Circle())
                 .background { if phase == .listening && !reduceMotion { Breath() } }
                 .perchHover(Circle(), tint: live ? .white : Perch.ink, opacity: live ? 0.12 : 0.06)
                 .contentShape(Circle())
