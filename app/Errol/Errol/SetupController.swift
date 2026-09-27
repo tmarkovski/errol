@@ -1,12 +1,12 @@
 // The setup's observable face: the pure SetupState (Core/Setup.swift)
-// driven by the engine's readiness sweeps and the human's actions, plus
-// the remembered destinations in the defaults. Main thread only; the
-// engine answers on the main thread.
+// driven by the engine's readiness sweeps and the human's actions. Main
+// thread only; the engine answers on the main thread.
 //
 // Connecting has one entry point, `connect(_:to:)`. A side with one window
 // a run could target is connected to it as a sweep sees it; a side with
-// several waits for the human to choose one from its line under the box.
-// Both come through `connect(_:to:)`.
+// several (ChatGPT opens more with File > New Window) waits for the human
+// to choose one from its line under the box. Both come through
+// `connect(_:to:)`.
 
 import AppKit
 import Foundation
@@ -34,7 +34,6 @@ final class SetupController {
     var names: (chatgpt: String, claude: String) = ("ChatGPT", "Claude")
 
     @ObservationIgnored private let engine: RelayEngine
-    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var launchDeadlines: [Speaker: Timer] = [:]
     @ObservationIgnored private var arrangementsInFlight = 0
     /// The windows the last arrangement was asked to move, so a sweep
@@ -47,12 +46,9 @@ final class SetupController {
     /// so; it is never handed another window in the meantime.
     @ObservationIgnored private var runInProgress = false
 
-    init(engine: RelayEngine, defaults: UserDefaults = .standard) {
+    init(engine: RelayEngine) {
         self.engine = engine
-        self.defaults = defaults
-        var state = SetupState()
-        for (side, hint) in DestinationHints.load(from: defaults) { state[side].hint = hint }
-        self.state = state
+        state = SetupState()
     }
 
     func name(_ side: Speaker) -> String {
@@ -202,8 +198,8 @@ final class SetupController {
     }
 
     private func missingWindowProblem(_ side: Speaker) -> String {
-        state[side].needsConversationChoice
-            ? "Choose which \(name(side)) conversation to connect: click the line below."
+        state[side].needsWindowChoice
+            ? "Choose which \(name(side)) window to use: click the line below."
             : "Open a conversation in \(name(side)) first."
     }
 
@@ -231,15 +227,16 @@ final class SetupController {
             isBinding = false
             guard let observation else {
                 refusedAutomatically[side] = window
-                problem = "That \(name(side)) window is gone. Choose another."
+                problem = state[side].hasSeveralWindows
+                    ? "That \(name(side)) window is gone. Choose another."
+                    : "That \(name(side)) window is gone."
                 engine.requestSweep()
                 return
             }
             refusedAutomatically[side] = nil
             state.connected(side, window: window, identity: observation.identity,
                             model: candidate?.model, observation: observation)
-            DestinationHints.save(state[side].hint, for: side, in: defaults)
-            announce("\(name(side)) connected to \(state[side].connection?.name ?? "its conversation").")
+            announce("\(name(side)) connected.")
             // One bind at a time: the other side's turn comes now, not a
             // sweep later.
             connectIfUnambiguous()
@@ -258,15 +255,6 @@ final class SetupController {
             connect(side, to: window)
             return
         }
-    }
-
-    /// Choose another conversation for a connected side: the connection is
-    /// dropped, and the side is connected again the way any side is.
-    func chooseAnother(_ side: Speaker) {
-        problem = nil
-        engine.unbind(side)
-        state.disconnect(side)
-        engine.requestSweep()
     }
 
     // MARK: Runs and returns

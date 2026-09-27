@@ -2,7 +2,7 @@
 // so the canvas lists them together. Each stands the console the way the
 // panel does (PerchPreviewScene), and each runs on PerchPreviewEngine: the
 // controls do what they do in the app, and nothing reaches either app. An
-// icon opens its app, a destination line connects a conversation, Start
+// icon opens its app, a destination line chooses among windows, Start
 // relay starts a run, Stop ends it at the next handoff, Pause to steer
 // holds it and opens the field, and Return sends the note. The render
 // harness (tools/console-preview) draws the same states in the same scene.
@@ -121,8 +121,8 @@ func connectedController(_ engine: PerchPreviewEngine = PerchPreviewEngine(),
 /// and settles within a couple of seconds.
 enum PerchPreviewState: CaseIterable {
     // Before a run.
-    case severalConversations, bothConnected, noTopic, codeSession, stillReplying,
-         chatgptClosed, claudeNotInstalled, longTopic, longDestinations,
+    case severalWindows, bothConnected, noTopic, codeSession, stillReplying,
+         chatgptClosed, claudeNotInstalled, longTopic,
          turnLimit, untilStopped, narrow
     // A side's tip.
     case details, detailsChoosing, detailsClosed, detailsHeld
@@ -149,7 +149,7 @@ enum PerchPreviewState: CaseIterable {
 
     @MainActor func controller() -> RelayController {
         switch self {
-        case .severalConversations, .detailsChoosing:
+        case .severalWindows, .detailsChoosing:
             // Two windows on each side, so neither is connected until one
             // is chosen from its line under the box.
             return freshController()
@@ -160,8 +160,8 @@ enum PerchPreviewState: CaseIterable {
             controller.topic = ""
             return controller
         case .codeSession:
-            // Named as a Code session under the prompt, with the bare model
-            // its popup announces.
+            // Code as the mode under the prompt, with the bare model its
+            // popup announces.
             return connectedController(claude: PerchPreviewEngine.Windows.claudeCode)
         case .stillReplying:
             // Claude is answering something the relay did not send, so
@@ -181,19 +181,6 @@ enum PerchPreviewState: CaseIterable {
             let controller = connectedController()
             controller.topic = Array(repeating: "Compare pricing by seat and by usage. Consider predictability, fairness, and how each option grows with a team.", count: 8)
                 .joined(separator: "\n\n")
-            return controller
-        case .longDestinations:
-            // Titles longer than the line under the box, which shortens them
-            // in the middle.
-            let controller = connectedController()
-            var report = ReadinessReport(chatgpt: controller.chatgptStatus, claude: controller.claudeStatus)
-            var left = PerchPreviewEngine.chatgptWindows[0]
-            left.identity.title = "Pricing critique \u{2014} enterprise tier, second pass"
-            var right = PerchPreviewEngine.claudeWindows[0]
-            right.identity.title = "Pricing critique \u{2014} enterprise tier, first pass"
-            right.identity.surface = "Code"
-            report.candidates = [.chatgpt: [left], .claude: [right]]
-            controller.setup.apply(report)
             return controller
         case .turnLimit:
             let controller = connectedController()
@@ -339,7 +326,7 @@ enum PerchPreviewState: CaseIterable {
 
 // MARK: - Canvases
 
-#Preview("Compose · several conversations") { PerchPreviewState.severalConversations.scene }
+#Preview("Compose · several windows") { PerchPreviewState.severalWindows.scene }
 #Preview("Compose · both connected") { PerchPreviewState.bothConnected.scene }
 #Preview("Compose · no topic yet") { PerchPreviewState.noTopic.scene }
 #Preview("Compose · Code session") { PerchPreviewState.codeSession.scene }
@@ -347,13 +334,12 @@ enum PerchPreviewState: CaseIterable {
 #Preview("Compose · ChatGPT closed") { PerchPreviewState.chatgptClosed.scene }
 #Preview("Compose · Claude not installed") { PerchPreviewState.claudeNotInstalled.scene }
 #Preview("Compose · long topic") { PerchPreviewState.longTopic.scene }
-#Preview("Compose · long destination titles") { PerchPreviewState.longDestinations.scene }
 #Preview("Compose · ends after a set number of turns") { PerchPreviewState.turnLimit.scene }
 #Preview("Compose · ends when you stop it") { PerchPreviewState.untilStopped.scene }
 #Preview("Compose · narrow console") { PerchPreviewState.narrow.scene }
 
 #Preview("Tip · ChatGPT") { PerchPreviewState.details.scene }
-#Preview("Tip · no conversation chosen") { PerchPreviewState.detailsChoosing.scene }
+#Preview("Tip · no window chosen") { PerchPreviewState.detailsChoosing.scene }
 #Preview("Tip · ChatGPT closed") { PerchPreviewState.detailsClosed.scene }
 #Preview("Tip · Claude minimized mid-run") { PerchPreviewState.detailsHeld.scene }
 

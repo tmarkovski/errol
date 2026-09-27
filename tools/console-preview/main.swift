@@ -106,7 +106,7 @@ func main() {
     // Before a run.
     if wanted("01") {
         let c = quick(RelayController(engine: PerchPreviewEngine()))
-        scene("01-compose-several-conversations", c)
+        scene("01-compose-several-windows", c)
         details("01-participant-choose", c, .chatgpt)
     }
     if wanted("02") {
@@ -280,18 +280,6 @@ func main() {
         let narrow = quick(connectedController())
         narrow.ending = .turnLimit
         scene("18-ending-turn-limit-narrow", narrow, consoleWidth: 600, settle: 0.5)
-    }
-    if wanted("17") {
-        let c = quick(connectedController())
-        var report = ReadinessReport(chatgpt: c.chatgptStatus, claude: c.claudeStatus)
-        var left = PerchPreviewEngine.chatgptWindows[0]
-        left.identity.title = "Pricing critique — enterprise tier, second pass"
-        var right = PerchPreviewEngine.claudeWindows[0]
-        right.identity.title = "Pricing critique — enterprise tier, first pass"
-        right.identity.surface = "Code"
-        report.candidates = [.chatgpt: [left], .claude: [right]]
-        c.setup.apply(report)
-        scene("17-long-destinations", c, settle: 0.3)
     }
     if wanted("19") {
         // Settings, in the card the panel turns into: the shell, with its

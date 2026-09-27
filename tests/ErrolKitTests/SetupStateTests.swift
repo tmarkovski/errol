@@ -123,12 +123,29 @@ final class SetupStateTests: XCTestCase {
         let two = try candidate("claude-chat-home", id: 2, selectors: claude)
         state.observe(.claude, presence: .available(windows: 2), candidates: [one, two])
         XCTAssertNil(state.claude.arrangementTarget)
-        XCTAssertTrue(state.claude.needsConversationChoice)
+        XCTAssertTrue(state.claude.needsWindowChoice)
         XCTAssertFalse(state.canArrange)
         // The connection names the window to move.
         state.connected(.claude, window: one.id, identity: one.identity, model: nil, observation: observation(one))
         XCTAssertEqual(state.claude.arrangementTarget, one.id)
-        XCTAssertFalse(state.claude.needsConversationChoice)
+        XCTAssertFalse(state.claude.needsWindowChoice)
+        XCTAssertTrue(state.claude.hasSeveralWindows, "the chooser stays, to switch windows")
+    }
+
+    func testTheChooserNamesWindowsByTitleAndNumbersTheUntitled() throws {
+        var side = SideSetup(side: .chatgpt)
+        let named = try candidate("chatgpt-chat-conversation", id: 1, selectors: chatgpt)
+        var scan = WindowScan()
+        scan.title = "ChatGPT"
+        scan.hasComposer = true
+        let first = WindowCandidate(id: WindowID(raw: 2), scan: scan, selectors: chatgpt)
+        let second = WindowCandidate(id: WindowID(raw: 3), scan: scan, selectors: chatgpt)
+        side.candidates = [named, first]
+        XCTAssertEqual(side.windowChoices.map(\.label), ["\u{201C}Logo brainstorm\u{201D}", "Untitled window"])
+        side.candidates = [first, named, second]
+        XCTAssertEqual(side.windowChoices.map(\.label),
+                       ["Untitled window 1", "\u{201C}Logo brainstorm\u{201D}", "Untitled window 2"])
+        XCTAssertEqual(side.windowChoices.map(\.id), [first.id, named.id, second.id], "the app's order holds")
     }
 
     // MARK: Connect
@@ -140,17 +157,16 @@ final class SetupStateTests: XCTestCase {
         let fresh = try candidate("claude-chat-home", id: 3, selectors: claude)
         state.observe(.chatgpt, presence: .available(windows: 1), candidates: [gpt])
         state.observe(.claude, presence: .available(windows: 2), candidates: [named, fresh])
-        state.claude.hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
 
         XCTAssertEqual(state.automaticConnection(for: .chatgpt), gpt.id)
-        XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among, hint or not")
-        XCTAssertTrue(state.needsConversationChoice(.claude))
+        XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among")
+        XCTAssertTrue(state.needsWindowChoice(.claude))
         XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
 
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
         XCTAssertNil(state.automaticConnection(for: .chatgpt), "a connected side is left alone")
         XCTAssertEqual(state.notice(names: names)?.text,
-                       "Claude has 2 conversations open. Click the line below to choose one.")
+                       "Claude has 2 windows open. Click the line below to choose one.")
 
         state.connected(.claude, window: named.id, identity: named.identity, model: nil,
                         observation: observation(named))
@@ -158,17 +174,11 @@ final class SetupStateTests: XCTestCase {
         XCTAssertNil(state.sendBlocker(names: names))
     }
 
-    func testConnectingBothSidesReadsReadyAndRemembersTheNamedOne() throws {
+    func testConnectingBothSidesReadsReady() throws {
         let state = try composed()
         XCTAssertTrue(state.chatgpt.isReady)
         XCTAssertTrue(state.claude.isReady)
         XCTAssertNil(state.sendBlocker(names: names))
-        XCTAssertEqual(state.chatgpt.connection?.context, "New chat")
-        XCTAssertEqual(state.claude.connection?.name, "\u{201C}Errol brand naming\u{201D}")
-        XCTAssertEqual(state.claude.connection?.context, "Continues here")
-        XCTAssertEqual(state.claude.hint, DestinationHint(title: "Errol brand naming", surface: "Chat"),
-                       "a named conversation is remembered; an unnamed one is not")
-        XCTAssertNil(state.chatgpt.hint)
     }
 
     func testAWorkSurfaceConnectsLikeAnyConversation() throws {
@@ -276,27 +286,5 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.layout, .stacked)
         XCTAssertFalse(state.layoutApplied, "a moving layout waits for the engine's word")
         XCTAssertTrue(state.canArrange, "the connected windows are the ones to move")
-    }
-
-    // MARK: Remembered destinations
-
-    func testHintsRoundTripThroughTheDefaults() throws {
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ErrolKitTests.hints.\(UUID().uuidString)"))
-        defer { defaults.removePersistentDomain(forName: defaults.description) }
-        XCTAssertTrue(DestinationHints.load(from: defaults).isEmpty)
-        DestinationHints.save(DestinationHint(title: "Logo brainstorm", surface: "Chat"), for: .chatgpt, in: defaults)
-        XCTAssertEqual(DestinationHints.load(from: defaults)[.chatgpt],
-                       DestinationHint(title: "Logo brainstorm", surface: "Chat"))
-        DestinationHints.save(nil, for: .chatgpt, in: defaults)
-        XCTAssertNil(DestinationHints.load(from: defaults)[.chatgpt])
-    }
-
-    func testAHintMatchesOnlyAWindowShowingItsTitle() throws {
-        let named = try candidate("claude-chat-conversation", id: 1, selectors: claude)
-        let fresh = try candidate("claude-chat-home", id: 2, selectors: claude)
-        let hint = DestinationHint(title: "Errol brand naming", surface: "Chat")
-        XCTAssertTrue(hint.matches(named))
-        XCTAssertFalse(hint.matches(fresh))
-        XCTAssertFalse(DestinationHint(title: "Something else", surface: "Chat").matches(named))
     }
 }

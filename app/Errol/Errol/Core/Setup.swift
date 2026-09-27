@@ -1,5 +1,5 @@
 // The console's setup state: what each side has been observed to be, which
-// conversation it is connected to, and how the windows are arranged. Pure,
+// window it is connected to, and how the windows are arranged. Pure,
 // so every transition runs in the tests with no app open. The observable
 // controller in the app wraps a SetupState and asks the engine for the
 // observations; nothing here touches Accessibility, and the live window
@@ -16,8 +16,8 @@ struct WindowID: Hashable {
     let raw: UInt
 }
 
-/// One window of one app, as a place a conversation could be connected to:
-/// what it shows and whether a run could target it.
+/// One window of one app, as a place a side could be connected to: what it
+/// shows and whether a run could target it.
 struct WindowCandidate: Identifiable, Equatable {
     let id: WindowID
     var identity: DestinationIdentity
@@ -26,9 +26,6 @@ struct WindowCandidate: Identifiable, Equatable {
     /// Model plus effort where the window announces one, as the strip
     /// renders it ("Fable 5 · Extra").
     var model: String?
-    /// Messages visible in the window's tree, by their affordances. Zero
-    /// under a generic title is the only evidence there is of a new chat.
-    var visibleMessages: Int
     /// The window's frame in AX coordinates, for the picker's highlight;
     /// nil in fixtures.
     var frame: CGRect?
@@ -49,27 +46,20 @@ struct WindowCandidate: Identifiable, Equatable {
         if let effort = scan.effort {
             model = model.map { "\($0) \u{00B7} \(effort)" } ?? effort
         }
-        visibleMessages = scan.messageAffordances
         self.frame = frame
         self.isMinimized = isMinimized
         isEligible = scan.hasComposer && (!scan.isExcluded || selectors.excludedSurfaceIsFallback)
     }
 
-    /// How the window's conversation is named in the picker and under the
-    /// icon: its title, its surface for a work session, or what can be said
-    /// of an unnamed chat.
-    var name: String {
+    /// How the window chooser names the window: its title as the app shows
+    /// it, or its surface for a work session. nil where the title is the
+    /// app's own name or a placeholder. Whether the chat in such a window is
+    /// new or goes on from before can't be told reliably, so nothing is
+    /// said of it.
+    var name: String? {
         if !identity.titleIsGeneric { return "\u{201C}\(identity.title)\u{201D}" }
         if identity.excluded, let surface = identity.surface { return "\(surface) session" }
-        return visibleMessages == 0 ? "New chat" : "Unnamed chat"
-    }
-
-    /// Whether the window continues an existing conversation or starts a
-    /// new one, said only on evidence: a route or a title continues; an
-    /// empty unnamed chat is new; anything else is left unnamed.
-    var context: String {
-        if identity.isDistinct { return "Continues here" }
-        return visibleMessages == 0 ? "New chat" : "Unnamed chat"
+        return nil
     }
 
     /// The window's state as a place to paste into, one short phrase.
@@ -237,47 +227,14 @@ struct SideConnection: Equatable {
     var identity: DestinationIdentity
     var model: String?
     var readiness = DestinationReadiness.unverified
-
-    /// The conversation's name under the icon.
-    var name: String {
-        if !identity.titleIsGeneric { return "\u{201C}\(identity.title)\u{201D}" }
-        if identity.excluded, let surface = identity.surface { return "\(surface) session" }
-        return "New chat"
-    }
-
-    /// Continues or new, on the evidence at binding.
-    var context: String { identity.isDistinct ? "Continues here" : "New chat" }
 }
 
-/// What was connected last time: a title and surface remembered across
-/// launches, shown as "Last used" until a window showing them is observed
-/// again. Never a live connection — an Accessibility element does not
-/// survive the app it belongs to, let alone a relaunch of Errol.
-struct DestinationHint: Equatable, Codable {
-    var title: String?
-    var surface: String?
-
-    init?(identity: DestinationIdentity) {
-        guard identity.isDistinct, !identity.titleIsGeneric else { return nil }
-        title = identity.title
-        surface = identity.surface
-    }
-
-    init(title: String?, surface: String?) {
-        self.title = title
-        self.surface = surface
-    }
-
-    var name: String {
-        if let title { return "\u{201C}\(title)\u{201D}" }
-        if let surface { return "the \(surface) conversation" }
-        return "the last conversation"
-    }
-
-    func matches(_ candidate: WindowCandidate) -> Bool {
-        guard let title, !candidate.identity.titleIsGeneric else { return false }
-        return candidate.identity.title == title
-    }
+/// One entry in a side's window chooser: the window and what it is called
+/// there.
+struct WindowChoice: Identifiable, Equatable {
+    let candidate: WindowCandidate
+    let label: String
+    var id: WindowID { candidate.id }
 }
 
 struct SideSetup: Equatable {
@@ -285,14 +242,31 @@ struct SideSetup: Equatable {
     var presence = AppPresence.checking
     var candidates: [WindowCandidate] = []
     var connection: SideConnection?
-    var hint: DestinationHint?
 
     var eligible: [WindowCandidate] { candidates.filter(\.isEligible) }
     var isConnected: Bool { connection != nil }
     var isReady: Bool { connection?.readiness.isReady ?? false }
+    /// The app has more than one window a run could target. ChatGPT opens
+    /// another with File > New Window; Claude keeps to one. Only then is
+    /// there a window to choose.
+    var hasSeveralWindows: Bool { eligible.count > 1 }
     /// Several windows could be connected and none has been named: the
     /// human chooses one from the side's line under the box.
-    var needsConversationChoice: Bool { !isConnected && eligible.count > 1 }
+    var needsWindowChoice: Bool { !isConnected && hasSeveralWindows }
+
+    /// The window chooser's entries, front window first: each window by
+    /// its name, and those without one as "Untitled window", numbered
+    /// when there are several of them.
+    var windowChoices: [WindowChoice] {
+        let untitled = eligible.filter { $0.name == nil }.count
+        var number = 0
+        return eligible.map { candidate in
+            if let name = candidate.name { return WindowChoice(candidate: candidate, label: name) }
+            number += 1
+            return WindowChoice(candidate: candidate,
+                                label: untitled > 1 ? "Untitled window \(number)" : "Untitled window")
+        }
+    }
 
     /// The connected window as the latest sweep saw it. The connection
     /// keeps what the window showed when it was made — the connection is
@@ -410,15 +384,15 @@ struct SetupState: Equatable {
 
     /// The window a side is connected to without being asked: the only one
     /// a run could target. With several, which one is the human's to say,
-    /// and nothing is guessed from their order or from the last one used.
+    /// and nothing is guessed from their order.
     func automaticConnection(for side: Speaker) -> WindowID? {
         guard !self[side].isConnected, self[side].eligible.count == 1 else { return nil }
         return self[side].eligible[0].id
     }
 
     /// Several windows could be connected and none has been named.
-    func needsConversationChoice(_ side: Speaker) -> Bool {
-        self[side].needsConversationChoice
+    func needsWindowChoice(_ side: Speaker) -> Bool {
+        self[side].needsWindowChoice
     }
 
     /// The engine bound the chosen window.
@@ -427,7 +401,6 @@ struct SetupState: Equatable {
         var connection = SideConnection(window: window, identity: identity, model: model)
         connection.readiness = destinationReadiness(observation, side: side)
         self[side].connection = connection
-        self[side].hint = DestinationHint(identity: identity) ?? self[side].hint
     }
 
     /// Drop a side's connection: the side needs connecting again, and only
@@ -480,7 +453,7 @@ struct SetupState: Equatable {
                 return SetupNotice(text: "\(name(side)) has no conversation to relay into. Open a chat in it.",
                                    isProblem: false)
             case .available(let windows) where windows > 1:
-                return SetupNotice(text: "\(name(side)) has \(windows) conversations open. Click the line below to choose one.",
+                return SetupNotice(text: "\(name(side)) has \(windows) windows open. Click the line below to choose one.",
                                    isProblem: false)
             case .available, .notInstalled, .notRunning:
                 return SetupNotice(text: "Connecting \(name(side))\u{2026}", isProblem: false)
@@ -495,30 +468,4 @@ struct SetupState: Equatable {
 struct SetupNotice: Equatable {
     var text: String
     var isProblem: Bool
-}
-
-// MARK: - Remembered destinations
-
-/// The hints' home in the defaults, one per side.
-enum DestinationHints {
-    private static func key(_ side: Speaker) -> String { "lastDestination.\(side.rawValue)" }
-
-    static func load(from defaults: UserDefaults = .standard) -> [Speaker: DestinationHint] {
-        var hints: [Speaker: DestinationHint] = [:]
-        for side in [Speaker.chatgpt, .claude] {
-            if let data = defaults.data(forKey: key(side)),
-               let hint = try? JSONDecoder().decode(DestinationHint.self, from: data) {
-                hints[side] = hint
-            }
-        }
-        return hints
-    }
-
-    static func save(_ hint: DestinationHint?, for side: Speaker, in defaults: UserDefaults = .standard) {
-        guard let hint, let data = try? JSONEncoder().encode(hint) else {
-            defaults.removeObject(forKey: key(side))
-            return
-        }
-        defaults.set(data, forKey: key(side))
-    }
 }

@@ -682,14 +682,6 @@ final class RelayController {
         setup.revalidate()
     }
 
-    /// Choose another conversation for one side, from its details. A
-    /// finished run's summary gives way first; the topic stays.
-    func chooseAnotherConversation(_ side: Speaker) {
-        guard !isRunning else { return }
-        if hasFinishedRun { resetSession() }
-        setup.chooseAnother(side)
-    }
-
     /// The run's `.finished` event: put the panel back to idle. Ordered
     /// after every line the run logged, because it rides the same stream.
     /// Whatever the note was doing becomes its record for the head, since

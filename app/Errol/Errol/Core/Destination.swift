@@ -7,11 +7,12 @@
 // 2026: the drag that connects a window is there to teach where Errol
 // writes, and the binding was never meant to police the conversation.)
 //
-// The identity is still read, to name the destination under the icon and
-// in the log. The evidence is uneven across surfaces (docs/design-
-// proposals/first-run-usability): a Claude chat exposes /chat/<uuid>, a
-// Claude Code session /epitaxy/<id>, a fresh chat and a Cowork task only
-// /new, and the ChatGPT desktop app no conversation URL at all. The pure
+// The identity is still read, to name the window in the chooser an app
+// with several windows offers, and in the log. The evidence is uneven
+// across surfaces (docs/design-proposals/first-run-usability): a Claude
+// chat exposes /chat/<uuid>, a Claude Code session /epitaxy/<id>, a fresh
+// chat and a Cowork task only /new, and the ChatGPT desktop app no
+// conversation URL at all. The pure
 // parts here run over recorded fixtures in the tests; BoundDestination is
 // the live face.
 
@@ -56,8 +57,8 @@ struct DestinationIdentity: Equatable {
     }
 
     /// Whether anything here names this conversation as against another:
-    /// what the details call "Continues here" rather than "New chat", and
-    /// what a remembered destination is matched by.
+    /// a route, or a title that is not the app's own name or a placeholder.
+    /// Evidence only; it says nothing of whether the chat is new.
     var isDistinct: Bool { route != nil || !titleIsGeneric }
 
     /// How the conversation is named to the human: its title, or the

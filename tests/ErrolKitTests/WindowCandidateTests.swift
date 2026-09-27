@@ -22,7 +22,6 @@ final class WindowCandidateTests: XCTestCase {
         let chat = found[0], code = found[1]
         XCTAssertTrue(chat.isEligible)
         XCTAssertEqual(chat.name, "\u{201C}Errol brand naming\u{201D}")
-        XCTAssertEqual(chat.context, "Continues here")
         XCTAssertEqual(chat.stateLine, "Ready")
         XCTAssertTrue(code.isEligible, "the selectors allow a Code session as a deliberate choice")
         XCTAssertTrue(code.identity.excluded)
@@ -35,20 +34,17 @@ final class WindowCandidateTests: XCTestCase {
         XCTAssertEqual(found.map(\.id.raw), [8, 9])
     }
 
-    func testAFreshChatReadsAsNewAndAnUnnamedOneWithMessagesDoesNot() throws {
+    func testAWindowWhoseTitleNamesNothingIsNotGuessedAt() throws {
+        // Whether its chat is new can't be told reliably, empty or not.
         let fresh = try XCTUnwrap(candidates("claude-chat-home", selectors: claude).first)
-        XCTAssertEqual(fresh.name, "New chat")
-        XCTAssertEqual(fresh.context, "New chat")
-        XCTAssertEqual(fresh.visibleMessages, 0)
+        XCTAssertNil(fresh.name)
         XCTAssertFalse(fresh.identity.isDistinct)
-        // A generic title over visible messages proves nothing about freshness.
         var scan = WindowScan()
         scan.title = "ChatGPT"
         scan.hasComposer = true
         scan.messageAffordances = 3
         let unnamed = WindowCandidate(id: WindowID(raw: 1), scan: scan, selectors: chatgpt)
-        XCTAssertEqual(unnamed.name, "Unnamed chat")
-        XCTAssertEqual(unnamed.context, "Unnamed chat")
+        XCTAssertNil(unnamed.name)
     }
 
     func testTheComposerIsJudgedFromTheScan() throws {

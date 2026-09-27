@@ -83,8 +83,6 @@ extension DestinationReadiness {
 }
 
 extension SideSetup {
-    var destinationName: String? { connectedCandidate?.name ?? connection?.name }
     var destinationSurface: String? { connectedCandidate?.identity.surface ?? connection?.identity.surface }
     var destinationModel: String? { connectedCandidate?.model ?? connection?.model }
-    var destinationContext: String? { connectedCandidate?.context ?? connection?.context }
 }

@@ -4,7 +4,7 @@
 // corner, and the app's name under it. A click on the icon focuses the app,
 // its connected window in front, or opens it when it is closed. Resting the
 // pointer on the icon brings up its tip (PerchParticipantTip): what a click
-// does, then the window's mode, model, effort, conversation, and state.
+// does, then the window's mode, model, effort, and state.
 import AppKit
 import SwiftUI
 
@@ -211,35 +211,29 @@ struct ParticipantPresentation {
         case .available: "Not connected"
         }
     }
-    var needsChoice: Bool { !side.isConnected && !side.eligible.isEmpty }
-    var isRemembered: Bool {
-        side.connection?.readiness == .unverified || (!side.isConnected && !needsChoice && side.hint != nil)
-    }
+    /// A connection not checked since the last run: the line stays muted
+    /// until a sweep reads the window again.
+    var isRemembered: Bool { side.connection?.readiness == .unverified }
+    /// What the line under the box says. For a connected side, that is the
+    /// window's mode, then its model with the effort after it, each only
+    /// where the window shows one, since nothing about the conversation in
+    /// it can be told reliably. Otherwise, what to do next, or what is
+    /// happening.
     var destination: String {
-        if let title = side.destinationName {
-            return side.connection?.readiness == .unverified ? "Last used · \(title)" : title
+        if side.isConnected {
+            let model = modelAndEffort.map { [$0.model, $0.effort].compactMap { $0 }.joined(separator: " ") }
+            let parts = [side.destinationSurface, model].compactMap { $0 }
+            return parts.isEmpty ? "Connected" : parts.joined(separator: " \u{00B7} ")
         }
-        if needsChoice {
-            return side.eligible.count == 1 ? "Choose this conversation" : "Choose one of \(side.eligible.count) conversations"
-        }
-        if let hint = side.hint { return "Last used · \(hint.name)" }
+        if side.needsWindowChoice { return "Choose one of \(side.eligible.count) windows" }
         if side.presence == .noWindow || side.presence == .noConversation { return "Open a conversation in \(name)" }
         return side.presence.action(name: name)
     }
-    /// A problem the destination line names after the title, in red. "Last
-    /// used" is not one; the muted title already says it.
+    /// A problem the destination line names after the window, in red.
+    /// "Last used" is not one; the muted line already says it.
     var problem: String? {
         guard let status = shortStatus, status != "Last used" else { return nil }
         return status
-    }
-    /// Whether the continuing conversation or a new one: said only when the
-    /// window's title does not already say it.
-    var continuation: String? {
-        switch side.destinationContext {
-        case "Continues here"?: "Continues this chat"
-        case "New chat"? where destination != "New chat": "Starts a new chat"
-        default: nil
-        }
     }
 
     /// What a click on the icon does now: bring the app forward, keyboard
@@ -282,18 +276,9 @@ struct ParticipantPresentation {
     }
 
     /// The model the window shows, and its effort apart from it.
-    private var modelAndEffort: (model: String, effort: String?)? {
+    var modelAndEffort: (model: String, effort: String?)? {
         guard let line = side.destinationModel else { return nil }
         return splitEffort(line, selectors: speaker == .chatgpt ? config.chatgptSelectors : config.claudeSelectors)
-    }
-
-    /// The conversation the side writes into; how many there are to
-    /// choose from while none is chosen; or the one used last.
-    private var conversationName: String? {
-        if side.isConnected { return destination }
-        if needsChoice { return side.eligible.count == 1 ? "1 open, none chosen" : "\(side.eligible.count) open, none chosen" }
-        if let hint = side.hint { return "Last used \u{00B7} \(hint.name)" }
-        return nil
     }
 
     /// The tip's lines under what a click does, each only where the window
@@ -304,9 +289,6 @@ struct ParticipantPresentation {
         if let model = modelAndEffort {
             facts.append(ParticipantFact(label: "Model", value: model.model))
             if let effort = model.effort { facts.append(ParticipantFact(label: "Effort", value: effort)) }
-        }
-        if let conversationName {
-            facts.append(ParticipantFact(label: "Conversation", value: conversationName, detail: continuation))
         }
         facts.append(ParticipantFact(label: "Status", value: stateText.prefix(1).uppercased() + stateText.dropFirst(),
                                      badge: state))
@@ -320,24 +302,23 @@ struct ParticipantPresentation {
     }
 }
 
-/// One of a tip's lines: a label, its value, and what else the value needs
-/// said under it. The status wears the side's badge.
+/// One of a tip's lines: a label and its value. The status wears the
+/// side's badge.
 struct ParticipantFact: Identifiable {
     let label: String
     let value: String
-    var detail: String? = nil
     var badge: ParticipantState? = nil
     var id: String { label }
 }
 
-/// Each side's destination under the box: the surface, the title
-/// truncated in the middle so similar titles keep the ends that tell them
-/// apart, and a problem when there is one. It reads as a status, with no
-/// chevron. Where there is something to do, it is a chip that does it: it
-/// lists the app's conversations to choose from, opens the app while it
-/// is closed, or brings it forward to open one. Through a run it is a
-/// plain label. It hugs its text, so only the text is the target, and a
-/// new destination springs it to its new width.
+/// Each side's destination under the box: the window's mode, then its
+/// model with the effort a shade lighter, and a problem when there is one.
+/// It reads as a status, with no chevron. Where there is something to do,
+/// it is a chip that does it: it lists the app's windows to choose from
+/// when there are several, opens the app while it is closed, or brings it
+/// forward to open a conversation. Through a run it is a plain label. It
+/// hugs its text, so only the text is the target, and a new destination
+/// springs it to its new width.
 struct PerchDestinations: View {
     let controller: RelayController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -358,7 +339,7 @@ struct PerchDestinations: View {
         Group {
             switch info.lineAction {
             case .choose:
-                Menu { conversations(info) } label: { text(info).perchChip() }
+                Menu { windows(info) } label: { text(info).perchChip() }
                     .menuStyle(.button)
                     .buttonStyle(.plain)
                     .menuIndicator(.hidden)
@@ -374,49 +355,59 @@ struct PerchDestinations: View {
                     .frame(height: PerchChip.height)
             }
         }
-        .accessibilityLabel("\(info.name) conversation: \(info.destination)")
+        .accessibilityLabel("\(info.name): \(info.destination)")
         .accessibilityValue(info.stateText)
         .accessibilityHint(info.lineAction?.hint(name: info.name) ?? "")
     }
 
     private func text(_ info: ParticipantPresentation) -> some View {
         // Nothing connected yet: the line is what to do, in the accent. A
-        // remembered destination stays muted, as unverified.
+        // connection not checked since the last run stays muted.
         let needsSomething = !info.side.isConnected && info.state == .attention && !info.isRemembered
+        let surface = info.side.destinationSurface
+        let model = info.modelAndEffort
         return HStack(spacing: Perch.s(4)) {
-            if let surface = info.side.destinationSurface {
+            if let surface {
                 Text(surface).fontWeight(.medium).fixedSize()
-                Text("\u{00B7}").foregroundStyle(Perch.muted).fixedSize()
             }
-            Text(info.destination).truncationMode(.middle)
-                .foregroundStyle(needsSomething ? Perch.accentText : info.isRemembered ? Perch.muted : Perch.secondary)
+            if let model {
+                if surface != nil { Text("\u{00B7}").foregroundStyle(Perch.muted).fixedSize() }
+                // The effort follows the model a shade lighter, as the apps
+                // set it apart in their own model buttons.
+                let effort = Text(model.effort.map { " \($0)" } ?? "").foregroundStyle(Perch.muted)
+                Text("\(model.model)\(effort)").truncationMode(.tail)
+            }
+            if surface == nil, model == nil {
+                Text(info.destination).truncationMode(.middle)
+                    .foregroundStyle(needsSomething ? Perch.accentText : info.isRemembered ? Perch.muted : Perch.secondary)
+            }
             if let problem = info.problem {
                 Text("\u{00B7} \(problem)").fontWeight(.medium).foregroundStyle(Perch.red).fixedSize()
             }
         }
         .font(Perch.text(11.5)).lineLimit(1)
-        .foregroundStyle(Perch.secondary)
+        .foregroundStyle(info.isRemembered ? Perch.muted : Perch.secondary)
     }
 
-    /// The app's conversations, the connected one checked.
-    private func conversations(_ info: ParticipantPresentation) -> some View {
-        ForEach(info.side.eligible) { candidate in
-            Toggle("\(candidate.name) \u{00B7} \(candidate.stateLine)", isOn: Binding(
-                get: { info.side.connection?.window == candidate.id },
-                set: { if $0 { controller.connect(info.speaker, to: candidate.id) } }))
+    /// The app's windows, front first, the connected one checked.
+    private func windows(_ info: ParticipantPresentation) -> some View {
+        ForEach(info.side.windowChoices) { choice in
+            Toggle("\(choice.label) \u{00B7} \(choice.candidate.stateLine)", isOn: Binding(
+                get: { info.side.connection?.window == choice.id },
+                set: { if $0 { controller.connect(info.speaker, to: choice.id) } }))
         }
     }
 }
 
 extension ParticipantPresentation {
     /// What a click on the destination line does: choose among the app's
-    /// conversations, open the app, or bring it forward to open one.
+    /// windows, open the app, or bring it forward to open a conversation.
     enum LineAction {
         case choose, open, focus
 
         func hint(name: String) -> String {
             switch self {
-            case .choose: "Chooses the conversation"
+            case .choose: "Chooses the window"
             case .open: "Opens \(name)"
             case .focus: "Brings \(name) forward"
             }
@@ -424,13 +415,15 @@ extension ParticipantPresentation {
     }
 
     /// nil leaves the line a plain label: through a run, while the app
-    /// is being checked or opened, and when it is not installed.
+    /// is being checked or opened, when it is not installed, and while it
+    /// has only one window, which connects on its own.
     var lineAction: LineAction? {
         switch side.presence {
         case .notRunning: controller.isRunning ? nil : .open
         case .noWindow, .noConversation:
             !controller.isRunning && controller.consoleAccess.canShowWindow ? .focus : nil
-        case .available: controller.consoleAccess.canChangeDestination ? .choose : nil
+        case .available:
+            controller.consoleAccess.canChangeDestination && side.hasSeveralWindows ? .choose : nil
         case .checking, .notInstalled, .launching: nil
         }
     }
@@ -465,19 +458,13 @@ struct PerchParticipantTip: View {
     }
 
     private func value(_ fact: ParticipantFact) -> some View {
-        VStack(alignment: .leading, spacing: Perch.s(1)) {
-            HStack(alignment: .firstTextBaseline, spacing: Perch.s(4)) {
-                if let badge = fact.badge {
-                    ParticipantBadge(state: badge, size: Perch.s(10), ringed: false)
-                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Perch.s(3.5) }
-                }
-                Text(fact.value).foregroundStyle(.white.opacity(0.92))
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .firstTextBaseline, spacing: Perch.s(4)) {
+            if let badge = fact.badge {
+                ParticipantBadge(state: badge, size: Perch.s(10), ringed: false)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + Perch.s(3.5) }
             }
-            if let detail = fact.detail {
-                Text(detail).foregroundStyle(.white.opacity(0.55))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(fact.value).foregroundStyle(.white.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .lineLimit(3)
     }

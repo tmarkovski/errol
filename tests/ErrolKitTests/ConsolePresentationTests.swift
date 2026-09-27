@@ -52,7 +52,8 @@ final class ConsolePresentationTests: XCTestCase {
         let original = DestinationIdentity(title: "Original topic", titleIsGeneric: false, surface: "Chat")
         var side = SideSetup(side: .claude)
         side.connection = SideConnection(window: window, identity: original, model: "Old model")
-        XCTAssertEqual(side.destinationName, "“Original topic”")
+        XCTAssertEqual(side.destinationSurface, "Chat")
+        XCTAssertEqual(side.destinationModel, "Old model")
         var scan = WindowScan()
         scan.title = "Different topic in the same window"
         scan.hasComposer = true
@@ -61,10 +62,8 @@ final class ConsolePresentationTests: XCTestCase {
         current.identity.surface = "Cowork"
         current.model = "Current model · High"
         side.candidates = [current]
-        XCTAssertEqual(side.destinationName, "“Different topic in the same window”")
         XCTAssertEqual(side.destinationSurface, "Cowork")
         XCTAssertEqual(side.destinationModel, "Current model · High")
-        XCTAssertEqual(side.destinationContext, "Continues here")
     }
 
     func testAllThemeTextPairsMeetNormalTextContrast() {

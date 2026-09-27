@@ -273,7 +273,7 @@ final class PerchPreviewEngine: RelayEngine {
             return
         }
         bindings[side] = candidate
-        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") connected to \(candidate.name)."))
+        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") connected to \(candidate.name ?? "an untitled window")."))
         completion(BindingObservation(check: .same, identity: candidate.identity, composer: candidate.composer))
     }
 
