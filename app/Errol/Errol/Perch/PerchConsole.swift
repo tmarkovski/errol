@@ -349,7 +349,7 @@ struct PerchPromptBox: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // A very soft shadow all around lifts the box off the shell.
         .background(RoundedRectangle(cornerRadius: Self.corner).fill(editing ? Perch.paper : Perch.well)
-            .shadow(color: Perch.shadow, radius: Perch.s(7), y: Perch.s(1.5)))
+            .shadow(color: Perch.shadow.opacity(0.75), radius: Perch.s(5), y: Perch.s(1)))
         .overlay(RoundedRectangle(cornerRadius: Self.corner)
             .stroke(controller.consoleAccess.pauseGranted ? Perch.accent : Perch.chipEdge,
                     lineWidth: controller.consoleAccess.pauseGranted ? 1.5 : 1))
