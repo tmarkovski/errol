@@ -1,6 +1,8 @@
-// The console's canvases, one for each state it shows, gathered in one file
-// so the canvas lists them together. Each stands the console the way the
-// panel does (PerchPreviewScene), and each runs on PerchPreviewEngine: the
+// What the console's canvases stand on: the scene, the controllers, and one
+// state for each thing the console shows. The canvases are in the files
+// beside this one, a group to a file (PerchPreviews+Compose and the rest),
+// so each file's canvas list stays short. Each stands the console the way
+// the panel does (PerchPreviewScene), and each runs on PerchPreviewEngine: the
 // controls do what they do in the app, and nothing reaches either app. An
 // icon opens its app, a destination line chooses among windows, Start
 // relay starts a run, Stop ends it at the next handoff, Pause to steer
@@ -324,57 +326,7 @@ enum PerchPreviewState: CaseIterable {
     }
 }
 
-// MARK: - Canvases
+// The canvases themselves are in the files beside this one, one per group:
+// PerchPreviews+Compose, +Participants, +Running, +Finished, and +Update.
 
-#Preview("Compose · several windows") { PerchPreviewState.severalWindows.scene }
-#Preview("Compose · both connected") { PerchPreviewState.bothConnected.scene }
-#Preview("Compose · no topic yet") { PerchPreviewState.noTopic.scene }
-#Preview("Compose · Code session") { PerchPreviewState.codeSession.scene }
-#Preview("Compose · Claude still replying") { PerchPreviewState.stillReplying.scene }
-#Preview("Compose · ChatGPT closed") { PerchPreviewState.chatgptClosed.scene }
-#Preview("Compose · Claude not installed") { PerchPreviewState.claudeNotInstalled.scene }
-#Preview("Compose · long topic") { PerchPreviewState.longTopic.scene }
-#Preview("Compose · ends after a set number of turns") { PerchPreviewState.turnLimit.scene }
-#Preview("Compose · ends when you stop it") { PerchPreviewState.untilStopped.scene }
-#Preview("Compose · narrow console") { PerchPreviewState.narrow.scene }
-
-#Preview("Tip · ChatGPT") { PerchPreviewState.details.scene }
-#Preview("Tip · no window chosen") { PerchPreviewState.detailsChoosing.scene }
-#Preview("Tip · ChatGPT closed") { PerchPreviewState.detailsClosed.scene }
-#Preview("Tip · Claude minimized mid-run") { PerchPreviewState.detailsHeld.scene }
-
-#Preview("Running · first reply") { PerchPreviewState.opening.scene }
-#Preview("Running · mid-run") { PerchPreviewState.running.scene }
-#Preview("Running · until you stop it") { PerchPreviewState.runningUntilStopped.scene }
-#Preview("Running · model unavailable") { PerchPreviewState.modelUnavailable.scene }
-#Preview("Running · pause pending") { PerchPreviewState.pausePending.scene }
-#Preview("Running · paused, writing a note") { PerchPreviewState.paused.scene }
-#Preview("Running · note queued") { PerchPreviewState.noteQueued.scene }
-#Preview("Running · waiting for focus") { PerchPreviewState.waitingForFocus.scene }
-#Preview("Running · Claude's conversation covered") { PerchPreviewState.conversationCovered.scene }
-#Preview("Running · Claude minimized") { PerchPreviewState.held.scene }
-#Preview("Running · handoffs, animated") { PerchPreviewState.handoffs.scene }
-
-#Preview("Finished · complete") { PerchPreviewState.complete.scene }
-#Preview("Finished · stopped") { PerchPreviewState.stopped.scene }
-#Preview("Finished · turn limit reached") { PerchPreviewState.turnLimitReached.scene }
-#Preview("Finished · delivery interrupted") { PerchPreviewState.interrupted.scene }
-#Preview("Finished · note not sent") { PerchPreviewState.noteNotSent.scene }
-
-#Preview("Dark · both connected") { PerchPreviewState.bothConnected.scene.preferredColorScheme(.dark) }
-#Preview("Dark · mid-run") { PerchPreviewState.running.scene.preferredColorScheme(.dark) }
-#Preview("Dark · paused, writing a note") { PerchPreviewState.paused.scene.preferredColorScheme(.dark) }
-#Preview("Dark · complete") { PerchPreviewState.complete.scene.preferredColorScheme(.dark) }
-
-#Preview("Avatars (icon and fallback)") {
-    // The first wears whatever Claude Desktop's icon is on this Mac; the
-    // second names no installed app, so it is the initial-in-a-circle
-    // fallback the column uses when an app is missing.
-    HStack(spacing: Perch.s(24)) {
-        PerchAvatar(bundleID: config.claudeBundleID, initial: "C", feather: Perch.claudeFeather)
-        PerchAvatar(bundleID: "com.example.not-installed", initial: "C", feather: Perch.claudeFeather)
-    }
-    .padding(Perch.s(24))
-    .background(Perch.paper)
-}
 #endif

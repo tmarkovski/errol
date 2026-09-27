@@ -44,15 +44,18 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 
-	<!-- Checking and downloading in the background is fine. Installing is not:
-	     a relay run owns the screen focus and the clipboard for minutes at a
-	     time, and an update that relaunched the app mid-run would destroy it.
-	     For v1 installation stays user-mediated, and UpdaterController holds
-	     back even the user-initiated path while a run is live. -->
+	<!-- Download and stage each update in the background, so it installs
+	     the next time Errol quits and the console's Update button can
+	     relaunch into it at once. Neither step touches focus, so both are
+	     fine during a run; what a run can't survive is a relaunch, and
+	     UpdaterController postpones any relaunch until the run is idle, while
+	     quitting cancels the run first. When an install would need an
+	     admin's password, Sparkle doesn't stage it, and the button offers
+	     it instead. -->
 	<key>SUAutomaticallyUpdate</key>
-	<false/>
+	<true/>
 	<key>SUAllowsAutomaticUpdates</key>
-	<false/>
+	<true/>
 
 	<!-- Off deliberately: no system profile is sent with update checks. -->
 	<key>SUEnableSystemProfiling</key>

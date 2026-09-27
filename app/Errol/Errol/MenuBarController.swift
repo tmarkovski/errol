@@ -116,6 +116,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         trackAppearance()
         updater = UpdaterController { [weak self] in self?.relay.isRunning ?? false }
+        updater.bringConsoleForward = { [weak self] in self?.showPanel() }
         buildStatusItem()
         buildPanel()
         trackStatusIcon()
@@ -178,12 +179,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.addItem(withTitle: "About Errol", action: #selector(showAbout), keyEquivalent: "").target = self
-        let checkForUpdatesItem = menu.addItem(
-            withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-        checkForUpdatesItem.target = self
-        // Refused rather than queued during a run: queueing would only
-        // surface Sparkle's window later, at a moment nobody chose.
-        checkForUpdatesItem.isEnabled = updater.canCheckForUpdates
+        // A check while nothing is on offer, then the console's Update
+        // button's own action. Refused rather than queued during a run.
+        let updateItem = menu.addItem(
+            withTitle: updater.menuTitle, action: #selector(updateItemChosen), keyEquivalent: "")
+        updateItem.target = self
+        updateItem.isEnabled = updater.menuEnabled
         menu.addItem(.separator())
         addAppearanceOptions(to: menu)
         menu.addItem(.separator())
@@ -209,8 +210,11 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         return menu
     }
 
-    @objc private func checkForUpdates() {
-        updater.checkForUpdates()
+    /// The console comes forward, since the button, and the note when
+    /// there is nothing new, are where the answer shows.
+    @objc private func updateItemChosen() {
+        if UpdateStatus.shared.phase == .idle { showPanel() }
+        updater.menuItemChosen()
     }
 
     // MARK: Session options

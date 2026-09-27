@@ -58,7 +58,8 @@ struct PerchConsoleView: View {
 
 /// Before a run, the run's settings as chips that show their values; during
 /// and after one, the topic. The ··· app menu stands at the trailing end in
-/// every stage. A chip's width follows its value, so choosing another one
+/// every stage, with the update beside it while one is on offer and no run
+/// is live. A chip's width follows its value, so choosing another one
 /// springs the chip, and the chips after it, to the new width. Who starts is
 /// a choice of two, so its chip swaps with a click instead of opening a
 /// menu. With a turn limit, a stepper stands beside the ending chip and sets
@@ -85,6 +86,7 @@ struct PerchTopicLine: View {
                     .padding(.leading, PerchChip.inset)
             }
             Spacer(minLength: 0)
+            PerchUpdateButton(hidden: controller.stage == .running)
             PerchAppMenuButton(controller: controller)
         }
         .animation(reduceMotion ? nil : Perch.spring, value: [starterTitle, endingTitle, windowsTitle])
