@@ -656,7 +656,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         else { logWindow?.orderFront(nil) }
     }
 
-    /// The on-disk debug logs (RunLog in Core/Logging.swift): one file per
+    /// The on-disk debug logs (RunLog in Core/Logging/RunLog.swift): one file per
     /// run with the detail the window leaves out, plus the snapshots taken
     /// at failures. Reveals the latest run's file when this process has
     /// written one, else opens the folder.
