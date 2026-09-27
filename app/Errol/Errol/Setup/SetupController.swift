@@ -1,4 +1,4 @@
-// The setup's observable face: the pure SetupState (Core/Setup.swift)
+// The setup's observable face: the pure SetupState (Core/Setup/Setup.swift)
 // driven by the engine's readiness sweeps and the human's actions. Main
 // thread only; the engine answers on the main thread.
 //

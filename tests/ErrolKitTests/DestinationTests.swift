@@ -5,7 +5,7 @@
 // /epitaxy/<id> name a conversation, /new and /project/<uuid> do not, and
 // ChatGPT exposes no conversation URL at all. Nothing here compares one
 // reading against a later one: the binding is to the window, and what it
-// shows afterwards is not judged (Core/Destination.swift).
+// shows afterwards is not judged (Core/Setup/Destination.swift).
 
 import XCTest
 @testable import ErrolKit

@@ -17,7 +17,7 @@
 //   swift tools/ax-dump.swift claude --find stop        # every attribute of matching elements
 //   swift tools/ax-dump.swift claude --menus            # menu bar (hover-free AX targets)
 //
-// "claude" and "chatgpt"/"codex" resolve to the bundle IDs from Core/Config.swift;
+// "claude" and "chatgpt"/"codex" resolve to the bundle IDs from Core/Settings/Config.swift;
 // anything else matches a bundle ID or app name of a running app.
 //
 // Permission: the *invoking* process needs Accessibility — macOS attributes it to
@@ -32,12 +32,12 @@
 // --frames (window positions would pollute every diff), values truncated. Both
 // target apps are Chromium and publish an empty tree until nudged, so the same
 // AXManualAccessibility/AXEnhancedUserInterface nudge Errol applies at run start
-// (Core/TargetApp.swift) is applied here before reading.
+// (Core/AX/TargetApp.swift) is applied here before reading.
 
 import AppKit
 import ApplicationServices
 
-// MARK: - AX helpers (same idioms as app/Errol/Errol/Core/Accessibility.swift)
+// MARK: - AX helpers (same idioms as app/Errol/Errol/Core/AX/Accessibility.swift)
 
 func axAttribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
     var value: CFTypeRef?
@@ -439,7 +439,7 @@ func runFind(_ appElement: AXUIElement, query: String, options: Options) {
 // MARK: - Capture (fixture JSON)
 
 /// One node in the schema ErrolKit's FixtureElement decodes (see
-/// app/Errol/Errol/Core/ElementNode.swift): role, subrole, the label
+/// app/Errol/Errol/Core/AX/ElementNode.swift): role, subrole, the label
 /// attributes under their own keys, value, url, children. Empty strings are
 /// dropped, long values truncated — detection reads labels and short values,
 /// never message bodies.
@@ -492,7 +492,7 @@ func runMenus(_ appElement: AXUIElement, options: Options) {
 
 // MARK: - App resolution
 
-/// Shortcuts mirror the bundle IDs in Core/Config.swift.
+/// Shortcuts mirror the bundle IDs in Core/Settings/Config.swift.
 let shortcuts = [
     "claude": "com.anthropic.claudefordesktop",
     "chatgpt": "com.openai.codex",
@@ -613,7 +613,7 @@ guard AXIsProcessTrusted() else {
 let app = resolveApp(spec)
 let appElement = AXUIElementCreateApplication(app.processIdentifier)
 
-// Chromium exposes an empty tree until nudged (see Core/TargetApp.swift); the
+// Chromium exposes an empty tree until nudged (see Core/AX/TargetApp.swift); the
 // nudge is harmless for native apps. The tree populates asynchronously.
 AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)

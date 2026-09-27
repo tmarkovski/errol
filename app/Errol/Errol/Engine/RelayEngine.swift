@@ -4,7 +4,7 @@
 // permission, the two apps, the readiness sweeps, the relay worker, the
 // microphone — and reports back over its event stream. The app runs
 // LiveRelayEngine. The canvases run PerchPreviewEngine
-// (Perch/PerchPreviewEngine.swift), which plays a run without touching any
+// (Perch/Previews/PerchPreviewEngine.swift), which plays a run without touching any
 // app, so a preview's Start starts something and its Stop stops it while
 // nothing is relayed anywhere.
 //

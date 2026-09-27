@@ -10,7 +10,7 @@
 // which the relay engine hands out: the live one here in the app, a scripted
 // one in the canvases (PerchPreviewTranscriber) that never opens the
 // microphone. Another model (Parakeet, Whisper) would be one more conformer.
-// How the heard words join the field is Core/VoiceText.swift.
+// How the heard words join the field is Core/Console/VoiceText.swift.
 
 import AVFoundation
 import Foundation

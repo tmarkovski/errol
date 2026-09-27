@@ -83,7 +83,7 @@ final class ClaudeScenarioTests: XCTestCase {
         let d = detectClaude("claude-project-chat")
         XCTAssertEqual(d.status.state, .ready)
         // "project" is in surfacePathNames; an unmapped path would show up
-        // capitalized raw — the cue to extend the map in Core/Config.swift.
+        // capitalized raw — the cue to extend the map in Core/Settings/Config.swift.
         XCTAssertEqual(d.status.surface, "Project chat")
         XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
     }

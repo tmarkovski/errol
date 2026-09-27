@@ -1,8 +1,9 @@
 // swift-tools-version: 5.9
 //
 // The package builds the app's detection/relay engine (the same files the
-// Xcode app target compiles — Sources live in app/Errol/Errol/Core, pointed
-// at in place) as the ErrolKit library, plus the tools that reuse it:
+// Xcode app target compiles — Sources live in app/Errol/Errol/Core and its
+// subfolders, pointed at in place) as the ErrolKit library, plus the tools
+// that reuse it:
 //
 //   swift test               # contract tests for the pure detection logic
 //   tools/verify [...]       # guided live harness (docs/desktop-verification.md)

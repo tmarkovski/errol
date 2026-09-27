@@ -10,7 +10,7 @@ tools/console-preview/render /tmp/errol-preview 03 08 09 10 14 15 16 17
 
 The scenes cover composition, an app with several windows to choose from, closed apps, Code sessions, long prompts, running, steering, queued notes, focus recovery, completion, pending pauses, held windows, interrupted delivery, the endings (18: a turn limit with its stepper, and a run that only Stop ends), and the About window (19). State 03 also renders the 600-point layout. States 01, 03, 04, 08, and 15 render a side's tip where the app puts it: under the console, its outer edge on the side's icon. Each scene stands in the Xcode canvases' own scene (`PerchPreviewScene`): the capsule wears the theme's window color, as the panel does, and only the windows' shadows are stand-ins. Hover can't be shown, because SwiftUI reads the real pointer, so the scene stands the tip there itself. The capture also draws faint ticks at the ends of outlined capsules, as it does for any SwiftUI capsule stroke.
 
-`canvas` renders every state the Xcode canvases show (`PerchPreviewState` in `app/Errol/Errol/Perch/PerchPreviews.swift`), numbered in the canvases' order; `canvas-05` renders one. Only named arguments render them:
+`canvas` renders every state the Xcode canvases show (`PerchPreviewState` in `app/Errol/Errol/Perch/Previews/PerchPreviews.swift`), numbered in the canvases' order; `canvas-05` renders one. Only named arguments render them:
 
 ```sh
 tools/console-preview/render /tmp/errol-preview canvas
