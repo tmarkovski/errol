@@ -1,5 +1,6 @@
-// The conversation shapes behind the panel's picker, editable in the
-// settings card: add, rename, rewrite, delete. The list is persisted
+// The conversation shapes behind the panel's picker: their type, the
+// shipped defaults, and the store that keeps the edits made in the
+// settings card (add, rename, rewrite, delete). The list is persisted
 // wholesale in UserDefaults — but only while it differs from the shipped
 // defaults, and the stored copy is dropped again the moment the list
 // matches them, so an untouched install keeps tracking default-text
@@ -124,4 +125,85 @@ final class SettingsStore: ObservableObject {
         while taken.contains("\(base) \(n)") { n += 1 }
         return "\(base) \(n)"
     }
+}
+
+/// A canned conversation shape selectable in the panel's picker. The body
+/// carries the purpose and its pacing and refers to the user's topic as
+/// "below"; composing appends the topic after a blank line. Templates are
+/// starting text, not hidden framing — the panel's full-prompt editor reveals
+/// the composed message without changing the selected template, and only that
+/// text is ever sent. The relay's standing rules (relayRules) own the sign-off
+/// mechanics, so bodies must not mention the stop sequence.
+struct ConversationTemplate: Identifiable, Codable, Equatable {
+    /// The picker's label and the shape's identity — per-shape drafts and
+    /// the panel's selection key on it, so SettingsStore keeps names unique.
+    var name: String
+    /// Placeholder shown in the panel's topic field.
+    var topicPrompt: String
+    /// The purpose and pacing framing; refers to the topic as "below".
+    var body: String
+    var id: String { name }
+
+    func composed(topic: String) -> String {
+        body + "\n\n" + topic
+    }
+}
+
+/// The shipped shapes, in display order. Pacing differs by purpose on top of
+/// the standing rules' baseline (never sign off in a first reply): brainstorms
+/// need divergence time, a review legitimately ends when the findings run out.
+/// These are the defaults Settings edits are measured against; the picker and
+/// the relay read `conversationTemplates` below, which applies those edits.
+let defaultConversationTemplates = [
+    ConversationTemplate(
+        name: "Brainstorm",
+        topicPrompt: "What to brainstorm about",
+        body: """
+            Brainstorm together on the topic below. Diverge before you \
+            converge: offer a handful of ideas at a time, build on and twist \
+            each other's suggestions, and keep new ideas coming for at least \
+            three rounds each before any evaluating or narrowing begins. Then \
+            converge on the strongest few and end with a shortlist you both \
+            like.
+            """),
+    ConversationTemplate(
+        name: "Debate",
+        topicPrompt: "The question to debate",
+        body: """
+            Debate the question below. Take opposing positions — decide who \
+            argues which side in your first exchange — and steelman each \
+            other's arguments rather than attacking weak versions of them. \
+            Concede a point only when genuinely persuaded. End once you have \
+            either converged or clearly mapped where and why you still \
+            disagree.
+            """),
+    ConversationTemplate(
+        name: "Code review",
+        topicPrompt: "Paste the code or describe what to review",
+        body: """
+            Review the code or design below together. One of you leads with \
+            concrete findings — correctness first, then clarity and \
+            maintainability — and the other challenges each finding: is it \
+            real, does it matter, what is the simplest fix? Work through the \
+            material a piece at a time rather than all at once. End with an \
+            agreed list of the issues worth fixing.
+            """),
+    ConversationTemplate(
+        name: "Adversary",
+        topicPrompt: "The proposal to stress-test",
+        body: """
+            One of you defends the proposal below and the other attacks it — \
+            decide who takes which role in your first exchange, then stay in \
+            role. The attacker probes for the weakest assumptions; the \
+            defender strengthens or amends the proposal rather than dodging. \
+            End once the attacks stop finding new ground, with a verdict on \
+            whether the proposal survives and in what amended form.
+            """),
+]
+
+/// The picker's shapes: the shipped defaults with any Settings edits applied.
+/// Computed so every reader — the composer's pills, the controller's
+/// compose path — sees an edit the moment it lands.
+var conversationTemplates: [ConversationTemplate] {
+    SettingsStore.shared.templates
 }
