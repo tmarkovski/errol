@@ -8,14 +8,6 @@
 import AppKit
 import ApplicationServices
 
-/// AX window coordinates use a top-left origin on the primary display;
-/// NSScreen uses bottom-left. Convert a Cocoa rect to AX coordinates.
-func axRect(_ rect: CGRect) -> CGRect {
-    let primaryHeight = NSScreen.screens[0].frame.height
-    return CGRect(x: rect.origin.x, y: primaryHeight - rect.maxY,
-                  width: rect.width, height: rect.height)
-}
-
 func windowFrameDescription(_ window: AXUIElement) -> String {
     let frame = windowFrame(window) ?? .zero
     return "(\(Int(frame.minX)),\(Int(frame.minY))) \(Int(frame.width))x\(Int(frame.height))"
@@ -40,20 +32,6 @@ func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint,
     if hadEnhanced {
         AXUIElementSetAttributeValue(target.ax, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
-}
-
-/// A window's frame in AX coordinates, or nil when the element no longer
-/// answers — a closed window, or an app whose tree was rebuilt under it.
-func windowFrame(_ window: AXUIElement) -> CGRect? {
-    var position = CGPoint.zero
-    var size = CGSize.zero
-    guard let positionValue = axAttribute(window, kAXPositionAttribute),
-          CFGetTypeID(positionValue) == AXValueGetTypeID(),
-          AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
-          let sizeValue = axAttribute(window, kAXSizeAttribute),
-          CFGetTypeID(sizeValue) == AXValueGetTypeID(),
-          AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
-    return CGRect(origin: position, size: size)
 }
 
 func currentFrame(_ window: AXUIElement) -> CGRect {
