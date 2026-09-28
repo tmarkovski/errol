@@ -27,8 +27,11 @@
 //     relaunch. Finding nothing leaves a short note beside the ··· menu.
 //   - While a run is live the button is hidden, the menu entry is disabled,
 //     and a relaunch Sparkle asks for is postponed until the run is idle.
-//     Termination cancels a run first, so it winds down at a safe point and
-//     the debug log closes before an install-on-quit takes over.
+//     Termination cancels a run first and waits (up to five seconds) for it
+//     to wind down at a safe point, so the clipboard is put back and the
+//     debug log closes before an install-on-quit takes over. A relaunch
+//     postponed by that run is dropped then: the quit wins, and the staged
+//     update installs on it instead (MenuBarController.trackStatusIcon).
 //
 // A debug build leaves the updater stopped (see updatesEnabled).
 

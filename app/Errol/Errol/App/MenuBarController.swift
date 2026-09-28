@@ -37,6 +37,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// Edge detection for the run-finished hook below. The observation
     /// callback also fires once at launch, which is not a transition.
     private var wasRunning = false
+    /// A termination is waiting for the run to wind down; see
+    /// applicationShouldTerminate.
+    private var terminationPending = false
     /// The capsule that lights the status item while a run lasts.
     private let statusLight = StatusItemLight()
 
@@ -203,11 +206,32 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// already agrees, but the close button depends on it, so it is stated.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    /// Every termination path cancels a run here: the Quit item included,
-    /// logout, and Sparkle's own install-on-quit.
+    /// Every termination path comes through here: the Quit item, logout,
+    /// and Sparkle's own install-on-quit. With no run it ends at once. A run
+    /// is asked to stop and the answer waits for it to reach idle, because
+    /// the worker may be holding a clipboard lease (whose release puts the
+    /// human's clipboard back) or be partway through a keystroke; ending the
+    /// process there loses the clipboard's earlier contents for good. The
+    /// run-finished edge in trackStatusIcon answers; five seconds is the
+    /// fallback for a worker stuck past it, longer than an Accessibility
+    /// call's 3-second timeout, so it rarely cuts a wind-down short.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard relay.isRunning else { return .terminateNow }
+        terminationPending = true
         relay.stop()
-        return .terminateNow
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.replyToTermination()
+        }
+        return .terminateLater
+    }
+
+    /// Lets a termination held for a run go ahead. Called by whichever comes
+    /// first, the run reaching idle or the fallback; the second finds
+    /// nothing pending and does nothing.
+    private func replyToTermination() {
+        guard terminationPending else { return }
+        terminationPending = false
+        NSApp.reply(toApplicationShouldTerminate: true)
     }
 
     // MARK: Panel
@@ -334,7 +358,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         statusLight.show(running, accent: theme.palette.accent, behind: statusItem.button)
         // A run reaching idle is when the updater can release what it held
         // back: a staged install, or an update it found but never presented.
-        if wasRunning, !running { updater?.relayDidFinish() }
+        // A quit waiting on the run comes first and the updater is skipped:
+        // its postponed install relaunches the app, which would turn Quit
+        // into a restart. The update is not lost, because Sparkle installs
+        // what it staged when the app quits, without relaunching it.
+        if wasRunning, !running {
+            if terminationPending { replyToTermination() } else { updater?.relayDidFinish() }
+        }
         wasRunning = running
     }
 
