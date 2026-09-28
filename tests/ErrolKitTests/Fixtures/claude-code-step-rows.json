@@ -1,0 +1,110 @@
+[
+  {
+    "role": "AXWindow",
+    "subrole": "AXStandardWindow",
+    "title": "Claude",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 0 },
+          { "role": "AXRadioButton", "description": "Code, idle", "value": 1 }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "subrole": "AXLandmarkComplementary",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New session" },
+          {
+            "role": "AXButton",
+            "title": "Idle Copy edits for the landing page",
+            "children": [
+              { "role": "AXImage", "description": "Idle" },
+              { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Copy edits for the landing page" } ] }
+            ]
+          },
+          {
+            "role": "AXButton",
+            "title": "Idle Release checklist",
+            "children": [
+              { "role": "AXImage", "description": "Idle" },
+              { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Release checklist" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/epitaxy/local_0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0",
+        "children": [
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkMain",
+            "children": [
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkRegion",
+                "description": "Primary pane",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "subrole": "AXApplicationGroup",
+                    "description": "Chat messages",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "subrole": "AXDocumentArticle",
+                        "description": "Message 1",
+                        "children": [
+                          { "role": "AXStaticText", "value": "Proofread the release page and fix the copy." },
+                          {
+                            "role": "AXToolbar",
+                            "description": "Message actions",
+                            "children": [
+                              { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Rewind to here" } ] },
+                              { "role": "AXButton", "description": "Copy" },
+                              { "role": "AXButton", "description": "Fork from here" }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "role": "AXGroup",
+                        "children": [
+                          { "role": "AXButton", "title": "Read the release page" },
+                          { "role": "AXButton", "title": "Checked the copy on the release page" },
+                          { "role": "AXButton", "title": "Fixed two typos in the copy" },
+                          { "role": "AXStaticText", "value": "Fixed two typos; the rest reads well." },
+                          {
+                            "role": "AXToolbar",
+                            "description": "Message actions",
+                            "children": [
+                              { "role": "AXButton", "description": "Copy", "help": "newest" },
+                              { "role": "AXButton", "description": "Fork from here" },
+                              { "role": "AXCheckBox", "description": "Pin as chapter", "value": 0 },
+                              { "role": "AXButton", "description": "Read aloud" }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Composer",
+                "children": [
+                  { "role": "AXTextArea", "description": "Prompt", "value": "" },
+                  { "role": "AXButton", "description": "Send" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

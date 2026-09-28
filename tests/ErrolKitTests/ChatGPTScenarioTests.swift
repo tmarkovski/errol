@@ -173,16 +173,24 @@ final class ChatGPTScenarioTests: XCTestCase {
         }
     }
 
-    // MARK: Known hazard, pinned
+    // MARK: Sidebar titles
 
-    func testSidebarTitleContainingCopyInflatesTheCount() {
-        // HAZARD (documented in docs/how-it-works.md's open threads): the finders walk
-        // the whole window, so a sidebar conversation titled with a bare
-        // "Copy..." registers as a message affordance. One real response plus
-        // one poisoned title = 2. If this assertion starts failing at 1, the
-        // finders learned to scope past the sidebar — update docs/how-it-works.md too.
+    func testSidebarTitleContainingCopyIsNotACopyButton() throws {
+        // A conversation titled "Copy editing tips" meets the copy rule by its
+        // label, and it once registered as a message affordance: one real
+        // response plus one poisoned title made 2. Its row is not a command,
+        // though: ChatGPT names it after the title and draws the title inside
+        // it, beside its Pin and Archive buttons (live Sep 28 2026), where the
+        // response's Copy is an icon the app names "Copy" (isAppCommand).
         let d = detectChatGPT("chatgpt-sidebar-copy-trap")
-        XCTAssertEqual(d.copyLabels.count, 2)
-        XCTAssertEqual(d.copyLabels.first, "Copy editing tips")
+        XCTAssertEqual(d.copyLabels, ["Copy newest"])
+        XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
+        let window = try XCTUnwrap(d.windows.first)
+        let row = try XCTUnwrap(firstMatch(in: window) {
+            $0.role == kAXButtonRole as String && $0.title == "Copy editing tips"
+        })
+        XCTAssertTrue(isCopyButtonLabel(row.label, selectors: selectors),
+                      "the label alone still meets the rule; the row's shape is what rules it out")
+        XCTAssertFalse(isCopyButton(row, selectors: selectors))
     }
 }

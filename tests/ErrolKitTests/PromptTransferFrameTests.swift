@@ -327,6 +327,7 @@ private final class Node: ElementNode {
     let children: [Node]
     var subrole: String? { nil }
     var title: String? { nil }
+    var axDescription: String? { nil }
     var stringValue: String? { nil }
     var numberValue: Int? { nil }
     var url: URL? { nil }

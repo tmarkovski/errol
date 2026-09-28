@@ -27,6 +27,47 @@ final class CopySelectorTests: XCTestCase {
         XCTAssertFalse(isCopyButtonLabel("Copy table", selectors: claude))
         XCTAssertFalse(isCopyButtonLabel("Copy link", selectors: claude))
     }
+
+    // The button shapes both apps showed live on Sep 28 2026: a copy button
+    // is an icon the app names (AXDescription) and draws no text in; a row
+    // that mentions copying is named by, or shows, text someone wrote.
+
+    func testCommandsTheAppNamesAreCopyButtons() {
+        let button = kAXButtonRole as String
+        XCTAssertTrue(isCopyButton(FixtureElement(role: button, axDescription: "Copy"), selectors: claude),
+                      "Claude's message Copy: the name in AXDescription alone")
+        XCTAssertTrue(isCopyButton(FixtureElement(role: button, axDescription: "Copy", title: "Copy"),
+                                   selectors: chatgpt),
+                      "ChatGPT's response Copy: the same name in AXDescription and AXTitle")
+        XCTAssertTrue(isCopyButton(FixtureElement(role: button, axDescription: "Copy",
+                                                  children: [FixtureElement(role: "AXImage")]),
+                                   selectors: claude),
+                      "an icon the app exposes as an image is still no text")
+    }
+
+    func testRowsThatMentionCopyingAreNot() {
+        let button = kAXButtonRole as String
+        let text = kAXStaticTextRole as String
+        XCTAssertFalse(isCopyButton(FixtureElement(role: button, title: "Checked the copy on the release page"),
+                                    selectors: claude),
+                       "a finished Claude Code step: named by the text it shows, nothing under it")
+        XCTAssertFalse(isCopyButton(FixtureElement(role: button, title: "Checking the copy on the release page…",
+                                                   children: [FixtureElement(role: text, value: .string("Checking the copy on the release page…")),
+                                                              FixtureElement(role: text, value: .string("running"))]),
+                                    selectors: claude),
+                       "a running Claude Code step shows its summary as text")
+        XCTAssertFalse(isCopyButton(FixtureElement(role: button, title: "Idle Copy edits for the landing page",
+                                                   children: [FixtureElement(role: "AXImage", axDescription: "Idle"),
+                                                              FixtureElement(role: "AXGroup", children: [
+                                                                  FixtureElement(role: text, value: .string("Copy edits for the landing page"))])]),
+                                    selectors: claude),
+                       "a Claude session row")
+        XCTAssertFalse(isCopyButton(FixtureElement(role: button, axDescription: "Copy editing tips", title: "Copy editing tips",
+                                                   children: [FixtureElement(role: "AXGroup", children: [
+                                                       FixtureElement(role: text, value: .string("Copy editing tips"))])]),
+                                    selectors: chatgpt),
+                       "a ChatGPT conversation row: named by the app after its title, which it also shows")
+    }
 }
 
 final class EchoAndAffordanceContractTests: XCTestCase {

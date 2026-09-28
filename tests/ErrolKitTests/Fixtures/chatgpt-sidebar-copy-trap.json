@@ -8,7 +8,21 @@
         "description": "Sidebar",
         "children": [
           { "role": "AXButton", "description": "New chat" },
-          { "role": "AXButton", "title": "Copy editing tips" }
+          {
+            "role": "AXButton",
+            "description": "Copy editing tips",
+            "title": "Copy editing tips",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [
+                  { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Pin chat", "title": "Pin chat" } ] },
+                  { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Archive chat", "title": "Archive chat" } ] }
+                ]
+              },
+              { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Copy editing tips" } ] }
+            ]
+          }
         ]
       },
       {

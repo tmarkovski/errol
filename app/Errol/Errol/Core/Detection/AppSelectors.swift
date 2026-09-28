@@ -6,7 +6,9 @@ import Foundation
 /// Per-app label keywords. Kept separate per app because the two UIs label
 /// their affordances differently (verified against live trees, Aug 2026).
 struct AppSelectors {
-    /// Per-message copy button label substring.
+    /// Per-message copy button label substring. The label only nominates a
+    /// button: it must also be a command the app named so, not a row whose
+    /// text mentions copying (isAppCommand in Elements.swift).
     var copyKeyword: String
     /// Reject copy buttons whose label also contains any of these.
     var copyExcludeKeywords: [String]

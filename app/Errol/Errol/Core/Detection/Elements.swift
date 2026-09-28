@@ -115,7 +115,48 @@ func isPastedTextRemoveLabel(_ label: String, selectors: AppSelectors) -> Bool {
 
 func isCopyButton<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -> Bool {
     guard element.role == kAXButtonRole as String else { return false }
-    return isCopyButtonLabel(element.label, selectors: selectors)
+    return isCopyButton(element, label: element.label, selectors: selectors)
+}
+
+/// The same test for a button whose label a walk has already read: the
+/// label rule on the string in hand, then, for a button it matches, whether
+/// the app named the button so (isAppCommand).
+func isCopyButton<Node: ElementNode>(_ button: Node, label: String, selectors: AppSelectors) -> Bool {
+    isCopyButtonLabel(label, selectors: selectors)
+        && isAppCommand(button, named: { isCopyButtonLabel($0, selectors: selectors) })
+}
+
+/// Whether a button is one of the app's own commands, named as `rule`
+/// wants, rather than a row that shows data. A label can be data: a
+/// conversation title in a sidebar, or a step summary in a Claude Code
+/// transcript, is a button whose label is text the human or the model
+/// wrote, and one that merely mentions copying met the copy rule ("Idle
+/// Claude copy message overlay issue", "Applied the rule to the readiness
+/// scan and the copy press", live Sep 28 2026). Both apps name their
+/// commands for assistive technology, an aria-label that Chromium reports
+/// as AXDescription, and draw them as icons with no text of their own. A
+/// row is named by the text it shows, which Chromium reports as AXTitle
+/// (Claude's rows and both apps' text buttons), or it shows that text
+/// inside it (ChatGPT's conversation rows, which carry an aria-label as
+/// well). So the rule must match the AXDescription, and nothing in the
+/// button may be text. Only a button whose label the rule already matched
+/// gets here, so the walks read this for those alone.
+func isAppCommand<Node: ElementNode>(_ button: Node, named rule: (String) -> Bool) -> Bool {
+    guard let name = button.axDescription, rule(name) else { return false }
+    return !showsText(button)
+}
+
+/// Whether static text sits within three levels under `node`, the depth a
+/// row keeps its text at (ChatGPT's, in a group of its own). Level by
+/// level, so a row stops being read at the level that shows its text.
+private func showsText<Node: ElementNode>(_ node: Node) -> Bool {
+    var level = node.children
+    for _ in 0..<3 {
+        if level.isEmpty { return false }
+        if level.contains(where: { $0.role == kAXStaticTextRole as String }) { return true }
+        level = level.flatMap(\.children)
+    }
+    return false
 }
 
 /// The collapsed stand-in for a message's whole action bar (Claude Code's
@@ -164,7 +205,7 @@ func newestMessageAffordance<Node: ElementNode>(under root: Node, selectors: App
 private func isMessageAffordance<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -> Bool {
     guard element.role == kAXButtonRole as String else { return false }
     let label = element.label
-    return isCopyButtonLabel(label, selectors: selectors)
+    return isCopyButton(element, label: label, selectors: selectors)
         || isMessageActionsToggleLabel(label, selectors: selectors)
 }
 
@@ -238,7 +279,8 @@ struct ConversationSighting: Equatable {
 /// Generic over ElementNode, so fixture windows answer through the code the
 /// live poll runs; ConversationSightingTests pins it to the four finders it
 /// stands in for, fixture by fixture. Role is read once per node, a
-/// button's label once for all three button rules, and a group's title
+/// button's label once for all three button rules (and a copy match's
+/// description and children once more, isAppCommand), and a group's title
 /// (then label) only as messageOrdinal reads them. Dialogs stay out of the
 /// walk: the cover check looks for one only when this found no composer
 /// (coveringDialog(under:sighting:)), as scanWindow does.
@@ -256,7 +298,7 @@ private func sight<Node: ElementNode>(_ element: Node, depth: Int,
     let role = element.role ?? ""
     if role == kAXButtonRole as String {
         let label = element.label
-        if isCopyButtonLabel(label, selectors: selectors)
+        if isCopyButton(element, label: label, selectors: selectors)
             || isMessageActionsToggleLabel(label, selectors: selectors) {
             sighting.affordances += 1
         }

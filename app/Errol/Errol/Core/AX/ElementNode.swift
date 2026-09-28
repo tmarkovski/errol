@@ -6,8 +6,9 @@
 // The protocol carries only the primitives detection actually reads: role,
 // subrole (a dialog is a group told apart by it), the joined label every
 // selector match goes through, the title (surface tabs match on AXTitle
-// alone), the value in its two used shapes (composer text, toggle state),
-// the web-area URL, and children. Live-only concerns — focus, AXPress,
+// alone), the description (the name an app gave a command, isAppCommand),
+// the value in its two used shapes (composer text, toggle state), the
+// web-area URL, and children. Live-only concerns — focus, AXPress,
 // window identity — stay on AXUIElement in the live wrappers.
 
 import ApplicationServices
@@ -17,6 +18,9 @@ protocol ElementNode {
     var role: String? { get }
     var subrole: String? { get }
     var title: String? { get }
+    /// AXDescription alone: the name the app gave the element for assistive
+    /// technology (an aria-label), where AXTitle is the text it shows.
+    var axDescription: String? { get }
     /// Joined description/title/help/AXLabel — see axLabel in Accessibility.swift.
     var label: String { get }
     var stringValue: String? { get }
@@ -97,6 +101,7 @@ struct LiveElement: ElementNode {
     var role: String? { axAttribute(ax, kAXRoleAttribute) as? String }
     var subrole: String? { axAttribute(ax, kAXSubroleAttribute) as? String }
     var title: String? { axAttribute(ax, kAXTitleAttribute) as? String }
+    var axDescription: String? { axAttribute(ax, kAXDescriptionAttribute) as? String }
     var label: String { axLabel(ax) }
     var stringValue: String? { axAttribute(ax, kAXValueAttribute) as? String }
     var numberValue: Int? { (axAttribute(ax, kAXValueAttribute) as? NSNumber)?.intValue }

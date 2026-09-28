@@ -43,17 +43,23 @@ func inspectReport(_ target: TargetApp) -> String {
         // Collapse duplicate labels so a long conversation doesn't flood the output.
         var counts: [String: Int] = [:]
         var order: [String] = []
+        var copyKeys = Set<String>()
         for button in buttons {
             let label = axLabel(button).trimmingCharacters(in: .whitespacesAndNewlines)
             let key = label.isEmpty ? "<unlabeled>" : label
             if counts[key] == nil { order.append(key) }
             counts[key, default: 0] += 1
+            if isCopyButton(LiveElement(ax: button), label: label, selectors: target.selectors) {
+                copyKeys.insert(key)
+            }
         }
         lines.append("   Buttons (\(buttons.count) total, \(order.count) distinct):")
         for key in order {
             var marker = ""
-            if isCopyButtonLabel(key, selectors: target.selectors) {
+            if copyKeys.contains(key) {
                 marker = "  <- matches copy selector"
+            } else if isCopyButtonLabel(key, selectors: target.selectors) {
+                marker = "  (label matches copy, but the app does not name it so: a row, not a command)"
             } else if isMessageActionsToggleLabel(key, selectors: target.selectors) {
                 marker = "  <- message-actions toggle"
             }

@@ -19,6 +19,32 @@ final class ClaudeCodeScenarioTests: XCTestCase {
                file: file, line: line)
     }
 
+    func testStepRowsAndSessionTitlesAreNotCopyButtons() throws {
+        // A Claude Code transcript lists each tool step as a button labelled
+        // with the step's summary, and the sidebar lists sessions by title;
+        // either can mention copying. Live Sep 28 2026, a step row ("Applied
+        // the rule to the readiness scan and the copy press") was the last
+        // copy match in the window, so replyCopyButton picked it over every
+        // message's Copy, and a session title ("Idle Claude copy message
+        // overlay issue") counted as a message. Both are rows named by the
+        // text they show (AXTitle); the messages' Copy buttons are icons in a
+        // "Message actions" toolbar, named "Copy" by the app (AXDescription).
+        let d = detectClaude("claude-code-step-rows")
+        XCTAssertEqual(d.excluded, [true])
+        XCTAssertEqual(d.chosenIndex, 0)
+        // The user message's Copy and the reply's: the echo counts on Claude.
+        XCTAssertEqual(d.copyLabels, ["Copy", "Copy newest"])
+        XCTAssertEqual(d.affordanceLabels, ["Copy", "Copy newest"])
+        let window = try XCTUnwrap(d.windows.first)
+        XCTAssertEqual(replyCopyButton(under: window, selectors: selectors)?.label, "Copy newest")
+        for title in ["Idle Copy edits for the landing page", "Checked the copy on the release page",
+                      "Fixed two typos in the copy"] {
+            let row = try XCTUnwrap(firstMatch(in: window) { $0.title == title }, title)
+            XCTAssertTrue(isCopyButtonLabel(row.label, selectors: selectors), title)
+            XCTAssertFalse(isCopyButton(row, selectors: selectors), title)
+        }
+    }
+
     func testCollapsedBarsCountTogglesAsAffordances() {
         let d = detectClaude("claude-code-collapsed")
         // Every action bar is collapsed, so no "Rewind to here" is mounted
