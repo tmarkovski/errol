@@ -97,7 +97,7 @@ struct PerchTopicLine: View {
     private var starterTitle: String { "\(controller.appName(controller.firstSpeaker)) starts" }
 
     /// The side a click on the starter hands the first turn to.
-    private var otherStarter: Speaker { controller.firstSpeaker == .chatgpt ? .claude : .chatgpt }
+    private var otherStarter: Speaker { controller.firstSpeaker.other }
 
     private var endingTitle: String {
         switch controller.ending {

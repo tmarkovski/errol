@@ -97,9 +97,8 @@ struct PerchFocusAlert: View {
     /// The app's icon, with a ring that keeps swelling off it until the
     /// app is in front. Under Reduce Motion the icon stands alone.
     private var beacon: some View {
-        let bundleID = side == .chatgpt ? config.chatgptBundleID : config.claudeBundleID
-        let feather = side == .claude ? Perch.claudeFeather : Perch.chatgptFeather
-        return PerchAvatar(bundleID: bundleID, initial: String(name.prefix(1)), feather: feather)
+        PerchAvatar(bundleID: config.bundleID(for: side), initial: String(name.prefix(1)),
+                    feather: Perch.feather(for: side))
             .background {
                 if !reduceMotion { PerchFocusRing() }
             }

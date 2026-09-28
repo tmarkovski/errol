@@ -204,9 +204,9 @@ struct PerchPromptBox: View {
         } else {
             let speaker: Speaker = controller.chatgptConversation == .chatting || controller.chatgptConversation == .replied
                 ? .chatgpt : controller.claudeConversation == .notStarted ? controller.firstSpeaker : .claude
-            PerchAvatar(bundleID: speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID,
+            PerchAvatar(bundleID: config.bundleID(for: speaker),
                         initial: String(controller.appName(speaker).prefix(1)),
-                        feather: speaker == .chatgpt ? Perch.chatgptFeather : Perch.claudeFeather)
+                        feather: Perch.feather(for: speaker))
                 .scaleEffect(0.48).frame(width: Perch.s(24), height: Perch.s(24))
                 .accessibilityHidden(true)
         }
@@ -278,7 +278,7 @@ struct PerchConsoleActions: View {
     }
 
     private var closedApps: [Speaker] {
-        [Speaker.chatgpt, .claude].filter { setup.state[$0].presence == .notRunning }
+        Speaker.allCases.filter { setup.state[$0].presence == .notRunning }
     }
 
     /// Apps open only through this explicit action, or a click on a side's

@@ -51,8 +51,8 @@ struct ParticipantPresentation {
     let speaker: Speaker
     var side: SideSetup { controller.setup.state[speaker] }
     var name: String { controller.appName(speaker) }
-    var bundleID: String { speaker == .chatgpt ? config.chatgptBundleID : config.claudeBundleID }
-    var feather: Color { speaker == .chatgpt ? Perch.chatgptFeather : Perch.claudeFeather }
+    var bundleID: String { config.bundleID(for: speaker) }
+    var feather: Color { Perch.feather(for: speaker) }
     var conversation: ConversationStatus {
         speaker == .chatgpt ? controller.chatgptConversation : controller.claudeConversation
     }
@@ -154,7 +154,7 @@ struct ParticipantPresentation {
     /// The model the window shows, and its effort apart from it.
     var modelAndEffort: (model: String, effort: String?)? {
         guard let line = side.destinationModel else { return nil }
-        return splitEffort(line, selectors: speaker == .chatgpt ? config.chatgptSelectors : config.claudeSelectors)
+        return splitEffort(line, selectors: config.selectors(for: speaker))
     }
 
     /// The tip's lines under what a click does, each only where the window

@@ -16,7 +16,7 @@ struct PerchDestinations: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let lines = [Speaker.chatgpt, .claude].map { ParticipantPresentation(controller: controller, speaker: $0) }
+        let lines = Speaker.allCases.map { ParticipantPresentation(controller: controller, speaker: $0) }
         HStack(spacing: Perch.s(12)) {
             destination(lines[0]).frame(maxWidth: .infinity, alignment: .leading)
             destination(lines[1]).frame(maxWidth: .infinity, alignment: .trailing)

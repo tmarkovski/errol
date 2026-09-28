@@ -219,8 +219,7 @@ private struct PerchTranscriptRow: View {
     @ViewBuilder private var icon: some View {
         switch entry.author {
         case .side(let side):
-            let bundleID = side == .chatgpt ? config.chatgptBundleID : config.claudeBundleID
-            if let mark = AppIcons.mark(forBundleID: bundleID) {
+            if let mark = AppIcons.mark(forBundleID: config.bundleID(for: side)) {
                 Image(nsImage: mark)
                     .renderingMode(.template)
                     .resizable()

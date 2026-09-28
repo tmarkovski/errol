@@ -27,6 +27,7 @@ enum Perch {
     static var red: Color { Color(nsColor: palette.red) }
     static var chatgptFeather: Color { Color(nsColor: palette.chatgptFeather) }
     static var claudeFeather: Color { Color(nsColor: palette.claudeFeather) }
+    static func feather(for side: Speaker) -> Color { side == .chatgpt ? chatgptFeather : claudeFeather }
 
     static var shellNS: NSColor { palette.shell }
     static var inkNS: NSColor { palette.ink }
