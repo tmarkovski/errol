@@ -1,7 +1,8 @@
-// The AppKit shell around the SwiftUI interface: the status item (the Errol symbol,
-// hidden until clicked) and the floating panel that hosts the console
-// (PerchConsoleView). The panel's own window class, and the hosting view
-// that takes the first click, are in KeyablePanel.swift.
+// The AppKit shell around the SwiftUI interface: the status item (the Errol
+// symbol) and the floating panel that hosts the console (PerchConsoleView),
+// which opening the app brings up and the symbol shows and hides. The
+// panel's own window class, and the hosting view that takes the first
+// click, are in KeyablePanel.swift.
 //
 // The shell stays AppKit on purpose. SwiftUI's MenuBarExtra window dismisses
 // itself whenever another app activates — which the relay does on every
@@ -56,9 +57,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         transcript.track()
         relay.appMenuProvider = { [weak self] in self?.makeAppMenu() ?? NSMenu() }
         relay.focusPanelHandler = { [weak self] in self?.showPanel() }
-        // A menu-bar app with no window gives a first-time user nothing to
-        // discover the permission need from, so while the grant is missing
-        // every launch opens the panel with setup covering its console.
         // Keep watching for both grants and revocations, including while
         // the user is in System Settings or the panel is hidden. The run
         // loop keeps the timer for the app's life; the tolerance lets the
@@ -67,7 +65,32 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
             self?.refreshAccessibility()
         }
         permissionTimer.tolerance = 0.5
-        if !navigation.accessibilityGranted { showPanel() }
+        // Opening Errol is asking for its console, so a launch shows it; the
+        // status item is for bringing it back later. A launch at login is
+        // macOS opening Errol, not someone, so the console waits in the menu
+        // bar then, unless the grant is missing: a menu-bar app with no
+        // window gives a first-time user nothing to discover the permission
+        // need from, so every such launch opens the panel with setup
+        // covering its console.
+        if !launchedAtLogin || !navigation.accessibilityGranted { showPanel() }
+    }
+
+    /// Whether macOS opened Errol at login, from the user's Login Items,
+    /// rather than someone opening it: the launch's Apple event says so. It
+    /// is the current event only while the launch is handled, which
+    /// applicationDidFinishLaunching is part of.
+    private var launchedAtLogin: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventID == kAEOpenApplication else { return false }
+        return event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+
+    /// Opening Errol again while it runs, from Finder, Spotlight or
+    /// Launchpad, asks for the console the way a launch does. AppKit's own
+    /// handling has no window to show, so it is skipped.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPanel()
+        return false
     }
 
     // MARK: Appearance
@@ -142,6 +165,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         inspectItem.isEnabled = relay.consoleAccess.canChangeDestination
         #endif
         menu.addItem(.separator())
+        // Esc on the console does the same, so the item shows it as its key.
+        // With the menu open, Esc only closes the menu.
+        let minimizeItem = menu.addItem(withTitle: "Minimize", action: #selector(minimize),
+                                        keyEquivalent: "\u{1b}")
+        minimizeItem.keyEquivalentModifierMask = []
+        minimizeItem.target = self
+        minimizeItem.isEnabled = panel.isVisible
         menu.addItem(withTitle: "Quit Errol", action: #selector(quit), keyEquivalent: "q").target = self
         return menu
     }
@@ -198,6 +228,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         AppearanceStore.shared.theme = theme
     }
 
+    /// Puts the console away into the menu bar, as Esc on it does; the
+    /// status item, or opening Errol again, brings it back.
+    @objc private func minimize() {
+        panel.orderOut(nil)
+    }
+
     @objc private func quit() {
         NSApp.terminate(nil)
     }
@@ -247,8 +283,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// removes the rim along with it. Nothing else draws that line, the
     /// style mask included.
     ///
-    /// Esc hides it; the bare surface drags it; the frame follows the card
-    /// (fitPanel).
+    /// Esc, or Minimize in the app menu, hides it; the bare surface drags
+    /// it; the frame follows the card (fitPanel).
     private func buildPanel() {
         panel = KeyablePanel(contentRect: NSRect(origin: .zero, size: PerchMetrics.initialPanel),
                              styleMask: [.borderless, .nonactivatingPanel],
@@ -516,12 +552,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     /// The console, forward and key. Besides its own callers, this is the
     /// end of every run: the chat app that replied last still has the
-    /// keyboard, and New topic is what comes next. A panel Esc put away
-    /// mid-run comes back too — the summary is what there is to look at
-    /// now. Making the panel key is the whole move: a non-activating panel
-    /// takes keyboard focus without the app activating (see the file's
-    /// header), and activating the app, which earlier builds did at run
-    /// end through LaunchServices, left the panel without key status.
+    /// keyboard, and New topic is what comes next. A panel Esc or Minimize
+    /// put away mid-run comes back too — the summary is what there is to
+    /// look at now. Making the panel key is the whole move: a
+    /// non-activating panel takes keyboard focus without the app
+    /// activating (see the file's header), and activating the app, which
+    /// earlier builds did at run end through LaunchServices, left the
+    /// panel without key status.
     private func showPanel() {
         if !panel.isVisible { positionPanel() }
         present(panel)
