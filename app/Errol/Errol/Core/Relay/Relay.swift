@@ -616,6 +616,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                                 guardCheck: { deliveryGuard(listener) }, carries: carries) {
                 case .end(let ending):
                     if ending == .stopped { log("Run stopped by user.") }
+                    // A note this handoff already took, back at the gate after
+                    // a withheld send, left the mailbox, so the run's end would
+                    // not report it; nothing of it was typed.
+                    if let note = payload.note {
+                        reportSteering(.note, note, to: listener, turn: turn, outcome: .runEnded)
+                    }
                     return ending
                 case .proceed(let note, let unfit):
                     guard !noteTaken else { break }
@@ -644,7 +650,12 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 }
                 if outcome == .withheld || outcome == .notInFront {
                     endOperation(continuingRun: true)
-                    guard standBy() else { return .stopped }
+                    guard standBy() else {
+                        if let note = payload.note {
+                            reportSteering(.note, note, to: listener, turn: turn, outcome: .runEnded)
+                        }
+                        return .stopped
+                    }
                     continue
                 }
                 break
