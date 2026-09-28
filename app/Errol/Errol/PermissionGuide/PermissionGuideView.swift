@@ -184,8 +184,7 @@ struct PermissionGuideView: View {
 /// its dot keeps to the icon's column and its words start where the name
 /// does.
 private enum GuideMetrics {
-    /// The Settings card's corner, which the guide shares as the other card
-    /// Errol shows outside the console.
+    /// The guide card's corner, the shell's corner (Perch.shellCorner).
     static let card = RoundedRectangle(cornerRadius: Perch.shellCorner)
     static let cardInset = Perch.s(12)
     /// A step tighter than the card, as for any well set inside a window.
@@ -215,15 +214,10 @@ private struct GuideTile: View {
     var body: some View {
         let slot = GuideMetrics.iconSlot
         HStack(spacing: GuideMetrics.nameGap) {
-            // An app icon keeps a transparent margin around its squircle,
-            // which spans about 81% of the image, so the image is drawn
-            // oversize to make the squircle itself fill the slot, as the
-            // console's avatars do (PerchAvatar).
+            // The squircle fills the slot, as on the console's avatars
+            // (appIconFilling, in PerchAvatar.swift).
             Image(nsImage: icon)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: slot / 0.81, height: slot / 0.81)
-                .frame(width: slot, height: slot)
+                .appIconFilling(slot)
                 .opacity(model.isDragging ? 0.4 : 1)
                 .animation(Perch.fade, value: model.isDragging)
             Text(model.appName)

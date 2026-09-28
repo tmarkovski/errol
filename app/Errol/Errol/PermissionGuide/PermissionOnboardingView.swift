@@ -41,11 +41,7 @@ struct PermissionOnboardingView: View {
         return Group {
             if let icon = Self.listIcon {
                 // Like an app icon, the tile spans 81% of the image.
-                Image(nsImage: icon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: slot / 0.81, height: slot / 0.81)
-                    .frame(width: slot, height: slot)
+                Image(nsImage: icon).appIconFilling(slot)
             } else {
                 Image(systemName: AccessPermission.isRenamed ? "folder.badge.gearshape" : "accessibility")
                     .font(.system(size: slot * 0.45, weight: .medium))

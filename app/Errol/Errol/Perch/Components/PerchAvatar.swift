@@ -3,6 +3,9 @@
 //
 // The icon comes from AppIcons (AppIcons.swift), which reads it from the
 // installed app and redraws the avatar when the app or its artwork changes.
+// The way an app icon is sized to its slot (appIconFilling) lives here too,
+// since the permission guide's tile and the onboarding badge draw theirs the
+// same way.
 
 import AppKit
 import SwiftUI
@@ -22,17 +25,8 @@ struct PerchAvatar: View {
     var body: some View {
         Group {
             if let icon = AppIcons.shared.icon(forBundleID: bundleID) {
-                // A macOS app icon keeps a transparent margin around its
-                // squircle — the squircle spans about 81% of the canvas
-                // (measured on both apps' icons) — so the image is drawn
-                // oversize inside the slot to make the squircle itself
-                // slot-sized, matching the fallback circle. The overflow is
-                // only that margin; nothing paints outside the slot.
-                Image(nsImage: icon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: slot / 0.81, height: slot / 0.81)
-                    .frame(width: slot, height: slot)
+                // The squircle fills the slot, matching the fallback circle.
+                Image(nsImage: icon).appIconFilling(slot)
             } else {
                 ZStack {
                     Circle()
@@ -44,5 +38,19 @@ struct PerchAvatar: View {
                 }
             }
         }
+    }
+}
+
+extension Image {
+    /// A macOS app icon keeps a transparent margin around its squircle — the
+    /// squircle spans about 81% of the canvas (measured on both apps' icons)
+    /// — so the image is drawn oversize inside the slot to make the squircle
+    /// itself slot-sized. The overflow is only that margin; nothing paints
+    /// outside the slot.
+    func appIconFilling(_ slot: CGFloat) -> some View {
+        resizable()
+            .interpolation(.high)
+            .frame(width: slot / 0.81, height: slot / 0.81)
+            .frame(width: slot, height: slot)
     }
 }
