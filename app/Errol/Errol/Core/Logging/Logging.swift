@@ -13,8 +13,16 @@ let isoMillis: ISO8601DateFormatter = {
     return formatter
 }()
 
+/// A `log` line as stdout and the panel show it: the message behind a
+/// second-precision timestamp in brackets. Its own function so a run that
+/// posts to a bus other than `relayEvents` (the preview engine's) formats
+/// its lines the same way.
+func timestampedLogLine(_ message: String) -> String {
+    "[\(iso.string(from: Date()))] \(message)"
+}
+
 func log(_ message: String) {
-    let line = "[\(iso.string(from: Date()))] \(message)"
+    let line = timestampedLogLine(message)
     print(line)
     relayEvents.post(.log(line))
     RunLog.write(message, detail: false)

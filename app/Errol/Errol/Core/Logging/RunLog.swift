@@ -64,8 +64,14 @@ final class RunLog: @unchecked Sendable {
         }
         prune()
         // Colons are legal in APFS names but unfriendly in Finder and in
-        // shells, so the timestamp in the name swaps them for dashes.
-        let stamp = iso.string(from: date).replacingOccurrences(of: ":", with: "-")
+        // shells, so the timestamp in the name swaps them for dashes. It
+        // carries milliseconds, so two runs started in the same second get
+        // two files instead of the second truncating the first; the dot
+        // before them becomes a dash too, because `prune` and `sidecar`
+        // take the run's name to be everything before the first dot.
+        let stamp = isoMillis.string(from: date)
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: ".", with: "-")
         let url = directory.appendingPathComponent("\(filePrefix)\(stamp).log")
         guard manager.createFile(atPath: url.path, contents: nil),
               let handle = try? FileHandle(forWritingTo: url) else {
@@ -139,6 +145,10 @@ final class RunLog: @unchecked Sendable {
     let url: URL
     private let handle: FileHandle
     private let writeLock = NSLock()
+    /// Set by `close`, under `writeLock`. `write` lets go of the class lock
+    /// before it appends, so a line can reach a log that `end` has closed
+    /// in between; that line is dropped, as every line after `end` is.
+    private var closed = false
     /// Sidecars issued so far; read and advanced under the class lock.
     private var sidecars = 0
 
@@ -155,12 +165,18 @@ final class RunLog: @unchecked Sendable {
     private func append(_ line: String) {
         writeLock.lock()
         defer { writeLock.unlock() }
-        handle.write((line + "\n").data(using: .utf8) ?? Data())
+        guard !closed else { return }
+        // The throwing write: the older `write(_:)` raises an Objective-C
+        // exception on a closed handle or a full disk, which ends the
+        // process, and a debug log must never take the app down with it.
+        try? handle.write(contentsOf: Data((line + "\n").utf8))
     }
 
     private func close() {
         writeLock.lock()
         defer { writeLock.unlock() }
+        guard !closed else { return }
+        closed = true
         try? handle.synchronize()
         try? handle.close()
     }
