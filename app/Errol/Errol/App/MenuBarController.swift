@@ -28,8 +28,7 @@ private struct MainQueueHop: @unchecked Sendable {
 final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: KeyablePanel!
-    // Veils are temporarily disabled. Restore SideVeils() here to enable them again.
-    private let relay = RelayController(veils: nil, transferOverlay: TransferOverlay())
+    private let relay = RelayController(engine: LiveRelayEngine(), transferOverlay: TransferOverlay())
     /// What fitPanel last applied, so a card re-reporting the same size
     /// doesn't restart the frame animation.
     private var lastPanelSize: CGSize?

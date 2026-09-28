@@ -8,10 +8,6 @@
 // re-evaluates only for the properties it actually read — which is why the
 // panel is split into child views along update boundaries.
 //
-// The veil over whichever chat window is waiting (SideVeils, an AppKit
-// object the shell hands in) is driven from here too, off the same
-// events, so what it shows and what the perches say cannot disagree.
-//
 // The records the model keeps — log lines, the steering note and its
 // receipt, transcript entries — are plain values in RelayRecords.swift.
 
@@ -153,9 +149,6 @@ final class RelayController {
     @ObservationIgnored private var nextLogID = 0
     /// What drives the apps and reports back; LiveRelayEngine in the app.
     @ObservationIgnored private let engine: RelayEngine
-    /// The veil over the waiting chat window; nil in previews, which have
-    /// no windows to veil.
-    @ObservationIgnored private let veils: SideVeils?
     @ObservationIgnored private let transferOverlay: TransferOverlay?
     @ObservationIgnored let promptTransferSource = TransferAnchorSource()
     /// Each side's icon in the console, where its replies set off from
@@ -204,10 +197,8 @@ final class RelayController {
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
     @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
-    init(engine: RelayEngine = LiveRelayEngine(), veils: SideVeils? = nil,
-         transferOverlay: TransferOverlay? = nil) {
+    init(engine: RelayEngine, transferOverlay: TransferOverlay? = nil) {
         self.engine = engine
-        self.veils = veils
         self.transferOverlay = transferOverlay
         voice = VoiceInput(transcriber: engine.transcriber)
         setup = SetupController(engine: engine)
@@ -250,7 +241,6 @@ final class RelayController {
                 chatgptConversation = chatgpt
                 claudeConversation = claude
                 if chatgpt != .notStarted || claude != .notStarted { openingSent = true }
-                veils?.update(chatgpt: chatgpt, claude: claude)
             case .turn(let turn):
                 currentTurn = turn
                 if turn > 0 { openingSent = true }
@@ -557,7 +547,6 @@ final class RelayController {
         // a failed start) stay until the next run claims the buffer.
         logLines.removeAll()
         engine.startRun()
-        veils?.begin(chatgptName: chatgptStatus.appName, claudeName: claudeStatus.appName)
     }
 
     /// Whether a finished run is still on the panel: a report from a run
@@ -613,7 +602,6 @@ final class RelayController {
         isRunning = false
         isHolding = false
         block = nil
-        veils?.end()
         transferOverlay?.stop()
         recordSteeringAtRunEnd()
         resetSteering()
