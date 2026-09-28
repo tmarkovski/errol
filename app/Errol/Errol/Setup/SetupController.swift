@@ -30,7 +30,7 @@ final class SetupController {
     /// copies its word here, where the menu can.
     private(set) var canRestoreLayout = false
     /// The apps' names as the panel shows them.
-    let names: (chatgpt: String, claude: String) = ("ChatGPT", "Claude")
+    let names = SideNames.apps
 
     @ObservationIgnored private let engine: RelayEngine
     @ObservationIgnored private var launchDeadlines: [Speaker: Timer] = [:]
@@ -53,7 +53,7 @@ final class SetupController {
     }
 
     func name(_ side: Speaker) -> String {
-        side == .chatgpt ? names.chatgpt : names.claude
+        names[side]
     }
 
     // MARK: Observations
@@ -64,7 +64,7 @@ final class SetupController {
     /// sweep is applied to a copy and published only when it differs.
     func apply(_ report: ReadinessReport) {
         var next = state
-        for side in [Speaker.chatgpt, .claude] {
+        for side in Speaker.allCases {
             let status = side == .chatgpt ? report.chatgpt : report.claude
             let candidates = report.candidates[side] ?? []
             let presence = appPresence(installed: report.installed[side] ?? true,
@@ -104,7 +104,7 @@ final class SetupController {
 
     /// Open whichever app is not open.
     func launchBoth() {
-        for side in [Speaker.chatgpt, .claude] where state[side].presence == .notRunning {
+        for side in Speaker.allCases where state[side].presence == .notRunning {
             launch(side)
         }
     }
@@ -243,7 +243,7 @@ final class SetupController {
     /// several windows is never chosen for (SetupState.automaticConnection).
     private func connectIfUnambiguous() {
         guard !runInProgress, !isBinding else { return }
-        for side in [Speaker.chatgpt, .claude] {
+        for side in Speaker.allCases {
             guard let window = state.automaticConnection(for: side),
                   refusedAutomatically[side] != window else { continue }
             connect(side, to: window)

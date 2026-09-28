@@ -86,7 +86,7 @@ final class DestinationTests: XCTestCase {
     // MARK: Block wording
 
     func testBlockLinesNameTheSideAndWhatClearsThem() {
-        let names = (chatgpt: "ChatGPT", claude: "Claude")
+        let names = SideNames(chatgpt: "ChatGPT", claude: "Claude")
         let hidden = RunBlock.windowHidden(side: .claude, seen: "minimized")
         XCTAssertEqual(hidden.headline(names: names), "Paused: Claude's window isn't showing")
         XCTAssertTrue(hidden.recovery(names: names).contains("It is minimized. Bring it back to continue, or Stop"))

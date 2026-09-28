@@ -8,7 +8,7 @@ import XCTest
 @testable import ErrolKit
 
 final class SetupStateTests: XCTestCase {
-    private let names = (chatgpt: "ChatGPT", claude: "Claude")
+    private let names = SideNames(chatgpt: "ChatGPT", claude: "Claude")
     private let chatgpt = config.chatgptSelectors
     private let claude = config.claudeSelectors
 

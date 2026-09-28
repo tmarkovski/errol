@@ -49,8 +49,8 @@ enum RunBlock: Equatable {
     }
 
     /// The one line that says what is wrong.
-    func headline(names: (chatgpt: String, claude: String)) -> String {
-        let name = side == .chatgpt ? names.chatgpt : names.claude
+    func headline(names: SideNames) -> String {
+        let name = names[side]
         switch self {
         case .windowHidden: return "Paused: \(name)'s window isn't showing"
         case .draft: return "Paused: \(name) has an unsent draft"
@@ -64,8 +64,8 @@ enum RunBlock: Equatable {
     }
 
     /// What clears it, and that Stop is there.
-    func recovery(names: (chatgpt: String, claude: String)) -> String {
-        let name = side == .chatgpt ? names.chatgpt : names.claude
+    func recovery(names: SideNames) -> String {
+        let name = names[side]
         switch self {
         case .windowHidden(_, let seen):
             return "It is \(seen). Bring it back to continue, or Stop. Errol resumes when it is showing again."
@@ -148,8 +148,8 @@ func deliveryBlock(for state: ComposerState, side: Speaker) -> RunBlock? {
 extension RunBlock {
     /// The block as a clause in the summary's context: what the run stood
     /// on when Stop was pressed.
-    func contextClause(names: (chatgpt: String, claude: String)) -> String {
-        let name = side == .chatgpt ? names.chatgpt : names.claude
+    func contextClause(names: SideNames) -> String {
+        let name = names[side]
         switch self {
         case .windowHidden: return "\(name)'s window was hidden"
         case .draft: return "\(name) had an unsent draft"

@@ -107,9 +107,7 @@ final class RelayController {
 
     /// The apps' names as the panel shows them, for the summary and the
     /// hold lines the engine reports by side.
-    var names: (chatgpt: String, claude: String) {
-        ("ChatGPT", "Claude")
-    }
+    var names: SideNames { .apps }
 
     /// The reason the last start failed, while nothing has replaced it: the
     /// line under the composer, where the run would have been.
@@ -551,10 +549,7 @@ final class RelayController {
     }
 
     func appName(_ speaker: Speaker) -> String {
-        switch speaker {
-        case .chatgpt: names.chatgpt
-        case .claude: names.claude
-        }
+        names[speaker]
     }
 
     /// Pause to steer requests focus ownership; the field waits for any

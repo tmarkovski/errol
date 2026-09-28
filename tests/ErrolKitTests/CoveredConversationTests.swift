@@ -90,7 +90,7 @@ final class CoveredConversationTests: XCTestCase {
     }
 
     func testTheHoldSaysWhatToClose() {
-        let names = (chatgpt: "ChatGPT", claude: "Claude")
+        let names = SideNames(chatgpt: "ChatGPT", claude: "Claude")
         let named = RunBlock.covered(side: .claude, by: "Image preview")
         XCTAssertEqual(named.side, .claude)
         XCTAssertEqual(named.headline(names: names), "Paused: Claude's conversation is covered")

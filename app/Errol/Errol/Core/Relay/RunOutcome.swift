@@ -51,23 +51,19 @@ struct RunReport: Equatable {
     /// The hold the run was standing in when it ended.
     var block: RunBlock?
 
-    private func name(_ side: Speaker, _ names: (chatgpt: String, claude: String)) -> String {
-        side == .chatgpt ? names.chatgpt : names.claude
-    }
-
     /// The summary's headline: the outcome, in the reading the human
     /// needs first.
-    func headline(names: (chatgpt: String, claude: String)) -> String {
+    func headline(names: SideNames) -> String {
         switch outcome {
         case .completed: return "Run complete"
         case .stopped: return "Run stopped"
         case .turnLimitReached: return "Turn limit reached"
-        case .timedOut(let side): return "\(name(side, names)) stopped responding"
-        case .copyFailed(let side): return "Couldn't copy \(name(side, names))'s reply"
-        case .sendRefused(let side): return "Couldn't type into \(name(side, names))"
-        case .sendAbandoned(let side): return "Delivery to \(name(side, names)) interrupted"
-        case .emptyReply(let side): return "\(name(side, names)) ended the conversation"
-        case .destinationLost(let side, _): return "Lost \(name(side, names))'s conversation"
+        case .timedOut(let side): return "\(names[side]) stopped responding"
+        case .copyFailed(let side): return "Couldn't copy \(names[side])'s reply"
+        case .sendRefused(let side): return "Couldn't type into \(names[side])"
+        case .sendAbandoned(let side): return "Delivery to \(names[side]) interrupted"
+        case .emptyReply(let side): return "\(names[side]) ended the conversation"
+        case .destinationLost(let side, _): return "Lost \(names[side])'s conversation"
         case .failedStart: return "Couldn't start"
         }
     }
@@ -76,7 +72,7 @@ struct RunReport: Equatable {
     /// already say, and what it stood on. Empty when there is nothing to
     /// add. The reply count and the run's time are the conversation
     /// summary's to show (PerchTranscript), not this line's.
-    func detail(names: (chatgpt: String, claude: String), timeout: TimeInterval) -> String {
+    func detail(names: SideNames, timeout: TimeInterval) -> String {
         var parts: [String] = []
         if case .failedStart(let reason) = outcome {
             return reason
@@ -102,7 +98,7 @@ struct RunReport: Equatable {
         if let block {
             parts.append("while paused: " + block.contextClause(names: names))
         } else if let side = signedOffBy, outcome != .completed, outcome != .emptyReply(side: side) {
-            parts.append("after \(name(side, names)) signed off")
+            parts.append("after \(names[side]) signed off")
         }
         return parts.joined(separator: " \u{00B7} ")
     }

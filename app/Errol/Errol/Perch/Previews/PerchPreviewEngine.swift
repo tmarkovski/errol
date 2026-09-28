@@ -229,7 +229,7 @@ final class PerchPreviewEngine: RelayEngine {
     /// The fixed picture, as a sweep would report it.
     private func publish() {
         var report = ReadinessReport(chatgpt: readiness.chatgpt, claude: readiness.claude, installed: installed)
-        for side in [Speaker.chatgpt, .claude] {
+        for side in Speaker.allCases {
             report.candidates[side] = windows(side)
             if let bound = bindings[side] {
                 report.bindings[side] = BindingObservation(window: bound.id, check: .same, identity: bound.identity,
@@ -260,7 +260,7 @@ final class PerchPreviewEngine: RelayEngine {
     }
 
     func bringForward(_ side: Speaker, completion: @escaping () -> Void) {
-        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") would come forward now."))
+        events.post(.log("Preview: \(side.appName) would come forward now."))
         DispatchQueue.main.async(execute: completion)
     }
 
@@ -270,7 +270,7 @@ final class PerchPreviewEngine: RelayEngine {
             return
         }
         bindings[side] = candidate
-        events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") connected to \(candidate.name ?? "an untitled window")."))
+        events.post(.log("Preview: \(side.appName) connected to \(candidate.name ?? "an untitled window")."))
         completion(BindingObservation(window: candidate.id, check: .same, identity: candidate.identity,
                                       composer: candidate.composer))
     }
@@ -316,7 +316,7 @@ final class PerchPreviewEngine: RelayEngine {
         if let operation { _ = control.beginOperation(operation) }
         events.post(.log("Preview run: nothing is sent to either app."))
         let play = PreviewRun(events: events, control: control, replyTime: replyTime, handoffTime: handoffTime,
-                              names: (readiness.chatgpt.appName, readiness.claude.appName),
+                              names: SideNames(chatgpt: readiness.chatgpt.appName, claude: readiness.claude.appName),
                               first: config.first,
                               turnCap: config.turnCap,
                               signOffAt: config.ending.endsOnSignOff ? signOffAt : nil,
@@ -342,7 +342,7 @@ private final class PreviewRun {
     private let control: RelayControl
     private let replyTime: Duration
     private let handoffTime: Duration
-    private let names: (chatgpt: String, claude: String)
+    private let names: SideNames
     private let first: Speaker
     private let turnCap: Int?
     private let signOffAt: Int?
@@ -355,7 +355,7 @@ private final class PreviewRun {
     private var claude = ConversationStatus.notStarted
 
     nonisolated init(events: RelayEventBus, control: RelayControl, replyTime: Duration, handoffTime: Duration,
-                     names: (chatgpt: String, claude: String), first: Speaker, turnCap: Int?,
+                     names: SideNames, first: Speaker, turnCap: Int?,
                      signOffAt: Int?, startTurn: Int, atHandoff: Bool,
                      openingOperation: FocusOperation?) {
         self.events = events
@@ -377,8 +377,8 @@ private final class PreviewRun {
             if operationActive { endOperation(continuing: false) }
             control.finishRun()
         }
-        var speaker = startTurn % 2 == 1 ? first : other(than: first)
-        var listener = other(than: speaker)
+        var speaker = startTurn % 2 == 1 ? first : first.other
+        var listener = speaker.other
         set(speaker, .chatting)
         set(listener, .waiting)
 
@@ -410,7 +410,7 @@ private final class PreviewRun {
             if reserved != .delivery {
                 var capture = reserved == .capture ? OperationDecision.proceed : control.beginOperation(.capture)
                 if capture == .hold {
-                    log("Paused — \(name(speaker))'s reply is ready; waiting to copy it.")
+                    log("Paused — \(names[speaker])'s reply is ready; waiting to copy it.")
                     events.post(.holding(true))
                     repeat {
                         try? await Task.sleep(for: .milliseconds(200))
@@ -431,17 +431,17 @@ private final class PreviewRun {
             if signedOff {
                 set(speaker, .ended)
                 if lastReplyEnded {
-                    log("\(name(speaker)) ended the conversation too — both sides have signed off.")
+                    log("\(names[speaker]) ended the conversation too — both sides have signed off.")
                     signedOffBy = nil
                     outcome = .completed
                     break
                 }
                 signedOffBy = speaker
-                log("\(name(speaker)) ended the conversation; relaying the sign-off so \(name(listener)) can close out.")
+                log("\(names[speaker]) ended the conversation; relaying the sign-off so \(names[listener]) can close out.")
             }
             lastReplyEnded = signedOff
 
-            log("Turn \(turn)\(turnCap.map { "/\($0)" } ?? ""): \(name(speaker)) -> \(name(listener))")
+            log("Turn \(turn)\(turnCap.map { "/\($0)" } ?? ""): \(names[speaker]) -> \(names[listener])")
             if let turnCap, turn >= turnCap {
                 log("Turn cap reached.")
                 outcome = .turnLimitReached
@@ -454,7 +454,7 @@ private final class PreviewRun {
                 ? HandoffDecision.commit(note: nil, unfit: nil)
                 : control.decideHandoff { _ in true }
             if decision == .hold {
-                log("Paused — holding \(name(speaker))'s reply before it reaches \(name(listener)).")
+                log("Paused — holding \(names[speaker])'s reply before it reaches \(names[listener]).")
                 if !signedOff { set(speaker, .replied) }
                 events.post(.holding(true))
                 repeat {
@@ -548,14 +548,6 @@ private final class PreviewRun {
     /// on this run's bus rather than the process-wide one.
     private func log(_ line: String) {
         events.post(.log(timestampedLogLine(line)))
-    }
-
-    private func name(_ side: Speaker) -> String {
-        side == .chatgpt ? names.chatgpt : names.claude
-    }
-
-    private func other(than side: Speaker) -> Speaker {
-        side == .chatgpt ? .claude : .chatgpt
     }
 }
 #endif

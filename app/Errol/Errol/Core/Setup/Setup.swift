@@ -286,7 +286,7 @@ struct SetupState: Equatable {
     var canArrange: Bool { chatgpt.arrangementTarget != nil && claude.arrangementTarget != nil }
 
     /// Why Send is unavailable, or nil when both destinations are ready.
-    func sendBlocker(names: (chatgpt: String, claude: String)) -> String? {
+    func sendBlocker(names: SideNames) -> String? {
         notice(names: names)?.text
     }
 
@@ -383,7 +383,7 @@ struct SetupState: Equatable {
     /// Both connections stand to be verified again: a finished run's, on
     /// returning to the editor.
     mutating func markUnverified() {
-        for side in [Speaker.chatgpt, .claude] {
+        for side in Speaker.allCases {
             self[side].connection?.readiness = .unverified
         }
     }
@@ -394,40 +394,39 @@ struct SetupState: Equatable {
     /// app missing, the apps closed, then each side's windows and its
     /// connection, ChatGPT before Claude. Nil when both destinations read
     /// ready. A wait is not a problem; something the human must fix is.
-    func notice(names: (chatgpt: String, claude: String)) -> SetupNotice? {
-        let sides = [Speaker.chatgpt, .claude]
-        func name(_ side: Speaker) -> String { side == .chatgpt ? names.chatgpt : names.claude }
+    func notice(names: SideNames) -> SetupNotice? {
+        let sides = Speaker.allCases
 
         if let missing = sides.first(where: { self[$0].presence == .notInstalled }) {
-            return SetupNotice(text: "\(name(missing)) isn't installed on this Mac. Install it, then come back here.",
+            return SetupNotice(text: "\(names[missing]) isn't installed on this Mac. Install it, then come back here.",
                                isProblem: true)
         }
         let closed = sides.filter { self[$0].presence == .notRunning }
         if !closed.isEmpty {
-            return SetupNotice(text: "Open \(closed.map(name).joined(separator: " and ")) to begin.",
+            return SetupNotice(text: "Open \(closed.map { names[$0] }.joined(separator: " and ")) to begin.",
                                isProblem: false)
         }
         for side in sides {
             let setup = self[side]
             if let connection = setup.connection {
-                guard let problem = connection.readiness.problem(name: name(side)) else { continue }
+                guard let problem = connection.readiness.problem(name: names[side]) else { continue }
                 return SetupNotice(text: problem, isProblem: connection.readiness != .unverified)
             }
             switch setup.presence {
             case .checking:
-                return SetupNotice(text: "Checking \(name(side))\u{2026}", isProblem: false)
+                return SetupNotice(text: "Checking \(names[side])\u{2026}", isProblem: false)
             case .launching:
-                return SetupNotice(text: "Opening \(name(side))\u{2026}", isProblem: false)
+                return SetupNotice(text: "Opening \(names[side])\u{2026}", isProblem: false)
             case .noWindow:
-                return SetupNotice(text: "\(name(side)) has no window open. Open a chat in it.", isProblem: false)
+                return SetupNotice(text: "\(names[side]) has no window open. Open a chat in it.", isProblem: false)
             case .noConversation:
-                return SetupNotice(text: "\(name(side)) has no conversation to relay into. Open a chat in it.",
+                return SetupNotice(text: "\(names[side]) has no conversation to relay into. Open a chat in it.",
                                    isProblem: false)
             case .available(let windows) where windows > 1:
-                return SetupNotice(text: "\(name(side)) has \(windows) windows open. Click the line below to choose one.",
+                return SetupNotice(text: "\(names[side]) has \(windows) windows open. Click the line below to choose one.",
                                    isProblem: false)
             case .available, .notInstalled, .notRunning:
-                return SetupNotice(text: "Connecting \(name(side))\u{2026}", isProblem: false)
+                return SetupNotice(text: "Connecting \(names[side])\u{2026}", isProblem: false)
             }
         }
         return nil
