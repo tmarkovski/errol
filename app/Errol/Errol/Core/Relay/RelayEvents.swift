@@ -73,7 +73,8 @@ enum SteeringOutcome: Equatable {
     /// confirms it — the paste never verified, the composer never moved,
     /// or the foreground was lost mid-confirmation. Worth checking the app.
     case unconfirmed
-    /// Nothing was typed: the relay could not take the foreground.
+    /// Nothing was typed: the send was called off (cancelled, or vetoed by
+    /// an inspection) before the paste.
     case refused
     /// The framing and the steering sections alone would exceed the
     /// message cap, so the note could not travel whole and was not sent.

@@ -28,6 +28,11 @@ final class RelayControl: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
     private var paused = false
+    /// The steering mailbox: one slot. The console's path in is
+    /// finishSteering(note:), which sets the slot and lifts the hold in one
+    /// step; the worker takes the note at the next handoff boundary — it
+    /// rides to the side about to reply and is echoed to the other side a
+    /// turn later. Setting it is a set, never an append.
     private var note: String?
     private var operation: FocusOperation?
     private var pendingEditor = false
@@ -108,11 +113,8 @@ final class RelayControl: @unchecked Sendable {
         pendingEditor = false
     }
 
-    /// The steering mailbox: one slot. The panel posts the human's note
-    /// here and the worker takes it at the next handoff boundary — the note
-    /// rides to the side about to reply and is echoed to the other side a
-    /// turn later. Posting is a set, never an append: the panel keeps one
-    /// note at a time, so a second post replaces the first.
+    /// Test seam: queue a note without the hold/finish handshake; a second
+    /// post replaces the first.
     func postSteering(_ text: String) { lock.lock(); note = text; lock.unlock() }
 
     /// Withdraw the queued note. nil when the slot is empty — including
@@ -126,7 +128,7 @@ final class RelayControl: @unchecked Sendable {
         return taken
     }
 
-    /// Whether a note is waiting for its handoff.
+    /// Test seam: whether a note is waiting for its handoff.
     var hasSteering: Bool { lock.lock(); defer { lock.unlock() }; return note != nil }
 
     /// Claim the note and ask for editor ownership together. A lost claim

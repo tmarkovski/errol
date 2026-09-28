@@ -226,7 +226,7 @@ func pasteMissSnapshot(in target: TargetApp, input: AXUIElement?, needle: String
     trace("text inputs in the window: \(inputs.count)")
     for element in inputs.prefix(12) {
         let value = axAttribute(element, kAXValueAttribute) as? String
-        let holds = value.map { !needle.isEmpty && $0.contains(needle) } ?? false
+        let holds = value.map { !needle.isEmpty && alphanumerics(of: $0).contains(needle) } ?? false
         trace("  \(describeElement(element))" + (holds ? "  <- holds the needle" : ""))
     }
     if let input {

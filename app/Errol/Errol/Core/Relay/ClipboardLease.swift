@@ -10,8 +10,9 @@
 // The capture keeps every item and every representation, so a rich copy
 // (an image with a file promise, styled text with its plain fallback)
 // comes back whole; a representation that cannot be read, or a capture
-// past the byte limit, marks the capture incomplete, and an incomplete
-// capture is never put back in part.
+// past the byte limit, marks the capture incomplete, and release() never
+// puts an incomplete capture back in part. The harness's restore() puts
+// back whatever was captured and reports it as a failure.
 
 import AppKit
 
@@ -44,7 +45,7 @@ final class ClipboardLease {
         var reason: String?
         var bytes = 0
         var items: [[NSPasteboard.PasteboardType: Data]] = []
-        for item in pasteboard.pasteboardItems ?? [] {
+        capture: for item in pasteboard.pasteboardItems ?? [] {
             var representations: [NSPasteboard.PasteboardType: Data] = [:]
             for type in item.types {
                 guard let data = item.data(forType: type) else {
@@ -56,7 +57,11 @@ final class ClipboardLease {
                 if bytes > byteLimit {
                     complete = false
                     reason = "the earlier contents exceed \(byteLimit >> 20) MB"
-                    break
+                    // Nothing past the limit is kept, so stop reading: each
+                    // later item would only render promised data to discard.
+                    // The partial item stays for the harness's restore.
+                    items.append(representations)
+                    break capture
                 }
                 representations[type] = data
             }
