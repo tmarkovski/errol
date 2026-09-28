@@ -5,10 +5,10 @@
 #if DEBUG
 import SwiftUI
 
-#Preview("Tip · ChatGPT") { PerchPreviewState.details.scene }
-#Preview("Tip · no window chosen") { PerchPreviewState.detailsChoosing.scene }
-#Preview("Tip · ChatGPT closed") { PerchPreviewState.detailsClosed.scene }
-#Preview("Tip · Claude minimized mid-run") { PerchPreviewState.detailsHeld.scene }
+#Preview("Tip · ChatGPT") { PerchPreviewState.tipConnected.scene }
+#Preview("Tip · no window chosen") { PerchPreviewState.tipChoosing.scene }
+#Preview("Tip · ChatGPT closed") { PerchPreviewState.tipClosed.scene }
+#Preview("Tip · Claude minimized mid-run") { PerchPreviewState.tipHeld.scene }
 
 #Preview("Avatars (icon and fallback)") {
     // The first wears whatever Claude Desktop's icon is on this Mac; the

@@ -5,7 +5,7 @@ Run `tools/console-preview/render /tmp/errol-preview` from the repository to com
 Add `--dark` for dark appearance, and `-appTheme warm-stone` (any theme's identifier) for another theme; the theme is read from the arguments, not saved. Numeric prefixes select scenes, for example:
 
 ```sh
-tools/console-preview/render /tmp/errol-preview 03 08 09 10 14 15 16 17
+tools/console-preview/render /tmp/errol-preview 03 08 09 10 14 15 16 18
 ```
 
 The scenes cover composition, an app with several windows to choose from, closed apps, Code sessions, long prompts, running, steering, queued notes, focus recovery, completion, pending pauses, held windows, interrupted delivery, the endings (18: a turn limit with its stepper, and a run that only Stop ends), and the About window (19). State 03 also renders the 600-point layout. States 01, 03, 04, 08, and 15 render a side's tip where the app puts it: under the console, its outer edge on the side's icon. Each scene stands in the Xcode canvases' own scene (`PerchPreviewScene`): the capsule wears the theme's window color, as the panel does, and only the windows' shadows are stand-ins. Hover can't be shown, because SwiftUI reads the real pointer, so the scene stands the tip there itself. The capture also draws faint ticks at the ends of outlined capsules, as it does for any SwiftUI capsule stroke.

@@ -24,20 +24,20 @@ struct PerchPreviewScene: View {
     let controller: RelayController
     var consoleWidth: CGFloat = Perch.widgetWidth
     /// The side whose tip stands under the console.
-    var details: Speaker? = nil
+    var tipSide: Speaker? = nil
     @Environment(\.colorScheme) private var colorScheme
     @State private var tipWidth: CGFloat = 0
 
     /// The backdrop's margin around the windows.
     static let margin: CGFloat = 36
     /// The room a tip takes under the console.
-    static let detailsRoom: CGFloat = 170
+    static let tipRoom: CGFloat = 170
 
     /// The scene's size, which the render harness sizes its window to.
-    static func size(summary: Bool, details: Bool = false,
+    static func size(summary: Bool, tip: Bool = false,
                      consoleWidth: CGFloat = Perch.widgetWidth) -> CGSize {
         var height = Perch.widgetHeight + (summary ? PerchTranscript.gap + PerchTranscript.height : 0)
-        if details { height = max(height, Perch.widgetHeight + detailsRoom) }
+        if tip { height = max(height, Perch.widgetHeight + tipRoom) }
         return CGSize(width: consoleWidth + 2 * margin, height: height + 2 * margin)
     }
 
@@ -48,7 +48,7 @@ struct PerchPreviewScene: View {
 
     var body: some View {
         let summary = controller.stage != .compose
-        let size = Self.size(summary: summary, details: details != nil, consoleWidth: consoleWidth)
+        let size = Self.size(summary: summary, tip: tipSide != nil, consoleWidth: consoleWidth)
         ZStack(alignment: .topLeading) {
             VStack(spacing: PerchTranscript.gap) {
                 PerchConsoleView(controller: controller, width: consoleWidth)
@@ -64,7 +64,7 @@ struct PerchPreviewScene: View {
                 }
             }
             .padding(Self.margin)
-            if let details { tip(details) }
+            if let tipSide { tip(tipSide) }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .background(Self.backdrop(colorScheme))
@@ -127,7 +127,7 @@ enum PerchPreviewState: CaseIterable {
          chatgptClosed, claudeNotInstalled, longTopic,
          turnLimit, untilStopped, narrow
     // A side's tip.
-    case details, detailsChoosing, detailsClosed, detailsHeld
+    case tipConnected, tipChoosing, tipClosed, tipHeld
     // A run.
     case opening, running, runningUntilStopped, modelUnavailable, pausePending, paused,
          noteQueued, waitingForFocus, conversationCovered, held, handoffs
@@ -136,26 +136,26 @@ enum PerchPreviewState: CaseIterable {
 
     /// The canvas: the console in this state, standing as the panel does.
     @MainActor var scene: PerchPreviewScene {
-        PerchPreviewScene(controller: controller(), consoleWidth: consoleWidth, details: details)
+        PerchPreviewScene(controller: controller(), consoleWidth: consoleWidth, tipSide: tipSide)
     }
 
     var consoleWidth: CGFloat { self == .narrow ? 600 : Perch.widgetWidth }
 
-    var details: Speaker? {
+    var tipSide: Speaker? {
         switch self {
-        case .details, .detailsChoosing, .detailsClosed: .chatgpt
-        case .detailsHeld: .claude
+        case .tipConnected, .tipChoosing, .tipClosed: .chatgpt
+        case .tipHeld: .claude
         default: nil
         }
     }
 
     @MainActor func controller() -> RelayController {
         switch self {
-        case .severalWindows, .detailsChoosing:
+        case .severalWindows, .tipChoosing:
             // Two windows on each side, so neither is connected until one
             // is chosen from its line under the box.
             return freshController()
-        case .bothConnected, .details:
+        case .bothConnected, .tipConnected:
             return connectedController()
         case .noTopic:
             let controller = connectedController()
@@ -170,7 +170,7 @@ enum PerchPreviewState: CaseIterable {
             // Start relay waits and the line under the box says why.
             return connectedController(PerchPreviewEngine(replying: .claude),
                                        claude: PerchPreviewEngine.Windows.claudeCode)
-        case .chatgptClosed, .detailsClosed:
+        case .chatgptClosed, .tipClosed:
             var closed = PerchPreviewEngine.bothReady
             closed.chatgpt = SideStatus(appName: "ChatGPT", state: .missing, headline: "Not running")
             return freshController(PerchPreviewEngine(readiness: closed))
@@ -199,7 +199,7 @@ enum PerchPreviewState: CaseIterable {
             let controller = connectedController()
             controller.ending = .turnLimit
             return controller
-        case .detailsHeld:
+        case .tipHeld:
             return Self.held.controller()
 
         case .opening:

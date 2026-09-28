@@ -35,9 +35,9 @@ func pumpUntil(_ timeout: Double, _ done: () -> Bool) {
 /// up: under the console, its outer edge on the icon's, over the transcript
 /// during a run.
 @MainActor
-func details(_ name: String, _ controller: RelayController, _ speaker: Speaker) {
-    render(name, PerchPreviewScene(controller: controller, details: speaker),
-           size: PerchPreviewScene.size(summary: controller.stage != .compose, details: true), settle: 0.6)
+func tip(_ name: String, _ controller: RelayController, _ speaker: Speaker) {
+    render(name, PerchPreviewScene(controller: controller, tipSide: speaker),
+           size: PerchPreviewScene.size(summary: controller.stage != .compose, tip: true), settle: 0.6)
 }
 
 @MainActor
@@ -105,9 +105,9 @@ func main() {
     try! FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
     // Before a run.
     if wanted("01") {
-        let c = quick(RelayController(engine: PerchPreviewEngine()))
+        let c = quick(freshController())
         scene("01-compose-several-windows", c)
-        details("01-participant-choose", c, .chatgpt)
+        tip("01-participant-choose", c, .chatgpt)
     }
     if wanted("02") {
         let c = quick(connectedController())
@@ -118,17 +118,17 @@ func main() {
         let c = quick(connectedController())
         scene("03-compose-connected-topic", c)
         scene("03-narrow", c, consoleWidth: 600, settle: 0.5)
-        details("03-participant", c, .chatgpt)
+        tip("03-participant", c, .chatgpt)
     }
     if wanted("04") {
         var closed = PerchPreviewEngine.bothReady
         closed.chatgpt = SideStatus(appName: "ChatGPT", state: .missing, headline: "Not running")
-        let c = quick(RelayController(engine: PerchPreviewEngine(readiness: closed)))
+        let c = quick(freshController(PerchPreviewEngine(readiness: closed)))
         scene("04-compose-chatgpt-closed", c)
-        details("04-participant-closed", c, .chatgpt)
+        tip("04-participant-closed", c, .chatgpt)
     }
     if wanted("05") {
-        let c = quick(RelayController(engine: PerchPreviewEngine()))
+        let c = quick(freshController())
         c.setup.connect(.chatgpt, to: PerchPreviewEngine.Windows.chatgptConversation)
         c.setup.connect(.claude, to: PerchPreviewEngine.Windows.claudeCode)
         scene("05-compose-code-session", c)
@@ -159,7 +159,7 @@ func main() {
         engine.postReplies(4)
         scene("08-running-mid", c, settle: 0.5)
         precondition(!c.consoleAccess.canShowWindow)
-        details("08-participant", c, .chatgpt)
+        tip("08-participant", c, .chatgpt)
     }
     if wanted("09") {
         let engine = PerchPreviewEngine(pace: .seconds(120), turn: 5, atHandoff: true)
@@ -246,7 +246,7 @@ func main() {
         c.start()
         engine.events.post(.blocked(.windowHidden(side: .claude, seen: "minimized")))
         scene("15-held", c, settle: 0.3)
-        details("15-participant-held", c, .claude)
+        tip("15-participant-held", c, .claude)
         c.stop()
     }
     if wanted("16") {
@@ -304,8 +304,8 @@ func main() {
             guard wanted(name) else { continue }
             let controller = state.controller()
             render(name, PerchPreviewScene(controller: controller, consoleWidth: state.consoleWidth,
-                                           details: state.details),
-                   size: PerchPreviewScene.size(summary: controller.stage != .compose, details: state.details != nil,
+                                           tipSide: state.tipSide),
+                   size: PerchPreviewScene.size(summary: controller.stage != .compose, tip: state.tipSide != nil,
                                                 consoleWidth: state.consoleWidth),
                    settle: 2.5)
         }
