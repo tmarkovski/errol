@@ -61,10 +61,15 @@ final class WindowCandidateTests: XCTestCase {
     func testTheScanSeesReplyingTheWayTheFindersDo() throws {
         for (fixture, selectors, name) in [("claude-multiwindow", claude, "Claude"),
                                            ("chatgpt-chat-conversation", chatgpt, "ChatGPT"),
-                                           ("claude-code-collapsed", claude, "Claude")] {
+                                           ("claude-code-collapsed", claude, "Claude"),
+                                           ("chatgpt-chat-streaming", chatgpt, "ChatGPT"),
+                                           ("claude-code-streaming", claude, "Claude")] {
             let detection = detect(fixture: fixture, selectors: selectors, appName: name)
             let chosen = try XCTUnwrap(detection.chosenIndex)
             XCTAssertEqual(detection.scans[chosen].isReplying, detection.streaming, fixture)
+            // Both verdicts false would agree too, so the finder must also
+            // see what the fixture was captured showing.
+            XCTAssertEqual(detection.streaming, fixture.hasSuffix("-streaming"), fixture)
         }
     }
 
