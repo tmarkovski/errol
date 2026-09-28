@@ -34,7 +34,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var lastPanelSize: CGSize?
     private var panelResizeTimer: Timer?
     private let navigation = PanelNavigation(accessibilityGranted: AXIsProcessTrusted())
-    private var permissionTimer: Timer?
     /// The debug log window, behind the status item's "Show Last Run Log".
     private var logWindow: NSWindow?
     private var aboutWindow: NSWindow?
@@ -71,10 +70,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // discover the permission need from, so while the grant is missing
         // every launch opens the panel with setup covering its console.
         // Keep watching for both grants and revocations, including while
-        // the user is in System Settings or the panel is hidden.
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // the user is in System Settings or the panel is hidden. The run
+        // loop keeps the timer for the app's life; the tolerance lets the
+        // system fold this poll into other wakeups.
+        let permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.refreshAccessibility()
         }
+        permissionTimer.tolerance = 0.5
         if !navigation.accessibilityGranted { showPanel() }
     }
 
@@ -161,7 +163,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         updater.menuItemChosen()
     }
 
-    // MARK: Session options
+    // MARK: Appearance options
 
     private func addAppearanceOptions(to menu: NSMenu) {
         let display = submenu("Appearance", in: menu)
@@ -207,7 +209,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
-        relayControl.cancel()
         NSApp.terminate(nil)
     }
 
@@ -215,9 +216,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// already agrees, but the close button depends on it, so it is stated.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    /// Every termination path, not just the Quit item: logout, and Sparkle's
-    /// own install-on-quit. Cancelling is idempotent, so the Quit item having
-    /// already done it costs nothing.
+    /// Every termination path cancels a run here: the Quit item included,
+    /// logout, and Sparkle's own install-on-quit.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         relay.stop()
         return .terminateNow
@@ -424,16 +424,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard granted != navigation.accessibilityGranted else { return }
         panel.makeFirstResponder(nil)
         navigation.accessibilityGranted = granted
-        updateNavigation()
+        pushPanelVisibility()
         // The grant came through the guide under System Settings: put it
         // away and bring the console up, even if it was hidden meanwhile,
-        // since setup is the next step. The permission timer and the menu
-        // both call this on the main thread, where the guide lives.
+        // since setup is the next step. The permission timer and the panel's
+        // showing both call this on the main thread, where the guide lives.
         if granted, MainActor.assumeIsolated({ PermissionGuide.dismiss() }) { showPanel() }
-    }
-
-    private func updateNavigation() {
-        pushPanelVisibility()
     }
 
     // MARK: The transcript
@@ -521,7 +517,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// while the panel is still resizing, the resize's end calls back
     /// here. A transcript still fading out is turned around.
     private func showTranscript() {
-        guard panelResizeTimer == nil, panel.frame.height == Perch.widgetHeight else { return }
+        guard panelResizeTimer == nil else { return }
         let transcript = transcriptPanel ?? makeTranscriptPanel()
         transcriptPanel = transcript
         transcriptFade += 1
@@ -576,28 +572,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// inspect reports are long.
     @objc private func showRunLog() {
         if logWindow == nil {
-            let window = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
-                                      styleMask: [.titled, .closable, .resizable,
-                                                  .fullSizeContentView,
-                                                  .nonactivatingPanel],
-                                      backing: .buffered, defer: false)
-            window.title = "Errol Log"
-            window.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = true
-            window.isReleasedWhenClosed = false
-            window.isFloatingPanel = true
-            window.hidesOnDeactivate = false
-            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = Perch.shellNS
-            window.contentView = FirstMouseHostingView(
-                rootView: PerchLogWindowView(controller: relay))
-            window.center()
-            logWindow = window
+            logWindow = utilityPanel(title: "Errol Log", size: NSSize(width: 560, height: 420),
+                                     resizable: true,
+                                     content: FirstMouseHostingView(
+                                        rootView: PerchLogWindowView(controller: relay)))
         }
-        if relay.consoleAccess.canTakeFocus { logWindow?.makeKeyAndOrderFront(nil) }
-        else { logWindow?.orderFront(nil) }
+        if let logWindow { present(logWindow) }
     }
 
     /// The on-disk debug logs (RunLog in Core/Logging/RunLog.swift): one file per
@@ -636,26 +616,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     @objc func showAbout() {
         if aboutWindow == nil {
             let host = FirstMouseHostingView(rootView: AboutView())
-            let window = KeyablePanel(contentRect: NSRect(origin: .zero, size: host.fittingSize),
-                                      styleMask: [.titled, .closable, .fullSizeContentView,
-                                                  .nonactivatingPanel],
-                                      backing: .buffered, defer: false)
-            window.title = "About Errol"
-            window.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.isMovableByWindowBackground = true
-            window.isReleasedWhenClosed = false
-            window.isFloatingPanel = true
-            window.hidesOnDeactivate = false
-            window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-            window.backgroundColor = Perch.shellNS
-            window.contentView = host
-            window.center()
-            aboutWindow = window
+            aboutWindow = utilityPanel(title: "About Errol", size: host.fittingSize,
+                                       resizable: false, content: host)
         }
-        if relay.consoleAccess.canTakeFocus { aboutWindow?.makeKeyAndOrderFront(nil) }
-        else { aboutWindow?.orderFront(nil) }
+        if let aboutWindow { present(aboutWindow) }
     }
 
     /// The console, forward and key. Besides its own callers, this is the
@@ -668,7 +632,41 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     /// end through LaunchServices, left the panel without key status.
     private func showPanel() {
         if !panel.isVisible { positionPanel() }
-        if relay.consoleAccess.canTakeFocus { panel.makeKeyAndOrderFront(nil) }
-        else { panel.orderFront(nil) }
+        present(panel)
+    }
+
+    // MARK: Utility windows
+
+    /// The log's and About's shared chrome: bare-titled and closable,
+    /// non-activating, floating a level above the console in the theme's
+    /// shell (trackAppearance repaints it), and dragged by its background.
+    /// It takes the keyboard only when the console could, so opening one
+    /// mid-run never takes it from an app the relay is typing into.
+    private func utilityPanel(title: String, size: NSSize, resizable: Bool,
+                              content: NSView) -> KeyablePanel {
+        var styleMask: NSWindow.StyleMask = [.titled, .closable, .fullSizeContentView,
+                                             .nonactivatingPanel]
+        if resizable { styleMask.insert(.resizable) }
+        let window = KeyablePanel(contentRect: NSRect(origin: .zero, size: size),
+                                  styleMask: styleMask, backing: .buffered, defer: false)
+        window.title = title
+        window.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.isReleasedWhenClosed = false
+        window.isFloatingPanel = true
+        window.hidesOnDeactivate = false
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+        window.backgroundColor = Perch.shellNS
+        window.contentView = content
+        window.center()
+        return window
+    }
+
+    /// Forward, and key only when the relay allows the keyboard to move.
+    private func present(_ window: NSWindow) {
+        if relay.consoleAccess.canTakeFocus { window.makeKeyAndOrderFront(nil) }
+        else { window.orderFront(nil) }
     }
 }

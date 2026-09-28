@@ -93,7 +93,7 @@ final class UpdaterController: NSObject {
         } catch {
             // A development build run outside a signed bundle can't update;
             // the menu entry stays disabled through canCheckForUpdates.
-            print("Updater failed to start: \(error.localizedDescription)")
+            log("Updater failed to start: \(error.localizedDescription)")
         }
     }
 
@@ -127,7 +127,7 @@ final class UpdaterController: NSObject {
         if status.canAct { update() } else { checkForUpdates() }
     }
 
-    func checkForUpdates() {
+    private func checkForUpdates() {
         guard !relayIsRunning() else { return }
         updater.checkForUpdates()
     }

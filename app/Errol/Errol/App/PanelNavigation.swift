@@ -19,18 +19,16 @@ final class PanelNavigation {
     var screen: Screen { accessibilityGranted ? .console : .accessibility }
 }
 
-/// The screen and native frame use the same smoothstep timing curve.
+/// The native frame's animated resize (MenuBarController.resizePanel)
+/// runs for this duration on a smoothstep curve.
 enum PanelNavigationMotion {
     static let duration = 0.32
-    static let animation = Animation.timingCurve(1.0 / 3, 0, 2.0 / 3, 1,
-                                                 duration: duration)
 }
 
 /// Animate only presentation, leaving destination measurements immediate.
 /// Animating layout here would continually restart the native frame animation.
 struct PanelScreenPresentation: ViewModifier {
     let isVisible: Bool
-    let hiddenOffset: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
@@ -41,9 +39,6 @@ struct PanelScreenPresentation: ViewModifier {
             .animation(reduceMotion ? .easeOut(duration: 0.12)
                        : isVisible ? .easeInOut(duration: 0.24).delay(0.08)
                        : .easeOut(duration: 0.12), value: isVisible)
-            .offset(x: isVisible || reduceMotion ? 0 : hiddenOffset)
-            .animation(reduceMotion ? nil : PanelNavigationMotion.animation,
-                       value: isVisible)
             .disabled(!isVisible)
             .allowsHitTesting(isVisible)
             .accessibilityHidden(!isVisible)
@@ -86,12 +81,11 @@ struct PanelRootView: View {
             // drafts. Setup shares the console's capsule, so the two only
             // crossfade.
             PerchConsoleView(controller: controller, width: navigation.consoleWidth)
-                .modifier(PanelScreenPresentation(isVisible: screen == .console, hiddenOffset: 0))
+                .modifier(PanelScreenPresentation(isVisible: screen == .console))
                 .frame(width: 0, height: screen == .console ? nil : 0, alignment: .top)
 
             PermissionOnboardingView(width: navigation.consoleWidth)
-                .modifier(PanelScreenPresentation(isVisible: screen == .accessibility,
-                                                  hiddenOffset: 0))
+                .modifier(PanelScreenPresentation(isVisible: screen == .accessibility))
                 .frame(width: 0, height: screen == .accessibility ? nil : 0, alignment: .top)
         }
         .frame(width: navigation.consoleWidth)

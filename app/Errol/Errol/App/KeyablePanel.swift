@@ -12,7 +12,8 @@ final class KeyablePanel: NSPanel {
     /// Fires on every path the panel appears or disappears through — toggle,
     /// Esc, the close button — so the readiness scanner tracks visibility.
     var onVisibilityChange: ((Bool) -> Void)?
-    /// Navigation gets the first chance at Escape; other screens hide the panel.
+    /// A window that handles Escape itself, like the transcript sending it
+    /// back to the console, returns true; otherwise Escape hides the panel.
     var onCancel: (() -> Bool)?
 
     var permitsKey: (() -> Bool)?

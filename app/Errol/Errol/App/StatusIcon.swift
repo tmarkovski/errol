@@ -7,10 +7,8 @@ import AppKit
 /// a capsule of the theme's accent (StatusItemLight) that fills the item.
 enum StatusIcon {
     static func image(running: Bool) -> NSImage? {
-        // Keep the original owl as a fallback; ErrolSymbol is the default mark.
-        guard let mark = NSImage(named: "ErrolSymbol") ?? NSImage(named: "MenuBarIcon")
-            ?? NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil),
-            let image = running ? lit(mark) : idle(mark) else { return nil }
+        guard let mark = NSImage(named: "ErrolSymbol"),
+              let image = running ? lit(mark) : idle(mark) else { return nil }
         image.accessibilityDescription = running ? "Errol is running" : "Errol"
         return image
     }
