@@ -46,6 +46,30 @@ private func collect<Node: ElementNode>(_ node: Node, depth: Int,
     }
 }
 
+/// Every node the predicate accepts, in findAll's order, each with the nodes
+/// above it, the root first. Holding them costs no reads; a rule about where
+/// a match sits reads them for the few matches it weighs, never for every
+/// node the walk passes.
+func findAllWithAncestors<Node: ElementNode>(in node: Node,
+                                             where predicate: (Node) -> Bool) -> [(node: Node, ancestors: [Node])] {
+    var results: [(node: Node, ancestors: [Node])] = []
+    var path: [Node] = []
+    collect(node, depth: 0, path: &path, where: predicate, into: &results)
+    return results
+}
+
+private func collect<Node: ElementNode>(_ node: Node, depth: Int, path: inout [Node],
+                                        where predicate: (Node) -> Bool,
+                                        into results: inout [(node: Node, ancestors: [Node])]) {
+    guard depth <= axMaxTreeDepth else { return }
+    if predicate(node) { results.append((node, path)) }
+    path.append(node)
+    for child in node.children {
+        collect(child, depth: depth + 1, path: &path, where: predicate, into: &results)
+    }
+    path.removeLast()
+}
+
 /// The first node the predicate accepts, in the same order and to the same
 /// depth as findAll — so the node findAll would list first — without
 /// walking the rest of the tree once it is found.

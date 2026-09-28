@@ -130,6 +130,49 @@ final class ChatGPTScenarioTests: XCTestCase {
                        .draft(characters: 16))
     }
 
+    // MARK: File pane
+
+    func testFilePaneEditorIsNotTheComposer() throws {
+        // With a file open in the side pane, ChatGPT mounts the file's
+        // editor (CodeMirror: editable, unnamed) as a text area after the
+        // composer in the tree, inside the pane's complementary landmark
+        // (live Sep 28 2026). Taken for the composer, the file's text read
+        // as an unsent draft whenever ChatGPT was not in front, and a run
+        // was held on it.
+        let d = detectChatGPT("chatgpt-file-pane")
+        XCTAssertEqual(d.composerLabel, "Do anything Do anything")
+        let scan = try XCTUnwrap(d.scans.first)
+        XCTAssertTrue(scan.hasComposer)
+        XCTAssertEqual(scan.composerLabel, "Do anything Do anything")
+        XCTAssertEqual(classifyComposer(value: scan.composerValue, label: scan.composerLabel,
+                                        attachments: 0, replying: false), .empty)
+    }
+
+    func testFilePaneCopyIsNotTheReplysCopy() throws {
+        // The pane's "Copy Markdown" matches the copy rule and is the last
+        // match in the tree. Pressed as the reply's copy, it took the open
+        // file as ChatGPT's reply. It still counts among the copy buttons
+        // (the count is a baseline taken with the pane as it stands); it is
+        // never the one pressed.
+        let d = detectChatGPT("chatgpt-file-pane")
+        XCTAssertEqual(d.copyLabels, ["Copy Copy newest", "Copy Markdown Copy Markdown"])
+        let window = try XCTUnwrap(d.windows.first)
+        XCTAssertEqual(replyCopyButton(under: window, selectors: selectors)?.label, "Copy Copy newest")
+        XCTAssertEqual(newestMessageAffordance(under: window, selectors: selectors)?.label, "Copy Copy newest")
+    }
+
+    func testWindowsWithoutSidePanelsPressTheLastCopy() {
+        // The side-panel rule changes nothing where there is no panel.
+        for fixture in ["chatgpt-chat-conversation", "chatgpt-work-conversation", "chatgpt-codex-conversation"] {
+            let d = detectChatGPT(fixture)
+            guard let window = d.chosenIndex.map({ d.windows[$0] }) else {
+                XCTFail("\(fixture): no chat window"); continue
+            }
+            XCTAssertEqual(replyCopyButton(under: window, selectors: selectors)?.label,
+                           d.copyLabels.last, fixture)
+        }
+    }
+
     // MARK: Known hazard, pinned
 
     func testSidebarTitleContainingCopyInflatesTheCount() {

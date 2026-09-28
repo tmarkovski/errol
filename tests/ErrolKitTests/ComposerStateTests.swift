@@ -54,6 +54,8 @@ final class ComposerStateTests: XCTestCase {
         XCTAssertEqual(try state(of: "chatgpt-chat-conversation", selectors: config.chatgptSelectors),
                        .draft(characters: 16), "the fixture's half-typed reply is a draft")
         XCTAssertEqual(try state(of: "chatgpt-chat-streaming", selectors: config.chatgptSelectors), .replying)
+        XCTAssertEqual(try state(of: "chatgpt-file-pane", selectors: config.chatgptSelectors), .empty,
+                       "the open file's editor, in the side panel, is not the composer")
     }
 
     func testStatesMapToDeliveryBlocks() {

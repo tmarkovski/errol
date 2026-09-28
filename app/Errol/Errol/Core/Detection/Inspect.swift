@@ -16,6 +16,7 @@ func inspectReport(_ target: TargetApp) -> String {
     lines.append("=== \(target.name) (\(target.app.bundleIdentifier ?? "?")) ===")
     let windows = axWindows(target)
     let chosen = chatWindow(in: target)
+    let composer = inputArea(in: target)
     lines.append("Windows: \(windows.count)")
 
     for (index, window) in windows.enumerated() {
@@ -69,7 +70,13 @@ func inspectReport(_ target: TargetApp) -> String {
             let role = (axAttribute(input, kAXRoleAttribute) as? String) ?? "?"
             let label = axLabel(input).trimmingCharacters(in: .whitespacesAndNewlines)
             let value = (axAttribute(input, kAXValueAttribute) as? String)?.prefix(60) ?? ""
-            lines.append("     [\(role)] label=\"\(label)\" value=\"\(value)\"")
+            var marker = ""
+            if let composer, CFEqual(input, composer) {
+                marker = "  <- the composer"
+            } else if isInSidePanel(axAncestors(of: input)) {
+                marker = "  (in a side panel)"
+            }
+            lines.append("     [\(role)] label=\"\(label)\" value=\"\(value)\"\(marker)")
         }
 
         // Is message content exposed as readable text? (Decides whether the

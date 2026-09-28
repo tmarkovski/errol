@@ -14,7 +14,8 @@ import XCTest
 /// Fixture files are arrays of window trees in the ax-dump --capture schema
 /// (see Core/AX/ElementNode.swift). Five fixtures are real captures, anonymized:
 /// chatgpt-chat-home, claude-chat-home, claude-virtualized-conversation,
-/// claude-code-image-viewer and chatgpt-work-composer-fenced-paste. The rest are
+/// claude-code-image-viewer and chatgpt-work-composer-fenced-paste. chatgpt-file-pane
+/// is trimmed from one (Sep 28 2026), its text replaced. The rest are
 /// synthesized from the live-verified shapes in docs/how-it-works.md's field notes;
 /// replace them with real captures (tools/ax-dump.swift <app> --capture) as app
 /// versions move.

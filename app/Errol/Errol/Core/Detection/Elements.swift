@@ -132,6 +132,15 @@ func copyButtons<Node: ElementNode>(under root: Node, selectors: AppSelectors) -
     return results
 }
 
+/// The copy button the newest reply is taken with: the last in tree order,
+/// the walk being depth-first, but never one in a side panel
+/// (sidePanelSubrole). ChatGPT's file pane comes after the conversation, so
+/// its "Copy Markdown" was the last match, and pressing it took the open
+/// file as the reply.
+func replyCopyButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Node? {
+    lastOutsideSidePanel(under: root, where: { isCopyButton($0, selectors: selectors) })
+}
+
 /// Exactly one per rendered message: its mounted copy button, or the collapsed
 /// toggle standing in for the bar. Counting these is counting messages, which
 /// is what the completion baselines actually need; the tree walk is
@@ -141,13 +150,22 @@ func copyButtons<Node: ElementNode>(under root: Node, selectors: AppSelectors) -
 /// makes the same test in its one walk.
 func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
     var results: [Node] = []
-    findAll(in: root, where: { el in
-        guard el.role == kAXButtonRole as String else { return false }
-        let label = el.label
-        return isCopyButtonLabel(label, selectors: selectors)
-            || isMessageActionsToggleLabel(label, selectors: selectors)
-    }, into: &results)
+    findAll(in: root, where: { isMessageAffordance($0, selectors: selectors) }, into: &results)
     return results
+}
+
+/// The newest message's affordance: the last one outside a side panel, as
+/// replyCopyButton picks the copy button, so a copy button in a pane cannot
+/// stand in for the collapsed bar the newest message still needs expanded.
+func newestMessageAffordance<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Node? {
+    lastOutsideSidePanel(under: root, where: { isMessageAffordance($0, selectors: selectors) })
+}
+
+private func isMessageAffordance<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -> Bool {
+    guard element.role == kAXButtonRole as String else { return false }
+    let label = element.label
+    return isCopyButtonLabel(label, selectors: selectors)
+        || isMessageActionsToggleLabel(label, selectors: selectors)
 }
 
 /// The absolute ordinal of a conversation message, where the surface numbers
@@ -303,17 +321,40 @@ func pastedTextAttachmentCount<Node: ElementNode>(around input: Node,
     return pastedTextAttachmentCount(under: container, selectors: selectors)
 }
 
-/// The last text area in the window — composers sit at the bottom. The live
-/// inputArea prefers the focused element; this is its shared fallback.
-/// Every composer on every surface of both apps is an AXTextArea; a text
-/// field is something else, and it can come after the composer: ChatGPT's
-/// terminal panel mounts one ("Terminal input") below it in the tree (live
-/// Sep 24 2026), and a paste there, with the Return that sends it, runs the
-/// message as a shell command.
+/// The subrole Chromium gives role="complementary", an <aside>: content that
+/// supports the page's main content rather than being part of it. ChatGPT
+/// mounts its file pane in one (live Sep 28 2026), after the conversation in
+/// tree order, and the pane holds an editable text area with the open file's
+/// text (CodeMirror) and a "Copy Markdown" button that the copy rule
+/// matches. A composer, and the copy button on a reply, are the page's main
+/// content by definition, so nothing inside a side panel is either.
+let sidePanelSubrole = "AXLandmarkComplementary"
+
+/// Whether any of these nodes, a candidate's ancestors, is a side panel. One
+/// subrole read per node until one is, so it weighs the ancestors of a few
+/// candidates, never every node of a walk.
+func isInSidePanel<Nodes: Sequence>(_ ancestors: Nodes) -> Bool where Nodes.Element: ElementNode {
+    ancestors.contains { $0.subrole == sidePanelSubrole }
+}
+
+/// The last node the predicate accepts that is not inside a side panel. The
+/// matches are weighed from the last back, so only those after the answer
+/// have their ancestors read, and the answer's own.
+func lastOutsideSidePanel<Node: ElementNode>(under root: Node, where predicate: (Node) -> Bool) -> Node? {
+    findAllWithAncestors(in: root, where: predicate).last { !isInSidePanel($0.ancestors) }?.node
+}
+
+/// The last text area in the window outside a side panel: composers sit at
+/// the bottom of the conversation. The live inputArea prefers the focused
+/// element; this is its shared fallback. Every composer on every surface of
+/// both apps is an AXTextArea; a text field is something else, and it can
+/// come after the composer: ChatGPT's terminal panel mounts one ("Terminal
+/// input") below it in the tree (live Sep 24 2026), and a paste there, with
+/// the Return that sends it, runs the message as a shell command. A text
+/// area can come after it too, in a side panel: ChatGPT's file editor, whose
+/// text read as the human's unsent draft (sidePanelSubrole).
 func composerElement<Node: ElementNode>(under root: Node) -> Node? {
-    var areas: [Node] = []
-    findAll(in: root, where: { $0.role == kAXTextAreaRole as String }, into: &areas)
-    return areas.last
+    lastOutsideSidePanel(under: root, where: { $0.role == kAXTextAreaRole as String })
 }
 
 /// The subroles Chromium gives role="dialog" and role="alertdialog". Neither
@@ -396,9 +437,31 @@ func copyButtons(in target: TargetApp) -> [AXUIElement] {
     return copyButtons(under: LiveElement(ax: root), selectors: target.selectors).map(\.ax)
 }
 
+func replyCopyButton(in target: TargetApp) -> AXUIElement? {
+    guard let root = chatWindow(in: target) else { return nil }
+    return replyCopyButton(under: LiveElement(ax: root), selectors: target.selectors)?.ax
+}
+
 func messageAffordances(in target: TargetApp) -> [AXUIElement] {
     guard let root = chatWindow(in: target) else { return [] }
     return messageAffordances(under: LiveElement(ax: root), selectors: target.selectors).map(\.ax)
+}
+
+func newestMessageAffordance(in target: TargetApp) -> AXUIElement? {
+    guard let root = chatWindow(in: target) else { return nil }
+    return newestMessageAffordance(under: LiveElement(ax: root), selectors: target.selectors)?.ax
+}
+
+/// A live element's ancestors, nearest first, each parent read only when the
+/// sequence is asked for it.
+func axAncestors(of element: AXUIElement) -> some Sequence<LiveElement> {
+    sequence(first: element) { node in
+        axAttribute(node, kAXParentAttribute).map { $0 as! AXUIElement }
+    }
+    .dropFirst()
+    .prefix(axMaxTreeDepth)
+    .lazy
+    .map(LiveElement.init)
 }
 
 func lastMessageOrdinal(in target: TargetApp) -> Int? {
@@ -456,18 +519,20 @@ func pastedTextAttachmentCount(around input: AXUIElement,
 /// names the way alongside the element.
 enum InputAreaSource: String {
     case focused = "the focused element"
-    case lastTextArea = "the window's last text area"
+    case lastTextArea = "the window's last text area outside a side panel"
 }
 
 func resolveInputArea(in target: TargetApp) -> (element: AXUIElement, source: InputAreaSource)? {
     guard let root = chatWindow(in: target) else { return nil }
     // Prefer the focused element, but only if it lives in the chat window;
-    // focus could be on another window (e.g. a Claude Code session).
+    // focus could be on another window (e.g. a Claude Code session), or on a
+    // text area in one of its side panels (ChatGPT's file editor).
     if let focused = axAttribute(target.ax, kAXFocusedUIElementAttribute) {
         let el = focused as! AXUIElement
         if axAttribute(el, kAXRoleAttribute) as? String == kAXTextAreaRole as String,
            let window = axAttribute(el, kAXWindowAttribute),
-           CFEqual(window, root) {
+           CFEqual(window, root),
+           !isInSidePanel(axAncestors(of: el)) {
             return (el, .focused)
         }
     }

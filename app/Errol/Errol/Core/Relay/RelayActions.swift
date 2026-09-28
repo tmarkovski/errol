@@ -8,7 +8,7 @@ import ApplicationServices
 /// (Claude Code), press it and wait for the bar's copy button to mount —
 /// the AXPress equivalent of the hover that normally expands it.
 func expandLastMessageActions(in target: TargetApp) {
-    guard let last = messageAffordances(in: target).last,
+    guard let last = newestMessageAffordance(in: target),
           isMessageActionsToggle(last, selectors: target.selectors) else { return }
     let before = copyButtons(in: target).count
     guard AXUIElementPerformAction(last, kAXPressAction as CFString) == .success else {
@@ -71,8 +71,7 @@ func copyLastResponse(from target: TargetApp,
 /// produced no clipboard write.
 func pressCopyButton(in target: TargetApp) -> String? {
     expandLastMessageActions(in: target)
-    let buttons = copyButtons(in: target)
-    guard let button = buttons.last else {
+    guard let button = replyCopyButton(in: target) else {
         log("\(target.name): no copy button found")
         return nil
     }

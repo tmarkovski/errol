@@ -1,0 +1,79 @@
+[
+  {
+    "role": "AXWindow",
+    "subrole": "AXStandardWindow",
+    "title": "ChatGPT",
+    "children": [
+      {
+        "role": "AXGroup",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New chat", "title": "New chat" },
+          { "role": "AXButton", "description": "Release checklist", "title": "Release checklist" }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "subrole": "AXLandmarkMain",
+        "children": [
+          {
+            "role": "AXGroup",
+            "children": [
+              {
+                "role": "AXGroup",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      { "role": "AXHeading", "title": "You said:" },
+                      { "role": "AXButton", "description": "Copy message", "title": "Copy message" },
+                      { "role": "AXButton", "description": "Edit message", "title": "Edit message" },
+                      { "role": "AXHeading", "title": "ChatGPT said:" },
+                      { "role": "AXStaticText", "value": "The notes are in release-notes.md." },
+                      { "role": "AXButton", "description": "Copy", "title": "Copy", "help": "newest" },
+                      { "role": "AXButton", "description": "Rate response", "title": "Rate response" }
+                    ]
+                  },
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      { "role": "AXTextArea", "description": "Do anything", "title": "Do anything", "value": "\nDo anything" },
+                      { "role": "AXButton", "description": "Add files and more", "title": "Add files and more" },
+                      { "role": "AXButton", "description": "Dictate", "title": "Dictate" },
+                      { "role": "AXButton", "description": "Start voice chat", "title": "Start voice chat" }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkComplementary",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "subrole": "AXTabPanel",
+                    "description": "release-notes.md",
+                    "title": "release-notes.md",
+                    "children": [
+                      { "role": "AXButton", "title": "View source" },
+                      { "role": "AXButton", "description": "Toggle file tree", "title": "Toggle file tree" },
+                      { "role": "AXButton", "description": "Open in VS Code", "title": "Open in VS Code" },
+                      {
+                        "role": "AXGroup",
+                        "children": [
+                          { "role": "AXTextArea", "value": "Release notes\nOverview\nThe relay copies each reply and pastes it into the other app." }
+                        ]
+                      },
+                      { "role": "AXButton", "description": "Copy Markdown", "title": "Copy Markdown" },
+                      { "role": "AXTextField", "title": "Filter files", "value": "" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

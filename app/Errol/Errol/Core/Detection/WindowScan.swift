@@ -50,10 +50,10 @@ struct WindowScan {
     /// chat, "/epitaxy/<id>" on a Claude Code session. nil on a fresh chat,
     /// a Cowork task, a project page, and everywhere ChatGPT.
     var conversationRoute: String?
-    /// The value and label of the window's last text area — the composer,
-    /// the way `composerElement` picks it — for judging what it holds
-    /// (classifyComposer) without a second walk. nil when the window has
-    /// no text area.
+    /// The value and label of the window's last text area outside a side
+    /// panel — the composer, the way `composerElement` picks it — for
+    /// judging what it holds (classifyComposer) without a second walk. nil
+    /// when the window has no such text area.
     var composerValue: String?
     var composerLabel = ""
     /// A stop control is mounted: the app is producing a reply.
@@ -84,7 +84,8 @@ func value(after prefix: String, in label: String) -> String? {
 func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> WindowScan {
     var scan = WindowScan()
     scan.title = window.title ?? ""
-    visit(window, depth: 0, into: &scan, selectors: selectors)
+    var path: [Node] = []
+    visit(window, depth: 0, path: &path, into: &scan, selectors: selectors)
     // Only a window without a composer is walked again, and a covered one
     // is a small tree: the dialog hides everything behind it.
     if !scan.hasComposer, let dialog = openDialog(under: window) {
@@ -93,8 +94,10 @@ func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> W
     return scan
 }
 
-private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: inout WindowScan,
-                                      selectors: AppSelectors) {
+/// `path` holds the nodes above `element`, the window first; they are read
+/// only for a text area's side-panel check (isInSidePanel).
+private func visit<Node: ElementNode>(_ element: Node, depth: Int, path: inout [Node],
+                                      into scan: inout WindowScan, selectors: AppSelectors) {
     guard depth <= axMaxTreeDepth else { return }
     let role = element.role ?? ""
 
@@ -117,14 +120,17 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
         let label = element.label
         if role == kAXTextAreaRole as String {
             scan.hasComposer = true
-            if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
-                scan.composerSurface = selectors.composerSurfaceNames
-                    .first { label.contains($0.key) }?.value
+            // The last text area in tree order outside a side panel is the
+            // composer, exactly as composerElement picks it; each one seen
+            // overwrites the last.
+            if !isInSidePanel(path) {
+                if scan.composerSurface == nil, !selectors.composerSurfaceNames.isEmpty {
+                    scan.composerSurface = selectors.composerSurfaceNames
+                        .first { label.contains($0.key) }?.value
+                }
+                scan.composerValue = element.stringValue
+                scan.composerLabel = label
             }
-            // The last text area in tree order is the composer, exactly as
-            // composerElement picks it; each one seen overwrites the last.
-            scan.composerValue = element.stringValue
-            scan.composerLabel = label
         } else if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
             scan.isExcluded = true
         }
@@ -194,9 +200,11 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
         }
     }
 
+    path.append(element)
     for child in element.children {
-        visit(child, depth: depth + 1, into: &scan, selectors: selectors)
+        visit(child, depth: depth + 1, path: &path, into: &scan, selectors: selectors)
     }
+    path.removeLast()
 }
 
 /// Human name for a window's active surface, best signal first: the selected
