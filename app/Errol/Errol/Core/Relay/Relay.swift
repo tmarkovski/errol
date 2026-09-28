@@ -194,7 +194,26 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         /// The destination is gone for good; the run ends on it.
         case lost(String)
     }
+    /// The bound window still there and reachable, nothing over its
+    /// conversation, and no front block holding it. The cover check walks
+    /// for a composer alone (coveringDialogName), which is all the paste
+    /// and the copy's retries need.
     func destinationGuard(_ target: TargetApp) -> GuardVerdict {
+        checkDestination(target, reading: false).verdict
+    }
+    /// The destination guard for the two checks that go on to read the
+    /// conversation, the response wait's poll and the capture gate: the
+    /// cover check's look for a composer is one walk of the window that
+    /// reads the conversation too (conversationSighting), and that reading
+    /// comes back with a clear verdict instead of being taken again. nil
+    /// beside a clear verdict is a window gone since the check.
+    func sightedGuard(_ target: TargetApp) -> (verdict: GuardVerdict, sighting: ConversationSighting?) {
+        checkDestination(target, reading: true)
+    }
+    /// Both guards' one body, so the order stays one: the window's check,
+    /// then the cover, then the front.
+    func checkDestination(_ target: TargetApp,
+                          reading: Bool) -> (verdict: GuardVerdict, sighting: ConversationSighting?) {
         let destination = bound(target)
         switch destination.check() {
         case .same:
@@ -202,12 +221,18 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             // button too, so nothing read there is evidence: the wait is
             // suspended, the copy and the paste held, until the human
             // closes it (coveringDialog).
-            if let cover = coveringDialogName(in: target) {
-                return .block(.covered(side: side(target), by: cover))
+            let sighting = reading ? conversationSighting(in: target) : nil
+            let cover = reading
+                ? sighting.flatMap { coveringDialogName(in: target, sighting: $0) }
+                : coveringDialogName(in: target)
+            if let cover {
+                return (.block(.covered(side: side(target), by: cover)), nil)
             }
-            return frontGuard(target)
-        case .hidden(let seen): return .block(.windowHidden(side: side(target), seen: seen))
-        case .lost(let detail): return .lost(detail)
+            let front = frontGuard(target)
+            guard case .clear = front else { return (front, nil) }
+            return (.clear, sighting)
+        case .hidden(let seen): return (.block(.windowHidden(side: side(target), seen: seen)), nil)
+        case .lost(let detail): return (.lost(detail), nil)
         }
     }
     /// An app that would not come to the front for the relay is the
@@ -223,14 +248,18 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     /// Before copying `target`'s reply: the destination, and that the reply
     /// the wait completed on is still the newest thing there
     /// (conversationMovedOn), judged against what the wait knew — the
-    /// baseline it started from and the sighting it completed on.
+    /// baseline it started from and the sighting it completed on. All of
+    /// it is read in the walk the destination's cover check makes.
     func captureGuard(_ target: TargetApp, expected: ResponseSighting,
                       baseline: ResponseBaseline) -> GuardVerdict {
-        let destination = destinationGuard(target)
+        let (destination, sighting) = sightedGuard(target)
         guard case .clear = destination else { return destination }
-        if hasStopButton(in: target) { return .block(.replying(side: side(target))) }
-        let now = ResponseSighting(affordances: messageAffordances(in: target).count,
-                                   lastOrdinal: lastMessageOrdinal(in: target), streaming: false)
+        // A window gone since the check reads as empty, as the separate
+        // finders read it; the copy then fails and finds it gone.
+        let seen = sighting ?? ConversationSighting()
+        if seen.streaming { return .block(.replying(side: side(target))) }
+        let now = ResponseSighting(affordances: seen.affordances,
+                                   lastOrdinal: seen.lastOrdinal, streaming: false)
         if conversationMovedOn(now, since: expected, baseline: baseline) {
             trace("\(target.name): \(now.affordances) affordances, message \(now.lastOrdinal.map(String.init) ?? "-") against the completed reply's \(expected.affordances)/\(expected.lastOrdinal.map(String.init) ?? "-") and the baseline's \(baseline.affordances)")
             return .block(.historyChanged(side: side(target)))
@@ -430,12 +459,13 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 in: speaker, baseline: baseline,
                 mayContinue: { lost == nil && inspection?.mayContinue(speaker) != false },
                 blocked: {
-                    switch destinationGuard(speaker) {
-                    case .clear: return nil
-                    case .block(let found): return found
+                    let (verdict, sighting) = sightedGuard(speaker)
+                    switch verdict {
+                    case .clear: return (nil, sighting)
+                    case .block(let found): return (found, nil)
                     case .lost(let detail):
                         lost = detail
-                        return nil
+                        return (nil, nil)
                     }
                 },
                 onBlock: setBlock,

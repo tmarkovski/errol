@@ -90,8 +90,9 @@ func isCopyButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
 }
 
 // The button rules below take a label already read, so a walk that reads
-// each button's label once (messageAffordances, the readiness scan) can test
-// it against several of them without restating any.
+// each button's label once (messageAffordances, the conversation sighting,
+// the readiness scan) can test it against several of them without restating
+// any.
 
 /// The collapsed stand-in for a message's whole action bar; never on an app
 /// without one.
@@ -135,8 +136,9 @@ func copyButtons<Node: ElementNode>(under root: Node, selectors: AppSelectors) -
 /// toggle standing in for the bar. Counting these is counting messages, which
 /// is what the completion baselines actually need; the tree walk is
 /// depth-first, so the last element belongs to the newest message. Role and
-/// label are read once per node for both rules: this walk runs on every
-/// tick of a reply wait, and each read is IPC into the app.
+/// label are read once per node for both rules, since each read is IPC into
+/// the app. The reply wait counts them through conversationSighting, which
+/// makes the same test in its one walk.
 func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
     var results: [Node] = []
     findAll(in: root, where: { el in
@@ -159,7 +161,13 @@ func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelec
 /// title answers without changing which text wins.
 func messageOrdinal<Node: ElementNode>(_ element: Node) -> Int? {
     guard element.role == kAXGroupRole as String else { return nil }
-    return ordinal(inMessageName: element.title) ?? ordinal(inMessageName: element.label)
+    return messageOrdinal(ofGroup: element)
+}
+
+/// The same rule for a node already known to be an AXGroup, so a walk that
+/// has read the role does not read it again.
+private func messageOrdinal<Node: ElementNode>(ofGroup element: Node) -> Int? {
+    ordinal(inMessageName: element.title) ?? ordinal(inMessageName: element.label)
 }
 
 private func ordinal(inMessageName text: String?) -> Int? {
@@ -191,6 +199,62 @@ func hasStopButton<Node: ElementNode>(under root: Node, selectors: AppSelectors)
         guard el.role == kAXButtonRole as String else { return false }
         return isStopButtonLabel(el.label, selectors: selectors)
     }) != nil
+}
+
+/// What the relay reads of a conversation while it waits on a reply and
+/// before it copies one, from a single walk of the window: the message
+/// affordances (messageAffordances' count), the newest message's ordinal
+/// (lastMessageOrdinal), whether a reply is streaming (hasStopButton), and
+/// whether the window has a composer at all (hasTextArea), which is the
+/// first half of the cover check. The response wait polls every 1.2 s for
+/// as long as a reply takes, and the capture gate once a second while
+/// held; made separately, the four walked the whole window four times,
+/// every node's role read in each over IPC into an app busy streaming.
+struct ConversationSighting: Equatable {
+    var affordances = 0
+    var lastOrdinal: Int?
+    var streaming = false
+    var hasComposer = false
+}
+
+/// Generic over ElementNode, so fixture windows answer through the code the
+/// live poll runs; ConversationSightingTests pins it to the four finders it
+/// stands in for, fixture by fixture. Role is read once per node, a
+/// button's label once for all three button rules, and a group's title
+/// (then label) only as messageOrdinal reads them. Dialogs stay out of the
+/// walk: the cover check looks for one only when this found no composer
+/// (coveringDialog(under:sighting:)), as scanWindow does.
+func conversationSighting<Node: ElementNode>(under root: Node,
+                                             selectors: AppSelectors) -> ConversationSighting {
+    var sighting = ConversationSighting()
+    sight(root, depth: 0, into: &sighting, selectors: selectors)
+    return sighting
+}
+
+private func sight<Node: ElementNode>(_ element: Node, depth: Int,
+                                      into sighting: inout ConversationSighting,
+                                      selectors: AppSelectors) {
+    guard depth <= axMaxTreeDepth else { return }
+    let role = element.role ?? ""
+    if role == kAXButtonRole as String {
+        let label = element.label
+        if isCopyButtonLabel(label, selectors: selectors)
+            || isMessageActionsToggleLabel(label, selectors: selectors) {
+            sighting.affordances += 1
+        }
+        if !sighting.streaming, isStopButtonLabel(label, selectors: selectors) {
+            sighting.streaming = true
+        }
+    } else if role == kAXGroupRole as String {
+        if let ordinal = messageOrdinal(ofGroup: element) {
+            sighting.lastOrdinal = max(sighting.lastOrdinal ?? ordinal, ordinal)
+        }
+    } else if role == kAXTextAreaRole as String {
+        sighting.hasComposer = true
+    }
+    for child in element.children {
+        sight(child, depth: depth + 1, into: &sighting, selectors: selectors)
+    }
 }
 
 func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
@@ -283,6 +347,14 @@ func coveringDialog<Node: ElementNode>(under window: Node) -> Node? {
     return openDialog(under: window)
 }
 
+/// The same check with the composer already looked for, by a sighting of
+/// this window: the dialog is searched for only when it found none.
+func coveringDialog<Node: ElementNode>(under window: Node,
+                                       sighting: ConversationSighting) -> Node? {
+    guard !sighting.hasComposer else { return nil }
+    return openDialog(under: window)
+}
+
 /// What a dialog is called, for the human: its title, which is where
 /// Claude's viewer keeps "Image preview", else its joined label; empty
 /// when it has neither.
@@ -339,6 +411,13 @@ func hasStopButton(in target: TargetApp) -> Bool {
     return hasStopButton(under: LiveElement(ax: root), selectors: target.selectors)
 }
 
+/// The target's conversation in one walk of its chat window (see
+/// ConversationSighting); nil when it has no chat window.
+func conversationSighting(in target: TargetApp) -> ConversationSighting? {
+    guard let root = chatWindow(in: target) else { return nil }
+    return conversationSighting(under: LiveElement(ax: root), selectors: target.selectors)
+}
+
 func sendButton(in target: TargetApp) -> AXUIElement? {
     guard let root = chatWindow(in: target) else { return nil }
     return sendButton(under: LiveElement(ax: root), selectors: target.selectors)?.ax
@@ -351,6 +430,14 @@ func sendButton(in target: TargetApp) -> AXUIElement? {
 func coveringDialogName(in target: TargetApp) -> String? {
     guard let root = chatWindow(in: target) else { return nil }
     return coveringDialog(under: LiveElement(ax: root)).map(dialogName)
+}
+
+/// The same answer from a sighting just taken of the target's window, which
+/// already says whether it has a composer: nothing more is read while it
+/// does, and a window without one is walked for its dialog alone.
+func coveringDialogName(in target: TargetApp, sighting: ConversationSighting) -> String? {
+    guard !sighting.hasComposer, let root = chatWindow(in: target) else { return nil }
+    return coveringDialog(under: LiveElement(ax: root), sighting: sighting).map(dialogName)
 }
 
 /// ChatGPT's remove buttons are siblings of the input; Claude nests its

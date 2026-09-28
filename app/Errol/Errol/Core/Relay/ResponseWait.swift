@@ -17,9 +17,11 @@ struct ResponseBaseline {
     var lastOrdinal: Int?
 }
 
+/// Both signals from one walk of the window (conversationSighting). A
+/// window gone reads as empty, as the separate finders read it.
 func responseBaseline(in target: TargetApp) -> ResponseBaseline {
-    ResponseBaseline(affordances: messageAffordances(in: target).count,
-                     lastOrdinal: lastMessageOrdinal(in: target))
+    let seen = conversationSighting(in: target) ?? ConversationSighting()
+    return ResponseBaseline(affordances: seen.affordances, lastOrdinal: seen.lastOrdinal)
 }
 
 /// One poll of the responding side, as waitForResponse sees it.
@@ -27,6 +29,15 @@ struct ResponseSighting: Equatable {
     var affordances: Int
     var lastOrdinal: Int?
     var streaming: Bool
+}
+
+extension ResponseSighting {
+    /// The poll's part of a walk of the window that also answered the
+    /// cover check.
+    init(_ seen: ConversationSighting) {
+        self.init(affordances: seen.affordances, lastOrdinal: seen.lastOrdinal,
+                  streaming: seen.streaming)
+    }
 }
 
 /// The completion verdict for one poll — pure, so the tests can drive it
@@ -142,14 +153,16 @@ struct ResponseWaitState {
 /// would be the response itself, and folding that in leaves the relay
 /// waiting forever (the Codex-mode fast-reply race, observed Aug 27 2026).
 /// The baseline ordinal deliberately stays pre-send: responseArrived expects
-/// the echo-inclusive delta.
+/// the echo-inclusive delta. Each look is one walk of the window for both
+/// signals (conversationSighting).
 func absorbEchoIntoBaseline(in target: TargetApp, preSend: ResponseBaseline) -> ResponseBaseline {
     guard target.selectors.echoCountsAsAffordance else { return preSend }
     let deadline = Date().addingTimeInterval(4)
     while Date() < deadline {
-        let echoSeen = messageAffordances(in: target).count > preSend.affordances
+        let seen = conversationSighting(in: target) ?? ConversationSighting()
+        let echoSeen = seen.affordances > preSend.affordances
             || preSend.lastOrdinal.map { base in
-                (lastMessageOrdinal(in: target) ?? base) > base
+                (seen.lastOrdinal ?? base) > base
             } ?? false
         if echoSeen {
             return ResponseBaseline(affordances: preSend.affordances + 1,
@@ -169,9 +182,15 @@ enum ResponseWait: Equatable {
     case ended
 }
 
+/// `blocked` is the run's guard, asked before every poll: the block the
+/// run stands on, or none with the sighting the guard took of the window
+/// on the way — its cover check reads the whole conversation in the walk
+/// that looks for a composer (conversationSighting), so the poll uses that
+/// reading rather than walking the window again. With no guard, or one
+/// that hands back no sighting, the wait reads the window itself.
 func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
                      mayContinue: () -> Bool = { true },
-                     blocked: (() -> RunBlock?)? = nil,
+                     blocked: (() -> (block: RunBlock?, sighting: ConversationSighting?))? = nil,
                      onBlock: ((RunBlock?) -> Void)? = nil,
                      onPoll: ((ResponseSighting) -> Void)? = nil) -> ResponseWait {
     log("\(target.name): waiting for response (baseline \(baseline.affordances) message affordances"
@@ -187,8 +206,9 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
         // not evidence about this one: no sighting is taken, and the time
         // does not count against the reply. The baseline is kept, so a
         // reply that completed out of view is seen on return.
+        var guardSighting: ConversationSighting?
         if let blocked {
-            let now = blocked()
+            let (now, sighted) = blocked()
             // A Stop, or a destination found gone by this very check, ends
             // the wait where it stands: the block is left for the run's
             // report to name, as the gate leaves it, nothing is said to have
@@ -204,10 +224,12 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
                 continue
             }
             wait.resume(at: ProcessInfo.processInfo.systemUptime)
+            guardSighting = sighted
         }
-        let sighting = ResponseSighting(affordances: messageAffordances(in: target).count,
-                                        lastOrdinal: lastMessageOrdinal(in: target),
-                                        streaming: hasStopButton(in: target))
+        // A window gone since the guard reads as empty, as the separate
+        // finders read it; the next guard finds it gone.
+        let sighting = ResponseSighting(guardSighting ?? conversationSighting(in: target)
+                                        ?? ConversationSighting())
         onPoll?(sighting)
         let seen = "affordances \(sighting.affordances), message \(sighting.lastOrdinal.map(String.init) ?? "-"), streaming \(sighting.streaming)"
         if seen != lastSeen {
