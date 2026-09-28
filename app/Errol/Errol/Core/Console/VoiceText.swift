@@ -1,8 +1,8 @@
 // How dictated words land in a prompt field, kept pure so the contract
 // tests pin it. The microphone and the model live in the app target
-// (VoiceInput.swift); this file is only the text: what one listening has
-// heard, how it joins what the field already held, and the fillers a
-// written prompt does without.
+// (VoiceInput.swift, SpeechAnalyzerTranscriber.swift); this file is only
+// the text: what one listening has heard, how it joins what the field
+// already held, and the fillers a written prompt does without.
 
 import Foundation
 
