@@ -2,8 +2,13 @@
 #
 # Verify a distribution artifact before it reaches anyone.
 #
-#   scripts/verify-artifact.sh path/to/Errol.app [--golden Config/designated-requirement.txt]
+#   scripts/verify-artifact.sh path/to/Errol.app [--golden FILE]
 #   scripts/verify-artifact.sh path/to/Errol.dmg
+#
+# --golden defaults to the repo's Config/designated-requirement.txt, found from
+# this script's own directory, so the check does not depend on the working
+# directory. An app is always held to it: a missing golden file is a failure,
+# never a skipped check.
 #
 # Read-only: every check here inspects, none of them re-sign or modify the
 # artifact. Safe to run against an installed copy.
@@ -32,6 +37,7 @@ done
 
 [[ -n "$ARTIFACT" ]] || { echo "usage: $0 <Errol.app|Errol.dmg> [--golden FILE] [--team ID]" >&2; exit 2; }
 [[ -e "$ARTIFACT" ]] || { echo "no such artifact: $ARTIFACT" >&2; exit 2; }
+[[ -n "$GOLDEN_REQ" ]] || GOLDEN_REQ="$(cd "$(dirname "$0")/.." && pwd)/Config/designated-requirement.txt"
 
 pass() { printf '  \033[32mok\033[0m    %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
@@ -90,7 +96,7 @@ if [[ "$ARTIFACT" == *.app ]]; then
   echo "Designated requirement"
   echo "        $ACTUAL_DR"
 
-  if [[ -n "$GOLDEN_REQ" && -f "$GOLDEN_REQ" ]]; then
+  if [[ -f "$GOLDEN_REQ" ]]; then
     GOLDEN_TEXT="$(tr -s '[:space:]' ' ' < "$GOLDEN_REQ" | sed 's/^ *//; s/ *$//')"
 
     # 6a. Semantic gate: does this artifact actually satisfy the committed
@@ -113,8 +119,7 @@ if [[ "$ARTIFACT" == *.app ]]; then
       printf '        actual: %s\n' "$ACTUAL_DR"
     fi
   else
-    note "no golden requirement committed yet -- record this one only after the"
-    note "v1 -> v2 Sparkle update is confirmed to preserve the Accessibility grant"
+    fail "golden requirement $GOLDEN_REQ not found -- cannot check the designated requirement"
   fi
 fi
 

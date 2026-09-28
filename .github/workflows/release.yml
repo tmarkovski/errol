@@ -182,11 +182,7 @@ jobs:
         run: |
           set -euo pipefail
           V="${{ steps.version.outputs.version }}"
-          if [[ -f Config/designated-requirement.txt ]]; then
-            scripts/verify-artifact.sh "$RUNNER_TEMP/build/$APP_NAME.app" --golden Config/designated-requirement.txt
-          else
-            scripts/verify-artifact.sh "$RUNNER_TEMP/build/$APP_NAME.app"
-          fi
+          scripts/verify-artifact.sh "$RUNNER_TEMP/build/$APP_NAME.app" --golden Config/designated-requirement.txt
           scripts/verify-artifact.sh "dist/$APP_NAME-$V.dmg"
 
       - name: Keep the dSYMs

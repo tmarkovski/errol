@@ -5,26 +5,6 @@
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:botbridge}",
-            "name": "Debug Errol",
-            "target": "Errol",
-            "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug Errol"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:botbridge}",
-            "name": "Release Errol",
-            "target": "Errol",
-            "configuration": "release",
-            "preLaunchTask": "swift: Build Release Errol"
-        },
-        {
-            "type": "swift",
-            "request": "launch",
-            "args": [],
-            "cwd": "${workspaceFolder:botbridge}",
             "name": "Debug errol-verify",
             "target": "errol-verify",
             "configuration": "debug",
