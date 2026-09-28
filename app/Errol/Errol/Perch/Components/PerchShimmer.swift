@@ -1,7 +1,7 @@
 // The busy shimmer: a sheen of near-white sweeping through a line of text,
-// masked to the glyphs, for the one line that means "working" —
-// the perch subline while its side is composing. Off it is plain text, and
-// under Reduce Motion it stays plain text.
+// masked to the glyphs, for a transcript line whose reply the on-device
+// model is still summing up (PerchTranscript, entry.summarizing). Off it is
+// plain text, and under Reduce Motion it stays plain text.
 
 import SwiftUI
 

@@ -25,6 +25,8 @@ struct PerchTranscript: View {
     /// Whether the transcript is scrolling itself to the newest line, so
     /// the scroll's own motion is not read as the reader's.
     @State private var scrollingToNewest = false
+    /// The pending end of that scroll, which clears scrollingToNewest.
+    @State private var followReset: Task<Void, Never>?
 
     /// The window's height: the console's, so the two stand as a pair.
     /// Room for seven lines, or six with the newest taking two.
@@ -99,8 +101,12 @@ struct PerchTranscript: View {
                     withAnimation(reduceMotion ? nil : Self.follow) {
                         proxy.scrollTo(newest.id, anchor: .bottom)
                     }
-                    Task { @MainActor in
+                    // A newer scroll outlives the last one's reset, so that
+                    // reset is cancelled rather than let clear the flag mid-scroll.
+                    followReset?.cancel()
+                    followReset = Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(450))
+                        guard !Task.isCancelled else { return }
                         scrollingToNewest = false
                     }
                 }
@@ -147,17 +153,14 @@ private struct PerchTranscriptRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 if entry.verbatim { Text("“").fixedSize() }
                 Text(entry.text)
-                .font(Perch.text(12))
-                .italic(entry.verbatim)
-                .foregroundStyle(ink)
-                // The model's sentence may run to a second line; a reply's
-                // own words get one, as a quotation, not a reading.
-                .lineLimit(entry.verbatim ? 1 : 2)
-                .truncationMode(.tail)
-                .contentTransition(.opacity)
-                .animation(Perch.fade, value: entry.text)
-                .perchShimmer(active: entry.summarizing)
-                .help(entry.text)
+                    // The model's sentence may run to a second line; a reply's
+                    // own words get one, as a quotation, not a reading.
+                    .lineLimit(entry.verbatim ? 1 : 2)
+                    .truncationMode(.tail)
+                    .contentTransition(.opacity)
+                    .animation(Perch.fade, value: entry.text)
+                    .perchShimmer(active: entry.summarizing)
+                    .help(entry.text)
                 // Separate closing punctuation survives native truncation:
                 // the ellipsis is inside the closing quote, even on narrow rows.
                 if entry.verbatim { Text("”").fixedSize() }

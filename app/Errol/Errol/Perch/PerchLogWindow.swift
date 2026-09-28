@@ -1,7 +1,7 @@
 // The run log in a debug window of its own: the log is kept in memory
-// (RelayController.logLines) and read through the owl menu's "Show Last Run
-// Log" — Inspect reports land here too. Dressed like the settings card: the
-// panel's shell, the log in a well that stands lighter than it.
+// (RelayController.logLines) and read through the status item menu's "Show
+// Last Run Log" — Inspect reports land here too. Dressed like the console:
+// the panel's shell, with the log in a well that stands lighter than it.
 
 import SwiftUI
 
@@ -51,10 +51,8 @@ struct PerchLogWindowView: View {
             .background(RoundedRectangle(cornerRadius: Perch.insetCorner).fill(Perch.well))
             .overlay(RoundedRectangle(cornerRadius: Perch.insetCorner)
                 .stroke(Perch.chipEdge, lineWidth: 1))
-            .onChange(of: controller.logLines.count) { _, _ in
-                if let last = controller.logLines.last {
-                    proxy.scrollTo(last.id, anchor: .bottom)
-                }
+            .onChange(of: controller.logLines.last?.id) { _, id in
+                if let id { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
     }
