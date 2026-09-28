@@ -106,30 +106,3 @@ struct RunReport: Equatable {
         return parts.joined(separator: " \u{00B7} ")
     }
 }
-
-/// m:ss, or h:mm:ss past an hour.
-func runClock(_ duration: TimeInterval) -> String {
-    let total = Int(duration.rounded())
-    let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60)
-    return hours > 0
-        ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        : String(format: "%d:%02d", minutes, seconds)
-}
-
-extension RunBlock {
-    /// The block as a clause in the summary's context: what the run stood
-    /// on when Stop was pressed.
-    func contextClause(names: (chatgpt: String, claude: String)) -> String {
-        let name = side == .chatgpt ? names.chatgpt : names.claude
-        switch self {
-        case .windowHidden: return "\(name)'s window was hidden"
-        case .draft: return "\(name) had an unsent draft"
-        case .attachments: return "\(name) had an unsent attachment"
-        case .replying: return "\(name) was replying to something else"
-        case .composerUnreadable: return "\(name)'s composer could not be read"
-        case .historyChanged: return "\(name)'s conversation had moved on"
-        case .notInFront: return "\(name) would not come to the front"
-        case .covered: return "\(name)'s conversation was covered"
-        }
-    }
-}
