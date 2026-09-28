@@ -1,5 +1,5 @@
 // The steering note's feedback lines on the console. The native editor
-// and the run's actions live in PerchConsole.swift.
+// and the run's actions live in PerchPromptBox.swift.
 
 import SwiftUI
 
