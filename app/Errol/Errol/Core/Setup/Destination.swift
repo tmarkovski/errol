@@ -75,7 +75,7 @@ struct DestinationIdentity: Equatable {
 
 /// One side's destination for the length of a run: the window chosen at
 /// connection, checked again on demand for being there and reachable, and
-/// the identity read from it then, which names it under the icon and in
+/// the identity read from it then, which names it in the console and in
 /// the log. A check is a few attribute reads on the bound window, so
 /// callers poll it at the pace of the operation they guard, not in a
 /// tight loop.

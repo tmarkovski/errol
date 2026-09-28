@@ -111,7 +111,7 @@ enum AppPresence: Equatable {
     /// Running with `windows` windows a run could target.
     case available(windows: Int)
 
-    /// The line under the icon: the next action, or the observed state.
+    /// The destination line under the box: the next action, or the observed state.
     func action(name: String) -> String {
         switch self {
         case .checking: return "Checking\u{2026}"

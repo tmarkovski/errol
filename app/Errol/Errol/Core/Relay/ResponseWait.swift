@@ -202,10 +202,12 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
     var block: RunBlock?
     while true {
         if relayControl.isCancelled || !mayContinue() { return .ended }
-        // While the window shows another conversation, what it shows is
-        // not evidence about this one: no sighting is taken, and the time
-        // does not count against the reply. The baseline is kept, so a
-        // reply that completed out of view is seen on return.
+        // While the run's guard names a block (the window minimized,
+        // covered by a dialog, or its app not coming forward), what the
+        // window shows is not evidence about this reply: no sighting is
+        // taken, and the time does not count against the reply. The
+        // baseline is kept, so a reply that completed out of view is seen
+        // on return.
         var guardSighting: ConversationSighting?
         if let blocked {
             let (now, sighted) = blocked()

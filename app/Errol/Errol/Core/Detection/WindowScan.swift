@@ -101,7 +101,7 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
     if role == kAXButtonRole as String {
         // One label read serves every rule a button can match. The
         // exclusion rule is shared with the relay's own window choice
-        // rather than restated: the strip must classify a window exactly
+        // rather than restated: the readiness sweep must classify a window exactly
         // the way chooseChatWindow will, and two copies of the rule drift.
         let label = element.label
         if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {

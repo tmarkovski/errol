@@ -29,7 +29,7 @@ private func liveTarget(bundleID: String, name: String,
 }
 
 /// Read-only live smoke: the readiness sweep must find both apps ready, the
-/// same verdict the panel's strip and the run preflight reach. Fails when an
+/// same verdict setup and the run preflight reach. Fails when an
 /// app is running without a usable chat surface; skips when one isn't up.
 final class LiveReadinessTests: XCTestCase {
     override func setUpWithError() throws { try requireLiveOptIn() }

@@ -5,7 +5,7 @@ import Foundation
 // MARK: - Run
 
 /// Per-side conversation state during a relay run. It drives each
-/// participant's state in the console (PerchParticipant.conversation).
+/// participant's state in the console (ParticipantPresentation.conversation).
 enum ConversationStatus {
     case notStarted
     case chatting
@@ -143,8 +143,8 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             // Not a fault, and on the current single-window Claude Desktop not
             // even unusual: the Code world replaces the chat inside the one
             // window instead of opening beside it. With setup, the human
-            // chose that window, named as a Code session under the icon.
-            // Lead with what is being targeted either way.
+            // chose that window, which the window chooser names as a Code
+            // session. Lead with what is being targeted either way.
             log("\(target.name): NOTE: relaying into a \(target.selectors.excludedSurfaceName ?? "non-chat") session. Everything relayed lands in that session.")
         }
         // From here every read of the side goes through the bound window.
@@ -450,9 +450,10 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         while true {
             turn += 1
             relayEvents.post(.turn(turn))
-            // While the speaker's window shows another conversation, nothing
-            // seen there is about this reply: observation is suspended and
-            // the time does not count. A destination gone for good ends the
+            // While the speaker's window is minimized, covered by a dialog,
+            // or its app will not come forward, nothing seen there is
+            // evidence about this reply: observation is suspended and the
+            // time does not count. A destination gone for good ends the
             // wait through mayContinue.
             var lost: String?
             let wait = waitForResponse(

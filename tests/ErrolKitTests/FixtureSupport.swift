@@ -40,7 +40,7 @@ struct Detection {
     var excluded: [Bool] = []
     /// Index of the window chooseChatWindow targets, nil when none qualifies.
     var chosenIndex: Int?
-    /// The readiness strip's verdict over all windows.
+    /// The readiness sweep's verdict over all windows.
     var status = SideStatus(appName: "")
     // The rest is scoped to the chosen window, like every run-time finder.
     var affordanceLabels: [String] = []

@@ -1,4 +1,4 @@
-// The readiness strip's decision layer: window choice across multiple
+// The readiness sweep's decision layer: window choice across multiple
 // windows, and composeSideStatus edge states driven by hand-built scans
 // (states with no tree shape worth recording — no windows, no composer,
 // nothing but excluded surfaces).
@@ -11,7 +11,7 @@ final class ReadinessCompositionTests: XCTestCase {
 
     func testChatWindowBeatsClaudeCodeWindow() {
         // The older multi-window build: a chat conversation alongside a
-        // Claude Code session. The chat window must win, and the strip must
+        // Claude Code session. The chat window must win, and the sweep must
         // name the other surface.
         let d = detect(fixture: "claude-multiwindow", selectors: selectors, appName: "Claude")
         XCTAssertEqual(d.excluded, [false, true])
@@ -41,7 +41,7 @@ final class ReadinessCompositionTests: XCTestCase {
 
     func testOnlyExcludedWindowsWithoutComposers() {
         // Claude Desktop hosting only a composerless Claude Code surface:
-        // nothing is targetable, but the strip still names what it saw.
+        // nothing is targetable, but the sweep still names what it saw.
         var scan = WindowScan()
         scan.isExcluded = true
         scan.surfacePath = "epitaxy"
@@ -53,7 +53,7 @@ final class ReadinessCompositionTests: XCTestCase {
     }
 
     func testSplitModelAndEffortCompose() {
-        // Claude Code announces model and effort separately; the strip
+        // Claude Code announces model and effort separately; the sweep
         // renders them the way the chat surfaces embed them.
         var scan = WindowScan()
         scan.hasComposer = true
