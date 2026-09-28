@@ -54,7 +54,7 @@ struct PerchTranscript: View {
     }
 
     var body: some View {
-        let entries = controller.transcript
+        let entries = controller.transcript.entries
         VStack(spacing: 0) {
             HStack {
                 Text("Conversation summary").font(Perch.text(11, .semibold))
@@ -291,7 +291,7 @@ private func playedController(replies: Int, note: Bool = true,
                               summarize: (@Sendable (String) async -> String?)? = nil) -> RelayController {
     let engine = PerchPreviewEngine(turn: replies + 1)
     let controller = connectedController(engine)
-    if let summarize { controller.summarizeReply = summarize }
+    if let summarize { controller.transcript.summarizeReply = summarize }
     controller.start()
     engine.postReplies(replies, note: note)
     return controller

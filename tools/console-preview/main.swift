@@ -83,7 +83,7 @@ func quick(_ controller: RelayController) -> RelayController {
         try? await Task.sleep(for: .milliseconds(150))
         return "Whether to price by seat or by usage"
     }
-    controller.summarizeReply = { reply in PerchPreviewEngine.gist(for: reply) }
+    controller.transcript.summarizeReply = { reply in PerchPreviewEngine.gist(for: reply) }
     return controller
 }
 

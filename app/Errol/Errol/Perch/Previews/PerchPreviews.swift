@@ -111,7 +111,7 @@ func connectedController(_ engine: PerchPreviewEngine = PerchPreviewEngine(),
         try? await Task.sleep(for: .seconds(1.2))
         return "Whether to price by seat or by usage"
     }
-    controller.summarizeReply = { reply in
+    controller.transcript.summarizeReply = { reply in
         try? await Task.sleep(for: .seconds(1.5))
         return PerchPreviewEngine.gist(for: reply)
     }
@@ -221,7 +221,7 @@ enum PerchPreviewState: CaseIterable {
             // first and each summary line keeps its reply's opening.
             return Self.midRun {
                 $0.summarize = { _ in nil }
-                $0.summarizeReply = { _ in nil }
+                $0.transcript.summarizeReply = { _ in nil }
             }
         case .pausePending:
             // Pause to steer during the opening's delivery, which takes its
