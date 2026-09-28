@@ -115,6 +115,12 @@ final class VoiceInput {
             }
             guard let self, self.generation == generation else { return }
             phase = .idle
+            // A listening that broke off or ended by itself still holds the
+            // engine and analyzer, and nothing else would close them: this
+            // model's own cancel() returns early once the phase is idle.
+            // After a finish() they are already closed, and this finds
+            // nothing left to do.
+            await transcriber.cancel()
         }
     }
 }
