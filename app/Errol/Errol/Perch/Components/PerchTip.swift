@@ -26,6 +26,7 @@ struct PerchTipAnchor<Content: View>: NSViewRepresentable {
     }
     static func dismantleNSView(_ view: NSView, coordinator: Coordinator) { coordinator.close() }
 
+    @MainActor
     final class Coordinator {
         var dismiss: (() -> Void)?
         private var panel: NSPanel?
@@ -79,8 +80,10 @@ struct PerchTipAnchor<Content: View>: NSViewRepresentable {
             // way it went: Esc, ⌘W, or the status item.
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: parent, queue: .main) { [weak self, weak parent] _ in
-                guard let parent, !parent.isVisible || !parent.occlusionState.contains(.visible) else { return }
-                self?.dismiss?()
+                MainActor.assumeIsolated {
+                    guard let parent, !parent.isVisible || !parent.occlusionState.contains(.visible) else { return }
+                    self?.dismiss?()
+                }
             }
         }
 
@@ -98,7 +101,7 @@ struct PerchTipAnchor<Content: View>: NSViewRepresentable {
             }, completionHandler: { panel.orderOut(nil) })
         }
 
-        deinit { close() }
+        isolated deinit { close() }
 
         private func resize(to size: CGSize) {
             guard panel != nil, size.width > 0, size.height > 0, size != self.size else { return }

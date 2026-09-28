@@ -7,7 +7,6 @@ import SwiftUI
 struct PerchConsoleView: View {
     let controller: RelayController
     var width: CGFloat = Perch.widgetWidth
-    var onCardResize: ((CGSize) -> Void)? = nil
 
     /// The columns' inset from the capsule's ends, and the gap between a
     /// column and the middle.
@@ -51,7 +50,6 @@ struct PerchConsoleView: View {
         .tint(Perch.accent)
         .background(Color.clear.contentShape(Rectangle()).gesture(WindowDragGesture()))
         .clipShape(Capsule())
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { onCardResize?($0) }
     }
 }
 
@@ -226,6 +224,7 @@ struct PerchAppMenuButton: View {
 /// Where an AppKit menu pops up from a SwiftUI control: a flipped view in
 /// the control's background, so y grows downward from its top edge.
 struct PerchMenuAnchor: NSViewRepresentable {
+    @MainActor
     final class Reference {
         weak var view: NSView?
     }
@@ -276,15 +275,6 @@ extension LayoutChoice {
         case .stacked: return "rectangle.split.1x2"
         case .fullScreen: return "rectangle"
         case .keepPositions: return "macwindow.on.rectangle"
-        }
-    }
-
-    var actionHelp: String {
-        switch self {
-        case .sideBySide: return "Move both windows side by side now"
-        case .stacked: return "Move both windows into a stack now"
-        case .fullScreen: return "Make both windows fill the screen now, one over the other"
-        case .keepPositions: return "Leave both windows where they are"
         }
     }
 }

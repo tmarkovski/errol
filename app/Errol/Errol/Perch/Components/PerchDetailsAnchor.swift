@@ -19,9 +19,10 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
     var canTakeFocus: () -> Bool
     @ViewBuilder var content: () -> Content
 
-    /// The anchor is the opening control's own region, so a click on that
-    /// control toggles the details instead of closing and reopening them.
-    func makeNSView(context: Context) -> NSView { DetailsToggleRegionView() }
+    /// The anchor view is the opening control's region, so the outside-click
+    /// watch leaves clicks on it alone and the control toggles the details
+    /// instead of closing and reopening them.
+    func makeNSView(context: Context) -> NSView { NSView() }
     func makeCoordinator() -> Coordinator { Coordinator() }
     func updateNSView(_ view: NSView, context: Context) {
         let coordinator = context.coordinator
@@ -38,14 +39,11 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
         override func cancelOperation(_ sender: Any?) { dismiss?() }
     }
 
-    final class DetailsHostingView: NSHostingView<PerchDetailsCallout<Content>> {
-        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    }
-
+    @MainActor
     final class Coordinator {
         var dismiss: (() -> Void)?
         private var panel: DetailsPanel?
-        private var host: DetailsHostingView?
+        private var host: FirstMouseHostingView<PerchDetailsCallout<Content>>?
         private weak var anchor: NSView?
         private let placement = PerchDetailsPlacement()
         /// The card's size as SwiftUI last laid it out, arrow included.
@@ -85,7 +83,7 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.permitsKey = canTakeFocus
             panel.dismiss = { [weak self] in self?.dismiss?() }
-            let host = DetailsHostingView(rootView: callout)
+            let host = FirstMouseHostingView(rootView: callout)
             host.sizingOptions = []
             panel.contentView = host
             self.panel = panel
@@ -127,7 +125,7 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
             if hadKeyboard, let parent, parent.isVisible, parent.canBecomeKey { parent.makeKey() }
         }
 
-        deinit { close() }
+        isolated deinit { close() }
 
         private func resize(to size: CGSize) {
             guard panel != nil, size.width > 0, size.height > 0, size != self.size else { return }
@@ -177,7 +175,8 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
                     return nil
                 }
                 if event.window === panel { return event }
-                if let window = event.window, DetailsToggleRegionView.contains(event.locationInWindow, in: window) {
+                if let anchor = self.anchor, event.window === anchor.window, !anchor.isHiddenOrHasHiddenAncestor,
+                   anchor.convert(anchor.bounds, to: nil).contains(event.locationInWindow) {
                     return event
                 }
                 self.dismiss?()
@@ -191,8 +190,10 @@ struct PerchDetailsAnchor<Content: View>: NSViewRepresentable {
             // way it went: Esc, ⌘W, or the status item.
             observers = [NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: parent, queue: .main) { [weak self, weak parent] _ in
-                guard let parent, !parent.isVisible || !parent.occlusionState.contains(.visible) else { return }
-                self?.dismiss?()
+                MainActor.assumeIsolated {
+                    guard let parent, !parent.isVisible || !parent.occlusionState.contains(.visible) else { return }
+                    self?.dismiss?()
+                }
             }]
         }
     }
@@ -274,23 +275,5 @@ struct PerchCalloutShape: InsettableShape {
         var shape = self
         shape.inset += amount
         return shape
-    }
-}
-
-/// Marks a control that opens and closes the details itself, so the
-/// details' outside-click watch leaves that click to the control.
-final class DetailsToggleRegionView: NSView {
-    static func contains(_ point: NSPoint, in window: NSWindow) -> Bool {
-        guard let root = window.contentView else { return false }
-        return hits(point, under: root)
-    }
-
-    private static func hits(_ point: NSPoint, under view: NSView) -> Bool {
-        for subview in view.subviews {
-            if let region = subview as? DetailsToggleRegionView, !region.isHiddenOrHasHiddenAncestor,
-               region.convert(region.bounds, to: nil).contains(point) { return true }
-            if hits(point, under: subview) { return true }
-        }
-        return false
     }
 }

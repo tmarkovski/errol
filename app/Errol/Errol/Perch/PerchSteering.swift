@@ -4,25 +4,22 @@
 import SwiftUI
 
 /// The closed field's line about the note during a run. Ending outranks
-/// everything, the note in flight outranks a queued one, the queued note
-/// outranks the record (opening the field takes the note back), and the
-/// last note's record shows when none of those is true — so closing the
-/// field without a note brings the record back. The line describes the
-/// note; whether the run is running, pausing, or held is the turn line's
+/// everything and the note in flight outranks a queued one. The last
+/// note's record is not this line's to show: PerchPromptBox.statusPanel
+/// draws it with PerchReceiptLine. The line describes the note; whether the run is running, pausing, or held is the turn line's
 /// to say, and what the open field's keys do is the line under the box
 /// (RelayController.steeringHint), so the two never restate each other.
 struct PerchRunLine: View {
     let controller: RelayController
 
     private enum Slot: Equatable {
-        case ending, sending, queued, record, empty
+        case ending, sending, queued, empty
     }
 
     private var slot: Slot {
         if controller.stopRequested { return .ending }
         if controller.steeringInFlight != nil { return .sending }
         if controller.steeringQueued { return .queued }
-        if controller.lastReceipt != nil { return .record }
         return .empty
     }
 
@@ -36,11 +33,6 @@ struct PerchRunLine: View {
             case .queued:
                 live(queuedText)
                 clearNote
-            case .record:
-                if let receipt = controller.lastReceipt {
-                    PerchReceiptLine(controller: controller, receipt: receipt)
-                        .transition(.opacity)
-                }
             case .empty:
                 EmptyView()
             }
@@ -88,8 +80,8 @@ struct PerchRunLine: View {
     }
 }
 
-/// What became of the last note, in one muted line, until the next note or
-/// New session. The tooltip is the quick peek at the note; a click or
+/// What became of the last note, in one muted line, until the next note,
+/// the next run, or New topic. The tooltip is the quick peek at the note; a click or
 /// keyboard activation opens it whole.
 struct PerchReceiptLine: View {
     let controller: RelayController

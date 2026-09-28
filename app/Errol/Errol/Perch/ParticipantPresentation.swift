@@ -109,11 +109,8 @@ struct ParticipantPresentation {
         return side.presence.action(name: name)
     }
     /// A problem the destination line names after the window, in red.
-    /// "Last used" is not one; the muted line already says it.
-    var problem: String? {
-        guard let status = shortStatus, status != "Last used" else { return nil }
-        return status
-    }
+    /// An unverified connection is not one; the muted line already says it.
+    var problem: String? { isRemembered ? nil : shortStatus }
 
     /// What a click on the icon does now: bring the app forward, keyboard
     /// and all, or open it while it is closed. When it can do neither, the
