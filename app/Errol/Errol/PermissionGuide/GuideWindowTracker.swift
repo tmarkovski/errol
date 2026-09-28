@@ -6,13 +6,10 @@
 // anyone who asks, so polling that list 30 times a second follows the
 // window as it opens, moves, and resizes without any permission, which
 // matters because the guide runs exactly when Errol doesn't have one yet.
-// When Errol is already trusted, accessibility notifications for moves and
-// resizes are added on top of the polling. Frames are reported in AppKit's
-// screen coordinates, where the origin is the bottom left of the main
-// display.
+// Frames are reported in AppKit's screen coordinates, where the origin is
+// the bottom left of the main display.
 
 import AppKit
-import ApplicationServices
 
 @MainActor
 final class GuideWindowTracker {
@@ -21,11 +18,12 @@ final class GuideWindowTracker {
     /// Called once System Settings has quit, after tracking has stopped.
     var onTrackingEnded: (() -> Void)?
     /// The Settings window's last known frame, or nil until it is found.
-    private(set) var currentFrame: CGRect?
+    private var currentFrame: CGRect?
 
-    private static let settingsBundleID = "com.apple.systempreferences"
-    /// The polling keeps running even with accessibility notifications,
-    /// because the window can appear before the observers are attached.
+    /// System Settings, which PermissionGuide also opens and brings forward.
+    static let settingsBundleID = "com.apple.systempreferences"
+    /// Thirty polls a second, so the panel keeps up with the window while
+    /// the user drags or resizes it instead of trailing behind.
     private static let pollInterval: TimeInterval = 1.0 / 30.0
     /// System Settings briefly drops out of the running applications while
     /// it opens or swaps panes. Waiting for this many polls in a row without
@@ -33,9 +31,6 @@ final class GuideWindowTracker {
     private static let missingAppThreshold = 12
 
     private var pollTimer: Timer?
-    private var appObserver: AXObserver?
-    private var windowObserver: AXObserver?
-    private var observedWindow: AXUIElement?
     /// Whether System Settings was found since tracking started. Until it
     /// is, missing it just means it is still launching.
     private var hasFoundSettings = false
@@ -53,28 +48,19 @@ final class GuideWindowTracker {
         refresh()
     }
 
-    /// Stops polling and removes the observers, so the next start begins
-    /// from nothing.
+    /// Stops polling, so the next start begins from nothing.
     func stop() {
         pollTimer?.invalidate()
         pollTimer = nil
-        for observer in [appObserver, windowObserver].compactMap({ $0 }) {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
-        }
-        appObserver = nil
-        windowObserver = nil
-        observedWindow = nil
         currentFrame = nil
         hasFoundSettings = false
         missingPolls = 0
     }
 
-    /// The one place tracking updates, from the timer and from the
-    /// observers alike. It finds System Settings, reports the frame the
-    /// window server has for its window, and, when Errol is trusted,
-    /// attaches observers to that window for its moves and resizes.
+    /// The one place tracking updates, on every poll: it finds System
+    /// Settings and reports the frame the window server has for its window.
     private func refresh() {
-        guard let app = runningSettings() else {
+        guard let app = Self.runningSettings() else {
             endIfSettingsQuit()
             return
         }
@@ -84,24 +70,6 @@ final class GuideWindowTracker {
         if let frame = windowServerFrame(for: app.processIdentifier) {
             report(frame)
         }
-        guard AXIsProcessTrusted() else { return }
-
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        if appObserver == nil, let observer = makeObserver(for: app.processIdentifier) {
-            register(kAXMainWindowChangedNotification, on: appElement, with: observer)
-            register(kAXFocusedWindowChangedNotification, on: appElement, with: observer)
-            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
-            appObserver = observer
-        }
-
-        guard let window = mainWindow(of: appElement) else { return }
-        if let observedWindow, CFEqual(window, observedWindow) {
-            reportObservedWindowFrame()
-            return
-        }
-        observedWindow = window
-        observeMovesAndResizes(of: window, pid: app.processIdentifier)
-        reportObservedWindowFrame()
     }
 
     private func report(_ frame: CGRect) {
@@ -113,7 +81,7 @@ final class GuideWindowTracker {
     /// Ends tracking once System Settings has been missing for several
     /// polls in a row, which means it quit rather than paused.
     private func endIfSettingsQuit() {
-        guard hasFoundSettings || currentFrame != nil else { return }
+        guard hasFoundSettings else { return }
         missingPolls += 1
         guard missingPolls >= Self.missingAppThreshold else { return }
         stop()
@@ -122,7 +90,7 @@ final class GuideWindowTracker {
 
     /// The System Settings process to follow. When more than one is
     /// running, one that can show windows wins over a background helper.
-    private func runningSettings() -> NSRunningApplication? {
+    static func runningSettings() -> NSRunningApplication? {
         NSRunningApplication.runningApplications(withBundleIdentifier: Self.settingsBundleID)
             .max { ($0.activationPolicy == .prohibited ? 0 : 1) < ($1.activationPolicy == .prohibited ? 0 : 1) }
     }
@@ -152,9 +120,8 @@ final class GuideWindowTracker {
             .max { $0.width * $0.height < $1.width * $1.height }
     }
 
-    /// Converts a rectangle from the window server's and accessibility's
-    /// coordinates, where y grows downward from the top of the main display,
-    /// into AppKit's, where y grows upward from its bottom. Displays can be
+    /// Converts a rectangle from the window server's coordinates, where y
+    /// grows downward from the top of the main display, into AppKit's, where y grows upward from its bottom. Displays can be
     /// arranged unevenly, so the conversion goes through the display the
     /// rectangle overlaps most.
     private func appKitFrame(fromTopLeft rect: CGRect) -> CGRect {
@@ -174,98 +141,5 @@ final class GuideWindowTracker {
                       y: display.frame.maxY - (rect.minY - display.bounds.minY) - rect.height,
                       width: rect.width,
                       height: rect.height)
-    }
-
-    // MARK: Accessibility, once Errol is trusted
-
-    /// Reports the observed window's frame from its accessibility position
-    /// and size.
-    private func reportObservedWindowFrame() {
-        guard let window = observedWindow,
-              let position = pointValue(kAXPositionAttribute, of: window),
-              let size = sizeValue(kAXSizeAttribute, of: window) else { return }
-        report(appKitFrame(fromTopLeft: CGRect(origin: position, size: size)))
-    }
-
-    /// The window to follow: the main window, then the focused one, then
-    /// the first in the app's list.
-    private func mainWindow(of app: AXUIElement) -> AXUIElement? {
-        elementValue(kAXMainWindowAttribute, of: app)
-            ?? elementValue(kAXFocusedWindowAttribute, of: app)
-            ?? elementsValue(kAXWindowsAttribute, of: app)?.first
-    }
-
-    /// Moves the window observer onto a new window.
-    private func observeMovesAndResizes(of window: AXUIElement, pid: pid_t) {
-        if let windowObserver {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(windowObserver), .commonModes)
-        }
-        windowObserver = makeObserver(for: pid)
-        guard let windowObserver else { return }
-        register(kAXMovedNotification, on: window, with: windowObserver)
-        register(kAXResizedNotification, on: window, with: windowObserver)
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(windowObserver), .commonModes)
-    }
-
-    /// An observer whose every notification leads back to refresh(). The
-    /// refresh waits for the next turn of the main queue because it can
-    /// replace the very observer whose callback is running.
-    private func makeObserver(for pid: pid_t) -> AXObserver? {
-        var observer: AXObserver?
-        let callback: AXObserverCallback = { _, _, _, refcon in
-            guard let refcon else { return }
-            let tracker = Unmanaged<GuideWindowTracker>.fromOpaque(refcon).takeUnretainedValue()
-            DispatchQueue.main.async { tracker.refresh() }
-        }
-        guard AXObserverCreate(pid, callback, &observer) == .success else { return nil }
-        return observer
-    }
-
-    /// The tracker lives as long as PermissionGuide, which is the life of
-    /// the app, so the observers can hold it unretained.
-    private func register(_ notification: String, on element: AXUIElement, with observer: AXObserver) {
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        _ = AXObserverAddNotification(observer, element, notification as CFString, refcon)
-    }
-
-    // Each reader checks the value's type before casting, so an unexpected
-    // reply from System Settings reads as nothing instead of crashing.
-
-    private func elementValue(_ attribute: String, of element: AXUIElement) -> AXUIElement? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return (value as! AXUIElement)
-    }
-
-    private func elementsValue(_ attribute: String, of element: AXUIElement) -> [AXUIElement]? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == CFArrayGetTypeID() else { return nil }
-        let elements = (value as! NSArray).compactMap { item -> AXUIElement? in
-            let item = item as CFTypeRef
-            return CFGetTypeID(item) == AXUIElementGetTypeID() ? (item as! AXUIElement) : nil
-        }
-        return elements.isEmpty ? nil : elements
-    }
-
-    private func pointValue(_ attribute: String, of element: AXUIElement) -> CGPoint? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
-        let axValue = value as! AXValue
-        var point = CGPoint.zero
-        guard AXValueGetType(axValue) == .cgPoint, AXValueGetValue(axValue, .cgPoint, &point) else { return nil }
-        return point
-    }
-
-    private func sizeValue(_ attribute: String, of element: AXUIElement) -> CGSize? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
-        let axValue = value as! AXValue
-        var size = CGSize.zero
-        guard AXValueGetType(axValue) == .cgSize, AXValueGetValue(axValue, .cgSize, &size) else { return nil }
-        return size
     }
 }

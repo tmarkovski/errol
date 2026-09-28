@@ -17,7 +17,6 @@ import AppKit
 
 @MainActor
 enum PermissionGuide {
-    private static let settingsBundleID = "com.apple.systempreferences"
     private static let settingsAppURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
     /// The list in Privacy & Security. macOS 27 renamed it Device Control
     /// and Data Access, and the link stayed the same.
@@ -90,7 +89,9 @@ enum PermissionGuide {
     }
 
     /// Takes the panel down and stops following System Settings. The close
-    /// button also returns the user to the app they were in before.
+    /// button also returns the user to the app they were in before. Every
+    /// way out forgets that app, so a later guide opened from System
+    /// Settings leaves the user there instead of returning to a stale one.
     private static func close(returningToPreviousApp: Bool) {
         tracker.stop()
         stopFollowingFrontmostApp()
@@ -98,6 +99,7 @@ enum PermissionGuide {
         panel = nil
         model.isDragging = false
         if returningToPreviousApp { reactivatePreviousApp() }
+        previousApp = nil
     }
 
     private static func setDragging(_ isDragging: Bool) {
@@ -111,7 +113,7 @@ enum PermissionGuide {
     private static func openList() {
         NSWorkspace.shared.openApplication(at: settingsAppURL, configuration: NSWorkspace.OpenConfiguration())
         NSWorkspace.shared.open(listURL)
-        runningSettings()?.activate(options: [])
+        GuideWindowTracker.runningSettings()?.activate(options: [])
     }
 
     /// Brings the list back after the user has gone to another app, with
@@ -124,12 +126,8 @@ enum PermissionGuide {
     /// A press on the panel keeps System Settings in front, since that is
     /// where the drag ends and where the user works while the guide is up.
     private static func keepSettingsInFront() {
-        runningSettings()?.activate(options: [])
+        GuideWindowTracker.runningSettings()?.activate(options: [])
         panel?.orderFrontRegardless()
-    }
-
-    private static func runningSettings() -> NSRunningApplication? {
-        NSRunningApplication.runningApplications(withBundleIdentifier: settingsBundleID).first
     }
 
     /// Tells the panel whether System Settings is in front, so it can offer
@@ -143,7 +141,7 @@ enum PermissionGuide {
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 model.isSettingsFrontmost =
-                    NSWorkspace.shared.frontmostApplication?.bundleIdentifier == settingsBundleID
+                    NSWorkspace.shared.frontmostApplication?.bundleIdentifier == GuideWindowTracker.settingsBundleID
             }
         }
     }
@@ -161,7 +159,7 @@ enum PermissionGuide {
     /// which is where the guide leaves the user anyway.
     private static func rememberFrontmostApp() {
         guard let app = NSWorkspace.shared.frontmostApplication,
-              app.bundleIdentifier != settingsBundleID else { return }
+              app.bundleIdentifier != GuideWindowTracker.settingsBundleID else { return }
         previousApp = (app.processIdentifier, app.bundleIdentifier)
     }
 
@@ -169,7 +167,6 @@ enum PermissionGuide {
     /// running and by its bundle when it was relaunched meanwhile.
     private static func reactivatePreviousApp() {
         guard let previous = previousApp else { return }
-        previousApp = nil
         let app = NSRunningApplication(processIdentifier: previous.pid)
             ?? previous.bundleID.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }
         app?.activate(options: [])

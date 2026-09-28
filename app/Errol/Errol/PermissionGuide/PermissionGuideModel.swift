@@ -29,8 +29,9 @@ final class PermissionGuideModel {
     /// The drag source reports a drag starting (true) and ending (false).
     @ObservationIgnored var dragStateChanged: (Bool) -> Void = { _ in }
 
-    init(appURL: URL = Bundle.main.bundleURL) {
-        self.appURL = appURL.standardizedFileURL
-        appName = FileManager.default.displayName(atPath: appURL.path)
+    init() {
+        let url = Bundle.main.bundleURL
+        appURL = url.standardizedFileURL
+        appName = FileManager.default.displayName(atPath: url.path)
     }
 }

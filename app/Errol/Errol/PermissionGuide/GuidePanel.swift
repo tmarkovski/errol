@@ -180,10 +180,16 @@ final class GuidePanel: NSPanel {
     }
 
     /// Under the Settings window and as wide as its pane, kept on the
-    /// screen the window is on. Near the bottom of the screen, the panel
-    /// stays on screen and overlaps the window instead.
+    /// screen that holds most of the window, the one GuideWindowTracker
+    /// also converts its frame through. Near the bottom of the screen, the
+    /// panel stays on screen and overlaps the window instead.
     private func targetFrame(for settingsFrame: CGRect) -> CGRect {
-        let screen = NSScreen.screens.first { $0.frame.intersects(settingsFrame) }?.visibleFrame ?? settingsFrame
+        func overlap(_ s: NSScreen) -> CGFloat {
+            let r = s.frame.intersection(settingsFrame)
+            return r.isNull ? 0 : r.width * r.height
+        }
+        let screen = NSScreen.screens.filter { $0.frame.intersects(settingsFrame) }
+            .max { overlap($0) < overlap($1) }?.visibleFrame ?? settingsFrame
         let width = min(max(Self.minimumWidth, settingsFrame.width - Self.sidebarWidth),
                         screen.width - Self.screenInset * 2)
         let height = cardHeight(for: width)
