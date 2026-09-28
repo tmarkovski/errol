@@ -128,6 +128,18 @@ struct Config {
         // project, not a conversation in it (fixtures, Sep 2026).
         conversationRoutePrefixes: ["chat", "epitaxy"],
         genericWindowTitles: ["Claude", "New chat", "New task"])
+
+    /// The bundle ID of `side`'s app. A method on the config rather than a
+    /// property of Speaker, so it answers from whichever config it is asked
+    /// of: the global the harness swaps between runs, or a copy of it.
+    func bundleID(for side: Speaker) -> String {
+        side == .chatgpt ? chatgptBundleID : claudeBundleID
+    }
+
+    /// The label keywords `side`'s finders read, from this config.
+    func selectors(for side: Speaker) -> AppSelectors {
+        side == .chatgpt ? chatgptSelectors : claudeSelectors
+    }
 }
 
 /// In the app the per-run fields are written on main only, in

@@ -32,6 +32,13 @@ func findApp(bundleID: String, name: String, selectors: AppSelectors) -> TargetA
     return TargetApp(name: name, app: running, ax: ax, selectors: selectors)
 }
 
+/// `side`'s app, found by the bundle ID and selectors of the global `config`
+/// as it stands at the call, so a config the harness swapped in is the one
+/// searched, and named as the human reads it.
+func findApp(_ side: Speaker) -> TargetApp? {
+    findApp(bundleID: config.bundleID(for: side), name: side.appName, selectors: config.selectors(for: side))
+}
+
 /// Electron apps expose an empty AX tree until nudged. This is the raw
 /// setter; the app's repeated contacts go through `electronNudges`, which
 /// sends it once per process.
