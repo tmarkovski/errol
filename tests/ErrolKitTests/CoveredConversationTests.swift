@@ -49,7 +49,7 @@ final class CoveredConversationTests: XCTestCase {
         XCTAssertEqual(candidate.stateLine, "Covered by \u{201C}Image preview\u{201D}")
         // A connected side reads as something to finish first, with the
         // start refusal naming what to close.
-        let observation = BindingObservation(check: .same, identity: candidate.identity,
+        let observation = BindingObservation(window: candidate.id, check: .same, identity: candidate.identity,
                                              composer: candidate.composer)
         let readiness = destinationReadiness(observation, side: .claude)
         XCTAssertEqual(readiness, .finishPreparing(.covered(side: .claude, by: "Image preview")))

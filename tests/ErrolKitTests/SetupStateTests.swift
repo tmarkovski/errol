@@ -22,7 +22,8 @@ final class SetupStateTests: XCTestCase {
 
     private func observation(_ candidate: WindowCandidate,
                              check: BoundDestination.Check = .same) -> BindingObservation {
-        BindingObservation(check: check, identity: candidate.identity, composer: candidate.composer)
+        BindingObservation(window: candidate.id, check: check, identity: candidate.identity,
+                           composer: candidate.composer)
     }
 
     /// A state with both apps running and one ready window each.
@@ -181,7 +182,7 @@ final class SetupStateTests: XCTestCase {
 
     func testAWorkSurfaceConnectsLikeAnyConversation() throws {
         // An existing Code session is a place the human chose on purpose: it
-        // is named as one under the icon and asks for no further choice.
+        // is named as one in the window chooser and asks for no further choice.
         var state = SetupState()
         let code = try candidate("claude-code-collapsed", selectors: claude)
         XCTAssertTrue(code.isEligible, "Claude allows a Code session when the human picks it")
@@ -225,8 +226,6 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.sendBlocker(names: names),
                        "ChatGPT has an unsent draft (16 characters). Finish or clear it, then send again.")
         XCTAssertEqual(state.notice(names: names)?.isProblem, true)
-        XCTAssertEqual(state.chatgpt.connection?.identity.title, "Logo brainstorm",
-                       "the identity follows the observation, so an adopted name shows")
         let home = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)
         state.observe(.chatgpt, binding: observation(home))
         XCTAssertNil(state.sendBlocker(names: names))
@@ -240,6 +239,24 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(state.claude.connection?.readiness, .hidden("minimized"))
         XCTAssertEqual(state.sendBlocker(names: names), "Claude's window is minimized. Bring it back to send.")
         XCTAssertTrue(state.chatgpt.isReady, "the other side is untouched")
+    }
+
+    func testAStaleBindingObservationLeavesANewerConnectionAlone() throws {
+        // A sweep reads the binding on its own thread, so its word on the
+        // window the side was connected to can land after the human has
+        // switched it to another. It says nothing of the newer window: it
+        // neither relabels it nor, lost, disconnects it.
+        var state = SetupState()
+        let older = try candidate("claude-chat-home", id: 1, selectors: claude)
+        let newer = try candidate("claude-chat-conversation", id: 2, selectors: claude)
+        XCTAssertNotEqual(older.identity, newer.identity)
+        state.observe(.claude, presence: .available(windows: 2), candidates: [older, newer])
+        state.connected(.claude, window: newer.id, identity: newer.identity, model: nil,
+                        observation: observation(newer))
+        state.observe(.claude, binding: observation(older, check: .lost("the window closed")))
+        XCTAssertEqual(state.claude.connection?.window, newer.id, "the newer connection stands")
+        XCTAssertEqual(state.claude.connection?.identity, newer.identity)
+        XCTAssertEqual(state.claude.connection?.readiness, .ready)
     }
 
     func testALostConversationReopensOnlyThatSide() throws {

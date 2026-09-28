@@ -26,16 +26,12 @@ struct WindowCandidate: Identifiable, Equatable {
     /// Model plus effort where the window announces one, as the console
     /// renders it ("Fable 5 · Extra").
     var model: String?
-    /// The window's frame in AX coordinates, for the picker's highlight;
-    /// nil in fixtures.
-    var frame: CGRect?
     var isMinimized: Bool
     /// Whether a run could target it: a composer in a chat window, or in an
     /// excluded-surface window where the selectors allow the fallback.
     let isEligible: Bool
 
-    init(id: WindowID, scan: WindowScan, selectors: AppSelectors,
-         frame: CGRect? = nil, isMinimized: Bool = false) {
+    init(id: WindowID, scan: WindowScan, selectors: AppSelectors, isMinimized: Bool = false) {
         self.id = id
         identity = DestinationIdentity(scan: scan, selectors: selectors)
         hasComposer = scan.hasComposer
@@ -46,7 +42,6 @@ struct WindowCandidate: Identifiable, Equatable {
         if let effort = scan.effort {
             model = model.map { "\($0) \u{00B7} \(effort)" } ?? effort
         }
-        self.frame = frame
         self.isMinimized = isMinimized
         isEligible = scan.hasComposer && (!scan.isExcluded || selectors.excludedSurfaceIsFallback)
     }
@@ -174,6 +169,10 @@ enum DestinationReadiness: Equatable {
 
 /// What a sweep read from a bound destination.
 struct BindingObservation: Equatable {
+    /// The window the observation was read from. A sweep reads the binding
+    /// on its own thread, so its report can land after a bind to another
+    /// window has completed; the id lets the state tell it is stale.
+    var window: WindowID
     var check: BoundDestination.Check
     var identity: DestinationIdentity
     var composer: ComposerState
@@ -303,10 +302,13 @@ struct SetupState: Equatable {
     }
 
     /// A sweep's word on a side's bound conversation. A lost destination
-    /// drops the connection: the side needs connecting again.
+    /// drops the connection: the side needs connecting again. A word on
+    /// another window than the connected one is stale — read before the
+    /// human chose this one — and changes nothing, so it can neither
+    /// relabel nor disconnect, and so unbind, the newer window. The
+    /// identity stays the one the connection was made with.
     mutating func observe(_ side: Speaker, binding: BindingObservation) {
-        guard var connection = self[side].connection else { return }
-        connection.identity = binding.identity
+        guard var connection = self[side].connection, connection.window == binding.window else { return }
         connection.readiness = destinationReadiness(binding, side: side)
         if case .lost = connection.readiness {
             disconnect(side)

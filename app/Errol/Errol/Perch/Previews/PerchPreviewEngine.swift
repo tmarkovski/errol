@@ -75,8 +75,7 @@ final class PerchPreviewEngine: RelayEngine {
 
     private static func candidate(_ id: WindowID, title: String, composer: String,
                                   route: String? = nil, model: String? = nil,
-                                  excluded: Bool = false, messages: Int, selectors: AppSelectors,
-                                  frame: CGRect) -> WindowCandidate {
+                                  excluded: Bool = false, messages: Int, selectors: AppSelectors) -> WindowCandidate {
         var scan = WindowScan()
         scan.title = title
         scan.hasComposer = true
@@ -87,28 +86,24 @@ final class PerchPreviewEngine: RelayEngine {
         scan.isExcluded = excluded
         scan.surfacePath = excluded ? "epitaxy" : nil
         scan.messageAffordances = messages
-        var candidate = WindowCandidate(id: id, scan: scan, selectors: selectors, frame: frame)
+        var candidate = WindowCandidate(id: id, scan: scan, selectors: selectors)
         if candidate.identity.surface == nil { candidate.identity.surface = excluded ? "Code" : "Chat" }
         return candidate
     }
 
     static let chatgptWindows = [
         candidate(Windows.chatgptConversation, title: "Pricing by seat or by usage", composer: "\nMessage ChatGPT",
-                  model: "5.6 Sol High", messages: 4, selectors: config.chatgptSelectors,
-                  frame: CGRect(x: 0, y: 25, width: 720, height: 875)),
+                  model: "5.6 Sol High", messages: 4, selectors: config.chatgptSelectors),
         candidate(Windows.chatgptFresh, title: "ChatGPT", composer: "\nMessage ChatGPT",
-                  messages: 0, selectors: config.chatgptSelectors,
-                  frame: CGRect(x: 60, y: 80, width: 720, height: 875)),
+                  messages: 0, selectors: config.chatgptSelectors),
     ]
     static let claudeWindows = [
         candidate(Windows.claudeConversation, title: "Naming ideas", composer: "\n",
                   route: "/chat/8f3c2a91-77aa-4bfa-9f21-0d6e2b9d5c44", model: "Fable 5 \u{00B7} Extra",
-                  messages: 6, selectors: config.claudeSelectors,
-                  frame: CGRect(x: 720, y: 25, width: 720, height: 875)),
+                  messages: 6, selectors: config.claudeSelectors),
         candidate(Windows.claudeCode, title: "Claude", composer: "\n",
                   route: "/epitaxy/a1b2c3d4-5e6f-7089-9abc-def012345678", model: "Fable 5",
-                  excluded: true, messages: 2, selectors: config.claudeSelectors,
-                  frame: CGRect(x: 760, y: 80, width: 700, height: 800)),
+                  excluded: true, messages: 2, selectors: config.claudeSelectors),
     ]
 
     private var readiness: (chatgpt: SideStatus, claude: SideStatus)
@@ -235,7 +230,7 @@ final class PerchPreviewEngine: RelayEngine {
         for side in [Speaker.chatgpt, .claude] {
             report.candidates[side] = windows(side)
             if let bound = bindings[side] {
-                report.bindings[side] = BindingObservation(check: .same, identity: bound.identity,
+                report.bindings[side] = BindingObservation(window: bound.id, check: .same, identity: bound.identity,
                                                            composer: bound.composer)
             }
         }
@@ -274,7 +269,8 @@ final class PerchPreviewEngine: RelayEngine {
         }
         bindings[side] = candidate
         events.post(.log("Preview: \(side == .chatgpt ? "ChatGPT" : "Claude") connected to \(candidate.name ?? "an untitled window")."))
-        completion(BindingObservation(check: .same, identity: candidate.identity, composer: candidate.composer))
+        completion(BindingObservation(window: candidate.id, check: .same, identity: candidate.identity,
+                                      composer: candidate.composer))
     }
 
     func unbind(_ side: Speaker) {

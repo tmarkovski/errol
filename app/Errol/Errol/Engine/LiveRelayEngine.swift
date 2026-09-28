@@ -72,7 +72,8 @@ final class LiveRelayEngine: RelayEngine {
                     }
                 }
                 report.bindings[side] = BindingObservation(
-                    check: check, identity: binding.identity, composer: composer)
+                    window: windowID(of: binding.window), check: check, identity: binding.identity,
+                    composer: composer)
             }
         }
         return report
@@ -203,7 +204,7 @@ final class LiveRelayEngine: RelayEngine {
             let binding = BoundDestination(target: target, window: element)
             registry.bind(side, binding)
             log(binding.bindingReport)
-            let observation = BindingObservation(check: .same, identity: binding.identity,
+            let observation = BindingObservation(window: window, check: .same, identity: binding.identity,
                                                  composer: composerState(in: binding.target))
             DispatchQueue.main.async { completion(observation) }
         }

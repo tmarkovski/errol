@@ -93,15 +93,14 @@ func windowID(of window: AXUIElement) -> WindowID {
     WindowID(raw: UInt(CFHash(window)))
 }
 
-/// The candidates one sweep offers for a side, with each window's frame
-/// and minimized state read for the picker's highlight.
+/// The candidates one sweep offers for a side, with each window's
+/// minimized state read for its state line.
 func windowCandidates(from sweep: SideSweep, selectors: AppSelectors) -> [WindowCandidate] {
     let ids = sweep.windows.map(windowID(of:))
     var candidates = windowCandidates(sweep.scans, ids: ids, selectors: selectors)
     for index in candidates.indices {
         guard let position = ids.firstIndex(of: candidates[index].id) else { continue }
         let window = sweep.windows[position]
-        candidates[index].frame = windowFrame(window)
         candidates[index].isMinimized = (axAttribute(window, kAXMinimizedAttribute) as? Bool) ?? false
     }
     return candidates
