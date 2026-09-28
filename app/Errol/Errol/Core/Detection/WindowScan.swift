@@ -66,9 +66,6 @@ struct WindowScan {
     /// window has no composer because one does (coveringDialog); "" for a
     /// dialog with no name.
     var coveredBy: String?
-    /// Messages in the window's tree by their affordances (copy buttons and
-    /// collapsed action bars, the count the relay's baselines use).
-    var messageAffordances = 0
 }
 
 /// The text after `prefix` in a joined AX label. axLabel concatenates several
@@ -109,10 +106,6 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
         let label = element.label
         if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
             scan.isExcluded = true
-        }
-        if isCopyButtonLabel(label, selectors: selectors)
-            || selectors.messageActionsLabel.map({ label.localizedCaseInsensitiveContains($0) }) == true {
-            scan.messageAffordances += 1
         }
         if !scan.isReplying, isStopButtonLabel(label, selectors: selectors) {
             scan.isReplying = true

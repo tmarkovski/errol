@@ -60,7 +60,7 @@ final class PerchPreviewEngine: RelayEngine {
     }
 
     static func gist(for reply: String) -> String? {
-        let text = reply.replacingOccurrences(of: config.stopSequence, with: "")
+        let text = strippingSignOff(reply)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return replies.first { $0.text == text }?.gist
     }
@@ -75,7 +75,7 @@ final class PerchPreviewEngine: RelayEngine {
 
     private static func candidate(_ id: WindowID, title: String, composer: String,
                                   route: String? = nil, model: String? = nil,
-                                  excluded: Bool = false, messages: Int, selectors: AppSelectors) -> WindowCandidate {
+                                  excluded: Bool = false, selectors: AppSelectors) -> WindowCandidate {
         var scan = WindowScan()
         scan.title = title
         scan.hasComposer = true
@@ -85,7 +85,6 @@ final class PerchPreviewEngine: RelayEngine {
         scan.model = model
         scan.isExcluded = excluded
         scan.surfacePath = excluded ? "epitaxy" : nil
-        scan.messageAffordances = messages
         var candidate = WindowCandidate(id: id, scan: scan, selectors: selectors)
         if candidate.identity.surface == nil { candidate.identity.surface = excluded ? "Code" : "Chat" }
         return candidate
@@ -93,21 +92,21 @@ final class PerchPreviewEngine: RelayEngine {
 
     static let chatgptWindows = [
         candidate(Windows.chatgptConversation, title: "Pricing by seat or by usage", composer: "\nMessage ChatGPT",
-                  model: "5.6 Sol High", messages: 4, selectors: config.chatgptSelectors),
+                  model: "5.6 Sol High", selectors: config.chatgptSelectors),
         candidate(Windows.chatgptFresh, title: "ChatGPT", composer: "\nMessage ChatGPT",
-                  messages: 0, selectors: config.chatgptSelectors),
+                  selectors: config.chatgptSelectors),
     ]
     static let claudeWindows = [
         candidate(Windows.claudeConversation, title: "Naming ideas", composer: "\n",
                   route: "/chat/8f3c2a91-77aa-4bfa-9f21-0d6e2b9d5c44", model: "Fable 5 \u{00B7} Extra",
-                  messages: 6, selectors: config.claudeSelectors),
+                  selectors: config.claudeSelectors),
         candidate(Windows.claudeCode, title: "Claude", composer: "\n",
                   route: "/epitaxy/a1b2c3d4-5e6f-7089-9abc-def012345678", model: "Fable 5",
-                  excluded: true, messages: 2, selectors: config.claudeSelectors),
+                  excluded: true, selectors: config.claudeSelectors),
     ]
 
     private var readiness: (chatgpt: SideStatus, claude: SideStatus)
-    private var installed: [Speaker: Bool] = [.chatgpt: true, .claude: true]
+    private let installed: [Speaker: Bool]
     private let replying: Speaker?
     private var bindings: [Speaker: WindowCandidate] = [:]
     private var restorable = false
@@ -163,9 +162,8 @@ final class PerchPreviewEngine: RelayEngine {
     /// from ChatGPT's, a note rides the third handoff to Claude and is
     /// echoed with the fourth, and a completed run's last two replies sign
     /// off, as a played run's would.
-    static func ended(_ outcome: RunOutcome, replies: Int = 6, note: Bool = true) -> PerchPreviewEngine {
+    static func ended(_ outcome: RunOutcome, replies: Int = 6) -> PerchPreviewEngine {
         let engine = PerchPreviewEngine()
-        let text = Self.note
         let completed = outcome == .completed
         var events: [RelayEvent] = []
         for turn in 1...max(1, replies) {
@@ -174,13 +172,11 @@ final class PerchPreviewEngine: RelayEngine {
             let signsOff = completed && turn >= replies - 1
             events.append(.reply(side: side, text: signsOff ? "\(reply(turn: turn))\n\n\(config.stopSequence)"
                                                             : reply(turn: turn)))
-            if note, turn == 3 {
-                events.append(.steeringCommitted(note: text, recipient: .claude, turn: 3))
-                events.append(.steering(SteeringDelivery(leg: .note, note: text, recipient: .claude, turn: 3,
-                                                         outcome: .delivered)))
+            if turn == 3 {
+                events += deliveredNote
             }
-            if note, turn == 4 {
-                events.append(.steering(SteeringDelivery(leg: .echo, note: text, recipient: .chatgpt, turn: 4,
+            if turn == 4 {
+                events.append(.steering(SteeringDelivery(leg: .echo, note: note, recipient: .chatgpt, turn: 4,
                                                          outcome: .delivered)))
             }
         }
@@ -195,15 +191,21 @@ final class PerchPreviewEngine: RelayEngine {
     /// The note the canvases write.
     static let note = "Push on the pricing question before you wrap up."
 
+    /// The note committed and delivered to Claude with the third handoff,
+    /// as both a finished run's script and the replies posted mid-run carry
+    /// it.
+    private static let deliveredNote: [RelayEvent] = [
+        .steeringCommitted(note: note, recipient: .claude, turn: 3),
+        .steering(SteeringDelivery(leg: .note, note: note, recipient: .claude, turn: 3, outcome: .delivered)),
+    ]
+
     /// Replies already in hand when a canvas opens mid-run, posted as a run
     /// posts them, and a note sent to Claude with the third handoff.
     func postReplies(_ count: Int, note: Bool = true) {
         for turn in stride(from: 1, through: count, by: 1) {
             events.post(.reply(side: turn % 2 == 1 ? .chatgpt : .claude, text: Self.reply(turn: turn)))
             if note, turn == 3 {
-                events.post(.steeringCommitted(note: Self.note, recipient: .claude, turn: 3))
-                events.post(.steering(SteeringDelivery(leg: .note, note: Self.note, recipient: .claude, turn: 3,
-                                                       outcome: .delivered)))
+                Self.deliveredNote.forEach(events.post)
             }
         }
     }
@@ -545,7 +547,7 @@ private final class PreviewRun {
     /// Timestamped like the engine's own lines (Logging.swift's `log`),
     /// on this run's bus rather than the process-wide one.
     private func log(_ line: String) {
-        events.post(.log("[\(iso.string(from: Date()))] \(line)"))
+        events.post(.log(timestampedLogLine(line)))
     }
 
     private func name(_ side: Speaker) -> String {

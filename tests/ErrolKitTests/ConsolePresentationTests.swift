@@ -57,7 +57,6 @@ final class ConsolePresentationTests: XCTestCase {
         var scan = WindowScan()
         scan.title = "Different topic in the same window"
         scan.hasComposer = true
-        scan.messageAffordances = 4
         var current = WindowCandidate(id: window, scan: scan, selectors: config.claudeSelectors)
         current.identity.surface = "Cowork"
         current.model = "Current model · High"

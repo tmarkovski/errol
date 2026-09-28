@@ -42,7 +42,6 @@ final class WindowCandidateTests: XCTestCase {
         var scan = WindowScan()
         scan.title = "ChatGPT"
         scan.hasComposer = true
-        scan.messageAffordances = 3
         let unnamed = WindowCandidate(id: WindowID(raw: 1), scan: scan, selectors: chatgpt)
         XCTAssertNil(unnamed.name)
     }
@@ -59,14 +58,12 @@ final class WindowCandidateTests: XCTestCase {
         XCTAssertEqual(idle.composer, .empty, "the placeholder is not a draft")
     }
 
-    func testTheScanCountsMessagesTheWayTheBaselinesDo() throws {
+    func testTheScanSeesReplyingTheWayTheFindersDo() throws {
         for (fixture, selectors, name) in [("claude-multiwindow", claude, "Claude"),
                                            ("chatgpt-chat-conversation", chatgpt, "ChatGPT"),
                                            ("claude-code-collapsed", claude, "Claude")] {
             let detection = detect(fixture: fixture, selectors: selectors, appName: name)
             let chosen = try XCTUnwrap(detection.chosenIndex)
-            XCTAssertEqual(detection.scans[chosen].messageAffordances, detection.affordanceLabels.count,
-                           "\(fixture): the scan's count must match messageAffordances(under:)")
             XCTAssertEqual(detection.scans[chosen].isReplying, detection.streaming, fixture)
         }
     }
