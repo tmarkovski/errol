@@ -17,13 +17,17 @@ final class LiveRelayEngine: RelayEngine {
         get { scanner.onUpdate }
         set { scanner.onUpdate = newValue }
     }
-    private let scanner = ReadinessScanner()
+    private let scanner: ReadinessScanner
     /// The windows the sweeps found and the sides' bindings, by id.
-    private let registry = WindowRegistry()
+    private let registry: WindowRegistry
     private let arranger = WindowArranger()
 
     init() {
-        scanner.sweep = { [registry] in Self.sweep(registry: registry) }
+        // The registry is a local first, so the sweep closure captures it
+        // without reading self before every property is set.
+        let registry = WindowRegistry()
+        self.registry = registry
+        scanner = ReadinessScanner(sweep: { Self.sweep(registry: registry) })
     }
 
     func setScanning(_ scanning: Bool) {
@@ -38,7 +42,10 @@ final class LiveRelayEngine: RelayEngine {
 
     /// One readiness sweep, on the scanner's thread: both apps' windows
     /// refreshed into the registry, offered as candidates, and each bound
-    /// conversation checked the way the run's preflight will check it.
+    /// conversation checked the way the run's preflight will check it —
+    /// reusing this sweep's scan of the bound window for its Stop button
+    /// and covering dialog, and walking it afresh only when the app no
+    /// longer lists it among its windows.
     private static func sweep(registry: WindowRegistry) -> ReadinessReport {
         let installed: [Speaker: Bool] = [
             .chatgpt: isInstalled(config.chatgptBundleID),
@@ -56,9 +63,16 @@ final class LiveRelayEngine: RelayEngine {
             report.candidates[side] = windowCandidates(from: sweep, selectors: selectors)
             if let binding = registry.binding(side) {
                 let check = binding.check()
+                var composer = ComposerState.unreadable
+                if check == .same {
+                    if let i = sweep.windows.firstIndex(where: { CFEqual($0, binding.window) }) {
+                        composer = composerState(in: binding.target, scan: sweep.scans[i])
+                    } else {
+                        composer = composerState(in: binding.target)
+                    }
+                }
                 report.bindings[side] = BindingObservation(
-                    check: check, identity: binding.identity,
-                    composer: check == .same ? composerState(in: binding.target) : .unreadable)
+                    check: check, identity: binding.identity, composer: composer)
             }
         }
         return report
@@ -110,19 +124,20 @@ final class LiveRelayEngine: RelayEngine {
             // First contact only: the scanner has usually nudged both long
             // ago, and then the trees are already populated and the settle
             // wait would just delay the run.
-            let freshChatgpt = electronNudges.beginContact(chatgpt.target)
-            let freshClaude = electronNudges.beginContact(claude.target)
-            if freshChatgpt || freshClaude { usleep(700_000) }
+            electronNudges.settleFirstContact([chatgpt.target, claude.target])
             _ = runRelay(chatgpt: chatgpt.target, claude: claude.target,
                          bindings: [.chatgpt: chatgpt, .claude: claude],
                          showTransfers: true) { continuing in
                 completeFocusOperation(control: control, events: events, continuingRun: continuing)
             }
+            // The file closes before `.finished` is posted, because
+            // `.finished` is what lets the controller allow the next Start,
+            // whose RunLog.begin() this end() must not be able to close.
+            RunLog.end()
             // Focus is the controller's to settle on `.finished`: the
             // console takes the keyboard back from whichever chat app
             // replied last (RelayController.finishRun).
             events.post(.finished)
-            RunLog.end()
         }
     }
 
@@ -130,9 +145,7 @@ final class LiveRelayEngine: RelayEngine {
         guard ensureTrusted(), let apps = resolveApps() else { return }
         report("Inspecting both apps...")
         runExclusively { [events] in
-            let freshChatgpt = electronNudges.beginContact(apps.chatgpt)
-            let freshClaude = electronNudges.beginContact(apps.claude)
-            if freshChatgpt || freshClaude { usleep(700_000) }
+            electronNudges.settleFirstContact([apps.chatgpt, apps.claude])
             let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
             events.post(.log(report))
         }
@@ -215,7 +228,7 @@ final class LiveRelayEngine: RelayEngine {
             // worker while this is — they share it — so clearing the flags
             // here touches nothing in flight.
             control.reset()
-            for window in arranged where electronNudges.beginContact(window.target) { usleep(700_000) }
+            electronNudges.settleFirstContact(arranged.map(\.target))
             let outcome = arranger.apply(layout, to: arranged)
             DispatchQueue.main.async { completion(outcome) }
         }
@@ -313,13 +326,6 @@ final class WindowRegistry {
         defer { lock.unlock() }
         guard let target = targets[side], let element = windows[side]?[id] else { return nil }
         return (target, element)
-    }
-
-    /// The side's app as the last sweep found it.
-    func target(_ side: Speaker) -> TargetApp? {
-        lock.lock()
-        defer { lock.unlock() }
-        return targets[side]
     }
 
     func bind(_ side: Speaker, _ binding: BoundDestination) {

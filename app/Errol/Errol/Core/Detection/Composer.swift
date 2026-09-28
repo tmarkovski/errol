@@ -59,6 +59,23 @@ func composerState(in target: TargetApp) -> ComposerState {
                             replying: hasStopButton(in: target))
 }
 
+/// The same judgment for a window the readiness sweep has just scanned:
+/// the composer, its value and the precise attachment count are still read
+/// live, the way `composerState(in:)` reads them, but whether a reply is
+/// underway and which dialog covers the window come from `scan`, whose walk
+/// already found them (scanWindow checks the same Stop button and the same
+/// dialog), so the window is not walked twice in one sweep. The order is
+/// the live one's: covered or unreadable only when no composer resolves.
+func composerState(in target: TargetApp, scan: WindowScan) -> ComposerState {
+    guard let input = inputArea(in: target) else {
+        return scan.coveredBy.map { .covered(by: $0) } ?? .unreadable
+    }
+    let value = axAttribute(input, kAXValueAttribute) as? String
+    let attachments = pastedTextAttachmentCount(around: input, selectors: target.selectors)
+    return classifyComposer(value: value, label: axLabel(input), attachments: attachments,
+                            replying: scan.isReplying)
+}
+
 /// What `composerState` judged, for the debug log: the element and the way
 /// it was found. A hold on a draft the human cannot see in the composer is
 /// the fallback having picked some other text input, and only this line

@@ -25,12 +25,14 @@ protocol RelayEngine: AnyObject {
     /// The inward flags and mailbox: cancel, pause, the steering note. The
     /// controller writes them; the run reads them at its boundaries.
     var control: RelayControl { get }
-    /// Readiness sweeps report here, on whatever thread the sweep ran: the
-    /// strip's status per side, the windows each app offers, and how each
-    /// bound conversation reads now.
+    /// Readiness sweeps report here, on whatever thread the sweep ran:
+    /// each side's status for the console, the windows each app offers,
+    /// and how each bound conversation reads now.
     var onReadiness: ((ReadinessReport) -> Void)? { get set }
-    /// Whether to sweep at all: only while someone can see the strip, and
-    /// never while a run owns the apps.
+    /// Whether to sweep at all: only while someone can see the console.
+    /// The scanner starts no sweep while a run owns the apps; a sweep
+    /// already in flight finishes, read-only, alongside the run's first
+    /// steps.
     func setScanning(_ scanning: Bool)
     /// Ask for a prompt sweep — a side to connect again, a return to the
     /// editor — rather than waiting out the interval.

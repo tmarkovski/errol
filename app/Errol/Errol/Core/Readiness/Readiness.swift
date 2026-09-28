@@ -193,8 +193,10 @@ func composeSideStatus(appName: String, scans: [WindowScan], selectors: AppSelec
     return status
 }
 
-/// Both sides in one sweep. Runs on the scanner's worker thread. Checks the
-/// permission without prompting — the prompt stays tied to the Start button.
+/// Both sides in one sweep, without the engine's registry or bindings: the
+/// live tests' read of the two apps (the app's scanner runs the engine's
+/// own sweep). Checks the permission without prompting — the prompt stays
+/// tied to the Start button.
 func scanBothSides() -> (chatgpt: SideStatus, claude: SideStatus) {
     guard AXIsProcessTrusted() else {
         func blocked(_ name: String) -> SideStatus {

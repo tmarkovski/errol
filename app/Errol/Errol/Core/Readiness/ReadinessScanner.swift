@@ -96,15 +96,13 @@ final class AXWakeHints {
 /// mode or model flip has no workspace-level signal), so the ceiling stays
 /// low. Any change, lifecycle event, or fresh activation snaps it back.
 final class ReadinessScanner {
-    /// Called on the worker thread after each sweep.
+    /// Called on the worker thread after each sweep. Set once before the
+    /// first setActive(true); Thread.start publishes it to the worker,
+    /// which reads it without the lock.
     var onUpdate: ((ReadinessReport) -> Void)?
     /// The sweep itself, run on the worker thread: the engine supplies one
     /// that also refreshes its window registry and checks its bindings.
-    /// The default is the strip's plain sweep of both apps.
-    var sweep: () -> ReadinessReport = {
-        let both = scanBothSides()
-        return ReadinessReport(chatgpt: both.chatgpt, claude: both.claude)
-    }
+    let sweep: () -> ReadinessReport
 
     private static let baseInterval: TimeInterval = 3
     private static let maxInterval: TimeInterval = 10
@@ -120,7 +118,8 @@ final class ReadinessScanner {
     /// Main-thread only, like the run-loop sources it manages.
     private let wakeHints = AXWakeHints()
 
-    init() {
+    init(sweep: @escaping () -> ReadinessReport) {
+        self.sweep = sweep
         wakeHints.onHint = { [weak self] in self?.requestSweep() }
         // Lifecycle of the two target apps: launch and activation re-bank
         // the nudge ledger's retry and warrant a prompt sweep; termination

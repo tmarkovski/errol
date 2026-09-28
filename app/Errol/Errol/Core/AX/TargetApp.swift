@@ -13,7 +13,7 @@ struct TargetApp {
     /// this window and never with another in its place, so a paste cannot
     /// be handed to a window the human did not pick (docs/design-proposals/
     /// setup-interaction/SPEC.md). nil until then, when the finders pick a
-    /// window the way the readiness strip does.
+    /// window the way the readiness sweep does.
     var boundWindow: AXUIElement? = nil
 
     /// The same app, with every finder scoped to `window`.
@@ -81,6 +81,16 @@ final class ElectronNudges {
         lock.unlock()
         if renudge { enableElectronAccessibility(target) }
         return renudge
+    }
+
+    /// Nudge every target on first contact, then give the trees one shared
+    /// settle wait if any of them was fresh, so two fresh apps populate
+    /// side by side rather than one wait after the other.
+    func settleFirstContact(_ targets: [TargetApp]) {
+        // An eager map, not a short-circuiting contains(where:): every
+        // target is nudged.
+        let fresh = targets.map(beginContact).contains(true)
+        if fresh { usleep(700_000) }
     }
 
     /// Windows exist: clear the empty streak and re-bank the recovery retry.
