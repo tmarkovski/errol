@@ -75,6 +75,20 @@ final class RelayFramingTests: XCTestCase {
         XCTAssertFalse(isSignOff("It was a pleasure. [[END-CONVERSATION]]"))
     }
 
+    func testDefaultRulesTemplateCarriesTheToken() {
+        // The token appears once per mention of the sign-off: the initiating
+        // side and the reply. Rendering must resolve every occurrence.
+        XCTAssertEqual(RelayRules.defaultTemplate
+            .components(separatedBy: RelayRules.stopSequenceToken).count - 1, 2)
+    }
+
+    func testRelayRulesRenderSubstitutesEveryToken() {
+        let rendered = relayRules()
+        XCTAssertTrue(rendered.contains(config.stopSequence))
+        XCTAssertFalse(rendered.contains(RelayRules.stopSequenceToken),
+                       "an unresolved token would tell the agents to type the placeholder")
+    }
+
     // MARK: Steering
 
     func testRulesAnticipateSteering() {

@@ -270,7 +270,7 @@ struct GrowingTextEditor: NSViewRepresentable {
 }
 
 /// Draws a hint in NSTextView's extra line fragment — the insertion line
-/// after the template body — without adding those characters to its storage.
+/// after the text — without adding those characters to its storage.
 private final class TrailingPlaceholderTextView: NSTextView {
     var onWidthChange: (() -> Void)?
 

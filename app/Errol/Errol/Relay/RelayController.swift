@@ -11,32 +11,17 @@
 // The records the model keeps — log lines, the steering note and its
 // receipt, transcript entries — are plain values in RelayRecords.swift.
 
-import Combine
 import AppKit
 import Foundation
 import Observation
 
 @Observable
 final class RelayController {
-    /// The picker tag for free-form instructions; not a ConversationTemplate.
-    static let customConversation = "Custom"
-    /// The picker tag for an open conversation with no preset structure: the
-    /// topic is the whole opening message. Not a ConversationTemplate — a
-    /// template with an empty body would still frame the topic as "below",
-    /// and a shapes editor should not offer its body for editing.
-    static let freeConversation = "Free chat"
-    /// The selected template's name, customConversation, or freeConversation.
-    /// Free chat for now (Sep 2026): the shape choice is off the composer
-    /// and the session settings, so every opening is the bare topic. The
-    /// templates and selectConversation stay for when the choice comes
-    /// back; the shapes editor went with the settings screen (Sep 2026).
-    var conversation = RelayController.freeConversation
-    /// Completes the selected template ("What to brainstorm about").
+    /// The whole opening message, as the prompt box holds it. The
+    /// conversation shapes that once framed it (Brainstorm, Debate, a
+    /// prompt written from scratch) left the composer in Sep 2026 and were
+    /// deleted on Sep 27 2026, so the topic goes out as written.
     var topic = ""
-    /// The opening message written from scratch under Custom (More → Write
-    /// from scratch). A stored draft: it survives comparing other shapes, so
-    /// coming back to Custom finds the writing where it was left.
-    var customInstructions = ""
     /// How the next run ends, and its turn limit when it has one. Chosen on
     /// the console's ending chip and stepper, and copied into config at
     /// Start.
@@ -51,8 +36,7 @@ final class RelayController {
     /// windows it bound.
     let setup: SetupController
     /// The prompt the human sent to start the run on the panel, as they
-    /// wrote it: the topic, or the opening written from scratch. Set at
-    /// Start, cleared with the finished run.
+    /// wrote it: the topic. Set at Start, cleared with the finished run.
     private(set) var runPrompt: String?
     /// Whether the opening has left the prompt box: true from the first
     /// transfer that sets off from the prompt, or failing that, the first
@@ -195,7 +179,6 @@ final class RelayController {
     /// does an arrangement of the windows, which brings both chat apps
     /// forward on the way, and an app brought forward from its icon.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
-    @ObservationIgnored private var templatesWatcher: AnyCancellable?
 
     init(engine: RelayEngine, transferOverlay: TransferOverlay? = nil) {
         self.engine = engine
@@ -266,80 +249,20 @@ final class RelayController {
                 finishRun()
             }
         }
-        // A shape deleted or renamed in the store can leave the picker
-        // pointing at nothing; follow the list to its first shape (which
-        // always exists — the store refuses to empty the list).
-        templatesWatcher = SettingsStore.shared.$templates
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] templates in
-                guard let self, conversation != Self.customConversation,
-                      conversation != Self.freeConversation,
-                      !templates.contains(where: { $0.name == self.conversation })
-                else { return }
-                selectConversation(templates.first?.name ?? Self.customConversation)
-            }
     }
 
-    /// nil means the picker is on Custom or Free chat.
-    var selectedTemplate: ConversationTemplate? {
-        conversationTemplates.first { $0.name == conversation }
-    }
-
-    var isFreeChat: Bool { conversation == Self.freeConversation }
-
-    /// Custom is the one shape with a full editor: its prompt is written from
-    /// scratch. A template shows its topic field under a read-only preview of
-    /// its body, and Free chat's topic field already holds the whole opening
-    /// message, so neither has a composed prompt to reveal.
-    var showsFullInstructionsEditor: Bool {
-        selectedTemplate == nil && !isFreeChat
-    }
-
-    /// A visual hint at the insertion point in the full editor. It is never
-    /// part of customInstructions, so an untouched placeholder cannot leak
-    /// into the message sent to either agent.
-    var promptEditorPlaceholder: String? {
-        customInstructions.isEmpty ? "Write your complete opening prompt here…" : nil
-    }
-
-    /// The exact initial message the relay will hand to the first agent
-    /// (before the framing preamble): the template composed with the topic,
-    /// the bare topic for Free chat, or the from-scratch prompt as written.
-    var composedInstructions: String {
-        if isFreeChat { return topic }
-        guard let template = selectedTemplate else { return customInstructions }
-        return template.composed(topic: topic)
-    }
-
-    /// Whether Start has something to send: a topic for a template or Free
-    /// chat, any text for a prompt written from scratch.
+    /// Whether Start has something to send: a topic.
     var instructionsReady: Bool {
-        let text = showsFullInstructionsEditor ? customInstructions : topic
-        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    /// Select a shape. The from-scratch draft is left alone: it stays in
-    /// customInstructions across the switch, so comparing the shapes and
-    /// coming back to Custom does not throw the writing away.
-    func selectConversation(_ name: String) {
-        guard name == Self.customConversation
-                || name == Self.freeConversation
-                || conversationTemplates.contains(where: { $0.name == name }),
-              name != conversation else { return }
-        conversation = name
+        !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The mic button: speak into the field the prompt box shows — the note
-    /// during a pause, else the topic, or the opening written from scratch
-    /// under Custom — or finish the listening under way. The words land
-    /// after what the field holds.
+    /// during a pause, else the topic — or finish the listening under way.
+    /// The words land after what the field holds.
     func toggleVoice() {
         if consoleAccess.pauseGranted {
             voice.toggle(read: { [weak self] in self?.steeringText ?? "" },
                          write: { [weak self] in self?.setSteeringText($0) })
-        } else if stage == .compose, showsFullInstructionsEditor {
-            voice.toggle(read: { [weak self] in self?.customInstructions ?? "" },
-                         write: { [weak self] in self?.customInstructions = $0 })
         } else if stage == .compose {
             voice.toggle(read: { [weak self] in self?.topic ?? "" },
                          write: { [weak self] in self?.topic = $0 })
@@ -384,8 +307,7 @@ final class RelayController {
     /// the run has left the panel, or for another prompt, is dropped.
     private func beginTopicSummary() {
         summaryTask?.cancel()
-        let prompt = (showsFullInstructionsEditor ? customInstructions : topic)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = topic.trimmingCharacters(in: .whitespacesAndNewlines)
         runPrompt = prompt
         topicSummary = nil
         let summarize = self.summarize
@@ -479,11 +401,7 @@ final class RelayController {
     var sendBlocker: String? {
         if isShowingWindow { return "Waiting for the window to appear…" }
         if let blocker = setup.state.sendBlocker(names: names) { return blocker }
-        guard instructionsReady else {
-            if showsFullInstructionsEditor { return "Write the opening prompt first." }
-            return isFreeChat ? "Add a topic first: it is the whole opening message."
-                              : "Add a topic first: it completes the \(conversation) opening."
-        }
+        guard instructionsReady else { return "Add a topic first: it is the whole opening message." }
         return nil
     }
 
@@ -519,7 +437,7 @@ final class RelayController {
         }
         guard engine.preflight() else { return }
 
-        config.seed = composedInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.seed = topic.trimmingCharacters(in: .whitespacesAndNewlines)
         config.ending = ending
         turns = max(1, turns)
         config.turns = turns

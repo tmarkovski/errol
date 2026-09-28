@@ -216,34 +216,17 @@ struct PerchPromptBox: View {
 
     /// Return sends only when Send would: a refusal the status line already
     /// explains is not also recorded as a failed start.
-    @ViewBuilder private var openingEditor: some View {
-        if controller.showsFullInstructionsEditor {
-            GrowingTextEditor(text: $controller.customInstructions,
-                              font: Perch.promptFont,
-                              minimumFontSize: Perch.promptMinimumFontSize,
-                              textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
-                              placeholderColor: Perch.placeholderNS,
-                              placeholder: controller.promptEditorPlaceholder,
-                              minimumLines: 1, maximumLines: Perch.promptMaximumLines,
-                              fitsAvailableHeight: true,
-                              takesFocusOnAppear: true)
-        } else {
-            GrowingTextEditor(text: $controller.topic,
-                              font: Perch.promptFont,
-                              minimumFontSize: Perch.promptMinimumFontSize,
-                              textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
-                              placeholderColor: Perch.placeholderNS,
-                              placeholder: controller.topic.isEmpty ? topicPlaceholder : nil,
-                              minimumLines: 1, maximumLines: Perch.promptMaximumLines,
-                              fitsAvailableHeight: true,
-                              takesFocusOnAppear: true,
-                              onSubmit: { if controller.sendBlocker == nil { controller.start() } })
-        }
-    }
-
-    private var topicPlaceholder: String {
-        if let template = controller.selectedTemplate { return template.topicPrompt }
-        return "What should they work on together?"
+    private var openingEditor: some View {
+        GrowingTextEditor(text: $controller.topic,
+                          font: Perch.promptFont,
+                          minimumFontSize: Perch.promptMinimumFontSize,
+                          textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
+                          placeholderColor: Perch.placeholderNS,
+                          placeholder: controller.topic.isEmpty ? "What should they work on together?" : nil,
+                          minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                          fitsAvailableHeight: true,
+                          takesFocusOnAppear: true,
+                          onSubmit: { if controller.sendBlocker == nil { controller.start() } })
     }
 
     // MARK: During a run

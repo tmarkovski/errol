@@ -17,14 +17,13 @@ final class AppearanceStoreTests: XCTestCase {
     }
 
     func testNewAndExistingInstallsUseChalkTealAndFollowSystem() {
-        // Existing shape preferences must not stop appearance defaults applying.
-        let shapes = SettingsStore(defaults: defaults)
-        shapes.updateBody("Keep my edited shape", for: "Debate")
+        // Other stored preferences must not stop appearance defaults
+        // applying, and the store must leave them alone.
+        defaults.set("Keep my preference", forKey: "someOtherPreference")
         let store = AppearanceStore(defaults: defaults)
         XCTAssertEqual(store.theme, .chalkTeal)
         XCTAssertEqual(store.appearance, .system)
-        XCTAssertEqual(SettingsStore(defaults: defaults).template(named: "Debate")?.body,
-                       "Keep my edited shape")
+        XCTAssertEqual(defaults.string(forKey: "someOtherPreference"), "Keep my preference")
     }
 
     func testFormerBlueThemeUsesChalkTealWithoutChangingAppearance() {

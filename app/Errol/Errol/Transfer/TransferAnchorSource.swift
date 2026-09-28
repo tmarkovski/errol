@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Turns any NSView in the console into a TransferAnchor: its current screen
 /// position, read at launch. RelayController keeps one for the prompt, whose
-/// region survives topic, custom-prompt, and steering states and is read
+/// region survives the topic and steering states and is read
 /// without replacing the editor, and one for each side's icon, where that
 /// side's replies set off from (RelayController.iconTransferSources).
 final class TransferAnchorSource {
