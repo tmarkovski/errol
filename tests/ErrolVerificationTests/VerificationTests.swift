@@ -129,26 +129,6 @@ final class VerificationTests: XCTestCase {
         XCTAssertTrue(report.junit.contains("&lt;wrong&gt; &amp; &quot;quote&quot;"))
     }
 
-    func testClipboardRestoresMultipleTypesAndEmptyBoard() throws {
-        let board = NSPasteboard.withUniqueName()
-        defer { board.releaseGlobally() }
-        let item = NSPasteboardItem()
-        item.setString("original", forType: .string)
-        item.setData(Data([0, 1, 255]), forType: .init("test.binary"))
-        guard board.writeObjects([item]), board.data(forType: .init("test.binary")) != nil else {
-            throw XCTSkip("Named pasteboard service unavailable in this sandbox; clipboard integration requires a desktop session")
-        }
-        let lease = ClipboardLease(board)
-        board.clearContents(); board.setString("test payload", forType: .string)
-        XCTAssertTrue(lease.restore())
-        XCTAssertEqual(board.data(forType: .init("test.binary")), Data([0, 1, 255]))
-        board.clearContents()
-        let empty = ClipboardLease(board)
-        board.setString("probe", forType: .string)
-        XCTAssertTrue(empty.restore())
-        XCTAssertTrue(board.pasteboardItems?.isEmpty != false)
-    }
-
     func testEvidenceDoesNotCountComposerOrSidebarAsMessageBody() {
         let tree = EvidenceNode(role: "AXWindow", children: [
             EvidenceNode(role: "AXTextArea", value: "ACK case"),

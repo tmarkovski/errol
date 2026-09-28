@@ -1,8 +1,9 @@
 // The per-operation clipboard lease: what was there comes back after the
 // relay's own write, a newer copy by the human stays, and nothing is ever
-// put back in part. On a private pasteboard, so the suite never touches the
-// general one; skipped where the pasteboard service is unavailable, the way
-// the harness's clipboard test is.
+// put back in part; and the harness's restore, which puts the capture back
+// whatever came after it. On a private pasteboard, so the suite never touches
+// the general one; skipped where the named-pasteboard service is unavailable,
+// since clipboard integration needs a desktop session.
 
 import AppKit
 import XCTest
@@ -98,5 +99,13 @@ final class ClipboardLeaseTests: XCTestCase {
         XCTAssertTrue(lease.restore())
         XCTAssertEqual(board.string(forType: .string), "the human's copy")
         XCTAssertEqual(board.data(forType: binary), Data([0, 1, 255]))
+    }
+
+    func testTheHarnessRestoreOfAnEmptyCaptureEmptiesTheBoard() {
+        board.clearContents()
+        let lease = ClipboardLease(board)
+        board.setString("probe", forType: .string)
+        XCTAssertTrue(lease.restore())
+        XCTAssertTrue(board.pasteboardItems?.isEmpty != false)
     }
 }

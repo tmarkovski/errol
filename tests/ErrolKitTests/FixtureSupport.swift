@@ -12,9 +12,12 @@ import XCTest
 @testable import ErrolKit
 
 /// Fixture files are arrays of window trees in the ax-dump --capture schema
-/// (see Core/AX/ElementNode.swift). Current fixtures are synthesized from the
-/// live-verified shapes in docs/how-it-works.md's field notes; replace them with real
-/// captures (tools/ax-dump.swift <app> --capture) as app versions move.
+/// (see Core/AX/ElementNode.swift). Five fixtures are real captures, anonymized:
+/// chatgpt-chat-home, claude-chat-home, claude-virtualized-conversation,
+/// claude-code-image-viewer and chatgpt-work-composer-fenced-paste. The rest are
+/// synthesized from the live-verified shapes in docs/how-it-works.md's field notes;
+/// replace them with real captures (tools/ax-dump.swift <app> --capture) as app
+/// versions move.
 func loadFixture(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> [FixtureElement] {
     guard let url = Bundle.module.url(forResource: name, withExtension: "json",
                                       subdirectory: "Fixtures") else {
