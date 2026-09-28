@@ -127,7 +127,7 @@ final class RelayController {
     /// Each side's icon in the console, where its replies set off from
     /// (TransferSource).
     let iconTransferSources = [Speaker.chatgpt: TransferAnchorSource(),
-                                                   .claude: TransferAnchorSource()]
+                               .claude: TransferAnchorSource()]
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
@@ -233,7 +233,7 @@ final class RelayController {
     }
 
     /// Whether Start has something to send: a topic.
-    var instructionsReady: Bool {
+    var hasTopic: Bool {
         !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -306,7 +306,7 @@ final class RelayController {
     var sendBlocker: String? {
         if isShowingWindow { return "Waiting for the window to appear…" }
         if let blocker = setup.state.sendBlocker(names: names) { return blocker }
-        guard instructionsReady else { return "Add a topic first: it is the whole opening message." }
+        guard hasTopic else { return "Add a topic first: it is the whole opening message." }
         return nil
     }
 
