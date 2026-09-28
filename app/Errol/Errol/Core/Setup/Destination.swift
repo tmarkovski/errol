@@ -4,8 +4,8 @@
 // is the window, not the conversation in it, so a chat the human switches
 // to inside that window is written into all the same. (The identity
 // comparison that held a run on a switched conversation came out in Sep
-// 2026: the drag that connects a window is there to teach where Errol
-// writes, and the binding was never meant to police the conversation.)
+// 2026: the planned drag that connects a window is meant to teach where
+// Errol writes, and the binding was never meant to police the conversation.)
 //
 // The identity is still read, to name the window in the chooser an app
 // with several windows offers, and in the log. The evidence is uneven
@@ -25,7 +25,8 @@ import Foundation
 /// What one window scan says about the conversation it shows.
 struct DestinationIdentity: Equatable {
     /// The conversation's own route in the web-area URL, where the surface
-    /// exposes one ("/chat/<uuid>"). Binding when present.
+    /// exposes one ("/chat/<uuid>"). Named in the log's targeting line and
+    /// not compared, since the identity comparison came out in Sep 2026.
     var route: String?
     /// The window title as read.
     var title: String
@@ -115,10 +116,8 @@ final class BoundDestination {
     /// shows is not looked at.
     func check() -> Check {
         if target.app.isTerminated { return .lost("\(target.name) quit") }
-        // A window the app has torn down answers invalidUIElement to every
-        // read; one that merely lost its place in the list is still there.
-        let role = axAttributeResult(window, kAXRoleAttribute)
-        if role.error == .invalidUIElement { return .lost("the \(target.name) window closed") }
+        // A window that merely lost its place in the list is still there.
+        if !windowIsAlive(window) { return .lost("the \(target.name) window closed") }
         if (axAttribute(window, kAXMinimizedAttribute) as? Bool) == true {
             return .hidden("minimized")
         }

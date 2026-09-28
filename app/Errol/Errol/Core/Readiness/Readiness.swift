@@ -11,7 +11,8 @@
 import ApplicationServices
 import Foundation
 
-/// Coarse per-side state; drives the status dot color in the panel.
+/// Coarse per-side state. The setup state reads `.missing` as an app to
+/// open; the other states are diagnostics for the tools and the tests.
 enum ReadyState {
     case checking   // no sweep has completed yet
     case missing    // app not running, or no Accessibility permission
@@ -19,15 +20,18 @@ enum ReadyState {
     case ready      // chat window with a composer found
 }
 
-/// Equatable so the controller can drop no-change sweeps instead of
-/// republishing (and re-rendering the panel) every poll.
+/// One side's status as a sweep read it. The app reads only its name and
+/// whether it is missing; the headline, surface, model and detail stay as
+/// the diagnostics the verification tools and the tests read. Equatable so
+/// the controller can drop no-change sweeps instead of republishing (and
+/// re-rendering the console) every poll.
 struct SideStatus: Equatable {
     var appName: String
     var state = ReadyState.checking
     var headline = "Checking..."
     /// The chosen window's active surface ("Chat", "Work", "Cowork",
-    /// "Code", "Codex"). Shown under the app's own name, so the names
-    /// carry no vendor prefix.
+    /// "Code", "Codex"), with no vendor prefix: the console shows a
+    /// surface under the app's own name.
     var surface: String?
     /// The chosen window's active model plus effort ("Fable 5 · Extra",
     /// "5.6 Sol High", or "Default"), where the window announces one.
@@ -38,8 +42,8 @@ struct SideStatus: Equatable {
 
 // MARK: - Per-side sweep
 
-/// Everything one sweep of one side learned: the strip's status, and the
-/// windows behind it for the setup flow to offer as candidates. The
+/// Everything one sweep of one side learned: the side's status, and the
+/// windows behind it for the setup state to offer as candidates. The
 /// elements stay with the engine; the pure state only ever sees the
 /// candidates.
 struct SideSweep {
@@ -49,8 +53,8 @@ struct SideSweep {
     var scans: [WindowScan] = []
 }
 
-/// One sweep of one side. Mirrors chatWindow's selection rules so the strip
-/// reports readiness for exactly the window a run would target.
+/// One sweep of one side. Mirrors chatWindow's selection rules so the
+/// status reports readiness for exactly the window a run would target.
 func sweepSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSweep {
     guard let target = findApp(bundleID: bundleID, name: name, selectors: selectors) else {
         var status = SideStatus(appName: name)
@@ -103,9 +107,10 @@ func windowCandidates(from sweep: SideSweep, selectors: AppSelectors) -> [Window
     return candidates
 }
 
-/// What one readiness sweep reports: the strip's status per side, whether
-/// each app is installed at all, the windows each app offers, and — for a
-/// side the human has connected — how its bound conversation reads now.
+/// What one readiness sweep reports, for the setup state and the
+/// participant badges: each side's status, whether each app is installed,
+/// the windows each app offers, and — for a side the human has connected —
+/// how its bound conversation reads now.
 struct ReadinessReport: Equatable {
     var chatgpt: SideStatus
     var claude: SideStatus
@@ -114,7 +119,7 @@ struct ReadinessReport: Equatable {
     var bindings: [Speaker: BindingObservation] = [:]
 
     /// The report while the Accessibility grant is missing: nothing can be
-    /// read, and the strip says so.
+    /// read, and each side's status says so.
     static func blocked(installed: [Speaker: Bool]) -> ReadinessReport {
         func status(_ name: String) -> SideStatus {
             SideStatus(appName: name, state: .missing, headline: "No access",
@@ -124,7 +129,7 @@ struct ReadinessReport: Equatable {
     }
 }
 
-/// The pure half of a sweep: window scans in, the strip's status out. Split
+/// The pure half of a sweep: window scans in, the side's status out. Split
 /// from the AX walking so fixture trees can drive the whole readiness
 /// decision in tests.
 func composeSideStatus(appName: String, scans: [WindowScan], selectors: AppSelectors) -> SideStatus {
@@ -199,11 +204,8 @@ func composeSideStatus(appName: String, scans: [WindowScan], selectors: AppSelec
 /// tied to the Start button.
 func scanBothSides() -> (chatgpt: SideStatus, claude: SideStatus) {
     guard AXIsProcessTrusted() else {
-        func blocked(_ name: String) -> SideStatus {
-            SideStatus(appName: name, state: .missing, headline: "No access",
-                       detail: "turn on Errol in \(AccessPermission.listName)")
-        }
-        return (blocked("ChatGPT"), blocked("Claude"))
+        let blocked = ReadinessReport.blocked(installed: [:])
+        return (blocked.chatgpt, blocked.claude)
     }
     return (scanSide(bundleID: config.chatgptBundleID, name: "ChatGPT",
                      selectors: config.chatgptSelectors),

@@ -23,7 +23,7 @@ struct WindowCandidate: Identifiable, Equatable {
     var identity: DestinationIdentity
     var hasComposer: Bool
     var composer: ComposerState
-    /// Model plus effort where the window announces one, as the strip
+    /// Model plus effort where the window announces one, as the console
     /// renders it ("Fable 5 · Extra").
     var model: String?
     /// The window's frame in AX coordinates, for the picker's highlight;
@@ -116,19 +116,6 @@ enum AppPresence: Equatable {
     /// Running with `windows` windows a run could target.
     case available(windows: Int)
 
-    var isAvailable: Bool {
-        if case .available = self { return true }
-        return false
-    }
-
-    /// Running, whatever its windows show.
-    var isOpen: Bool {
-        switch self {
-        case .noWindow, .noConversation, .available: return true
-        case .checking, .notInstalled, .notRunning, .launching: return false
-        }
-    }
-
     /// The line under the icon: the next action, or the observed state.
     func action(name: String) -> String {
         switch self {
@@ -157,8 +144,8 @@ func appPresence(installed: Bool, status: SideStatus, candidates: [WindowCandida
 /// How a connected side's bound conversation reads now — the same evidence
 /// the run's preflight uses, so the setup UI and the click agree.
 enum DestinationReadiness: Equatable {
-    /// Connected but not observed since: a remembered destination, or a
-    /// finished run's, until the next sweep reads it.
+    /// Connected but not observed since: a finished run's connection,
+    /// until the next sweep reads it.
     case unverified
     case ready
     /// The composer holds unsent work, or the app is replying, or the
@@ -170,17 +157,6 @@ enum DestinationReadiness: Equatable {
     case lost(String)
 
     var isReady: Bool { self == .ready }
-
-    /// The word under the icon.
-    func status(name: String) -> String {
-        switch self {
-        case .unverified: return "Last used"
-        case .ready: return "Connected"
-        case .finishPreparing: return "Finish preparing"
-        case .hidden: return "Hidden"
-        case .lost: return "Lost"
-        }
-    }
 
     /// Why sending is unavailable, beside the action; nil when it is not.
     func problem(name: String) -> String? {
@@ -204,8 +180,9 @@ struct BindingObservation: Equatable {
 }
 
 /// A work surface — a Claude Code session — reads like any other
-/// conversation: the human chose that window, it is named as a Code
-/// session under the icon, and the run's log says where everything lands.
+/// conversation: the human chose that window, its mode shows as Code on
+/// the line under the box and it is a Code session in the window chooser,
+/// and the run's log says where everything lands.
 func destinationReadiness(_ observation: BindingObservation, side: Speaker) -> DestinationReadiness {
     switch observation.check {
     case .lost(let detail): return .lost(detail)
@@ -320,10 +297,7 @@ struct SetupState: Equatable {
     /// stays "opening" until the app is seen running.
     mutating func observe(_ side: Speaker, presence: AppPresence, candidates: [WindowCandidate]) {
         var setup = self[side]
-        switch (setup.presence, presence) {
-        case (.launching, .notRunning), (.launching, .checking): break
-        default: setup.presence = presence
-        }
+        if !(setup.presence == .launching && presence == .notRunning) { setup.presence = presence }
         setup.candidates = candidates
         self[side] = setup
     }
@@ -388,11 +362,6 @@ struct SetupState: Equatable {
     func automaticConnection(for side: Speaker) -> WindowID? {
         guard !self[side].isConnected, self[side].eligible.count == 1 else { return nil }
         return self[side].eligible[0].id
-    }
-
-    /// Several windows could be connected and none has been named.
-    func needsWindowChoice(_ side: Speaker) -> Bool {
-        self[side].needsWindowChoice
     }
 
     /// The engine bound the chosen window.

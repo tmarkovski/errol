@@ -72,8 +72,6 @@ final class SetupStateTests: XCTestCase {
         XCTAssertEqual(AppPresence.launching.action(name: "ChatGPT"), "Opening\u{2026}")
         XCTAssertEqual(AppPresence.noConversation.action(name: "Claude"), "Open a conversation")
         XCTAssertEqual(AppPresence.available(windows: 2).action(name: "Claude"), "Ready")
-        XCTAssertTrue(AppPresence.noWindow.isOpen, "open asks nothing of the windows")
-        XCTAssertFalse(AppPresence.launching.isOpen)
     }
 
     func testALaunchStaysOpeningUntilTheAppIsSeen() throws {
@@ -160,7 +158,7 @@ final class SetupStateTests: XCTestCase {
 
         XCTAssertEqual(state.automaticConnection(for: .chatgpt), gpt.id)
         XCTAssertNil(state.automaticConnection(for: .claude), "several windows are never chosen among")
-        XCTAssertTrue(state.needsWindowChoice(.claude))
+        XCTAssertTrue(state.claude.needsWindowChoice)
         XCTAssertEqual(state.notice(names: names)?.text, "Connecting ChatGPT\u{2026}")
 
         state.connected(.chatgpt, window: gpt.id, identity: gpt.identity, model: nil, observation: observation(gpt))
@@ -224,7 +222,6 @@ final class SetupStateTests: XCTestCase {
         state.observe(.chatgpt, binding: observation(drafted))
         XCTAssertTrue(state.chatgpt.isConnected, "the connection stands; the draft is the human's to finish")
         XCTAssertEqual(state.chatgpt.connection?.readiness, .finishPreparing(.draft(side: .chatgpt, characters: 16)))
-        XCTAssertEqual(state.chatgpt.connection?.readiness.status(name: "ChatGPT"), "Finish preparing")
         XCTAssertEqual(state.sendBlocker(names: names),
                        "ChatGPT has an unsent draft (16 characters). Finish or clear it, then send again.")
         XCTAssertEqual(state.notice(names: names)?.isProblem, true)
@@ -241,7 +238,6 @@ final class SetupStateTests: XCTestCase {
         state.observe(.claude, binding: observation(claudeHome, check: .hidden("minimized")))
         XCTAssertTrue(state.claude.isConnected, "the connection stands; the window is the human's to bring back")
         XCTAssertEqual(state.claude.connection?.readiness, .hidden("minimized"))
-        XCTAssertEqual(state.claude.connection?.readiness.status(name: "Claude"), "Hidden")
         XCTAssertEqual(state.sendBlocker(names: names), "Claude's window is minimized. Bring it back to send.")
         XCTAssertTrue(state.chatgpt.isReady, "the other side is untouched")
     }
@@ -270,7 +266,7 @@ final class SetupStateTests: XCTestCase {
         state.markUnverified()
         XCTAssertEqual(state.chatgpt.connection?.readiness, .unverified)
         XCTAssertFalse(state.chatgpt.isReady)
-        XCTAssertEqual(state.chatgpt.connection?.readiness.status(name: "ChatGPT"), "Last used")
+        XCTAssertEqual(state.chatgpt.connection?.readiness.shortStatus, "Last used")
         XCTAssertEqual(state.sendBlocker(names: names), "Checking ChatGPT's conversation\u{2026}")
         XCTAssertEqual(state.notice(names: names)?.isProblem, false, "a wait is not a problem")
         let gpt = try candidate("chatgpt-chat-home", id: 1, selectors: chatgpt)

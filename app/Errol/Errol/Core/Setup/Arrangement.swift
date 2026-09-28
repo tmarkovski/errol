@@ -34,10 +34,6 @@ func setWindowFrame(_ target: TargetApp, _ window: AXUIElement, origin: CGPoint,
     }
 }
 
-func currentFrame(_ window: AXUIElement) -> CGRect {
-    windowFrame(window) ?? .zero
-}
-
 // MARK: - Layouts
 
 /// The layouts the console offers. Full screen gives each window the
@@ -45,7 +41,7 @@ func currentFrame(_ window: AXUIElement) -> CGRect {
 /// one in view; it is the screen's visible area, not the native full
 /// screen, which puts each window in a space of its own. Keep positions
 /// is a choice too, and the one the console starts on: it moves nothing.
-enum LayoutChoice: String, CaseIterable, Equatable {
+enum LayoutChoice: CaseIterable, Equatable {
     case sideBySide
     case stacked
     case fullScreen
@@ -132,7 +128,6 @@ struct ArrangedWindow {
 /// earlier layout left them.
 final class WindowArranger {
     private struct Entry {
-        let side: Speaker
         let target: TargetApp
         let window: AXUIElement
         let original: CGRect
@@ -171,7 +166,7 @@ final class WindowArranger {
             && zip(snapshot, windows).allSatisfy { CFEqual($0.window, $1.window) }
         if !sameWindows {
             snapshot = zip(windows, originals).map { arranged, original in
-                Entry(side: arranged.side, target: arranged.target, window: arranged.window,
+                Entry(target: arranged.target, window: arranged.window,
                       original: original, applied: original)
             }
         }
@@ -195,9 +190,10 @@ final class WindowArranger {
         lock.lock()
         for index in snapshot.indices where index < asked.count { snapshot[index].applied = asked[index] }
         lock.unlock()
+        // Bound to the arranged window, so activation raises that one and
+        // not whichever window of the app a chat window lookup would pick.
         for arranged in windows {
-            raiseWindow(arranged.window)
-            _ = makeFrontmost(arranged.target)
+            _ = makeFrontmost(arranged.target.bound(to: arranged.window))
         }
         log("arranged \(layout.title.lowercased()) on \(Int(area.width))x\(Int(area.height)): "
             + windows.map { "\($0.target.name) \(windowFrameDescription($0.window))" }.joined(separator: ", "))
