@@ -109,7 +109,8 @@ private func xml(_ text: String) -> String {
         .replacingOccurrences(of: "'", with: "&apos;")
 }
 
-func sha256(_ text: String) -> String { SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined() }
+func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+func sha256(_ text: String) -> String { sha256(Data(text.utf8)) }
 
 struct VerificationOptions {
     var suite: DesktopSuite = .smoke

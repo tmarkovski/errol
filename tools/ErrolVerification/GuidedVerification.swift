@@ -85,10 +85,18 @@ enum GuidedVerification {
                 // SIGKILL, or blocked AX call leaves an unfinished case, never PASS.
                 report.results[index] = evidence.result
                 try report.write(to: output)
-                if scenario.behavior == .switchedConversation, !prepareTransition(evidence, screenshots: options.screenshots) {
-                    report.results[index] = evidence.finish()
-                    try report.write(to: output)
-                    break
+                if scenario.behavior == .switchedConversation {
+                    // A transition that was not observed ends only its own
+                    // case; the next case has its own setup prompt. Only the
+                    // operator's q (or end of input) stops the suite.
+                    let setup = prepareTransition(evidence, screenshots: options.screenshots)
+                    if setup != .passed {
+                        report.results[index] = evidence.finish()
+                        try report.write(to: output)
+                        if setup == .stopped { break }
+                        print("Case result: \(report.results[index].status.rawValue.uppercased())")
+                        continue
+                    }
                 }
                 if scenario.behavior == .appControls {
                     report.results[index] = runAppControls(evidence: evidence, screenshots: options.screenshots)
@@ -96,7 +104,7 @@ enum GuidedVerification {
                     let returnFocus = currentFrontmostApp()
                     print("Focus the prepared app now. Starting in \(options.countdown) seconds...")
                     for _ in 0..<options.countdown { Thread.sleep(forTimeInterval: 1) }
-                    let runner = LiveScenarioRunner(options: options, evidence: evidence, nonce: UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(), returnFocus: returnFocus)
+                    let runner = LiveScenarioRunner(options: options, evidence: evidence, nonce: makeNonce(), returnFocus: returnFocus)
                     report.results[index] = runner.run()
                     try report.write(to: output)
                     if runner.shouldStop { break }
@@ -122,6 +130,33 @@ enum GuidedVerification {
         }
     }
 
+    /// The identifier a case's prompts carry and its replies must echo:
+    /// 32 lowercase hex characters, the same from every entry point, since
+    /// reply-contract compares the echoed text exactly.
+    static func makeNonce() -> String {
+        UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    }
+
+    /// One case outside the guided loop, for `errol-verify --live` and the
+    /// opt-in XCTest: no setup prompt, no transition setup, no stop between
+    /// cases. The report is written before the case starts, so a crash leaves
+    /// it unfinished rather than passed, and again when it ends; its run ID is
+    /// the directory's name. `beforeRun` is the caller's last word to the
+    /// operator (the CLI's countdown) before a real prompt is sent.
+    static func runSingle(_ scenario: DesktopScenario, suite: String, filter: String?, totalSuiteCases: Int,
+                          options: VerificationOptions, directory: URL,
+                          beforeRun: () -> Void = {}) throws -> VerificationReport {
+        var report = VerificationReport(runID: directory.lastPathComponent, suite: suite, filter: filter,
+            totalSuiteCases: totalSuiteCases, maxCharacters: options.cap, caseTimeout: options.timeout,
+            environment: environment(), results: [CaseResult(scenario: scenario)])
+        try report.write(to: directory)
+        let evidence = try CaseEvidence(scenario: scenario, directory: directory.appendingPathComponent(scenario.id))
+        beforeRun()
+        report.results[0] = LiveScenarioRunner(options: options, evidence: evidence, nonce: makeNonce()).run()
+        try report.write(to: directory)
+        return report
+    }
+
     static func environment() -> RunEnvironment {
         var apps: [String: String] = [:]
         for (name, id) in [("chatgpt", config.chatgptBundleID), ("claude", config.claudeBundleID)] {
@@ -142,7 +177,7 @@ enum GuidedVerification {
             }.sorted()
         return sha256(paths.map { path in
             let data = (try? Data(contentsOf: URL(fileURLWithPath: path))) ?? Data()
-            return path + ":" + sha256(data.base64EncodedString())
+            return path + ":" + sha256(data)
         }.joined(separator: "\n"))
     }
 
@@ -185,28 +220,42 @@ enum GuidedVerification {
         return evidence.finish()
     }
 
-    private static func prepareTransition(_ evidence: CaseEvidence, screenshots: Bool) -> Bool {
+    /// How the conversation-switch setup ended: `failed` ends only this case
+    /// (identity unavailable, or the switch was not observed), `stopped` is
+    /// the operator's q or end of input and ends the suite.
+    private enum TransitionSetup { case passed, failed, stopped }
+
+    private static func prepareTransition(_ evidence: CaseEvidence, screenshots: Bool) -> TransitionSetup {
         guard let target = resolve(evidence.result.scenario.endpoint), let window = chatWindow(in: target),
               let original = TargetBinding.identity(window) else {
             evidence.check("conversation-transition", .inconclusive, "Cannot identify the original conversation independently")
-            return false
+            return .failed
+        }
+        // Enter continues; anything else, or end of input, stops the suite.
+        func operatorContinued() -> Bool {
+            fflush(stdout)
+            guard readLine() == "" else {
+                evidence.check("conversation-transition", .notRun, "Operator stopped at transition setup")
+                return false
+            }
+            return true
         }
         evidence.capture(target, stage: "transition-original", screenshots: screenshots)
         print("Switch to a DIFFERENT disposable conversation in this app, then return here and press Enter. q stops:", terminator: " ")
-        fflush(stdout)
-        guard readLine() == "", let otherWindow = chatWindow(in: target), let other = TargetBinding.identity(otherWindow), other != original else {
+        guard operatorContinued() else { return .stopped }
+        guard let otherWindow = chatWindow(in: target), let other = TargetBinding.identity(otherWindow), other != original else {
             evidence.check("conversation-transition", .blocked, "Did not observe a different conversation")
-            return false
+            return .failed
         }
         evidence.capture(target, stage: "transition-away", screenshots: screenshots)
         print("Switch BACK to the original conversation, then return here and press Enter. q stops:", terminator: " ")
-        fflush(stdout)
-        guard readLine() == "", let restored = chatWindow(in: target), TargetBinding.identity(restored) == original else {
+        guard operatorContinued() else { return .stopped }
+        guard let restored = chatWindow(in: target), TargetBinding.identity(restored) == original else {
             evidence.check("conversation-transition", .blocked, "Original conversation was not restored")
-            return false
+            return .failed
         }
         evidence.capture(target, stage: "transition-restored", screenshots: screenshots)
         evidence.check("conversation-transition", .passed, "Observed original → different → original conversation identities")
-        return true
+        return .passed
     }
 }

@@ -289,21 +289,15 @@ struct Verify {
             report("FAIL", "live-surface", "unrecognized surface; use the guided suite to inspect it")
             return
         }
-        var options = VerificationOptions()
-        options.timeout = 180
+        let options = VerificationOptions()
         let scenario = DesktopScenario(endpoint: endpoint, conversation: messageAffordances(in: target).isEmpty ? .new : .existing)
-        let runID = UUID().uuidString
-        let directory = URL(fileURLWithPath: ".artifacts/verify/" + runID)
+        let directory = URL(fileURLWithPath: ".artifacts/verify/" + UUID().uuidString)
         do {
-            var result = VerificationReport(runID: runID, suite: "legacy-live", totalSuiteCases: 1,
-                maxCharacters: options.cap, caseTimeout: options.timeout,
-                environment: GuidedVerification.environment(), results: [CaseResult(scenario: scenario)])
-            try result.write(to: directory)
-            let evidence = try CaseEvidence(scenario: scenario, directory: directory.appendingPathComponent(scenario.id))
-            print("Sending one real test prompt to the displayed conversation in 3 seconds. Ctrl+C aborts.")
-            sleep(3)
-            result.results[0] = LiveScenarioRunner(options: options, evidence: evidence, nonce: runID).run()
-            try result.write(to: directory)
+            let result = try GuidedVerification.runSingle(scenario, suite: "legacy-live", filter: nil, totalSuiteCases: 1,
+                                                          options: options, directory: directory) {
+                print("Sending one real test prompt to the displayed conversation in 3 seconds. Ctrl+C aborts.")
+                sleep(3)
+            }
             if result.exitCode == 1 { failures += 1 }
             else if result.exitCode != 0 { incomplete += 1 }
             print("Live report: \(directory.appendingPathComponent("report.md").path)")

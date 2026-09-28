@@ -63,16 +63,9 @@ final class LiveRelayTests: XCTestCase {
             XCTFail("Unknown or manual-only live case: \(id)")
             return
         }
-        let options = VerificationOptions()
-        let runID = UUID().uuidString
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("errol-live-" + runID)
-        var report = VerificationReport(runID: runID, suite: "xctest-selected", filter: id, totalSuiteCases: DesktopSuite.full.scenarios.count,
-            maxCharacters: options.cap, caseTimeout: options.timeout, environment: GuidedVerification.environment(),
-            results: [CaseResult(scenario: scenario)])
-        try report.write(to: directory)
-        let evidence = try CaseEvidence(scenario: scenario, directory: directory.appendingPathComponent(scenario.id))
-        report.results[0] = LiveScenarioRunner(options: options, evidence: evidence, nonce: runID).run()
-        try report.write(to: directory)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("errol-live-" + UUID().uuidString)
+        let report = try GuidedVerification.runSingle(scenario, suite: "xctest-selected", filter: id,
+            totalSuiteCases: DesktopSuite.full.scenarios.count, options: VerificationOptions(), directory: directory)
         XCTAssertEqual(report.results[0].status, .passed, "Compatibility failed or incomplete. Report: \(directory.appendingPathComponent("report.md").path)")
     }
 }

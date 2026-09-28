@@ -87,6 +87,33 @@ struct EvidenceSnapshot {
     var complete: Bool
     var nodes: Int
 
+    /// Every attribute a node records, read in one call per node.
+    private static let nodeAttributes = [kAXRoleAttribute, kAXSubroleAttribute, kAXTitleAttribute,
+        kAXDescriptionAttribute, kAXHelpAttribute, "AXLabel", kAXValueAttribute, "AXURL"]
+
+    /// One IPC round trip for all of a node's attributes, as ax-dump.swift
+    /// does: per-attribute reads spend the walk's time budget on IPC, and a
+    /// capture that runs out of time is incomplete, which leaves the checks
+    /// built on it inconclusive on long conversations. Unreadable or absent
+    /// attributes come back as AXValue error placeholders and are skipped, as
+    /// a failed single read was; a failed call (an element torn down mid-walk)
+    /// reads as no attributes, so the missing role still marks the capture
+    /// incomplete.
+    private static func axMultiple(_ element: AXUIElement, _ names: [String]) -> [String: CFTypeRef] {
+        var values: CFArray?
+        let err = AXUIElementCopyMultipleAttributeValues(
+            element, names as CFArray, AXCopyMultipleAttributeOptions(), &values)
+        guard err == .success, let list = values as? [AnyObject] else { return [:] }
+        var out: [String: CFTypeRef] = [:]
+        for (index, name) in names.enumerated() where index < list.count {
+            let value = list[index] as CFTypeRef
+            if CFGetTypeID(value) == AXValueGetTypeID(),
+               AXValueGetType(value as! AXValue) == .axError { continue }
+            out[name] = value
+        }
+        return out
+    }
+
     static func capture(_ element: AXUIElement, budget: Int = 12_000, seconds: Double = 8) -> Self {
         var count = 0
         var complete = true
@@ -97,12 +124,13 @@ struct EvidenceSnapshot {
                 return EvidenceNode(description: "CAPTURE LIMIT REACHED")
             }
             count += 1
-            func string(_ key: String) -> String? { axAttribute(element, key) as? String }
-            let value = axAttribute(element, kAXValueAttribute)
+            let attrs = axMultiple(element, nodeAttributes)
+            func string(_ key: String) -> String? { attrs[key] as? String }
+            let value = attrs[kAXValueAttribute]
             var node = EvidenceNode(role: string(kAXRoleAttribute), subrole: string(kAXSubroleAttribute),
                 title: string(kAXTitleAttribute), description: string(kAXDescriptionAttribute),
                 help: string(kAXHelpAttribute), label: string("AXLabel"), value: value as? String,
-                number: (value as? NSNumber)?.intValue, url: (axAttribute(element, "AXURL") as? URL)?.absoluteString)
+                number: (value as? NSNumber)?.intValue, url: (attrs["AXURL"] as? URL)?.absoluteString)
             if node.role == nil { complete = false }
             for child in axChildren(element) {
                 guard count < budget, ProcessInfo.processInfo.systemUptime < deadline else { complete = false; break }
@@ -125,6 +153,7 @@ final class CaseEvidence {
     private var events: [[String: Any]] = []
     private var sequence = 0
     private(set) var writeError: String?
+    private static let timestampFormatter = ISO8601DateFormatter()
 
     init(scenario: DesktopScenario, directory: URL) throws {
         self.directory = directory
@@ -137,7 +166,7 @@ final class CaseEvidence {
         event("check", ["name": name, "status": status.rawValue, "detail": detail])
     }
     func event(_ name: String, _ fields: [String: Any] = [:]) {
-        events.append(fields.merging(["event": name, "at": ISO8601DateFormatter().string(from: Date()),
+        events.append(fields.merging(["event": name, "at": Self.timestampFormatter.string(from: Date()),
                                       "uptime": ProcessInfo.processInfo.systemUptime]) { _, new in new })
         do {
             try JSONSerialization.data(withJSONObject: events, options: [.prettyPrinted, .sortedKeys])

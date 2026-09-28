@@ -74,10 +74,6 @@ func label(from attrs: [String: CFTypeRef]) -> String {
         .filter { !$0.isEmpty }.joined(separator: " ")
 }
 
-func axLabel(_ element: AXUIElement) -> String {
-    label(from: axMultiple(element, labelAttributes))
-}
-
 func truncate(_ string: String, _ limit: Int) -> String {
     let flat = string.replacingOccurrences(of: "\n", with: "\\n")
     return flat.count <= limit ? flat : String(flat.prefix(limit)) + "…"
