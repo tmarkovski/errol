@@ -19,8 +19,8 @@ final class TransferOverlay {
     private var lastVisibilityCheck: TimeInterval = 0
     /// The two places a flight sets off from, both in the console
     /// (TransferSource): the prompt, and each side's icon.
-    var promptSource: PromptTransferSource?
-    var iconSource: ((Speaker) -> PromptTransferSource?)?
+    var promptSource: TransferAnchorSource?
+    var iconSource: ((Speaker) -> TransferAnchorSource?)?
 
     func handle(_ event: TransferFeedback) {
         switch event {

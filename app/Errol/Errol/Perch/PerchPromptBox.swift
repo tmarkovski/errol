@@ -115,7 +115,7 @@ struct PerchPromptBox: View {
             .stroke(controller.consoleAccess.pauseGranted ? Perch.accent : Perch.chipEdge,
                     lineWidth: controller.consoleAccess.pauseGranted ? 1.5 : 1))
         .background {
-            PromptTransferProbe(source: controller.promptTransferSource)
+            TransferAnchorProbe(source: controller.promptTransferSource)
                 .allowsHitTesting(false).accessibilityHidden(true)
         }
     }

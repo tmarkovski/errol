@@ -55,7 +55,7 @@ struct PerchParticipant: View {
             .accessibilityHint(presentation.click.hint(name: presentation.name))
             .background {
                 if let source = controller.iconTransferSources[speaker] {
-                    PromptTransferProbe(source: source).allowsHitTesting(false).accessibilityHidden(true)
+                    TransferAnchorProbe(source: source).allowsHitTesting(false).accessibilityHidden(true)
                 }
             }
             .background {

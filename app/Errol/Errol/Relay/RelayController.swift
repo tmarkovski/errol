@@ -157,11 +157,11 @@ final class RelayController {
     /// no windows to veil.
     @ObservationIgnored private let veils: SideVeils?
     @ObservationIgnored private let transferOverlay: TransferOverlay?
-    @ObservationIgnored let promptTransferSource = PromptTransferSource()
+    @ObservationIgnored let promptTransferSource = TransferAnchorSource()
     /// Each side's icon in the console, where its replies set off from
     /// (TransferSource).
-    @ObservationIgnored let iconTransferSources = [Speaker.chatgpt: PromptTransferSource(),
-                                                   .claude: PromptTransferSource()]
+    @ObservationIgnored let iconTransferSources = [Speaker.chatgpt: TransferAnchorSource(),
+                                                   .claude: TransferAnchorSource()]
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
     private var control: RelayControl { engine.control }
