@@ -4,19 +4,15 @@ import AppKit
 /// NSColors share that definition with SwiftUI, the native editors, and window
 /// chrome; their provider uses the appearance passed by the drawing view.
 struct PerchPalette {
-    let shell, well, paper, panelEdge, chipEdge, hairline: NSColor
-    let ink, secondary, muted, placeholder, previewInk: NSColor
-    let accent, accentText, accentBack, onAccent: NSColor
-    let red, redBack: NSColor
+    let shell, well, paper, chipEdge, hairline: NSColor
+    let ink, secondary, muted, placeholder: NSColor
+    let accent, accentText, onAccent: NSColor
+    let red: NSColor
     let chatgptFeather, claudeFeather: NSColor
 
-    static let chalkTeal = PerchPalette(ConsolePalette.chalkTeal)
-    static let warmStone = PerchPalette(ConsolePalette.warmStone)
-    static let classicAmber = PerchPalette(ConsolePalette.classicAmber)
-    static let chalkGraphite = PerchPalette(ConsolePalette.chalkGraphite)
-    static let ivoryCobalt = PerchPalette(ConsolePalette.ivoryCobalt)
-    static let pearlTeal = PerchPalette(ConsolePalette.pearlTeal)
-    static let linenMoss = PerchPalette(ConsolePalette.linenMoss)
+    /// One palette per theme, built once so every access returns the same
+    /// dynamic NSColors.
+    fileprivate static let byTheme = Dictionary(uniqueKeysWithValues: AppTheme.allCases.map { ($0, PerchPalette($0.consolePalette)) })
 
     private init(_ palette: ConsolePalette) {
         let light = palette.light
@@ -24,20 +20,16 @@ struct PerchPalette {
         shell = Self.adaptive(light.shell, dark.shell)
         well = Self.adaptive(light.well, dark.well)
         paper = Self.adaptive(light.paper, dark.paper)
-        panelEdge = Self.adaptive(light.panelEdge, dark.panelEdge)
         chipEdge = Self.adaptive(light.chipEdge, dark.chipEdge)
         hairline = Self.adaptive(light.hairline, dark.hairline)
         ink = Self.adaptive(light.ink, dark.ink)
         secondary = Self.adaptive(light.secondary, dark.secondary)
         muted = Self.adaptive(light.muted, dark.muted)
         placeholder = Self.adaptive(light.placeholder, dark.placeholder)
-        previewInk = Self.adaptive(light.previewInk, dark.previewInk)
         accent = Self.adaptive(light.accent, dark.accent)
         accentText = Self.adaptive(light.accentText, dark.accentText)
-        accentBack = Self.adaptive(light.accentBack, dark.accentBack)
         onAccent = Self.adaptive(light.onAccent, dark.onAccent)
         red = Self.adaptive(light.red, dark.red)
-        redBack = Self.adaptive(light.redBack, dark.redBack)
         // Participant identity is independent of the chosen app theme.
         chatgptFeather = Self.rgb(0x5D7A8C)
         claudeFeather = Self.rgb(0xC97E4A)
@@ -57,17 +49,7 @@ struct PerchPalette {
 }
 
 extension AppTheme {
-    var palette: PerchPalette {
-        switch self {
-        case .chalkTeal: .chalkTeal
-        case .warmStone: .warmStone
-        case .classicAmber: .classicAmber
-        case .chalkGraphite: .chalkGraphite
-        case .ivoryCobalt: .ivoryCobalt
-        case .pearlTeal: .pearlTeal
-        case .linenMoss: .linenMoss
-        }
-    }
+    var palette: PerchPalette { PerchPalette.byTheme[self]! }
 }
 
 extension AppAppearance {

@@ -80,7 +80,6 @@ final class ConsolePresentationTests: XCTestCase {
                     ("placeholder/paper", colors.placeholder, colors.paper),
                     ("accentText/paper", colors.accentText, colors.paper),
                     ("muted/paper", colors.muted, colors.paper),
-                    ("previewInk/paper", colors.previewInk, colors.paper),
                     ("muted/well", colors.muted, colors.well),
                     ("secondary/well", colors.secondary, colors.well),
                     ("ink/well", colors.ink, colors.well),

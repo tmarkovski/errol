@@ -2,17 +2,15 @@ import Foundation
 import Observation
 
 /// Stable identifiers keep a saved selection independent of its display name.
-enum AppTheme: String, CaseIterable, Identifiable {
+enum AppTheme: String, CaseIterable {
     case chalkTeal = "chalk-teal"
     case warmStone = "warm-stone"
     case classicAmber = "classic-amber"
-    // Lighter, warm candidates under evaluation; see PerchPalette for intent.
+    // The lighter, warmer themes; see ConsolePalette for intent.
     case chalkGraphite = "chalk-graphite"
     case ivoryCobalt = "ivory-cobalt"
     case pearlTeal = "pearl-teal"
     case linenMoss = "linen-moss"
-
-    var id: String { rawValue }
 
     var title: String {
         switch self {
@@ -27,10 +25,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
-enum AppAppearance: String, CaseIterable, Identifiable {
+enum AppAppearance: String, CaseIterable {
     case system, light, dark
-
-    var id: String { rawValue }
 
     var title: String {
         switch self {
