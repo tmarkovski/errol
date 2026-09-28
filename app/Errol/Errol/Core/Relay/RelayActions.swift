@@ -402,20 +402,8 @@ func send(_ text: String, to target: TargetApp,
             if receipt != .attachment, let input {
                 noteRepeatedPaste(payload: payload, needle: needle, input: input, in: target)
             }
-            // Where the paste landed, for the event stream and the trace; the
-            // light has faded by now, so nothing is drawn from it.
-            if destination != nil {
-                if let input, let landed = transferAnchor(for: input, in: target) {
-                    trace("transfer landed: \(describeAnchor(landed))")
-                    relayEvents.post(.transfer(.pasted(id: transferID, destination: landed)))
-                } else {
-                    trace("transfer cancelled: the composer has no usable geometry after the paste")
-                    relayEvents.post(.transfer(.cancelled(id: transferID)))
-                }
-            }
             break pasteAttempts
         }
-        if destination != nil { relayEvents.post(.transfer(.cancelled(id: transferID))) }
         // Did the composer move at all? If so the paste is in there in some
         // form, and another would double it: go on to the send unverified.
         let valueNow = input.flatMap { axAttribute($0, kAXValueAttribute) as? String }

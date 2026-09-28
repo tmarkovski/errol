@@ -26,15 +26,16 @@ final class TransferOverlay {
         switch event {
         case .began(let id, let sources, let destination, let startedAt):
             stop()
-            let windows = visibleWindows()
-            guard isVisible(destination, in: windows) else { return }
+            // Include floating windows: Errol's native prompt is in a panel.
+            let windows = onScreenWindowRegions(ordinaryOnly: false)
+            guard isShowing(destination, among: windows) else { return }
             let origins = sources.compactMap { source -> TransferAnchor? in
                 let anchor: TransferAnchor?
                 switch source {
                 case .reply(let sender): anchor = iconSource?(sender)?.anchor()
                 case .userPrompt: anchor = promptSource?.anchor()
                 }
-                return anchor.flatMap { isVisible($0, in: windows) ? $0 : nil }
+                return anchor.flatMap { isShowing($0, among: windows) ? $0 : nil }
             }
             let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             flight = Flight(id: id, sources: origins, destination: destination,
@@ -50,9 +51,6 @@ final class TransferOverlay {
             timer = clock
             RunLoop.main.add(clock, forMode: .common)
             draw()
-        case .pasted:
-            // The light has faded by the time the paste lands; nothing to draw.
-            break
         case .cancelled(let id):
             if flight?.id == id { stop() }
         }
@@ -73,11 +71,12 @@ final class TransferOverlay {
         guard !flight.timing.isFinished(at: now) else { stop(); return }
         if now - lastVisibilityCheck > 0.15 {
             lastVisibilityCheck = now
-            let windows = visibleWindows()
+            // Include floating windows: Errol's native prompt is in a panel.
+            let windows = onScreenWindowRegions(ordinaryOnly: false)
             // Hide if a chat window moves, closes, minimizes, or changes Space.
             // Errol's source panel may finish resizing after its dot launches.
-            guard isVisible(flight.destination, in: windows),
-                  flight.sources.allSatisfy({ isVisible($0, in: windows) }) else {
+            guard isShowing(flight.destination, among: windows),
+                  flight.sources.allSatisfy({ isShowing($0, among: windows) }) else {
                 stop()
                 return
             }
@@ -89,26 +88,6 @@ final class TransferOverlay {
             panel.drawing.render(starts: starts, destination: destination, prompt: prompt,
                                  timing: flight.timing, now: now, screenOrigin: panel.frame.origin)
             if !panel.isVisible { panel.orderFrontRegardless() }
-        }
-    }
-
-    private func visibleWindows() -> [(id: CGWindowID, pid: pid_t, frame: CGRect)] {
-        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                                kCGNullWindowID) as? [[String: Any]] ?? []
-        return windows.compactMap {
-            // Include floating windows: Errol's native prompt is in a panel.
-            guard let id = $0[kCGWindowNumber as String] as? CGWindowID,
-                  let pid = $0[kCGWindowOwnerPID as String] as? pid_t,
-                  let bounds = $0[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
-            return (id, pid, frame)
-        }
-    }
-
-    private func isVisible(_ anchor: TransferAnchor,
-                           in windows: [(id: CGWindowID, pid: pid_t, frame: CGRect)]) -> Bool {
-        windows.contains { id, pid, frame in
-            anchor.matchesWindow(id: id, pid: pid, frame: frame)
         }
     }
 }
@@ -137,10 +116,11 @@ private final class TransferPanel: NSPanel {
 
 /// Core Animation layers keep the short wake, the dissolving dot, and the
 /// receiving border on the same clock, all in the theme's accent: the color
-/// of the console's Send pill and buttons. The drawing is made afresh for
-/// each flight, so it reads the accent as chosen then, under the appearance
-/// the app shows. No particles or continuous idle work.
-final class TransferDrawing: NSView {
+/// of the console's Start relay button and the other prominent buttons. The
+/// drawing is made afresh for each flight, so it reads the accent as chosen
+/// then, under the appearance the app shows. No particles or continuous
+/// idle work.
+private final class TransferDrawing: NSView {
     private let tails = [CAShapeLayer(), CAShapeLayer()]
     private let dots = [CAShapeLayer(), CAShapeLayer()]
     private let bloom = CAShapeLayer()
@@ -260,8 +240,9 @@ final class TransferDrawing: NSView {
             outline.path = nil
         }
         if prompt != nil, let age = arrival {
-            let rise = min(1, age / 0.09)
-            let fall = max(0, 1 - max(0, age - 0.18) / 0.77)
+            let rise = min(1, age / TransferTiming.lightRise)
+            let fall = max(0, 1 - max(0, age - TransferTiming.lightHold)
+                / (TransferTiming.lightDuration - TransferTiming.lightHold))
             outline.opacity = timing.reducedMotion ? 0.85 : Float(rise * fall * fall)
         } else {
             outline.opacity = 0

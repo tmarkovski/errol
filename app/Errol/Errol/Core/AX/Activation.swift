@@ -24,24 +24,8 @@ func isFrontmost(_ target: TargetApp) -> Bool {
 func axFocusedPID() -> pid_t? {
     guard let focused = axAttribute(systemWideAX, kAXFocusedApplicationAttribute) else { return nil }
     var pid: pid_t = -1
-    AXUIElementGetPid(focused as! AXUIElement, &pid)
+    guard AXUIElementGetPid(focused as! AXUIElement, &pid) == .success, pid > 0 else { return nil }
     return pid
-}
-
-/// The pid owning the frontmost ordinary window, according to the window
-/// server. Needs no cooperation from the app, so this is what answers when the
-/// AX query above does not. Errol's own panels are above layer 0 and so are
-/// never mistaken for the front window.
-func frontWindowOwnerPID() -> pid_t? {
-    guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
-                                                kCGNullWindowID) as? [[String: Any]] else { return nil }
-    for window in info {
-        if let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
-           let pid = window[kCGWindowOwnerPID as String] as? pid_t {
-            return pid
-        }
-    }
-    return nil
 }
 
 /// What the focus checks actually saw, for the log line after a failed
@@ -84,11 +68,7 @@ func refocus(to app: NSRunningApplication?) {
     guard let app, let bundleID = app.bundleIdentifier else { return }
     // Skip when it never lost focus (e.g. an inspection moves no windows).
     if frontWindowOwnerPID() == app.processIdentifier { return }
-    let open = Process()
-    open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    open.arguments = ["-b", bundleID]
-    try? open.run()
-    open.waitUntilExit()
+    openViaLaunchServices(bundleID: bundleID)
     log("Focus returned to \(app.localizedName ?? bundleID).")
 }
 
@@ -100,6 +80,12 @@ func refocus(to app: NSRunningApplication?) {
 /// true.
 func activateViaLaunchServices(_ target: TargetApp) {
     guard let bundleID = target.app.bundleIdentifier else { return }
+    openViaLaunchServices(bundleID: bundleID)
+}
+
+/// `open -b`, waited out: what refocus and activateViaLaunchServices both
+/// run, and so makeFrontmost's last resort too.
+private func openViaLaunchServices(bundleID: String) {
     let open = Process()
     open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
     open.arguments = ["-b", bundleID]
@@ -129,15 +115,19 @@ func raiseWindow(_ window: AXUIElement) {
 /// caller polls for the result anyway.
 func resignOurOwnKeyStatus() {
     DispatchQueue.main.async {
-        guard NSApp.isActive || NSApp.keyWindow != nil else { return }
-        NSApp.deactivate()
+        // NSApp is nil in the command-line tools, which drive this too.
+        guard let app = NSApp, app.isActive || app.keyWindow != nil else { return }
+        app.deactivate()
     }
 }
 
-/// Bring the target app to the foreground and confirm it got there.
-/// NSRunningApplication.activate from a background process is ignored under
-/// macOS cooperative activation, so fall back to the AX frontmost attribute
-/// (which honors the Accessibility grant) and raising the chat window.
+/// Bring the target app to the foreground and confirm it got there. Lets go
+/// of Errol's own key status, raises the bound window within its app, then
+/// rotates NSRunningApplication.activate, the AX frontmost attribute, and
+/// LaunchServices (`open -b`) until isFrontmost reads true, the run is
+/// cancelled, or `seconds` pass. From a background process only
+/// LaunchServices reliably lands; the other two are kept because they are
+/// cheap where they still work.
 func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Bool {
     resignOurOwnKeyStatus()
     // A bound window comes to the front of its app's own windows first:
@@ -157,20 +147,11 @@ func makeFrontmost(_ target: TargetApp, within seconds: TimeInterval = 6) -> Boo
             // Observed returning success without effect (macOS 26); kept as a
             // cheap second try on systems where it still lands.
             AXUIElementSetAttributeValue(target.ax, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
-            if let window = chatWindow(in: target) {
-                AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
-                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-            }
+            if let window = chatWindow(in: target) { raiseWindow(window) }
         default:
             // LaunchServices activation is the one that reliably lands from a
             // background process (verified: the two above are no-ops here).
-            if let bundleID = target.app.bundleIdentifier {
-                let open = Process()
-                open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-                open.arguments = ["-b", bundleID]
-                try? open.run()
-                open.waitUntilExit()
-            }
+            activateViaLaunchServices(target)
         }
         attempt += 1
         usleep(300_000)

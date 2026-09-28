@@ -22,7 +22,7 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
                                               parent: (Node) -> Node?,
                                               frame: (Node) -> CGRect?) -> PromptTransferGeometry? {
     guard var editor = frame(input),
-          TransferAnchor(frame: editor, window: editor, pid: 0) != nil else { return nil }
+          isUsableRect(editor) else { return nil }
     var node = input
     for _ in 0..<8 {
         guard let ancestor = parent(node),
@@ -30,7 +30,7 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
               ["AXGroup", "AXScrollArea", "AXLayoutArea"].contains(role) else { break }
         node = ancestor
         guard let bounds = frame(ancestor) else { continue }
-        guard TransferAnchor(frame: bounds, window: window, pid: 0) != nil else {
+        guard isUsableRect(bounds, within: window) else {
             // Full-document wrappers can extend off-window too. They are
             // never shells, but their parent may be the visible viewport.
             if role == "AXScrollArea" { break }
@@ -47,7 +47,7 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
             // beyond both the composer and the window when scrolled. The scroll
             // area's explicit viewport supplies clipping evidence here.
             editor = editor.intersection(bounds)
-            guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
+            guard isUsableRect(editor, within: window) else { return nil }
         }
         // An unrecognized group is not sufficient clipping evidence. Continue
         // looking for a scroll viewport or a group with its own visible toolbar.
@@ -66,7 +66,7 @@ func promptTransferGeometry<Node: ElementNode>(around input: Node, window: CGRec
                 around: ancestor, shell: bounds, window: window, parent: parent, frame: frame))
         }
     }
-    guard TransferAnchor(frame: editor, window: window, pid: 0) != nil else { return nil }
+    guard isUsableRect(editor, within: window) else { return nil }
     return PromptTransferGeometry(editor: editor, shell: nil)
 }
 
@@ -116,7 +116,7 @@ private func visibleShell<Node: ElementNode>(around node: Node, shell: CGRect, w
     for _ in 0..<4 {
         guard let wrapper = parent(node), wrapper.role == "AXGroup",
               let bounds = frame(wrapper), bounds.contains(shell),
-              TransferAnchor(frame: bounds, window: window, pid: 0) != nil else { break }
+              isUsableRect(bounds, within: window) else { break }
         let insets = [shell.minX - bounds.minX, shell.minY - bounds.minY,
                       bounds.maxX - shell.maxX, bounds.maxY - shell.maxY]
         guard let thinnest = insets.min(), let widest = insets.max(),
@@ -148,7 +148,7 @@ private func toolbarClippedPromptEditor<Node: ElementNode>(
     let controls = node.children.compactMap { child -> CGRect? in
         guard child.role == "AXButton", isPromptControl(child, selectors: selectors),
               let rect = frame(child),
-              TransferAnchor(frame: rect, window: bounds, pid: 0) != nil,
+              isUsableRect(rect, within: bounds),
               rect.height <= 48, bounds.maxY - rect.maxY <= 24 else { return nil }
         return rect
     }
@@ -160,7 +160,7 @@ private func toolbarClippedPromptEditor<Node: ElementNode>(
         let viewport = CGRect(x: bounds.minX, y: bounds.minY,
                               width: bounds.width, height: top - bounds.minY)
         let visible = editor.intersection(viewport)
-        if TransferAnchor(frame: visible, window: bounds, pid: 0) != nil { return visible }
+        if isUsableRect(visible, within: bounds) { return visible }
     }
     return nil
 }

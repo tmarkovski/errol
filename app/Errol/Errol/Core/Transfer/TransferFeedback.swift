@@ -7,7 +7,7 @@ import Foundation
 
 /// Geometry crosses the event stream, never live AX elements. Coordinates
 /// use AX's top-left origin; the overlay converts them on the main thread.
-struct TransferAnchor: Equatable {
+struct TransferAnchor {
     let frame: CGRect
     /// The receiving composer shell, separate from the text field where
     /// the dot lands. Sources and unrecognized prompt layouts have no shell.
@@ -20,14 +20,10 @@ struct TransferAnchor: Equatable {
 
     init?(frame: CGRect, window: CGRect, pid: pid_t, windowID: CGWindowID? = nil,
           promptFrame: CGRect? = nil) {
-        func usable(_ rect: CGRect) -> Bool {
-            [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite)
-                && rect.width > 0 && rect.height > 0
-        }
-        guard usable(frame), usable(window), window.contains(frame) else { return nil }
+        guard isUsableRect(frame, within: window) else { return nil }
         self.frame = frame
         self.promptFrame = promptFrame.flatMap {
-            usable($0) && window.contains($0) && $0.contains(frame) ? $0 : nil
+            isUsableRect($0, within: window) && $0.contains(frame) ? $0 : nil
         }
         self.window = window
         self.pid = pid
@@ -37,9 +33,21 @@ struct TransferAnchor: Equatable {
     func matchesWindow(id: CGWindowID, pid: pid_t, frame: CGRect) -> Bool {
         guard self.pid == pid else { return false }
         if let windowID { return windowID == id }
-        return abs(frame.minX - window.minX) < 2 && abs(frame.minY - window.minY) < 2
-            && abs(frame.width - window.width) < 2 && abs(frame.height - window.height) < 2
+        return frame.nearlyEquals(window)
     }
+}
+
+/// A rect that can be drawn at: every coordinate finite, and some width and
+/// height to it.
+func isUsableRect(_ rect: CGRect) -> Bool {
+    [rect.minX, rect.minY, rect.width, rect.height].allSatisfy(\.isFinite)
+        && rect.width > 0 && rect.height > 0
+}
+
+/// A usable rect wholly inside another usable one: an anchor's frame inside
+/// its window, or a candidate for the prompt inside the group it came from.
+func isUsableRect(_ rect: CGRect, within outer: CGRect) -> Bool {
+    isUsableRect(rect) && isUsableRect(outer) && outer.contains(rect)
 }
 
 /// Called on the relay worker, where all other reads of the target occur.
@@ -102,10 +110,6 @@ enum TransferSource: Equatable {
 enum TransferFeedback {
     case began(id: UUID, sources: [TransferSource], destination: TransferAnchor,
                startedAt: TimeInterval)
-    /// The paste landed, after the light. Confirms only the paste, not
-    /// submission or a reply from the other app; the overlay has nothing
-    /// left to draw by then.
-    case pasted(id: UUID, destination: TransferAnchor)
     /// The handoff stopped before the paste — Stop, a switched app, a lost
     /// composer — and the flight ends where it is.
     case cancelled(id: UUID)
@@ -134,12 +138,22 @@ struct TransferTrajectory {
 /// plays when the dot lands, and the worker pastes only once it has faded
 /// (pasteTime), so the border the light traces is the one the dot landed
 /// on: the text going in can grow the composer and move that border.
-/// Without a flight — Reduce Motion, or no visible source — the light
-/// plays at once, and the paste still waits for it.
+/// Under Reduce Motion there is no flight: the light plays at once, and the
+/// paste still waits for it.
+/// The worker's clock assumes a flight whenever sources were asked for; when
+/// the overlay can see none of them (the console put away, or on another
+/// Space) it lights at once and finishes early, while the paste still waits
+/// out the full flight and the light. The worker never depends on what the
+/// renderer can see, so the gap is dead time, the safe direction: the other
+/// way round the paste would land under the light.
 struct TransferTiming {
     static let flightDuration: TimeInterval = 0.55
     /// The light's quick rise, short hold, and long fall (TransferDrawing).
     static let lightDuration: TimeInterval = 0.95
+    /// How long the light takes to rise to full.
+    static let lightRise: TimeInterval = 0.09
+    /// When the light starts to fall; it is out at lightDuration.
+    static let lightHold: TimeInterval = 0.18
     let startedAt: TimeInterval
     let travels: Bool
     let reducedMotion: Bool
