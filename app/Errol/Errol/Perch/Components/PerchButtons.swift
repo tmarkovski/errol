@@ -54,7 +54,7 @@ struct PerchCapsuleButton: View {
     }
 }
 
-/// The capsule itself, for a Button or a Menu to wear. It dims while
+/// The capsule's face, which PerchCapsuleButton wears. It dims while
 /// disabled, and an action coming into reach fades in like the text
 /// beside it.
 struct PerchCapsuleLabel: View {
@@ -77,9 +77,8 @@ struct PerchCapsuleLabel: View {
         }
         .foregroundStyle(prominent ? Perch.onAccent : Perch.ink)
         .padding(.horizontal, Perch.s(13))
-        .frame(height: Perch.s(29))
-        .perchGlass(prominent: prominent, in: Capsule())
-        .perchHover(Capsule(), tint: prominent ? .white : Perch.ink, opacity: prominent ? 0.12 : 0.06)
+        .frame(height: Perch.capsuleHeight)
+        .perchGlassButton(prominent: prominent, in: Capsule())
         .contentShape(Capsule())
         .opacity(isEnabled ? 1 : 0.45)
         .animation(Perch.fade, value: isEnabled)
@@ -91,6 +90,13 @@ extension View {
     /// prominent, clear otherwise, and answering a press either way.
     func perchGlass(prominent: Bool, in shape: some Shape) -> some View {
         glassEffect(prominent ? .regular.tint(Perch.accent).interactive() : .regular.interactive(), in: shape)
+    }
+
+    /// The glass with the pointer's wash over it, white on the accent and
+    /// the ink on clear glass: the labeled pills and the prompt box's mic.
+    func perchGlassButton(prominent: Bool, in shape: some Shape) -> some View {
+        perchGlass(prominent: prominent, in: shape)
+            .perchHover(shape, tint: prominent ? .white : Perch.ink, opacity: prominent ? 0.12 : 0.06)
     }
 }
 
@@ -208,8 +214,8 @@ struct PerchStepper: View {
     /// The accessible name, and the value read with its unit.
     let label: String
     let unit: (Int) -> String
-    var decrementHelp = "Fewer"
-    var incrementHelp = "More"
+    let decrementHelp: String
+    let incrementHelp: String
 
     var body: some View {
         HStack(spacing: 0) {

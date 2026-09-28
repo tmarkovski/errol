@@ -12,8 +12,6 @@ struct PerchMicButton: View {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static let diameter = Perch.s(29)
-
     private var phase: VoiceInput.Phase { controller.voice.phase }
     /// The microphone is open, or its last words are settling.
     private var live: Bool { phase == .listening || phase == .finishing }
@@ -26,10 +24,9 @@ struct PerchMicButton: View {
             Text(Image(systemName: live ? "mic.fill" : "mic"))
                 .font(Perch.text(12, .semibold))
                 .foregroundStyle(live ? Perch.onAccent : phase == .starting ? Perch.accentText : Perch.secondary)
-                .frame(width: Self.diameter, height: Self.diameter)
-                .perchGlass(prominent: live, in: Circle())
+                .frame(width: Perch.capsuleHeight, height: Perch.capsuleHeight)
+                .perchGlassButton(prominent: live, in: Circle())
                 .background { if phase == .listening && !reduceMotion { Breath() } }
-                .perchHover(Circle(), tint: live ? .white : Perch.ink, opacity: live ? 0.12 : 0.06)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

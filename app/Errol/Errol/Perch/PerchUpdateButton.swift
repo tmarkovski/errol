@@ -44,12 +44,9 @@ struct PerchUpdateButton: View {
         .animation(Perch.fade, value: status.note)
     }
 
-    private var busy: Bool {
-        switch status.phase {
-        case .preparing, .restarting: true
-        default: false
-        }
-    }
+    /// The capsule shows only while there is an offer or a restart, and in
+    /// those phases a busy capsule is one a click cannot act on.
+    private var busy: Bool { !status.canAct }
 
     private var title: String {
         switch status.phase {

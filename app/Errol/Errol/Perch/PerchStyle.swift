@@ -79,6 +79,9 @@ enum Perch {
     static let shellCorner = s(18)
     /// The console's circular actions.
     static let actionDiameter = s(32)
+    /// The labeled pills' height, which the prompt box's mic shares as its
+    /// diameter.
+    static let capsuleHeight = s(29)
     /// A step tighter than the card, for a well set inside a window: the
     /// log window's text area.
     static let insetCorner = s(10)
