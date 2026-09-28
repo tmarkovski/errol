@@ -16,15 +16,6 @@ import ApplicationServices
 import Observation
 import SwiftUI
 
-/// Carries a main-thread callback into withObservationTracking's @Sendable
-/// onChange without capturing the (non-Sendable) shell there. Unchecked is
-/// sound because the work both closes over and executes on the main queue.
-private struct MainQueueHop: @unchecked Sendable {
-    private let work: () -> Void
-    init(_ work: @escaping () -> Void) { self.work = work }
-    func run() { DispatchQueue.main.async(execute: work) }
-}
-
 final class MenuBarController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: KeyablePanel!
@@ -38,12 +29,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private var logWindow: NSWindow?
     private var aboutWindow: NSWindow?
     /// The run's transcript (PerchTranscript), in a window under the
-    /// console: a child of the panel, so it goes where the console is
-    /// dragged and is put away with it. Made at the first run.
-    private var transcriptPanel: NSPanel?
-    /// A count of the transcript's fades, so a hide whose fade is still
-    /// going does not finish over a show that came after it.
-    private var transcriptFade = 0
+    /// console. Made with the panel, whose child it is.
+    private var transcript: TranscriptPanelController!
     /// Auto-update. Created at launch so background checks start immediately;
     /// everything that could interrupt a run is gated inside it.
     private var updater: UpdaterController!
@@ -63,7 +50,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         buildStatusItem()
         buildPanel()
         trackStatusIcon()
-        trackTranscript()
+        transcript.track()
         relay.appMenuProvider = { [weak self] in self?.makeAppMenu() ?? NSMenu() }
         relay.focusPanelHandler = { [weak self] in self?.showPanel() }
         // A menu-bar app with no window gives a first-time user nothing to
@@ -262,7 +249,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         panel.onVisibilityChange = { [weak self] visible in
             if visible { self?.refreshAccessibility() }
             self?.pushPanelVisibility()
-            self?.updateTranscript()
+            self?.transcript.update()
         }
         _ = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,
@@ -275,13 +262,19 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         _ = NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification,
             object: panel, queue: .main) { [weak self] _ in
-            self?.placeTranscript()
+            self?.transcript.place()
         }
         panel.level = .floating
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // The transcript takes the console's level and space behavior when
+        // it first shows, and waits out the console's animated resize.
+        transcript = TranscriptPanelController(
+            relay: relay, navigation: navigation, console: panel,
+            isConsoleResizing: { [weak self] in self?.panelResizeTimer != nil },
+            showConsole: { [weak self] in self?.showPanel() })
         let host = FirstMouseHostingView(rootView: PanelRootView(
             controller: relay,
             navigation: navigation,
@@ -361,7 +354,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         guard panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.setFrame(frame, display: true)
             panel.invalidateShadow()
-            updateTranscript()
+            transcript.update()
             return
         }
         // Apply frames on run-loop ticks. This keeps the resize out of
@@ -388,7 +381,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
                 // The transcript waited for the console's frame to settle.
                 if let self, self.panelResizeTimer === timer {
                     self.panelResizeTimer = nil
-                    self.updateTranscript()
+                    self.transcript.update()
                 }
             }
         }
@@ -430,137 +423,6 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
         // since setup is the next step. The permission timer and the panel's
         // showing both call this on the main thread, where the guide lives.
         if granted, MainActor.assumeIsolated({ PermissionGuide.dismiss() }) { showPanel() }
-    }
-
-    // MARK: The transcript
-
-    /// The transcript stands under the console from a run's start until
-    /// New topic clears its ending, while the console is up and on its
-    /// own screen (not the permission ask). Read again at each
-    /// change of stage or screen, and at each showing or hiding of the
-    /// console.
-    private func trackTranscript() {
-        let rearm = MainQueueHop { [weak self] in self?.trackTranscript() }
-        withObservationTracking {
-            _ = relay.stage
-            _ = navigation.screen
-        } onChange: {
-            rearm.run()
-        }
-        updateTranscript()
-    }
-
-    private func updateTranscript() {
-        let wanted = relay.stage != .compose && navigation.screen == .console && panel.isVisible
-        if wanted { showTranscript() } else { hideTranscript() }
-    }
-
-    /// A borderless, non-activating panel like the console's, transparent
-    /// so the card's paper is its silhouette, and with the console's kind
-    /// of shadow around that silhouette, rim and all (buildPanel), so it
-    /// stands apart from the chat windows under it the way the console
-    /// does. The shadow is AppKit's rather than drawn in the card, so the
-    /// window stays the card's size and a click beside the card reaches
-    /// the window under it. It cannot become key, so a click or a scroll
-    /// in it never takes the keyboard from the console's field, and it
-    /// never moves on its own: it goes where the console is dragged.
-    private func makeTranscriptPanel() -> NSPanel {
-        let transcript = KeyablePanel(contentRect: NSRect(origin: .zero,
-                                                     size: NSSize(width: 1, height: PerchTranscript.height)),
-                                 styleMask: [.borderless, .nonactivatingPanel],
-                                 backing: .buffered, defer: false)
-        transcript.permitsKey = { [weak self] in self?.relay.consoleAccess.canTakeFocus ?? false }
-        transcript.onCancel = { [weak self] in
-            self?.showPanel()
-            self?.relay.steeringEditor.restoreFocus()
-            return true
-        }
-        transcript.isOpaque = false
-        transcript.backgroundColor = .clear
-        transcript.hasShadow = true
-        transcript.title = "Errol Transcript"
-        transcript.isMovableByWindowBackground = false
-        transcript.isFloatingPanel = true
-        transcript.hidesOnDeactivate = false
-        transcript.isReleasedWhenClosed = false
-        transcript.level = panel.level
-        transcript.collectionBehavior = panel.collectionBehavior
-        let host = FirstMouseHostingView(rootView: PerchTranscript(controller: relay))
-        // The window is the one thing that sizes the card (placeTranscript).
-        host.sizingOptions = []
-        transcript.contentView = host
-        return transcript
-    }
-
-    /// Under the console, centered on it, a gap below the capsule and as
-    /// wide as the prompt box inside it, so it stands as the box's
-    /// continuation — or over the console, when the screen ends before
-    /// there is room under it.
-    private func placeTranscript() {
-        guard let transcript = transcriptPanel, transcript.parent != nil else { return }
-        let console = panel.frame
-        let size = NSSize(width: PerchMetrics.promptBoxWidth(consoleWidth: console.width).rounded(),
-                          height: PerchTranscript.height.rounded())
-        var origin = NSPoint(x: (console.midX - size.width / 2).rounded(),
-                             y: (console.minY - PerchTranscript.gap - size.height).rounded())
-        if let visible = (panel.screen ?? NSScreen.main)?.visibleFrame, origin.y < visible.minY {
-            origin.y = (console.maxY + PerchTranscript.gap).rounded()
-        }
-        let frame = NSRect(origin: origin, size: size)
-        guard transcript.frame != frame else { return }
-        transcript.setFrame(frame, display: true)
-        // The shadow follows the silhouette, which a new size changes.
-        transcript.invalidateShadow()
-    }
-
-    /// The transcript comes in with a fade, under the console's own frame:
-    /// while the panel is still resizing, the resize's end calls back
-    /// here. A transcript still fading out is turned around.
-    private func showTranscript() {
-        guard panelResizeTimer == nil else { return }
-        let transcript = transcriptPanel ?? makeTranscriptPanel()
-        transcriptPanel = transcript
-        transcriptFade += 1
-        if transcript.parent == nil {
-            transcript.alphaValue = 0
-            // Adding the child orders it in with the console.
-            panel.addChildWindow(transcript, ordered: .above)
-        }
-        placeTranscript()
-        guard transcript.alphaValue < 1 else { return }
-        // The shadow is taken from the drawn card, once it is drawn whole.
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            transcript.alphaValue = 1
-            transcript.invalidateShadow()
-            return
-        }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.2
-            transcript.animator().alphaValue = 1
-        }, completionHandler: { transcript.invalidateShadow() })
-    }
-
-    /// Out with a fade, then off the console: a child window ordered out
-    /// leaves its parent, and is added back when it shows again. A
-    /// transcript the console took with it when it was put away goes at
-    /// once.
-    private func hideTranscript() {
-        guard let transcript = transcriptPanel, transcript.parent != nil else { return }
-        transcriptFade += 1
-        let fade = transcriptFade
-        let putAway = { [weak self] in
-            guard let self, self.transcriptFade == fade, let transcript = self.transcriptPanel else { return }
-            self.panel.removeChildWindow(transcript)
-            transcript.orderOut(nil)
-        }
-        guard transcript.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            putAway()
-            return
-        }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            transcript.animator().alphaValue = 0
-        }, completionHandler: putAway)
     }
 
     // MARK: Debug log window

@@ -1,5 +1,5 @@
 // The run's transcript, in a window of its own under the console
-// (MenuBarController.transcriptPanel): each reply as a line beside the
+// (TranscriptPanelController): each reply as a line beside the
 // mark of the app that wrote it, summed up by the on-device model
 // (ReplySummarizer), and each note the human sent beside a person, in the
 // order the conversation took them in. The window is shaped like the
