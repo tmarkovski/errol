@@ -4,18 +4,18 @@ import Foundation
 
 // MARK: - Run
 
-/// Per-side conversation state during a relay run, shown under each side's
-/// readiness card in the panel.
-enum ConversationStatus: String {
-    case notStarted = "Not started"
-    case chatting = "Chatting\u{2026}"
+/// Per-side conversation state during a relay run. It drives each
+/// participant's state in the console (PerchParticipant.conversation).
+enum ConversationStatus {
+    case notStarted
+    case chatting
     /// Finished writing, with the reply detected but not yet delivered. Capture
     /// may still be waiting for the steering editor to release focus. A normal
     /// handoff leaves this state after capture and delivery; a hold can park
     /// here without implying the agent is still composing.
-    case replied = "Reply ready"
-    case waiting = "Waiting"
-    case ended = "Conversation ended"
+    case replied
+    case waiting
+    case ended
 }
 
 /// Optional observations used by the live harness. No alternate relay engine.
@@ -46,18 +46,19 @@ struct RelayInspection {
 ///
 /// `bindings` are the destinations the human connected in setup, one per
 /// side: they are checked again here, at the click, and never re-found. A
-/// side without one is bound the way the readiness strip picks a window —
+/// side without one is bound the way the readiness sweep picks a window —
 /// the path of a run started without setup, such as the harness's.
+///
+/// `operationCompleted` releases each focus operation, and the caller
+/// supplies it: the app does it inside a main-queue fence
+/// (completeFocusOperation), while command-line callers have no steering
+/// editor and release ownership directly.
 @discardableResult
 func runRelay(chatgpt: TargetApp, claude: TargetApp,
               bindings prebound: [Speaker: BoundDestination] = [:],
               showTransfers: Bool = false,
               inspection: RelayInspection? = nil,
-              operationCompleted: (Bool) -> Void = {
-                  _ = relayControl.endOperation(continuingRun: $0)
-              }) -> RunReport {
-    // The app supplies a main-queue completion fence; command-line callers
-    // have no steering editor and can release ownership directly.
+              operationCompleted: (Bool) -> Void) -> RunReport {
     var operationActive = false
     func endOperation(continuingRun: Bool) {
         operationCompleted(continuingRun)
@@ -113,7 +114,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
     // or (where the selectors allow it) an excluded-surface window with a
     // composer, e.g. a Claude Code session in Claude Desktop when no chat
     // conversation is open — with a composer that is readable, empty, and
-    // not mid-reply. The readiness strip says the same things a few seconds
+    // not mid-reply. The readiness sweep says the same things a few seconds
     // earlier; this is the check that counts, made at the click.
     var bindings: [Speaker: BoundDestination] = [:]
     for target in [chatgpt, claude] {
@@ -499,8 +500,7 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
             relayEvents.post(.reply(side: side(speaker), text: reply))
             // With the run ending only on Stop, the marker is text like any
             // other, and the reply goes on to the listener.
-            let signedOff = config.ending.endsOnSignOff
-                && trimmedReply.localizedCaseInsensitiveContains(config.stopSequence)
+            let signedOff = isSignOff(trimmedReply)
             if signedOff {
                 setConversation(speaker, .ended)
                 if lastReplyEnded {

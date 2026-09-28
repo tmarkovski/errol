@@ -35,19 +35,14 @@ final class RunEndingTests: XCTestCase {
         XCTAssertFalse(RunEnding.whenStopped.endsOnSignOff)
     }
 
-    func testTheLimitTurnsSwitchMapsOntoTheEndings() {
-        // The live verification harness still sets the cap as a switch.
-        var settings = Config()
-        settings.limitTurns = true
-        XCTAssertEqual(settings.ending, .turnLimit)
-        settings.limitTurns = false
-        XCTAssertEqual(settings.ending, .bothAgree)
-        settings.ending = .whenStopped
-        XCTAssertFalse(settings.limitTurns)
-    }
-
-    func testTheDefaultRulesAreTheFramingAndTheSignOff() {
-        XCTAssertEqual(RelayRules.defaultTemplate, RelayRules.framing + " " + RelayRules.signOff)
+    func testTheDefaultEndingIsTheSignOffWithATenTurnCapReady() {
+        // A fresh Config must leave the turn cap off: runs end on the
+        // conversation's own close (mutual sign-off, empty reply, timeout,
+        // or Stop), and the cap is the opt-in turn-limit ending.
+        let defaults = Config()
+        XCTAssertEqual(defaults.ending, .bothAgree)
+        XCTAssertNil(defaults.turnCap)
+        XCTAssertEqual(defaults.turns, 10, "the cap's value when enabled")
     }
 
     func testRulesForARunThatStopEndsLeaveOutTheSignOff() {

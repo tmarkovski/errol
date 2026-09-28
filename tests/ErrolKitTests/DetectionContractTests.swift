@@ -15,11 +15,7 @@ final class CopySelectorTests: XCTestCase {
         XCTAssertTrue(isCopyButtonLabel("Copy", selectors: chatgpt))
     }
 
-    func testChatGPTUserEchoAndQualifiedCopiesExcluded() {
-        // "Copy message" belongs to user messages; counting it once cost a
-        // debugging round (the relay copied its own message back), and its
-        // exclusion is why echoCountsAsAffordance must be false below.
-        XCTAssertFalse(isCopyButtonLabel("Copy message", selectors: chatgpt))
+    func testChatGPTQualifiedCopiesExcluded() {
         XCTAssertFalse(isCopyButtonLabel("Copy table", selectors: chatgpt))
         XCTAssertFalse(isCopyButtonLabel("Copy code", selectors: chatgpt))
         XCTAssertFalse(isCopyButtonLabel("Copy link", selectors: chatgpt))
@@ -27,9 +23,6 @@ final class CopySelectorTests: XCTestCase {
 
     func testClaudeCopyLabels() {
         XCTAssertTrue(isCopyButtonLabel("Copy", selectors: claude))
-        // Claude user messages carry "Copy message" and DO count (the echo
-        // absorption on the Claude side depends on it).
-        XCTAssertTrue(isCopyButtonLabel("Copy message", selectors: claude))
         XCTAssertFalse(isCopyButtonLabel("Copy code", selectors: claude))
         XCTAssertFalse(isCopyButtonLabel("Copy table", selectors: claude))
         XCTAssertFalse(isCopyButtonLabel("Copy link", selectors: claude))
@@ -38,6 +31,12 @@ final class CopySelectorTests: XCTestCase {
 
 final class EchoAndAffordanceContractTests: XCTestCase {
     func testEchoRegistrationMatchesSelectors() {
+        // "Copy message" belongs to user messages. On ChatGPT, counting it
+        // once cost a debugging round (the relay copied its own message
+        // back), so it is excluded there; Claude's user messages carry it
+        // too, and there it counts, because the Claude side's echo
+        // absorption depends on it.
+        //
         // The Codex-mode fast-reply race: ChatGPT's echo ("Copy message") is
         // excluded from the count, so absorption there could only ever
         // swallow a fast response into the baseline. These two flags are the

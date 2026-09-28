@@ -5,11 +5,10 @@ import Foundation
 
 // MARK: - Message framing
 
-/// The ground rules' shipped text and the token it carries. The text is
-/// editable in Settings (behind a warning — it defines how runs end), so it
-/// lives as a template rather than an interpolated literal: the token stands
-/// in for `config.stopSequence` and is substituted at send time, keeping the
-/// marker itself a single source of truth however the prose is rewritten.
+/// The ground rules' text and the token it carries. The text is kept as a
+/// template rather than an interpolated literal so the marker has one
+/// source of truth: the token stands in for `config.stopSequence` and is
+/// substituted at send time, however the prose is rewritten.
 ///
 /// The rules are the framing and then how the conversation ends: the
 /// sign-off, or, when only Stop ends the run, the human ending it.
@@ -45,14 +44,25 @@ enum RelayRules {
 
 /// Ground rules given to each agent once, at the start of its side of the
 /// conversation. Everything after these two framing messages passes through
-/// verbatim. Reads the template from `config` (copied there at Start), not
-/// the settings store — this runs on the relay worker thread.
+/// verbatim.
 func relayRules() -> String {
     let template = config.ending.endsOnSignOff
-        ? config.relayRulesTemplate
+        ? RelayRules.defaultTemplate
         : RelayRules.framing + " " + RelayRules.humanEnds
     return template.replacingOccurrences(of: RelayRules.stopSequenceToken,
                                          with: config.stopSequence)
+}
+
+/// Whether a reply signs off: the chosen ending acts on the sign-off, and
+/// the reply carries the marker in any letter case. With the run ending
+/// only on Stop, the marker is text like any other.
+func isSignOff(_ reply: String) -> Bool {
+    config.ending.endsOnSignOff && reply.localizedCaseInsensitiveContains(config.stopSequence)
+}
+
+/// The reply with every copy of the marker taken out, in any letter case.
+func strippingSignOff(_ reply: String) -> String {
+    reply.replacingOccurrences(of: config.stopSequence, with: "", options: .caseInsensitive)
 }
 
 /// What the first agent receives: the rules plus the human's initial message.
@@ -177,12 +187,14 @@ struct HandoffPayload {
     /// cut to the room left and marked as cut, so the message never exceeds
     /// `cap`. Callers judge the notes with `carriesNotes` first; if the
     /// framing alone leaves no room — a rules template longer than the cap
-    /// — the plain cap applies as it always has.
+    /// — it falls back to the plain cap, which keeps the prefix and adds
+    /// the mark after it, so that message runs over by the mark's length,
+    /// as the plain cap always has.
     func text(reply: String, cap: Int) -> String {
         let whole = assemble(reply: reply)
         guard whole.count > cap else { return whole }
         let room = replyRoom(cap: cap) - relayTruncationMark.count
-        guard room > 0 else { return String(whole.prefix(cap)) + relayTruncationMark }
+        guard room > 0 else { return truncatedForRelay(whole, cap: cap) }
         return assemble(reply: String(reply.prefix(room)) + relayTruncationMark)
     }
 }
@@ -210,7 +222,7 @@ let relayTruncationMark = "\n\n[truncated by relay]"
 /// The plain cap keeps the beginning; a handoff carrying steering notes is
 /// assembled to fit under it first (HandoffPayload), so the notes travel
 /// whole and this never cuts one.
-func truncatedForRelay(_ text: String) -> String {
-    guard text.count > config.maxChars else { return text }
-    return String(text.prefix(config.maxChars)) + relayTruncationMark
+func truncatedForRelay(_ text: String, cap: Int = config.maxChars) -> String {
+    guard text.count > cap else { return text }
+    return String(text.prefix(cap)) + relayTruncationMark
 }

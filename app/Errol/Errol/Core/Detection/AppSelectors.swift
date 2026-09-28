@@ -62,7 +62,7 @@ struct AppSelectors {
     /// the app has no chat window at all (e.g. Claude Desktop showing only a
     /// Claude Code session). An open chat window always wins.
     var excludedSurfaceIsFallback = false
-    /// What an excluded window is, for the readiness strip ("Code"). Surface
+    /// What an excluded window is, for the console's participant line ("Code"). Surface
     /// names are shown right under the app's own name, so they drop a
     /// redundant vendor prefix: Claude's coding surface reads "Code".
     var excludedSurfaceName: String?

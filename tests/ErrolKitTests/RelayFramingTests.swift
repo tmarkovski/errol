@@ -64,21 +64,15 @@ final class RelayFramingTests: XCTestCase {
         }
     }
 
-    func testDefaultEndConditionIsTheSignoff() {
-        // A fresh Config must leave the turn cap off: runs end on the
-        // conversation's own close (mutual sign-off, empty reply, timeout,
-        // or Stop), and the cap is the opt-in "Limit turns" checkbox.
-        let defaults = Config()
-        XCTAssertFalse(defaults.limitTurns)
-        XCTAssertEqual(defaults.turns, 10, "the cap's value when enabled")
-    }
-
     func testStopSequenceDetectionIsCaseInsensitive() {
-        // The run loop checks replies with localizedCaseInsensitiveContains;
-        // a model lowercasing the marker must still end the conversation.
-        let reply = "It was a pleasure. [[end-conversation]]"
-        XCTAssertTrue(reply.localizedCaseInsensitiveContains(config.stopSequence))
-        XCTAssertFalse("no marker here".localizedCaseInsensitiveContains(config.stopSequence))
+        // The run loop asks isSignOff; a model lowercasing the marker must
+        // still end the conversation.
+        XCTAssertTrue(isSignOff("It was a pleasure. [[END-CONVERSATION]]"))
+        XCTAssertTrue(isSignOff("It was a pleasure. [[end-conversation]]"))
+        XCTAssertFalse(isSignOff("no marker here"))
+        // With the run ending only on Stop, the marker is text like any other.
+        config.ending = .whenStopped
+        XCTAssertFalse(isSignOff("It was a pleasure. [[END-CONVERSATION]]"))
     }
 
     // MARK: Steering

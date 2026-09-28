@@ -25,8 +25,8 @@ enum RunEnding: Equatable, CaseIterable {
 }
 
 struct Config {
-    var chatgptBundleID = "com.openai.codex"   // standalone Codex / unified app; classic ChatGPT is com.openai.chat
-    var claudeBundleID = "com.anthropic.claudefordesktop"
+    let chatgptBundleID = "com.openai.codex"   // standalone Codex / unified app; classic ChatGPT is com.openai.chat
+    let claudeBundleID = "com.anthropic.claudefordesktop"
     /// End condition: by default a run continues until the conversation
     /// closes itself — the mutual stop-sequence sign-off, an empty reply, a
     /// response timeout, or the Stop button. A turn limit additionally caps
@@ -39,12 +39,6 @@ struct Config {
     var turns = 10
     /// The cap in force: `turns` with the turn-limit ending, else none.
     var turnCap: Int? { ending == .turnLimit ? turns : nil }
-    /// The turn limit as an on/off switch, for callers that predate the
-    /// endings: on is the turn-limit ending, off the mutual sign-off.
-    var limitTurns: Bool {
-        get { ending == .turnLimit }
-        set { ending = newValue ? .turnLimit : .bothAgree }
-    }
     /// Which side sends the opening message; the other one answers it.
     var first = Speaker.chatgpt
     /// The human's initial message. The relay wraps it in a framing preamble
@@ -53,11 +47,6 @@ struct Config {
     var seed = ""
     /// A reply containing this marker (or an empty reply) ends the run early.
     var stopSequence = "[[END-CONVERSATION]]"
-    /// The framing preamble's text, with RelayRules.stopSequenceToken where
-    /// the marker goes. RelayController copies the Settings edit (if any)
-    /// here at Start; tools and tests that drive runRelay directly get the
-    /// shipped default.
-    var relayRulesTemplate = RelayRules.defaultTemplate
     /// Maximum wait without detected response activity. A visible Stop
     /// control means the app is still working and renews this interval;
     /// thinking and tool use can take longer than five minutes overall.
@@ -67,7 +56,7 @@ struct Config {
     // ChatGPT's response action bar uses bare "Copy"; "Copy message" (paired
     // with "Edit message") belongs to user messages, and tables/links get
     // their own qualified labels. Match bare copy, exclude the qualified ones.
-    var chatgptSelectors = AppSelectors(
+    let chatgptSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["message", "table", "link", "code"],
         // The echo's "Copy message" is excluded above, so it never counts.
@@ -94,7 +83,7 @@ struct Config {
         identityHosts: ["chatgpt.com", "chat.openai.com"],
         conversationRoutePrefixes: ["c"],
         genericWindowTitles: ["ChatGPT", "Codex", "New chat", "New task"])
-    var claudeSelectors = AppSelectors(
+    let claudeSelectors = AppSelectors(
         copyKeyword: "copy",
         copyExcludeKeywords: ["code", "link", "table"],
         // Claude Code's collapsed action-bar toggle; not seen on the chat
@@ -141,6 +130,10 @@ struct Config {
         genericWindowTitles: ["Claude", "New chat", "New task"])
 }
 
+/// In the app the per-run fields are written on main only, in
+/// RelayController.start, while no run is in flight; the scanner thread
+/// reads only the per-app fields, which are constants. The harness and the
+/// tests set the per-run fields before a run and restore them after.
 var config = Config()
 
 /// Known empty-composer placeholder values across both apps' surfaces. The

@@ -159,7 +159,6 @@ final class LiveScenarioRunner {
     let nonce: String
     private let returnFocus: NSRunningApplication?
     private var bindings: [String: TargetBinding] = [:]
-    private var deadlines: CaseDeadline?
     private var cleanup: [(AXUIElement, String, [AXUIElement], TargetBinding)] = []
     private var pasteCount = 0
     private var submitCount = 0
@@ -183,7 +182,6 @@ final class LiveScenarioRunner {
         config.timeout = min(120, options.timeout)
         relayControl.reset()
         let deadline = CaseDeadline(seconds: options.timeout, emergency: evidence.directory.appendingPathComponent("deadline.txt"))
-        deadlines = deadline
         perform()
         if deadline.timedOut { evidence.check("case-deadline", .failed, "Exceeded overall \(options.timeout)s deadline") }
         if deadline.cancelled { evidence.check("interrupted", .blocked, "Operator interrupted the case"); stopAfterCase = true }
@@ -191,7 +189,6 @@ final class LiveScenarioRunner {
         evidence.check("clipboard-restored", clipboard.restore() ? .passed : .failed, "Restored all captured pasteboard items and data types")
         if !deadline.cancelled { refocus(to: originalFocus) }
         deadline.stop()
-        deadlines = nil
         config = savedConfig
         return evidence.finish()
     }
@@ -431,7 +428,7 @@ final class LiveScenarioRunner {
             guard safe.status == .passed else { return }
             evidence.capture(target, stage: "before-\(target.name.lowercased())", screenshots: options.screenshots)
         }
-        config.limitTurns = true; config.turns = 6
+        config.ending = .turnLimit; config.turns = 6
         config.first = scenario.first == .chatgpt ? .chatgpt : .claude
         config.seed = """
         Automated relay verification. Do not use tools, run commands, edit files, or browse.
