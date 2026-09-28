@@ -660,7 +660,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     /// The console, forward and key. Besides its own callers, this is the
     /// end of every run: the chat app that replied last still has the
-    /// keyboard, and New session is what comes next. A panel Esc put away
+    /// keyboard, and New topic is what comes next. A panel Esc put away
     /// mid-run comes back too — the summary is what there is to look at
     /// now. Making the panel key is the whole move: a non-activating panel
     /// takes keyboard focus without the app activating (see the file's

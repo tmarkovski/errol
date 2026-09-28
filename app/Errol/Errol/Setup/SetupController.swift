@@ -20,22 +20,23 @@ final class SetupController {
     /// .apply), which leaves the keyboard with whichever app came forward
     /// last; the shell takes it back for the console. Main thread.
     @ObservationIgnored var onArranged: (() -> Void)?
-    /// Told each time an app has been brought forward from its icon, which
-    /// leaves the keyboard with that app; the shell takes it back for the
-    /// console. Main thread.
-    @ObservationIgnored var onBroughtForward: (() -> Void)?
     /// A bind is on the worker: a second Return or click waits for it.
-    private(set) var isBinding = false
-    /// An arrangement is on the worker.
-    private(set) var isArranging = false
+    @ObservationIgnored private var isBinding = false
     /// Why the last connect or arrangement did not happen, beside the action.
     private(set) var problem: String?
+    /// Whether an arrangement's original frames are held for a restore: the
+    /// Restore item's enabled state. The engine keeps the frames behind a
+    /// lock Observation cannot see, so each arrange and restore completion
+    /// copies its word here, where the menu can.
+    private(set) var canRestoreLayout = false
     /// The apps' names as the panel shows them.
-    var names: (chatgpt: String, claude: String) = ("ChatGPT", "Claude")
+    let names: (chatgpt: String, claude: String) = ("ChatGPT", "Claude")
 
     @ObservationIgnored private let engine: RelayEngine
     @ObservationIgnored private var launchDeadlines: [Speaker: Timer] = [:]
     @ObservationIgnored private var arrangementsInFlight = 0
+    /// An arrangement is on the worker.
+    private var isArranging: Bool { arrangementsInFlight > 0 }
     /// The windows the last arrangement was asked to move, so a sweep
     /// applies a moving layout only to windows it has not tried.
     @ObservationIgnored private var arrangedTargets: [Speaker: WindowID]?
@@ -55,35 +56,31 @@ final class SetupController {
         side == .chatgpt ? names.chatgpt : names.claude
     }
 
-    var canRestoreLayout: Bool { engine.canRestoreArrangement }
-
-    /// The line above the prompt: why the last action did not happen, then
-    /// what the sides still need.
-    var notice: SetupNotice? {
-        if let problem = problem ?? state.layoutProblem { return SetupNotice(text: problem, isProblem: true) }
-        return state.notice(names: names)
-    }
-
     // MARK: Observations
 
     /// Each sweep's word on the apps, their windows, and the bindings.
+    /// Most sweeps see the same picture as the last one, and observing in
+    /// place would tell every reader of `state` it changed anyway, so the
+    /// sweep is applied to a copy and published only when it differs.
     func apply(_ report: ReadinessReport) {
+        var next = state
         for side in [Speaker.chatgpt, .claude] {
             let status = side == .chatgpt ? report.chatgpt : report.claude
             let candidates = report.candidates[side] ?? []
             let presence = appPresence(installed: report.installed[side] ?? true,
                                        status: status, candidates: candidates)
-            state.observe(side, presence: presence, candidates: candidates)
+            next.observe(side, presence: presence, candidates: candidates)
             if presence != .launching, presence != .notRunning { clearLaunchDeadline(side) }
             if let binding = report.bindings[side] {
-                state.observe(side, binding: binding)
+                next.observe(side, binding: binding)
             }
             // A connection the state dropped — the window closed, the app
             // quit — leaves nothing for the engine to keep checking.
-            if state[side].connection == nil, report.bindings[side] != nil, !isBinding {
+            if next[side].connection == nil, report.bindings[side] != nil, !isBinding {
                 engine.unbind(side)
             }
         }
+        if next != state { state = next }
         applyIfPending()
         connectIfUnambiguous()
     }
@@ -113,12 +110,9 @@ final class SetupController {
     }
 
     /// Bring the app forward — its connected window, where it has one —
-    /// so the conversation is in view, and hand the keyboard back to the
-    /// console once it is there.
-    func bringForward(_ side: Speaker, completion: (() -> Void)? = nil) {
-        engine.bringForward(side) { [weak self] in
-            if let completion { completion() } else { self?.onBroughtForward?() }
-        }
+    /// so the conversation is in view.
+    func bringForward(_ side: Speaker, completion: @escaping () -> Void) {
+        engine.bringForward(side, completion: completion)
     }
 
     private func clearLaunchDeadline(_ side: Speaker) {
@@ -161,7 +155,7 @@ final class SetupController {
 
     /// Apply the chosen layout to the two windows. Keep positions applies
     /// itself; the others need a window on each side.
-    func applyLayout() {
+    private func applyLayout() {
         guard !runInProgress else { return }
         problem = nil
         guard state.layout.movesWindows else {
@@ -180,11 +174,10 @@ final class SetupController {
         let windows: [Speaker: WindowID] = [.chatgpt: chatgpt, .claude: claude]
         arrangedTargets = windows
         arrangementsInFlight += 1
-        isArranging = true
         engine.arrange(layout, windows: windows) { [weak self] outcome in
             guard let self else { return }
             arrangementsInFlight -= 1
-            isArranging = arrangementsInFlight > 0
+            canRestoreLayout = engine.canRestoreArrangement
             // Whatever the choice is now, the windows moved and the apps
             // came forward.
             if outcome == .arranged { onArranged?() }
@@ -208,6 +201,7 @@ final class SetupController {
         guard !runInProgress else { return }
         engine.restoreArrangement { [weak self] restored in
             guard let self else { return }
+            canRestoreLayout = engine.canRestoreArrangement
             if restored == 0 { problem = "Nothing to put back: the windows were moved since, or are gone." }
         }
     }

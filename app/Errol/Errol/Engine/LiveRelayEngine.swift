@@ -141,6 +141,7 @@ final class LiveRelayEngine: RelayEngine {
         }
     }
 
+    #if DEBUG
     func inspect() {
         guard ensureTrusted(), let apps = resolveApps() else { return }
         report("Inspecting both apps...")
@@ -150,6 +151,7 @@ final class LiveRelayEngine: RelayEngine {
             events.post(.log(report))
         }
     }
+    #endif
 
     // MARK: Setup
 
@@ -273,6 +275,7 @@ final class LiveRelayEngine: RelayEngine {
         return false
     }
 
+    #if DEBUG
     /// Both apps as running processes, for Inspect.
     private func resolveApps() -> (chatgpt: TargetApp, claude: TargetApp)? {
         guard let chatgpt = findApp(bundleID: config.chatgptBundleID, name: "ChatGPT",
@@ -287,6 +290,7 @@ final class LiveRelayEngine: RelayEngine {
         }
         return (chatgpt, claude)
     }
+    #endif
 
     /// Relay and setup jobs go through one worker, in the
     /// order asked: an arrangement pressed just before Send is finished

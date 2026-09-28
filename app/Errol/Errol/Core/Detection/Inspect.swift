@@ -1,10 +1,15 @@
 // The Inspect dump: per window, every button and text input plus anything
 // in any role whose label mentions the copy keyword. This is how selector
 // breakage gets diagnosed without reaching for Xcode's Accessibility
-// Inspector; the panel's Inspect button writes it into the log.
+// Inspector; a debug build's Inspect Apps item, in the app menu (the
+// console's ··· button and the menu-bar icon's right-click menu), writes
+// it into the log window. A release build has no way to reach it, so it
+// compiles only in a debug one.
 
 import AppKit
 import ApplicationServices
+
+#if DEBUG
 
 func inspectReport(_ target: TargetApp) -> String {
     var lines: [String] = []
@@ -123,3 +128,4 @@ func inspectReport(_ target: TargetApp) -> String {
     lines.append("\nApp-wide selector results: copy=\(copyButtons(in: target).count), affordances=\(messageAffordances(in: target).count), stop=\(hasStopButton(in: target)), input=\(inputArea(in: target) != nil ? "found" : "MISSING")")
     return lines.joined(separator: "\n")
 }
+#endif

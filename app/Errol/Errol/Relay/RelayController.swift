@@ -38,11 +38,6 @@ final class RelayController {
     /// The prompt the human sent to start the run on the panel, as they
     /// wrote it: the topic. Set at Start, cleared with the finished run.
     private(set) var runPrompt: String?
-    /// Whether the opening has left the prompt box: true from the first
-    /// transfer that sets off from the prompt, or failing that, the first
-    /// sign of the conversation under way. The box shows the prompt as
-    /// written until then (PerchPromptBox).
-    private(set) var openingSent = false
     /// One sentence on what the run is about, once the on-device model has
     /// written it from the prompt (TopicSummarizer); nil until then, and
     /// for good when the model cannot.
@@ -59,23 +54,23 @@ final class RelayController {
     @ObservationIgnored var summarizeReply: @Sendable (String) async -> String? = { await ReplySummarizer.gist($0) }
     @ObservationIgnored private var gistTasks: [Int: Task<Void, Never>] = [:]
     @ObservationIgnored private var nextTranscriptID = 0
-    var isRunning = false
+    private(set) var isRunning = false
     /// Whether Stop has been pressed on this run — or on the run that just
     /// finished, since the summary names it as the ending. The Stop button
     /// dims on it, because the run may be mid-reply for a while before the
-    /// next safe point. Cleared at the next start and by New session.
+    /// next safe point. Cleared at the next start and by New topic.
     private(set) var stopRequested = false
     /// The field opens only after focus ownership is granted. Both relay
     /// operations wait until Return or Continue closes the editor.
-    var isSteering = false
+    private(set) var isSteering = false
     private(set) var isSteeringPending = false
-    @ObservationIgnored let steeringEditor = TextEditorSession()
+    let steeringEditor = TextEditorSession()
     /// The prompt box's mic: speaking into the field the box shows
     /// (toggleVoice). Sending or clearing that field closes it.
     let voice: VoiceInput
     /// Whether the worker has parked at a capture or delivery gate. A hold
     /// requested during an operation stays pending until that operation ends.
-    var isHolding = false
+    private(set) var isHolding = false
     /// The condition in the apps the run is standing on — a changed
     /// conversation, an unsent draft — until the apps clear it. Separate
     /// from the steering hold, which the human asks for; the two can
@@ -83,7 +78,7 @@ final class RelayController {
     private(set) var block: RunBlock?
     /// How the last run ended, from the run itself. Set by the run's
     /// `.ended` event — or by a start that failed before the run began —
-    /// and cleared by New session and at the next start.
+    /// and cleared by New topic and at the next start.
     var lastReport: RunReport?
     /// The field's text: what the human is writing while the field is open,
     /// and the queued note as written — shown under a blur — while the
@@ -98,15 +93,13 @@ final class RelayController {
     /// The last note's record, for the head. Cleared by resetSession and at
     /// the next start.
     private(set) var lastReceipt: SteeringReceipt?
-    var logLines: [LogLine] = []
-    var chatgptStatus = SideStatus(appName: "ChatGPT")
-    var claudeStatus = SideStatus(appName: "Claude")
-    var chatgptConversation = ConversationStatus.notStarted
-    var claudeConversation = ConversationStatus.notStarted
+    private(set) var logLines: [LogLine] = []
+    private(set) var chatgptConversation = ConversationStatus.notStarted
+    private(set) var claudeConversation = ConversationStatus.notStarted
     /// The running turn number (1-based) during a relay run; 0 outside one.
     /// Feeds the head's turn line. It survives the run's end so the finished
     /// state stays readable, until resetSession or the next start clears it.
-    var currentTurn = 0
+    private(set) var currentTurn = 0
     /// How long the last run took, for the turn line's post-run clock. Set when
     /// a run finishes; cleared by resetSession and at the next start.
     var lastRunDuration: TimeInterval?
@@ -115,7 +108,7 @@ final class RelayController {
     /// The apps' names as the panel shows them, for the summary and the
     /// hold lines the engine reports by side.
     var names: (chatgpt: String, claude: String) {
-        (chatgptStatus.appName, claudeStatus.appName)
+        ("ChatGPT", "Claude")
     }
 
     /// The reason the last start failed, while nothing has replaced it: the
@@ -127,17 +120,17 @@ final class RelayController {
 
     /// Read by the widget's one-second timeline, without publishing a tick
     /// through the controller or changing any relay timing.
-    func elapsedRunDuration(at date: Date = Date()) -> TimeInterval {
+    func elapsedRunDuration(at date: Date) -> TimeInterval {
         max(0, runStartedAt.map { date.timeIntervalSince($0) } ?? lastRunDuration ?? 0)
     }
     @ObservationIgnored private var nextLogID = 0
     /// What drives the apps and reports back; LiveRelayEngine in the app.
-    @ObservationIgnored private let engine: RelayEngine
-    @ObservationIgnored private let transferOverlay: TransferOverlay?
-    @ObservationIgnored let promptTransferSource = TransferAnchorSource()
+    private let engine: RelayEngine
+    private let transferOverlay: TransferOverlay?
+    let promptTransferSource = TransferAnchorSource()
     /// Each side's icon in the console, where its replies set off from
     /// (TransferSource).
-    @ObservationIgnored let iconTransferSources = [Speaker.chatgpt: TransferAnchorSource(),
+    let iconTransferSources = [Speaker.chatgpt: TransferAnchorSource(),
                                                    .claude: TransferAnchorSource()]
     /// The engine's inward flags and mailbox, written here at the human's
     /// actions and read by the run at its handoff boundaries.
@@ -176,8 +169,8 @@ final class RelayController {
     }
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
-    /// does an arrangement of the windows, which brings both chat apps
-    /// forward on the way, and an app brought forward from its icon.
+    /// do an arrangement of the windows, which brings both chat apps
+    /// forward on the way, and Show window, once the window is up.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
 
     init(engine: RelayEngine, transferOverlay: TransferOverlay? = nil) {
@@ -186,19 +179,15 @@ final class RelayController {
         voice = VoiceInput(transcriber: engine.transcriber)
         setup = SetupController(engine: engine)
         setup.onArranged = { [weak self] in self?.focusPanelHandler?() }
-        setup.onBroughtForward = { [weak self] in self?.focusPanelHandler?() }
         transferOverlay?.promptSource = promptTransferSource
         transferOverlay?.iconSource = { [iconTransferSources] in iconTransferSources[$0] }
         // Most sweeps see the same picture as the last one; publishing them
-        // anyway would re-render the status views each poll, so only
-        // changed statuses reach the observable properties. The setup
-        // state does its own no-change filtering per side.
+        // anyway would re-render the console each poll, so the sweep goes
+        // to the setup alone, whose apply publishes only a changed state.
+        // The names the console shows are constant and never ride a sweep.
         engine.onReadiness = { [weak self] report in
             let apply = {
                 guard let self else { return }
-                if self.chatgptStatus != report.chatgpt { self.chatgptStatus = report.chatgpt }
-                if self.claudeStatus != report.claude { self.claudeStatus = report.claude }
-                self.setup.names = self.names
                 self.setup.apply(report)
             }
             // The live sweep reports from its own thread; a preview engine
@@ -214,19 +203,14 @@ final class RelayController {
             guard let self else { return }
             switch event {
             case .transfer(let feedback):
-                if case .began(_, let sources, _, _) = feedback, sources.contains(.userPrompt) {
-                    openingSent = true
-                }
                 if isRunning, !control.isCancelled { transferOverlay?.handle(feedback) }
             case .log(let line):
                 append(line)
             case .conversation(let chatgpt, let claude):
                 chatgptConversation = chatgpt
                 claudeConversation = claude
-                if chatgpt != .notStarted || claude != .notStarted { openingSent = true }
             case .turn(let turn):
                 currentTurn = turn
-                if turn > 0 { openingSent = true }
             case .reply(let side, let text):
                 replyCaptured(text, from: side)
             case .holding(let holding):
@@ -239,8 +223,7 @@ final class RelayController {
             case .steeringGranted:
                 guard isRunning, isSteeringPending, control.canOpenSteering else { return }
                 isSteeringPending = false
-                steeringEditor.begin(text: steeringText)
-                isSteering = true
+                openSteeringField()
             case .steeringCommitted(let note, let recipient, let turn):
                 steeringCommitted(note, to: recipient, turn: turn)
             case .steering(let delivery):
@@ -269,8 +252,10 @@ final class RelayController {
         }
     }
 
-    /// The readiness strip only scans while someone can see it, and never
-    /// while a run owns the apps' AX trees and the machine's focus.
+    /// Readiness sweeps run only while someone can see the console, and
+    /// none starts while a run owns the apps' AX trees and the machine's
+    /// focus; a sweep already in flight finishes read-only beside the
+    /// run's first steps.
     func setPanelVisible(_ visible: Bool) {
         panelVisible = visible
         // No one hears into a field they can't see.
@@ -294,13 +279,6 @@ final class RelayController {
         if isRunning { return .running }
         if hasFinishedRun { return .finished }
         return .compose
-    }
-
-    /// The prompt is still in the box, as written: the run has begun and
-    /// the opening has not set off yet. A block or a Stop in that window
-    /// closes the field, so what they say has its place.
-    var openingStillVisible: Bool {
-        isRunning && !openingSent && block == nil && !stopRequested
     }
 
     /// Ask the model for the run's sentence. An answer that arrives after
@@ -333,8 +311,8 @@ final class RelayController {
     /// reply that is nothing else is only that.
     private func replyCaptured(_ reply: String, from side: Speaker) {
         guard isRunning else { return }
-        let signsOff = config.ending.endsOnSignOff && reply.contains(config.stopSequence)
-        let text = reply.replacingOccurrences(of: config.stopSequence, with: "")
+        let signsOff = isSignOff(reply)
+        let text = strippingSignOff(reply)
         let flat = ReplySummarizer.flatten(text)
         guard !flat.isEmpty else {
             if signsOff { appendTranscript(.side(side), text: "Signs off") }
@@ -444,7 +422,6 @@ final class RelayController {
         config.first = firstSpeaker
 
         isRunning = true
-        openingSent = false
         stopRequested = false
         transferOverlay?.stop()
         isHolding = false
@@ -469,7 +446,7 @@ final class RelayController {
 
     /// Whether a finished run is still on the panel: a report from a run
     /// that began, no run to own it. The composer shows the run's summary
-    /// and New session in this state, and resetSession is what leaves it.
+    /// and New topic in these chats in this state, and resetSession is what leaves it.
     /// A start that failed is not a finished run: its reason shows under
     /// the composer, and Run stays the action.
     var hasFinishedRun: Bool {
@@ -512,7 +489,7 @@ final class RelayController {
     /// the composer goes back to the topic and ending is exactly when
     /// someone inspects what happened. Last, the console takes the keyboard
     /// back: the run left it with whichever chat app replied last, and New
-    /// session is what comes next.
+    /// topic is what comes next.
     private func finishRun() {
         if isSteering, let text = steeringEditor.end() { steeringText = text }
         lastRunDuration = runStartedAt.map { Date().timeIntervalSince($0) }
@@ -542,12 +519,13 @@ final class RelayController {
     // MARK: Steering
 
     /// Whether a hold is asked for. There is one way to ask: Pause to
-    /// steer, which opens the field. The pill and the turn line read this.
-    var holdRequested: Bool { isSteering || isSteeringPending }
+    /// steer, which opens the field. beginSteering reads this to refuse a
+    /// second ask.
+    private var holdRequested: Bool { isSteering || isSteeringPending }
 
-    /// Whether the field holds words. The circle reads it to be Send rather
-    /// than Continue, and the run's end records such words as a note never
-    /// sent.
+    /// Whether the field holds words. The paused button reads it to be
+    /// Send note & continue rather than Resume, and the run's end records
+    /// such words as a note never sent.
     var steeringHasText: Bool {
         !steeringText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -561,21 +539,21 @@ final class RelayController {
     /// composing.
     var nextRecipient: String? {
         switch (chatgptConversation, claudeConversation) {
-        case (.chatting, _), (.replied, _): return claudeStatus.appName
-        case (_, .chatting), (_, .replied): return chatgptStatus.appName
+        case (.chatting, _), (.replied, _): return names.claude
+        case (_, .chatting), (_, .replied): return names.chatgpt
         default: return nil
         }
     }
 
     /// The other side's name, for the receipt's echo clause.
     func otherName(than appName: String) -> String {
-        appName == chatgptStatus.appName ? claudeStatus.appName : chatgptStatus.appName
+        appName == names.chatgpt ? names.claude : names.chatgpt
     }
 
     func appName(_ speaker: Speaker) -> String {
         switch speaker {
-        case .chatgpt: chatgptStatus.appName
-        case .claude: claudeStatus.appName
+        case .chatgpt: names.chatgpt
+        case .claude: names.claude
         }
     }
 
@@ -606,13 +584,16 @@ final class RelayController {
             append("Pausing to steer — the run holds at the next handoff while you write.")
         }
         isSteeringPending = grant == .afterOperation
-        if grant == .now {
-            steeringEditor.begin(text: steeringText)
-            isSteering = true
-        }
+        if grant == .now { openSteeringField() }
     }
 
-    /// Return, or the circle: the field closes and the run goes on. Words
+    /// The hold is granted: the field opens on whatever it holds.
+    private func openSteeringField() {
+        steeringEditor.begin(text: steeringText)
+        isSteering = true
+    }
+
+    /// Return, or Send note & continue / Resume: the field closes and the run goes on. Words
     /// in it are the note — the mailbox takes them trimmed, and the field
     /// keeps them as written to show under the blur — and an empty field
     /// just continues. Posting comes before the hold lifts, so the handoff the
@@ -700,11 +681,16 @@ final class RelayController {
     private func steeringCommitted(_ note: String, to recipient: Speaker, turn: Int) {
         steeringInFlight = SteeringInFlight(note: note, recipient: appName(recipient), turn: turn)
         appendTranscript(.human, text: ReplySummarizer.flatten(note), recipient: recipient, delivery: .sending)
-        if let queued = queuedSteering,
-           queued.trimmingCharacters(in: .whitespacesAndNewlines) == note {
-            queuedSteering = nil
-            steeringText = ""
-        }
+        releaseQueued(matching: note)
+    }
+
+    /// The field lets go of the queued note, when the note the worker
+    /// named is the one it shows.
+    private func releaseQueued(matching note: String) {
+        guard let queued = queuedSteering,
+              queued.trimmingCharacters(in: .whitespacesAndNewlines) == note else { return }
+        queuedSteering = nil
+        steeringText = ""
     }
 
     /// One leg's outcome becomes the record. A note leg reported straight
@@ -725,11 +711,7 @@ final class RelayController {
             lastReceipt = SteeringReceipt(note: delivery.note, recipient: recipient,
                                           turn: delivery.turn, outcome: outcome)
             steeringInFlight = nil
-            if let queued = queuedSteering,
-               queued.trimmingCharacters(in: .whitespacesAndNewlines) == delivery.note {
-                queuedSteering = nil
-                steeringText = ""
-            }
+            releaseQueued(matching: delivery.note)
         case .echo:
             guard lastReceipt?.note == delivery.note else { return }
             switch delivery.outcome {
@@ -744,13 +726,16 @@ final class RelayController {
     /// an open field were never sent; a queued note the worker never took
     /// is reported by the worker itself before it finishes (a fallback here
     /// covers the case where it could not); a note still in flight never
-    /// got its outcome, which is what unconfirmed means. Notes already
-    /// resolved keep the record they have, and an echo still ahead is ruled
-    /// out.
+    /// got its outcome, which is what unconfirmed means, on its transcript
+    /// line as on the receipt. Notes already resolved keep the record they
+    /// have, and an echo still ahead is ruled out.
     private func recordSteeringAtRunEnd() {
         if let inFlight = steeringInFlight {
             lastReceipt = SteeringReceipt(note: inFlight.note, recipient: inFlight.recipient,
                                           turn: inFlight.turn, outcome: .unconfirmed)
+            if let index = transcript.lastIndex(where: { $0.author == .human && $0.delivery == .sending }) {
+                transcript[index].delivery = .unconfirmed
+            }
         } else if let queued = queuedSteering {
             lastReceipt = SteeringReceipt(note: queued.trimmingCharacters(in: .whitespacesAndNewlines),
                                           recipient: nil, turn: nil, outcome: .notSent(.runEnded))
@@ -764,12 +749,15 @@ final class RelayController {
         }
     }
 
+    #if DEBUG
     /// Dump both apps' windows, buttons, and selector matches into the log —
     /// the way selector breakage gets diagnosed after an app update. A debug
-    /// tool, reached through the status item's menu and read in the log
-    /// window it opens. The report arrives as a log line on the event stream.
+    /// tool, reached through the app menu's Inspect Apps item and read in the
+    /// log window it opens. The report arrives as a log line on the event
+    /// stream.
     func runInspect() {
         guard !isRunning else { return }
         engine.inspect()
     }
+    #endif
 }

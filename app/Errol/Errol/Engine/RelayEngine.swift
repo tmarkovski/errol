@@ -47,9 +47,12 @@ protocol RelayEngine: AnyObject {
     /// ends with `.finished` on the event stream, after every line it
     /// logged. Called after a preflight that passed.
     func startRun()
+    #if DEBUG
     /// The debug dump of both apps' windows, buttons, and selector matches
-    /// into the log. Does its own preflight.
+    /// into the log. Does its own preflight. A debug build's Inspect Apps
+    /// item is the only way to it.
     func inspect()
+    #endif
     /// What hears the microphone for the prompt box's mic button
     /// (VoiceInput.swift): SpeechTranscriber in the app, a script in the
     /// canvases, which never open the microphone.
