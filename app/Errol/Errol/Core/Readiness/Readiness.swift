@@ -53,15 +53,25 @@ struct SideSweep {
     var scans: [WindowScan] = []
 }
 
+/// One sweep of `side`, its app found by `findApp(_:)` from the global
+/// config and named as the human reads it.
+func sweepSide(_ side: Speaker) -> SideSweep {
+    sweepSide(findApp(side), name: side.appName)
+}
+
 /// One sweep of one side. Mirrors chatWindow's selection rules so the
 /// status reports readiness for exactly the window a run would target.
-func sweepSide(bundleID: String, name: String, selectors: AppSelectors) -> SideSweep {
-    guard let target = findApp(bundleID: bundleID, name: name, selectors: selectors) else {
+/// The app comes in already looked up, nil when it is not running; `name`
+/// labels the status either way, and the scan reads the found app's own
+/// selectors.
+private func sweepSide(_ found: TargetApp?, name: String) -> SideSweep {
+    guard let target = found else {
         var status = SideStatus(appName: name)
         status.state = .missing
         status.headline = "Not running"
         return SideSweep(status: status)
     }
+    let selectors = target.selectors
 
     let firstContact = electronNudges.beginContact(target)
     var windows = axWindows(target)
@@ -83,7 +93,7 @@ func sweepSide(bundleID: String, name: String, selectors: AppSelectors) -> SideS
 }
 
 func scanSide(bundleID: String, name: String, selectors: AppSelectors) -> SideStatus {
-    sweepSide(bundleID: bundleID, name: name, selectors: selectors).status
+    sweepSide(findApp(bundleID: bundleID, name: name, selectors: selectors), name: name).status
 }
 
 /// A window's identity for the length of the process, from the element's
@@ -124,7 +134,8 @@ struct ReadinessReport: Equatable {
             SideStatus(appName: name, state: .missing, headline: "No access",
                        detail: "turn on Errol in \(AccessPermission.listName)")
         }
-        return ReadinessReport(chatgpt: status("ChatGPT"), claude: status("Claude"), installed: installed)
+        return ReadinessReport(chatgpt: status(Speaker.chatgpt.appName), claude: status(Speaker.claude.appName),
+                               installed: installed)
     }
 }
 
@@ -206,8 +217,5 @@ func scanBothSides() -> (chatgpt: SideStatus, claude: SideStatus) {
         let blocked = ReadinessReport.blocked(installed: [:])
         return (blocked.chatgpt, blocked.claude)
     }
-    return (scanSide(bundleID: config.chatgptBundleID, name: "ChatGPT",
-                     selectors: config.chatgptSelectors),
-            scanSide(bundleID: config.claudeBundleID, name: "Claude",
-                     selectors: config.claudeSelectors))
+    return (sweepSide(.chatgpt).status, sweepSide(.claude).status)
 }

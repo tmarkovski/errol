@@ -47,20 +47,16 @@ final class LiveRelayEngine: RelayEngine {
     /// and covering dialog, and walking it afresh only when the app no
     /// longer lists it among its windows.
     private static func sweep(registry: WindowRegistry) -> ReadinessReport {
-        let installed: [Speaker: Bool] = [
-            .chatgpt: isInstalled(config.chatgptBundleID),
-            .claude: isInstalled(config.claudeBundleID),
-        ]
+        let installed = Dictionary(uniqueKeysWithValues: Speaker.allCases.map {
+            ($0, isInstalled(config.bundleID(for: $0)))
+        })
         guard AXIsProcessTrusted() else { return .blocked(installed: installed) }
-        let chatgpt = sweepSide(bundleID: config.chatgptBundleID, name: "ChatGPT",
-                                selectors: config.chatgptSelectors)
-        let claude = sweepSide(bundleID: config.claudeBundleID, name: "Claude",
-                               selectors: config.claudeSelectors)
+        let chatgpt = sweepSide(.chatgpt)
+        let claude = sweepSide(.claude)
         var report = ReadinessReport(chatgpt: chatgpt.status, claude: claude.status, installed: installed)
-        for (side, sweep, selectors) in [(Speaker.chatgpt, chatgpt, config.chatgptSelectors),
-                                         (Speaker.claude, claude, config.claudeSelectors)] {
+        for (side, sweep) in [(Speaker.chatgpt, chatgpt), (.claude, claude)] {
             registry.remember(side, windows: sweep.windows, target: sweep.target)
-            report.candidates[side] = windowCandidates(from: sweep, selectors: selectors)
+            report.candidates[side] = windowCandidates(from: sweep, selectors: config.selectors(for: side))
             if let binding = registry.binding(side) {
                 let check = binding.check()
                 var composer = ComposerState.unreadable
@@ -91,8 +87,8 @@ final class LiveRelayEngine: RelayEngine {
             return false
         }
         let bindings = registry.bindings
-        for side in [Speaker.chatgpt, .claude] where bindings[side] == nil {
-            failStart("Connect \(side == .chatgpt ? "ChatGPT" : "Claude")'s conversation first.")
+        for side in Speaker.allCases where bindings[side] == nil {
+            failStart("Connect \(side.appName)'s conversation first.")
             return false
         }
         return true
@@ -147,8 +143,8 @@ final class LiveRelayEngine: RelayEngine {
         guard ensureTrusted(), let apps = resolveApps() else { return }
         report("Inspecting both apps...")
         runExclusively { [events] in
-            electronNudges.settleFirstContact([apps.chatgpt, apps.claude])
-            let report = inspectReport(apps.chatgpt) + "\n\n" + inspectReport(apps.claude)
+            electronNudges.settleFirstContact(apps)
+            let report = apps.map(inspectReport).joined(separator: "\n\n")
             events.post(.log(report))
         }
     }
@@ -157,11 +153,11 @@ final class LiveRelayEngine: RelayEngine {
     // MARK: Setup
 
     func launch(_ side: Speaker) -> Bool {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID(side)) else {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: config.bundleID(for: side)) else {
             return false
         }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
-            if let error { log("\(self.name(side)): could not be opened: \(error.localizedDescription)") }
+            if let error { log("\(side.appName): could not be opened: \(error.localizedDescription)") }
         }
         // The scanner also hears the launch itself (didLaunchApplication),
         // and sweeps again when the windows appear.
@@ -176,7 +172,7 @@ final class LiveRelayEngine: RelayEngine {
         let work = { [self, registry] in
             defer { DispatchQueue.main.async(execute: completion) }
             if duringHold && !control.canOpenSteering { return }
-            guard let target = findApp(bundleID: bundleID(side), name: name(side), selectors: selectors(side)) else { return }
+            guard let target = findApp(side) else { return }
             // The bound window comes to the front of its app's own windows
             // first: activation alone leaves whichever window was last up.
             if let bound = registry.binding(side), windowIsAlive(bound.window) { raiseWindow(bound.window) }
@@ -195,9 +191,9 @@ final class LiveRelayEngine: RelayEngine {
     }
 
     func bind(_ side: Speaker, to window: WindowID, completion: @escaping (BindingObservation?) -> Void) {
-        runExclusively { [self, registry] in
+        runExclusively { [registry] in
             guard let (target, element) = registry.window(side, window), windowIsAlive(element) else {
-                log("\(name(side)): the chosen window is gone before it could be connected")
+                log("\(side.appName): the chosen window is gone before it could be connected")
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
@@ -218,7 +214,7 @@ final class LiveRelayEngine: RelayEngine {
                  completion: @escaping (ArrangeOutcome) -> Void) {
         runExclusively { [registry, arranger, control] in
             var arranged: [ArrangedWindow] = []
-            for side in [Speaker.chatgpt, .claude] {
+            for side in Speaker.allCases {
                 guard let id = windows[side], let (target, element) = registry.window(side, id),
                       windowIsAlive(element) else {
                     DispatchQueue.main.async { completion(.windowMissing(side)) }
@@ -247,18 +243,6 @@ final class LiveRelayEngine: RelayEngine {
         }
     }
 
-    private func bundleID(_ side: Speaker) -> String {
-        side == .chatgpt ? config.chatgptBundleID : config.claudeBundleID
-    }
-
-    private func name(_ side: Speaker) -> String {
-        side == .chatgpt ? "ChatGPT" : "Claude"
-    }
-
-    private func selectors(_ side: Speaker) -> AppSelectors {
-        side == .chatgpt ? config.chatgptSelectors : config.claudeSelectors
-    }
-
     // MARK: Plumbing
 
     /// An app-side line for the log, as the controller would append it:
@@ -277,19 +261,18 @@ final class LiveRelayEngine: RelayEngine {
     }
 
     #if DEBUG
-    /// Both apps as running processes, for Inspect.
-    private func resolveApps() -> (chatgpt: TargetApp, claude: TargetApp)? {
-        guard let chatgpt = findApp(bundleID: config.chatgptBundleID, name: "ChatGPT",
-                                    selectors: config.chatgptSelectors) else {
-            report("ERROR: ChatGPT (\(config.chatgptBundleID)) is not running.")
-            return nil
+    /// Both apps as running processes, for Inspect, in `Speaker.allCases`
+    /// order, ChatGPT first.
+    private func resolveApps() -> [TargetApp]? {
+        var apps: [TargetApp] = []
+        for side in Speaker.allCases {
+            guard let target = findApp(side) else {
+                report("ERROR: \(side.appName) (\(config.bundleID(for: side))) is not running.")
+                return nil
+            }
+            apps.append(target)
         }
-        guard let claude = findApp(bundleID: config.claudeBundleID, name: "Claude",
-                                   selectors: config.claudeSelectors) else {
-            report("ERROR: Claude Desktop (\(config.claudeBundleID)) is not running.")
-            return nil
-        }
-        return (chatgpt, claude)
+        return apps
     }
     #endif
 
