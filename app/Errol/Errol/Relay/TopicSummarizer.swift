@@ -7,7 +7,6 @@
 // Nothing leaves the Mac, and nothing from the apps' replies goes in.
 
 import Foundation
-import FoundationModels
 
 enum TopicSummarizer {
     /// The one sentence, or nil when the model is unavailable, declines,
@@ -15,29 +14,14 @@ enum TopicSummarizer {
     /// should wait.
     static func summarize(_ prompt: String) async -> String? {
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, SystemLanguageModel.default.isAvailable else { return nil }
+        guard !text.isEmpty else { return nil }
         // A topic is in the opening; a long prompt is cut so the model
         // reads a few hundred tokens at most and answers in a second or two.
         let excerpt = String(text.prefix(2400))
-        var options = GenerationOptions()
-        options.maximumResponseTokens = 60
-        let instructions = Self.instructions
-        return await withTaskGroup(of: String?.self) { group in
-            group.addTask {
-                let session = LanguageModelSession(instructions: instructions)
-                guard let answer = try? await session.respond(to: excerpt, options: options).content else {
-                    return nil
-                }
-                return clean(answer)
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(8))
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
+        let answer = await OnDeviceModel.respond(
+            instructions: Self.instructions, prompt: excerpt,
+            maxTokens: 60, timeout: .seconds(8))
+        return answer.flatMap(clean)
     }
 
     private static let instructions = """

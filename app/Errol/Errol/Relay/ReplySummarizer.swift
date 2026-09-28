@@ -26,33 +26,19 @@ enum ReplySummarizer {
     /// with nothing usable, or takes longer than the transcript should wait.
     static func gist(_ reply: String) async -> String? {
         let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, SystemLanguageModel.default.isAvailable else { return nil }
-        let excerpt = Self.excerpt(text)
-        var options = GenerationOptions()
-        // Two sentences of thirty words run to some forty-five tokens;
-        // the rest is room for the model to overrun, which clean trims.
-        options.maximumResponseTokens = 90
-        let instructions = Self.instructions
-        return await withTaskGroup(of: String?.self) { group in
-            group.addTask {
-                // Summing up is a transformation of text the human already
-                // has, which is what the permissive guardrails are for: a
-                // reply about something sensitive is still a reply to sum up.
-                let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
-                let session = LanguageModelSession(model: model, instructions: instructions)
-                guard let answer = try? await session.respond(to: excerpt, options: options).content else {
-                    return nil
-                }
-                return clean(answer)
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(12))
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
+        guard !text.isEmpty else { return nil }
+        let answer = await OnDeviceModel.respond(
+            instructions: Self.instructions,
+            prompt: Self.excerpt(text),
+            // Two sentences of thirty words run to some forty-five tokens;
+            // the rest is room for the model to overrun, which clean trims.
+            maxTokens: 90,
+            timeout: .seconds(12),
+            // Summing up is a transformation of text the human already
+            // has, which is what the permissive guardrails are for: a
+            // reply about something sensitive is still a reply to sum up.
+            guardrails: .permissiveContentTransformations)
+        return answer.flatMap(clean)
     }
 
     /// Tried against replies of every length in the logs, and on topics far
