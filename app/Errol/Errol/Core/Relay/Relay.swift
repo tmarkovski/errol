@@ -323,7 +323,19 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                     relayEvents.post(.holding(true))
                     announcedHold = true
                 }
+                // While held, the guard — and its window raise on the
+                // delivery side — runs about once a second, the cadence of
+                // a block (standBy), rather than on every 200 ms poll for as
+                // long as the human spends on a steering note. Stop and a
+                // lifted hold are still seen within 200 ms, and the check
+                // made after the operation is taken still vets the apps
+                // before anything is touched. The first sleep is
+                // unconditional, so a hold that is not a pause (an
+                // operation in flight) never spins.
                 usleep(200_000)
+                for _ in 0..<4 where !relayControl.isCancelled && relayControl.isPaused {
+                    usleep(200_000)
+                }
                 continue
             case .commit(let note, let unfit):
                 if taken == nil { taken = (note, unfit) }
@@ -341,9 +353,15 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
         }
     }
 
-    /// The outcome a send that ended the run maps to.
+    /// The outcome a send that ended the run maps to. A send called off by
+    /// Stop is the run stopped, said as the gates say it; one abandoned
+    /// after a Stop stays abandoned, since the message may have gone.
     func sendFailure(_ outcome: SendOutcome, to target: TargetApp) -> RunOutcome {
-        outcome == .abandoned ? .sendAbandoned(side: side(target)) : .sendRefused(side: side(target))
+        if outcome == .refused && relayControl.isCancelled {
+            log("Run stopped by user.")
+            return .stopped
+        }
+        return outcome == .abandoned ? .sendAbandoned(side: side(target)) : .sendRefused(side: side(target))
     }
 
     // MARK: The run
@@ -370,8 +388,11 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                                   destination: bound(speaker),
                                   inspection: inspection?.sendInspection(speaker))
             // Withheld, the send is tried again once the gate clears; not
-            // in front, the run holds for the human first (frontGuard).
-            if openingOutcome == .notInFront { setBlock(.notInFront(side: side(speaker))) }
+            // in front, the run holds for the human first (frontGuard) —
+            // unless Stop landed just after the activation gave up.
+            if openingOutcome == .notInFront, !relayControl.isCancelled {
+                setBlock(.notInFront(side: side(speaker)))
+            }
             if openingOutcome == .withheld || openingOutcome == .notInFront {
                 endOperation(continuingRun: true)
                 guard standBy() else { return .stopped }
@@ -454,6 +475,13 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 reply = copyLastResponse(from: speaker,
                                          mayContinue: { bound(speaker).check() == .same })
                 if reply == nil {
+                    // A copy that came back empty-handed because Stop was
+                    // pressed is the run stopped, not an app to wait on or
+                    // a copy that failed.
+                    if relayControl.isCancelled {
+                        log("Run stopped by user.")
+                        return .stopped
+                    }
                     switch destinationGuard(speaker) {
                     case .clear:
                         // The copy needs the app in front (copyLastResponse).
@@ -580,7 +608,9 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                                sources: payload.transferSources(from: side(speaker)), showTransfer: showTransfers,
                                destination: bound(listener),
                                inspection: inspection?.sendInspection(listener))
-                if outcome == .notInFront { setBlock(.notInFront(side: side(listener))) }
+                if outcome == .notInFront, !relayControl.isCancelled {
+                    setBlock(.notInFront(side: side(listener)))
+                }
                 if outcome == .withheld || outcome == .notInFront {
                     endOperation(continuingRun: true)
                     guard standBy() else { return .stopped }
@@ -589,11 +619,16 @@ func runRelay(chatgpt: TargetApp, claude: TargetApp,
                 break
             }
             inspection?.delivered(listener, outcome)
+            // A send Stop called off before anything was typed leaves its
+            // notes where the run's end leaves any other: undelivered
+            // because the run ended (sendFailure).
+            let steered = outcome == .refused && relayControl.isCancelled
+                ? SteeringOutcome.runEnded : SteeringOutcome(outcome)
             if let note = payload.note {
-                reportSteering(.note, note, to: listener, turn: turn, outcome: SteeringOutcome(outcome))
+                reportSteering(.note, note, to: listener, turn: turn, outcome: steered)
             }
             if let echo = payload.echo {
-                reportSteering(.echo, echo, to: listener, turn: turn, outcome: SteeringOutcome(outcome))
+                reportSteering(.echo, echo, to: listener, turn: turn, outcome: steered)
             }
             // The note is echoed at the next handoff unless nothing was typed
             // at all; a send that may have landed still earns its echo.

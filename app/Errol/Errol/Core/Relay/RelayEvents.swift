@@ -73,13 +73,14 @@ enum SteeringOutcome: Equatable {
     /// confirms it — the paste never verified, the composer never moved,
     /// or the foreground was lost mid-confirmation. Worth checking the app.
     case unconfirmed
-    /// Nothing was typed: the send was called off (cancelled, or vetoed by
-    /// an inspection) before the paste.
+    /// Nothing was typed: the send was vetoed by an inspection before the
+    /// paste.
     case refused
     /// The framing and the steering sections alone would exceed the
     /// message cap, so the note could not travel whole and was not sent.
     case tooLong
-    /// The run ended before the handoff this leg would have ridden.
+    /// The run ended before the handoff this leg would have ridden — or
+    /// Stop called that handoff off before anything was typed.
     case runEnded
 }
 

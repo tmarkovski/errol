@@ -181,7 +181,6 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
     var wait = ResponseWaitState(timeout: timeout, startedAt: startedAt)
     var lastSeen = ""
     var block: RunBlock?
-    defer { if block != nil { onBlock?(nil) } }
     while true {
         if relayControl.isCancelled || !mayContinue() { return .ended }
         // While the window shows another conversation, what it shows is
@@ -190,6 +189,11 @@ func waitForResponse(in target: TargetApp, baseline: ResponseBaseline,
         // reply that completed out of view is seen on return.
         if let blocked {
             let now = blocked()
+            // A Stop, or a destination found gone by this very check, ends
+            // the wait where it stands: the block is left for the run's
+            // report to name, as the gate leaves it, nothing is said to have
+            // resumed, and no sighting is taken of a window that is gone.
+            if relayControl.isCancelled || !mayContinue() { return .ended }
             if now != block {
                 onBlock?(now)
                 block = now

@@ -40,8 +40,12 @@ func copyLastResponse(from target: TargetApp,
     for attempt in 0..<2 {
         // The destination is the caller's to judge; a press into a
         // conversation the human switched to would copy their message.
-        guard mayContinue() else { return nil }
+        // After Stop nothing is pressed, and no app is brought forward.
+        guard mayContinue(), !relayControl.isCancelled else { return nil }
         if !makeFrontmost(target) {
+            // makeFrontmost gives up the moment Stop is pressed: that is the
+            // run ending, not an app that would not come.
+            if relayControl.isCancelled { return nil }
             // Unlike a keystroke, an AXPress lands on the element whatever is
             // frontmost, so the press is still worth making — but say what
             // focus looked like, since it is the first suspect for a press
@@ -53,7 +57,7 @@ func copyLastResponse(from target: TargetApp,
             trace("copied \(text.count) chars from \(target.name) on attempt \(attempt + 1)")
             return text
         }
-        if attempt == 0 {
+        if attempt == 0, !relayControl.isCancelled {
             log("\(target.name): retrying the copy after forcing activation")
             activateViaLaunchServices(target)
             usleep(400_000)
@@ -195,8 +199,11 @@ func send(_ text: String, to target: TargetApp,
     defer { noteRelease(lease.release(), of: "the message", in: target) }
 
     // Keystrokes go to the frontmost app no matter what has AX focus, so
-    // never type unless the target is verified frontmost.
+    // never type unless the target is verified frontmost. makeFrontmost
+    // gives up the moment Stop is pressed, and that is a send called off,
+    // not an app that would not come (as in lostFront, below).
     guard makeFrontmost(target) else {
+        if relayControl.isCancelled { return .refused }
         log("\(target.name): could not bring app to front; not typing into another app's window")
         log("\(target.name): \(focusReport(target))")
         return .notInFront

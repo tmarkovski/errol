@@ -19,8 +19,8 @@ enum RunOutcome: Equatable {
     case timedOut(side: Speaker)
     /// `side`'s reply could not be copied, after a retry.
     case copyFailed(side: Speaker)
-    /// The send to `side` was called off before anything was typed:
-    /// cancelled, or vetoed by an inspection.
+    /// The send to `side` was called off before anything was typed, vetoed
+    /// by an inspection. A send Stop calls off ends the run as `stopped`.
     case sendRefused(side: Speaker)
     /// Delivery to `side` was interrupted after typing began; the message
     /// may or may not have been submitted.
