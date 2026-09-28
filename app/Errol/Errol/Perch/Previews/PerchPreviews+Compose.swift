@@ -1,5 +1,6 @@
-// The console before a run, one canvas per state. The scene, the states,
-// and the preview engine they run on are in PerchPreviews.swift.
+// The console before a run, one canvas per state. The scene and the states
+// are in PerchPreviews.swift, and the preview engine they run on in
+// PerchPreviewEngine.swift.
 
 #if DEBUG
 import SwiftUI

@@ -6,8 +6,9 @@ import SwiftUI
 /// The closed field's line about the note during a run. Ending outranks
 /// everything and the note in flight outranks a queued one. The last
 /// note's record is not this line's to show: PerchPromptBox.statusPanel
-/// draws it with PerchReceiptLine. The line describes the note; whether the run is running, pausing, or held is the turn line's
-/// to say, and what the open field's keys do is the line under the box
+/// draws it with PerchReceiptLine. The line describes the note; whether
+/// the run is running, pausing, or held is the turn line's to say, and
+/// what the open field's keys do is the line under the box
 /// (RelayController.steeringHint), so the two never restate each other.
 struct PerchRunLine: View {
     let controller: RelayController

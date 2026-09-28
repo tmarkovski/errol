@@ -121,9 +121,10 @@ final class GuideWindowTracker {
     }
 
     /// Converts a rectangle from the window server's coordinates, where y
-    /// grows downward from the top of the main display, into AppKit's, where y grows upward from its bottom. Displays can be
-    /// arranged unevenly, so the conversion goes through the display the
-    /// rectangle overlaps most.
+    /// grows downward from the top of the main display, into AppKit's,
+    /// where y grows upward from its bottom. Displays can be arranged
+    /// unevenly, so the conversion goes through the display the rectangle
+    /// overlaps most.
     private func appKitFrame(fromTopLeft rect: CGRect) -> CGRect {
         let displays = NSScreen.screens.compactMap { screen -> (frame: CGRect, bounds: CGRect)? in
             guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
