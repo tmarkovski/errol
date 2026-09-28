@@ -1,6 +1,6 @@
 // What identifies a conversation on each surface, read from the recorded
-// fixtures: the name the destination goes by under the icon and in the
-// log. The fixture facts are the ones the first-run proposal tabulated
+// fixtures: the name the destination goes by in the window chooser and in
+// the log. The fixture facts are the ones the first-run proposal tabulated
 // (docs/design-proposals/first-run-usability): /chat/<uuid> and
 // /epitaxy/<id> name a conversation, /new and /project/<uuid> do not, and
 // ChatGPT exposes no conversation URL at all. Nothing here compares one

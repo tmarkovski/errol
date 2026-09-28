@@ -41,11 +41,11 @@ button. That poll is when the image viewer opened.
 The copy button you could see through the viewer's translucent backdrop was
 not in the tree Errol reads. The press didn't fail. `copyButtons` returned
 nothing, so no press was ever made
-([`pressCopyButton`](../../app/Errol/Errol/Core/RelayActions.swift#L67)).
+([`pressCopyButton`](../../app/Errol/Errol/Core/Relay/RelayActions.swift#L72)).
 
 The retry couldn't help, because it fixes a different problem. It forces a
 LaunchServices activation for the case where Claude isn't in front
-([`copyLastResponse`](../../app/Errol/Errol/Core/RelayActions.swift#L37)).
+([`copyLastResponse`](../../app/Errol/Errol/Core/Relay/RelayActions.swift#L38)).
 Claude was in front the whole time. So when the copy failed, the branch
 after the copy found the window present (`destinationGuard` → `.clear`) and
 the app frontmost, and took the only remaining exit: `.copyFailed`.
@@ -53,7 +53,7 @@ the app frontmost, and took the only remaining exit: `.copyFailed`.
 ## A second problem in the same log: the reply probably wasn't finished
 
 The response watch only logs a line when the reading changes
-([`waitForResponse`](../../app/Errol/Errol/Core/RelayActions.swift#L1010)).
+([`waitForResponse`](../../app/Errol/Errol/Core/Relay/ResponseWait.swift#L191)).
 So every poll from +87s to +355s read exactly `affordances 2, message 5,
 streaming true`, which means Claude's Stop button was still showing until the
 viewer opened. Unless Claude finished within one 1.2-second poll of the
@@ -61,7 +61,7 @@ click, **Claude was still replying when the image was opened**.
 
 The viewer hid the Stop button along with everything else, and that looked
 like the streaming transition.
-[`responseArrived`](../../app/Errol/Errol/Core/RelayActions.swift#L883)
+[`responseArrived`](../../app/Errol/Errol/Core/Relay/ResponseWait.swift#L56)
 returns true on `sawStreaming` once streaming reads false. Two such polls
 completed the wait: "response complete (0 message affordances)".
 
@@ -105,19 +105,19 @@ the embedded image and the session ID replaced.
 
 **Detection** lives in the finders, so the fixtures test the same code the
 relay runs.
-[`ElementNode`](../../app/Errol/Errol/Core/ElementNode.swift#L18) now
+[`ElementNode`](../../app/Errol/Errol/Core/AX/ElementNode.swift#L16) now
 carries `subrole`.
-[`coveringDialog`](../../app/Errol/Errol/Core/Elements.swift#L252) returns
+[`coveringDialog`](../../app/Errol/Errol/Core/Detection/Elements.swift#L345) returns
 the open dialog only when the window has no text area, and `dialogName`
 names it by its title ("Image preview"). The live entry point is
-[`coveringDialogName(in:)`](../../app/Errol/Errol/Core/Elements.swift#L326).
+[`coveringDialogName(in:)`](../../app/Errol/Errol/Core/Detection/Elements.swift#L430).
 Both signals are required. A dialog alone can be a popover that leaves the
 conversation readable, and in that case a copy works, because AXPress acts
 on the element directly and doesn't hit-test. A missing composer alone says
 nothing the human could close.
 
 **A new hold**,
-[`RunBlock.covered(side:by:)`](../../app/Errol/Errol/Core/Destination.swift#L165),
+[`RunBlock.covered(side:by:)`](../../app/Errol/Errol/Core/Relay/RunBlock.swift#L33),
 where `by` is the dialog's name. Its wording:
 
 | | |
@@ -134,7 +134,7 @@ A dialog with no name reads as "A dialog" and "the dialog". It isn't
 frontmost, and here Claude is frontmost the whole time.
 
 **Where it is checked.**
-[`destinationGuard`](../../app/Errol/Errol/Core/Relay.swift#L404) returns
+[`destinationGuard`](../../app/Errol/Errol/Core/Relay/Relay.swift#L201) returns
 the hold before `frontGuard` whenever a covering dialog is found. Every path
 that needs it already goes through that guard:
 
@@ -153,7 +153,7 @@ that needs it already goes through that guard:
   goes back to the gate.
 
 `ComposerState` gains `.covered(by:)`.
-[`composerState(in:)`](../../app/Errol/Errol/Core/Destination.swift#L117)
+[`composerState(in:)`](../../app/Errol/Errol/Core/Detection/Composer.swift#L52)
 returns it when the composer is missing and a dialog is found, and
 `deliveryBlock` maps it to the new hold. Through that one change:
 
@@ -165,7 +165,7 @@ returns it when the composer is missing and a dialog is found, and
   window's state line reads "Covered by “Image preview”".
 
 **The wait's confirming pair starts over on a hold.**
-[`ResponseWaitState.suspend`](../../app/Errol/Errol/Core/RelayActions.swift#L942)
+[`ResponseWaitState.suspend`](../../app/Errol/Errol/Core/Relay/ResponseWait.swift#L115)
 resets `stableTicks`. Without that, one dark poll taken as the viewer
 opened counts toward the two-poll confirmation, and a single poll after the
 viewer closes completes the wait.
