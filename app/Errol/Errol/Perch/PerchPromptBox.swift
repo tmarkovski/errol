@@ -72,11 +72,6 @@ struct PerchRunMetadata: View {
 struct PerchPromptBox: View {
     @Bindable var controller: RelayController
 
-    static let textInset = Perch.s(12)
-    static let corner = Perch.s(16)
-    /// The box's inset above its text and below its toolbar.
-    static let verticalInset = Perch.s(6)
-
     private var editing: Bool { controller.stage == .compose || controller.consoleAccess.pauseGranted }
 
     var body: some View {
@@ -87,7 +82,7 @@ struct PerchPromptBox: View {
                         if controller.stage == .compose { openingEditor } else { steering }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, Self.textInset)
+                    .padding(.horizontal, PerchMetrics.promptTextInset)
                     // The hint starts where the text above it does, and its
                     // bottom lines up with the buttons'.
                     HStack(alignment: .bottom, spacing: Perch.s(8)) {
@@ -99,19 +94,19 @@ struct PerchPromptBox: View {
                         PerchMicButton(controller: controller)
                         PerchConsoleActions(controller: controller)
                     }
-                    .padding(.leading, Self.textInset)
+                    .padding(.leading, PerchMetrics.promptTextInset)
                     .padding(.trailing, Perch.s(7))
                 }
             } else {
                 statusPanel
             }
         }
-        .padding(.vertical, Self.verticalInset)
+        .padding(.vertical, PerchMetrics.promptVerticalInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // A very soft shadow all around lifts the box off the shell.
-        .background(RoundedRectangle(cornerRadius: Self.corner).fill(editing ? Perch.paper : Perch.well)
+        .background(RoundedRectangle(cornerRadius: PerchMetrics.promptCorner).fill(editing ? Perch.paper : Perch.well)
             .shadow(color: Perch.shadow.opacity(0.75), radius: Perch.s(5), y: Perch.s(1)))
-        .overlay(RoundedRectangle(cornerRadius: Self.corner)
+        .overlay(RoundedRectangle(cornerRadius: PerchMetrics.promptCorner)
             .stroke(controller.consoleAccess.pauseGranted ? Perch.accent : Perch.chipEdge,
                     lineWidth: controller.consoleAccess.pauseGranted ? 1.5 : 1))
         .background {
@@ -179,7 +174,7 @@ struct PerchPromptBox: View {
             PerchConsoleActions(controller: controller)
                 .frame(maxHeight: .infinity, alignment: .bottom)
         }
-        .padding(.horizontal, Self.textInset)
+        .padding(.horizontal, PerchMetrics.promptTextInset)
     }
 
     private var headline: String {

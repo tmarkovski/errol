@@ -499,7 +499,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
     private func placeTranscript() {
         guard let transcript = transcriptPanel, transcript.parent != nil else { return }
         let console = panel.frame
-        let size = NSSize(width: PerchConsoleView.promptBoxWidth(consoleWidth: console.width).rounded(),
+        let size = NSSize(width: PerchMetrics.promptBoxWidth(consoleWidth: console.width).rounded(),
                           height: PerchTranscript.height.rounded())
         var origin = NSPoint(x: (console.midX - size.width / 2).rounded(),
                              y: (console.minY - PerchTranscript.gap - size.height).rounded())

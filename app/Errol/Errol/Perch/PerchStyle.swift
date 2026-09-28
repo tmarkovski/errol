@@ -108,7 +108,31 @@ enum Perch {
     static let promptMaximumLines = 3
 }
 
-/// The console and permission screen keep this height through every state.
+/// The console's layout: the measures its columns and its prompt box set,
+/// which the transcript, the focus alert, the canvases and the menu-bar
+/// shell line up against, so they live here rather than on one view.
 enum PerchMetrics {
+    /// The console and permission screen keep this height through every state.
     static let initialPanel = CGSize(width: Perch.widgetWidth, height: Perch.widgetHeight)
+
+    // MARK: The columns
+
+    /// The columns' inset from the capsule's ends, and the gap between a
+    /// column and the middle.
+    static let endInset = Perch.s(28)
+    static let columnGap = Perch.s(14)
+
+    /// The prompt box's width in a console of the given width: what the
+    /// two columns leave between them. The transcript under the console
+    /// takes the same width, to stand as the box's continuation.
+    static func promptBoxWidth(consoleWidth: CGFloat) -> CGFloat {
+        consoleWidth - 2 * (endInset + Perch.participantWidth + columnGap)
+    }
+
+    // MARK: The prompt box
+
+    static let promptTextInset = Perch.s(12)
+    static let promptCorner = Perch.s(16)
+    /// The box's inset above its text and below its toolbar.
+    static let promptVerticalInset = Perch.s(6)
 }

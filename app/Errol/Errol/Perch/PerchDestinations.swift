@@ -23,7 +23,7 @@ struct PerchDestinations: View {
         }
         .animation(reduceMotion ? nil : Perch.spring,
                    value: lines.map { [$0.side.destinationSurface ?? "", $0.destination, $0.problem ?? ""] })
-        .padding(.horizontal, PerchPromptBox.textInset - PerchChip.inset)
+        .padding(.horizontal, PerchMetrics.promptTextInset - PerchChip.inset)
         .frame(height: Perch.s(17))
     }
 

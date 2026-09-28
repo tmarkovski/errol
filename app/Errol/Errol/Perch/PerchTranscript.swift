@@ -36,7 +36,7 @@ struct PerchTranscript: View {
     /// The lines' inset from the window's top and bottom edges, the
     /// prompt's own; it scrolls away with the lines, so a scrolled line
     /// runs to the edge.
-    private static let endInset = PerchPromptBox.verticalInset + GrowingTextEditor.insetHeight
+    private static let endInset = PerchMetrics.promptVerticalInset + GrowingTextEditor.insetHeight
     private static let lineSpacing = Perch.s(4)
     private static let follow = Animation.easeOut(duration: 0.35)
     /// A new line's landing: it rises into place from a little under
@@ -125,10 +125,10 @@ struct PerchTranscript: View {
         }
         // The box's inset: its text starts here too. The lines' top and
         // bottom insets are inside the scrolling, so it reaches the edges.
-        .padding(.horizontal, PerchPromptBox.textInset)
+        .padding(.horizontal, PerchMetrics.promptTextInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: PerchPromptBox.corner).fill(Perch.paper))
-        .overlay(RoundedRectangle(cornerRadius: PerchPromptBox.corner).stroke(Perch.chipEdge, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: PerchMetrics.promptCorner).fill(Perch.paper))
+        .overlay(RoundedRectangle(cornerRadius: PerchMetrics.promptCorner).stroke(Perch.chipEdge, lineWidth: 1))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Conversation summary")
     }
@@ -279,7 +279,7 @@ private struct PerchTranscriptRow: View {
 /// it stands under the console.
 private func card(_ controller: RelayController) -> some View {
     PerchTranscript(controller: controller)
-        .frame(width: PerchConsoleView.promptBoxWidth(consoleWidth: Perch.widgetWidth),
+        .frame(width: PerchMetrics.promptBoxWidth(consoleWidth: Perch.widgetWidth),
                height: PerchTranscript.height)
         .padding(24)
         .background(Color(white: 0.75))

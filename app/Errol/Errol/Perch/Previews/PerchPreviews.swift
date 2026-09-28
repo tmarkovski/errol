@@ -58,7 +58,7 @@ struct PerchPreviewScene: View {
                     .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
                 if summary {
                     PerchTranscript(controller: controller)
-                        .frame(width: PerchConsoleView.promptBoxWidth(consoleWidth: consoleWidth),
+                        .frame(width: PerchMetrics.promptBoxWidth(consoleWidth: consoleWidth),
                                height: PerchTranscript.height)
                         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
                 }
@@ -73,7 +73,7 @@ struct PerchPreviewScene: View {
     /// The tip where PerchTipAnchor puts its panel: a step under the
     /// console, its outer edge on the icon's, running inward.
     private func tip(_ side: Speaker) -> some View {
-        let edge = PerchConsoleView.endInset + (Perch.participantWidth - PerchAvatar.slot) / 2
+        let edge = PerchMetrics.endInset + (Perch.participantWidth - PerchAvatar.slot) / 2
         let x = side == .chatgpt ? edge : consoleWidth - edge - tipWidth
         return PerchTip(content: PerchParticipantTip(controller: controller, speaker: side)) { size in
             tipWidth = size.width

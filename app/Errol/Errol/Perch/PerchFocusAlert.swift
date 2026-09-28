@@ -85,7 +85,9 @@ struct PerchFocusAlert: View {
                 .help("Stop at the next safe point")
                 .frame(width: Perch.participantWidth)
         }
-        .padding(.horizontal, Perch.s(28))
+        // The console's own end inset, so the blank column and Stop sit
+        // over the participants' columns under the wash.
+        .padding(.horizontal, PerchMetrics.endInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // The wash takes every click the console would have, and still
         // drags the window like the bare surface under it.

@@ -8,21 +8,9 @@ struct PerchConsoleView: View {
     let controller: RelayController
     var width: CGFloat = Perch.widgetWidth
 
-    /// The columns' inset from the capsule's ends, and the gap between a
-    /// column and the middle.
-    static let endInset = Perch.s(28)
-    static let columnGap = Perch.s(14)
-
-    /// The prompt box's width in a console of the given width: what the
-    /// two columns leave between them. The transcript under the console
-    /// takes the same width, to stand as the box's continuation.
-    static func promptBoxWidth(consoleWidth: CGFloat) -> CGFloat {
-        consoleWidth - 2 * (endInset + Perch.participantWidth + columnGap)
-    }
-
     var body: some View {
         let focusAsk = PerchFocusAlert.ask(for: controller)
-        HStack(spacing: Self.columnGap) {
+        HStack(spacing: PerchMetrics.columnGap) {
             PerchParticipant(controller: controller, speaker: .chatgpt)
             VStack(alignment: .leading, spacing: Perch.s(5)) {
                 PerchTopicLine(controller: controller)
@@ -33,7 +21,7 @@ struct PerchConsoleView: View {
             .layoutPriority(1)
             PerchParticipant(controller: controller, speaker: .claude)
         }
-        .padding(.horizontal, Self.endInset)
+        .padding(.horizontal, PerchMetrics.endInset)
         .padding(.vertical, Perch.s(8))
         // Under the alert, the console is only something to see through,
         // softened so its lines do not compete with the ask.
@@ -89,7 +77,7 @@ struct PerchTopicLine: View {
             PerchAppMenuButton(controller: controller)
         }
         .animation(reduceMotion ? nil : Perch.spring, value: [starterTitle, endingTitle, windowsTitle])
-        .padding(.leading, PerchPromptBox.textInset - PerchChip.inset)
+        .padding(.leading, PerchMetrics.promptTextInset - PerchChip.inset)
         .padding(.trailing, Perch.s(7) - PerchChip.inset)
         .frame(height: Perch.s(22))
     }
