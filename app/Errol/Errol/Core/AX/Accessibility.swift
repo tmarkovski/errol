@@ -16,29 +16,42 @@ func axChildren(_ element: AXUIElement) -> [AXUIElement] {
     (axAttribute(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
 }
 
+/// The attributes a label joins, in the order it joins them. captureSubtree
+/// writes the same four under the fixture keys, and FixtureElement.label
+/// joins its fields in this order.
+let axLabelAttributes = [kAXDescriptionAttribute, kAXTitleAttribute, kAXHelpAttribute, "AXLabel"]
+
 /// Empty attributes are dropped before joining: Chromium reports AXTitle as
 /// "" (not absent) next to a real AXDescription, and keeping it would leave a
 /// stray trailing separator — harmless to the contains-based selectors, fatal
 /// to exact parses like messageOrdinal ("Message 6 " is not a number), and a
 /// silent divergence from FixtureElement.label, whose captures never carry
 /// empty strings.
+///
+/// One batched read rather than four: every label read is synchronous IPC
+/// into the other app, and the finders read labels on every button of a
+/// whole-window walk. An attribute the element lacks comes back as an error
+/// placeholder, which the String cast drops, just as a failed single read
+/// did; a failed call (an element the app has torn down) reads as no label.
 func axLabel(_ element: AXUIElement) -> String {
-    [kAXDescriptionAttribute, kAXTitleAttribute, kAXHelpAttribute, "AXLabel"]
-        .compactMap { axAttribute(element, $0) as? String }
+    var values: CFArray?
+    guard AXUIElementCopyMultipleAttributeValues(element, axLabelAttributes as CFArray,
+                                                 AXCopyMultipleAttributeOptions(), &values) == .success
+    else { return "" }
+    return ((values as? [AnyObject]) ?? [])
+        .compactMap { $0 as? String }
         .filter { !$0.isEmpty }
         .joined(separator: " ")
 }
 
+/// The live face of the generic walk in ElementNode.swift, for callers that
+/// hold raw AXUIElements; the depth limit and the order are the same.
 func findAll(in element: AXUIElement,
-             depth: Int = 0,
-             maxDepth: Int = 80,
              where predicate: (AXUIElement) -> Bool,
              into results: inout [AXUIElement]) {
-    guard depth <= maxDepth else { return }
-    if predicate(element) { results.append(element) }
-    for child in axChildren(element) {
-        findAll(in: child, depth: depth + 1, maxDepth: maxDepth, where: predicate, into: &results)
-    }
+    var found: [LiveElement] = []
+    findAll(in: LiveElement(ax: element), where: { predicate($0.ax) }, into: &found)
+    results += found.map(\.ax)
 }
 
 // MARK: - Diagnostics
@@ -121,7 +134,7 @@ func describeElement(_ element: AXUIElement) -> String {
 /// hold — plus a "frame" key and the truncation markers, which the fixture
 /// decoder ignores. So the composer a paste was lost in can be replayed
 /// through the very finders that lost it, in a test, with no app open.
-/// Long values are cut at `valueLimit` and marked; the node budget stops
+/// Long values are cut at 4000 characters and marked; the node budget stops
 /// the walk before a whole conversation comes along.
 struct SubtreeCapture {
     var json: Data
@@ -129,16 +142,16 @@ struct SubtreeCapture {
     var truncated: Bool
 }
 
-func captureSubtree(_ root: AXUIElement, maxNodes: Int = 500, maxDepth: Int = 16,
-                    valueLimit: Int = 4000) -> SubtreeCapture? {
+func captureSubtree(_ root: AXUIElement, maxNodes: Int = 500, maxDepth: Int = 16) -> SubtreeCapture? {
+    let valueLimit = 4000
+    let keys = [("role", kAXRoleAttribute), ("subrole", kAXSubroleAttribute)]
+        + Array(zip(["description", "title", "help", "label"], axLabelAttributes))
     var budget = maxNodes
     var truncated = false
     func node(_ element: AXUIElement, depth: Int) -> [String: Any] {
         budget -= 1
         var item: [String: Any] = [:]
-        for (key, attribute) in [("role", kAXRoleAttribute), ("subrole", kAXSubroleAttribute),
-                                 ("description", kAXDescriptionAttribute), ("title", kAXTitleAttribute),
-                                 ("help", kAXHelpAttribute), ("label", "AXLabel")] {
+        for (key, attribute) in keys {
             if let text = axAttribute(element, attribute) as? String, !text.isEmpty { item[key] = text }
         }
         if let value = axAttribute(element, kAXValueAttribute) {

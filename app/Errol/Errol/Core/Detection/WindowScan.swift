@@ -98,7 +98,7 @@ func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> W
 
 private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: inout WindowScan,
                                       selectors: AppSelectors) {
-    guard depth <= 80 else { return }
+    guard depth <= axMaxTreeDepth else { return }
     let role = element.role ?? ""
 
     if role == kAXButtonRole as String {
@@ -114,11 +114,10 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, into scan: in
             || selectors.messageActionsLabel.map({ label.localizedCaseInsensitiveContains($0) }) == true {
             scan.messageAffordances += 1
         }
-        if !scan.isReplying, label.localizedCaseInsensitiveContains(selectors.stopKeyword) {
+        if !scan.isReplying, isStopButtonLabel(label, selectors: selectors) {
             scan.isReplying = true
         }
-        if let remove = selectors.pastedTextAttachmentRemoveLabel,
-           label.localizedCaseInsensitiveContains(remove) {
+        if isPastedTextRemoveLabel(label, selectors: selectors) {
             scan.attachmentChips += 1
         }
     } else if role == kAXTextAreaRole as String || role == kAXTextFieldRole as String {

@@ -25,16 +25,42 @@ protocol ElementNode {
     var children: [Self] { get }
 }
 
+/// How deep the finders and the readiness scan walk a window's tree. The
+/// captures and the evidence dump keep budgets of their own.
+let axMaxTreeDepth = 80
+
+/// Every node the predicate accepts, depth-first in tree order.
 func findAll<Node: ElementNode>(in node: Node,
-                                depth: Int = 0,
-                                maxDepth: Int = 80,
                                 where predicate: (Node) -> Bool,
                                 into results: inout [Node]) {
-    guard depth <= maxDepth else { return }
+    collect(node, depth: 0, where: predicate, into: &results)
+}
+
+private func collect<Node: ElementNode>(_ node: Node, depth: Int,
+                                        where predicate: (Node) -> Bool,
+                                        into results: inout [Node]) {
+    guard depth <= axMaxTreeDepth else { return }
     if predicate(node) { results.append(node) }
     for child in node.children {
-        findAll(in: child, depth: depth + 1, maxDepth: maxDepth, where: predicate, into: &results)
+        collect(child, depth: depth + 1, where: predicate, into: &results)
     }
+}
+
+/// The first node the predicate accepts, in the same order and to the same
+/// depth as findAll — so the node findAll would list first — without
+/// walking the rest of the tree once it is found.
+func firstMatch<Node: ElementNode>(in node: Node, where predicate: (Node) -> Bool) -> Node? {
+    firstMatch(node, depth: 0, where: predicate)
+}
+
+private func firstMatch<Node: ElementNode>(_ node: Node, depth: Int,
+                                           where predicate: (Node) -> Bool) -> Node? {
+    guard depth <= axMaxTreeDepth else { return nil }
+    if predicate(node) { return node }
+    for child in node.children {
+        if let match = firstMatch(child, depth: depth + 1, where: predicate) { return match }
+    }
+    return nil
 }
 
 // MARK: - Live trees
@@ -73,6 +99,8 @@ struct FixtureElement: ElementNode, Equatable {
     var urlString: String?
     var children: [FixtureElement] = []
 
+    /// The order is axLabelAttributes' (description, title, help, AXLabel);
+    /// FixtureElementTests pins it.
     var label: String {
         [axDescription, title, help, axLabelText].compactMap { $0 }
             .filter { !$0.isEmpty }

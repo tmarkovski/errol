@@ -183,8 +183,8 @@ struct Verify {
         }
     }
 
-    // The draft guard (composerDraft / composerPlaceholders) lives in
-    // ErrolKit now, shared with the live test category.
+    // The draft guard (composerSafety over composerPlaceholders) lives in
+    // ErrolVerification, shared with the live test category.
 
     // MARK: nudge tier — reversible UI touches
 
@@ -206,17 +206,13 @@ struct Verify {
             return
         }
         guard let binding = TargetBinding(target, context: .existing) else { report("FAIL", "nudge-window", "no stable window"); return }
+        // A conversation mid-run morphs the composer controls (Send becomes
+        // Stop/Queue), so the checks below would report app breakage that is
+        // really just a busy conversation.
         let safe = composerSafety(value: axAttribute(originalInput, kAXValueAttribute) as? String,
                                   attachments: attachmentControls(originalInput, target: target).count,
                                   busy: hasStopButton(in: target))
         guard safe.status == .passed else { report("SKIP", "nudge-paste", safe.detail); return }
-        // A conversation mid-run morphs the composer controls (Send becomes
-        // Stop/Queue), so the checks below would report app breakage that is
-        // really just a busy conversation.
-        guard !hasStopButton(in: target) else {
-            report("SKIP", "nudge-paste", "displayed conversation is mid-run — rerun when it is idle")
-            return
-        }
         let needle = "errol-verify probe text"
         pasteboard.clearContents()
         pasteboard.setString(needle, forType: .string)

@@ -1,8 +1,9 @@
 // Element finders. The detection logic is generic over ElementNode so the
 // same code runs against live AXUIElements and recorded fixture trees; the
 // TargetApp entry points below are the live face of it. Everything is scoped
-// to one chosen chat window per app, re-resolved on every call so window
-// churn during a run doesn't leave us holding a dead reference.
+// to one chat window per app: the target's bound window when it has one,
+// never substituted, since a dead bound window yields nothing; otherwise
+// chooseChatWindow's pick, resolved again on every call.
 
 import ApplicationServices
 import Foundation
@@ -59,18 +60,14 @@ func isExclusionMarker(role: String, label: String, selected: Bool, selectors: A
 func isExcludedWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> Bool {
     guard selectors.excludedWorldName != nil || !selectors.windowExcludeLabels.isEmpty
     else { return false }
-    var hits: [Node] = []
-    findAll(in: window, where: { el in
+    return firstMatch(in: window, where: { el in
         guard let role = el.role else { return false }
         return isExclusionMarker(el, role: role, selectors: selectors)
-    }, into: &hits)
-    return !hits.isEmpty
+    }) != nil
 }
 
 func hasTextArea<Node: ElementNode>(_ window: Node) -> Bool {
-    var areas: [Node] = []
-    findAll(in: window, where: { $0.role == kAXTextAreaRole as String }, into: &areas)
-    return !areas.isEmpty
+    firstMatch(in: window, where: { $0.role == kAXTextAreaRole as String }) != nil
 }
 
 /// The window all searches are scoped to: the first chat window, preferring
@@ -92,6 +89,29 @@ func isCopyButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
     return true
 }
 
+// The button rules below take a label already read, so a walk that reads
+// each button's label once (messageAffordances, the readiness scan) can test
+// it against several of them without restating any.
+
+/// The collapsed stand-in for a message's whole action bar; never on an app
+/// without one.
+func isMessageActionsToggleLabel(_ label: String, selectors: AppSelectors) -> Bool {
+    guard let actions = selectors.messageActionsLabel else { return false }
+    return label.localizedCaseInsensitiveContains(actions)
+}
+
+/// The control that stops a reply in progress.
+func isStopButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
+    label.localizedCaseInsensitiveContains(selectors.stopKeyword)
+}
+
+/// The remove button on a long paste's attachment chip; never on an app
+/// that does not turn long pastes into chips.
+func isPastedTextRemoveLabel(_ label: String, selectors: AppSelectors) -> Bool {
+    guard let remove = selectors.pastedTextAttachmentRemoveLabel else { return false }
+    return label.localizedCaseInsensitiveContains(remove)
+}
+
 func isCopyButton<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -> Bool {
     guard element.role == kAXButtonRole as String else { return false }
     return isCopyButtonLabel(element.label, selectors: selectors)
@@ -100,9 +120,9 @@ func isCopyButton<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -
 /// The collapsed stand-in for a message's whole action bar (Claude Code's
 /// "Show message actions"); pressing it mounts the bar and removes itself.
 func isMessageActionsToggle<Node: ElementNode>(_ element: Node, selectors: AppSelectors) -> Bool {
-    guard let label = selectors.messageActionsLabel else { return false }
+    guard selectors.messageActionsLabel != nil else { return false }
     guard element.role == kAXButtonRole as String else { return false }
-    return element.label.localizedCaseInsensitiveContains(label)
+    return isMessageActionsToggleLabel(element.label, selectors: selectors)
 }
 
 func copyButtons<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
@@ -114,12 +134,16 @@ func copyButtons<Node: ElementNode>(under root: Node, selectors: AppSelectors) -
 /// Exactly one per rendered message: its mounted copy button, or the collapsed
 /// toggle standing in for the bar. Counting these is counting messages, which
 /// is what the completion baselines actually need; the tree walk is
-/// depth-first, so the last element belongs to the newest message.
+/// depth-first, so the last element belongs to the newest message. Role and
+/// label are read once per node for both rules: this walk runs on every
+/// tick of a reply wait, and each read is IPC into the app.
 func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
     var results: [Node] = []
-    findAll(in: root, where: {
-        isCopyButton($0, selectors: selectors)
-            || isMessageActionsToggle($0, selectors: selectors)
+    findAll(in: root, where: { el in
+        guard el.role == kAXButtonRole as String else { return false }
+        let label = el.label
+        return isCopyButtonLabel(label, selectors: selectors)
+            || isMessageActionsToggleLabel(label, selectors: selectors)
     }, into: &results)
     return results
 }
@@ -130,15 +154,17 @@ func messageAffordances<Node: ElementNode>(under root: Node, selectors: AppSelec
 /// read through the joined label, with AXTitle kept as a candidate). nil for
 /// everything else — including the sidebar hazards ("Message actions
 /// button…" session rows are AXButtons, and the whole-string numeric parse
-/// rejects any label with more after the number).
+/// rejects any label with more after the number). The label is read only
+/// when the title does not parse, which saves a read on every group whose
+/// title answers without changing which text wins.
 func messageOrdinal<Node: ElementNode>(_ element: Node) -> Int? {
     guard element.role == kAXGroupRole as String else { return nil }
-    for text in [element.title, element.label] {
-        guard let text, text.hasPrefix("Message "),
-              let ordinal = Int(text.dropFirst("Message ".count)) else { continue }
-        return ordinal
-    }
-    return nil
+    return ordinal(inMessageName: element.title) ?? ordinal(inMessageName: element.label)
+}
+
+private func ordinal(inMessageName text: String?) -> Int? {
+    guard let text, text.hasPrefix("Message ") else { return nil }
+    return Int(text.dropFirst("Message ".count))
 }
 
 /// The newest message's ordinal, nil where messages are unnumbered (ChatGPT).
@@ -147,19 +173,24 @@ func messageOrdinal<Node: ElementNode>(_ element: Node) -> Int? {
 /// 2026 with only "Message 6"–"Message 8" mounted of 8 — so the affordance
 /// count can plateau or fall while the ordinal of the always-mounted newest
 /// message keeps rising.
+///
+/// One walk that keeps the highest ordinal as it goes, so each group's
+/// ordinal is read once and nothing is collected.
 func lastMessageOrdinal<Node: ElementNode>(under root: Node) -> Int? {
-    var groups: [Node] = []
-    findAll(in: root, where: { messageOrdinal($0) != nil }, into: &groups)
-    return groups.compactMap(messageOrdinal).max()
+    var newest: Int?
+    var none: [Node] = []
+    findAll(in: root, where: { el in
+        if let ordinal = messageOrdinal(el) { newest = max(newest ?? ordinal, ordinal) }
+        return false
+    }, into: &none)
+    return newest
 }
 
 func hasStopButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Bool {
-    var results: [Node] = []
-    findAll(in: root, where: { el in
+    firstMatch(in: root, where: { el in
         guard el.role == kAXButtonRole as String else { return false }
-        return el.label.localizedCaseInsensitiveContains(selectors.stopKeyword)
-    }, into: &results)
-    return !results.isEmpty
+        return isStopButtonLabel(el.label, selectors: selectors)
+    }) != nil
 }
 
 func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
@@ -170,12 +201,10 @@ func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
 }
 
 func sendButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Node? {
-    var results: [Node] = []
-    findAll(in: root, where: { el in
+    firstMatch(in: root, where: { el in
         guard el.role == kAXButtonRole as String else { return false }
         return isSendButtonLabel(el.label, selectors: selectors)
-    }, into: &results)
-    return results.first
+    })
 }
 
 /// Count the long-paste attachment chips under one composer container. The
@@ -184,11 +213,11 @@ func sendButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) ->
 /// conversation history and must not confirm a new paste.
 func pastedTextAttachmentCount<Node: ElementNode>(under root: Node,
                                                    selectors: AppSelectors) -> Int {
-    guard let removeLabel = selectors.pastedTextAttachmentRemoveLabel else { return 0 }
+    guard selectors.pastedTextAttachmentRemoveLabel != nil else { return 0 }
     var results: [Node] = []
     findAll(in: root, where: { element in
         element.role == kAXButtonRole as String
-            && element.label.localizedCaseInsensitiveContains(removeLabel)
+            && isPastedTextRemoveLabel(element.label, selectors: selectors)
     }, into: &results)
     return results.count
 }
@@ -266,10 +295,6 @@ func dialogName<Node: ElementNode>(_ dialog: Node) -> String {
 
 func isExcludedWindow(_ window: AXUIElement, selectors: AppSelectors) -> Bool {
     isExcludedWindow(LiveElement(ax: window), selectors: selectors)
-}
-
-func hasTextArea(_ window: AXUIElement) -> Bool {
-    hasTextArea(LiveElement(ax: window))
 }
 
 /// Whether a window element still answers: one the app has torn down
@@ -369,12 +394,4 @@ func inputArea(in target: TargetApp) -> AXUIElement? {
 func composerValue(in target: TargetApp) -> String? {
     guard let input = inputArea(in: target) else { return nil }
     return axAttribute(input, kAXValueAttribute) as? String
-}
-
-/// The composer's text when it holds a real draft; nil when it is empty or
-/// showing a known placeholder (composerPlaceholders in Config.swift).
-func composerDraft(in target: TargetApp) -> String? {
-    let value = (composerValue(in: target) ?? "")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    return composerPlaceholders.contains(value) ? nil : value
 }

@@ -48,8 +48,7 @@ func inspectReport(_ target: TargetApp) -> String {
             var marker = ""
             if isCopyButtonLabel(key, selectors: target.selectors) {
                 marker = "  <- matches copy selector"
-            } else if let actions = target.selectors.messageActionsLabel,
-                      key.localizedCaseInsensitiveContains(actions) {
+            } else if isMessageActionsToggleLabel(key, selectors: target.selectors) {
                 marker = "  <- message-actions toggle"
             }
             lines.append("     \(counts[key]!)x \(key)\(marker)")
