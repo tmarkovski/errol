@@ -7,8 +7,12 @@ final class PromptTextLayout {
     private let layout = NSLayoutManager()
     private let container = NSTextContainer(
         containerSize: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-    private var cachedFit: (text: String, width: CGFloat, preferred: NSFont,
-                            minimum: CGFloat, font: NSFont)?
+    // The fit is cached per width because GrowingTextEditor measures the same
+    // draft at two: sizeThatFits gets SwiftUI's unrounded proposal (582.8)
+    // and the coordinator's updateFont the pixel-rounded bounds (583.0). A
+    // single entry alternated between them and missed twice per keystroke.
+    private var fitKey: (text: String, preferred: NSFont, minimum: CGFloat)?
+    private var fitsByWidth: [CGFloat: NSFont] = [:]
 
     init() {
         container.lineFragmentPadding = 0
@@ -22,9 +26,12 @@ final class PromptTextLayout {
             return preferred
         }
         let minimum = min(preferred.pointSize, max(1, minimumSize))
-        if let cachedFit, cachedFit.text == text, cachedFit.width == width,
-           cachedFit.preferred == preferred, cachedFit.minimum == minimum {
-            return cachedFit.font
+        if let fitKey, fitKey.text == text, fitKey.preferred == preferred,
+           fitKey.minimum == minimum {
+            if let cached = fitsByWidth[width] { return cached }
+        } else {
+            fitsByWidth.removeAll()
+            fitKey = (text, preferred, minimum)
         }
 
         func font(at size: CGFloat) -> NSFont {
@@ -53,7 +60,10 @@ final class PromptTextLayout {
             }
             result = font(at: lower)
         }
-        cachedFit = (text, width, preferred, minimum, result)
+        // SwiftUI probes a few more widths during a layout pass; four
+        // entries hold them without letting a resize drag grow the cache.
+        if fitsByWidth.count >= 4 { fitsByWidth.removeAll() }
+        fitsByWidth[width] = result
         return result
     }
 
