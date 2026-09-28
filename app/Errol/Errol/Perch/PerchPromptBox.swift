@@ -45,7 +45,7 @@ extension RelayController {
     }
 }
 
-/// The run's turn and clock, at the status line's trailing end.
+/// The run's turn and clock, under the status headline.
 struct PerchRunMetadata: View {
     let controller: RelayController
 
@@ -217,16 +217,9 @@ struct PerchPromptBox: View {
     /// Return sends only when Send would: a refusal the status line already
     /// explains is not also recorded as a failed start.
     private var openingEditor: some View {
-        GrowingTextEditor(text: $controller.topic,
-                          font: Perch.promptFont,
-                          minimumFontSize: Perch.promptMinimumFontSize,
-                          textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
-                          placeholderColor: Perch.placeholderNS,
-                          placeholder: controller.topic.isEmpty ? "What should they work on together?" : nil,
-                          minimumLines: 1, maximumLines: Perch.promptMaximumLines,
-                          fitsAvailableHeight: true,
-                          takesFocusOnAppear: true,
-                          onSubmit: { if controller.sendBlocker == nil { controller.start() } })
+        promptEditor($controller.topic,
+                     placeholder: controller.topic.isEmpty ? "What should they work on together?" : nil,
+                     onSubmit: { if controller.sendBlocker == nil { controller.start() } })
     }
 
     // MARK: During a run
@@ -234,28 +227,39 @@ struct PerchPromptBox: View {
     /// The note editor. What its keys do is said under the box
     /// (RelayController.steeringHint).
     private var steering: some View {
-        GrowingTextEditor(text: Binding(get: { controller.steeringText },
-                                           set: { controller.setSteeringText($0) }),
-                              font: Perch.promptFont,
-                              minimumFontSize: Perch.promptMinimumFontSize,
-                              textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
-                              placeholderColor: Perch.placeholderNS,
-                              placeholder: controller.steeringText.isEmpty
-                                  ? "A note for the next handoff\u{2026}" : nil,
-                              minimumLines: 1, maximumLines: Perch.promptMaximumLines,
-                              fitsAvailableHeight: true, takesFocusOnAppear: true,
-                              onSubmit: { controller.sendSteering() },
-                              onEscape: { _ in controller.escapeSteering() },
-                              session: controller.steeringEditor)
+        promptEditor(Binding(get: { controller.steeringText },
+                             set: { controller.setSteeringText($0) }),
+                     placeholder: controller.steeringText.isEmpty
+                         ? "A note for the next handoff\u{2026}" : nil,
+                     onSubmit: { controller.sendSteering() },
+                     onEscape: { controller.escapeSteering() },
+                     session: controller.steeringEditor)
     }
 
+    // MARK: Both editors
+
+    /// An editor in the prompt box's type and ink, one line at rest and
+    /// scrolling past Perch.promptMaximumLines; only the text, its hint and
+    /// what Return and Esc do differ between the topic and the note.
+    private func promptEditor(_ text: Binding<String>, placeholder: String?,
+                              onSubmit: (() -> Void)? = nil, onEscape: (() -> Void)? = nil,
+                              session: TextEditorSession? = nil) -> GrowingTextEditor {
+        GrowingTextEditor(text: text,
+                          font: Perch.promptFont,
+                          minimumFontSize: Perch.promptMinimumFontSize,
+                          textColor: Perch.inkNS, caretColor: Perch.accentTextNS,
+                          placeholderColor: Perch.placeholderNS,
+                          placeholder: placeholder,
+                          minimumLines: 1, maximumLines: Perch.promptMaximumLines,
+                          onSubmit: onSubmit, onEscape: onEscape, session: session)
+    }
 }
 
 // MARK: - The actions
 
 /// The primary action and run controls stay at the trailing end.
 struct PerchConsoleActions: View {
-    @Bindable var controller: RelayController
+    let controller: RelayController
 
     private var setup: SetupController { controller.setup }
 
@@ -277,7 +281,8 @@ struct PerchConsoleActions: View {
         [Speaker.chatgpt, .claude].filter { setup.state[$0].presence == .notRunning }
     }
 
-    /// Apps open only through this explicit action or the participant popover.
+    /// Apps open only through this explicit action, or a click on a side's
+    /// icon or its destination line while that app is closed.
     private var open: some View {
         let title = closedApps.count == 2 ? "Open both apps" : "Open \(setup.name(closedApps[0]))"
         return PerchCapsuleButton(title: title, icon: "arrow.up.right") { setup.launchBoth() }

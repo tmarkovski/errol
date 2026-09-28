@@ -70,36 +70,22 @@ struct GrowingTextEditor: NSViewRepresentable {
     var caretColor: NSColor?
     var placeholderColor: NSColor = .placeholderTextColor
     var placeholder: String?
-    var minimumLines = 8
-    var maximumLines = 13
-    /// Height the editor holds beyond its minimum lines: what the composer
-    /// hands it when a row above is absent, so the card keeps one height
-    /// whether or not that row is showing (Perch.previewZoneHeight).
-    var extraMinimumHeight: CGFloat = 0
-    /// Console editors scroll within the fixed capsule instead of increasing
-    /// its height. Other editors retain their content-driven sizing.
-    var fitsAvailableHeight = false
-    /// When set, the editor takes the keyboard as soon as it is in a window
-    /// — for a field that opens on a click elsewhere, so the next thing
-    /// typed lands in it.
-    var takesFocusOnAppear = false
+    var minimumLines: Int
+    var maximumLines: Int
     /// When set, Return submits instead of breaking the line (Shift-Return
     /// still breaks one) — the chat-composer contract, for the fields whose
     /// text is a message to send rather than prose to shape.
     var onSubmit: (() -> Void)?
     /// When set, Esc reports out instead of invoking NSTextView's word
-    /// completion — the way a steer editor gets called off. The text view
-    /// comes along so the handler can also just leave focus.
-    var onEscape: ((NSTextView) -> Void)?
+    /// completion, the way a steer editor gets called off.
+    var onEscape: (() -> Void)?
     var session: TextEditorSession?
 
     /// The text's inset above and below, inside the editor.
     static let insetHeight: CGFloat = 2
 
-    /// The height the editor settles at for `lines` of `font`, insets
-    /// included — for a view that stands in for the editor and must not
-    /// move the card when the two swap.
-    static func height(lines: Int, font: NSFont) -> CGFloat {
+    /// The editor's minimum height for `lines` of `font`, insets included.
+    private static func height(lines: Int, font: NSFont) -> CGFloat {
         ceil(NSLayoutManager().defaultLineHeight(for: font)) * CGFloat(lines) + insetHeight * 2
     }
 
@@ -147,13 +133,13 @@ struct GrowingTextEditor: NSViewRepresentable {
         session?.attach(textView)
         textView.isEditable = context.environment.isEnabled && (session?.acceptsInput ?? true)
         textView.isSelectable = textView.isEditable
-        if takesFocusOnAppear {
-            // No window yet while the view is being made; by the next turn
-            // of the loop it is in one.
-            DispatchQueue.main.async {
-                guard textView.isEditable, session?.acceptsInput != false else { return }
-                textView.window?.makeFirstResponder(textView)
-            }
+        // The editor takes the keyboard as soon as it is in a window: it
+        // opens on a click elsewhere, so the next thing typed lands in it.
+        // No window yet while the view is being made; by the next turn of
+        // the loop it is in one.
+        DispatchQueue.main.async {
+            guard textView.isEditable, session?.acceptsInput != false else { return }
+            textView.window?.makeFirstResponder(textView)
         }
         return scrollView
     }
@@ -188,7 +174,7 @@ struct GrowingTextEditor: NSViewRepresentable {
             for: textView.string, width: width, preferred: font, minimumSize: minimumFontSize)
         let lineHeight = NSLayoutManager().defaultLineHeight(for: fittedFont)
         let insets = textView.textContainerInset.height * 2
-        let minimumHeight = Self.height(lines: minimumLines, font: font) + extraMinimumHeight
+        let minimumHeight = Self.height(lines: minimumLines, font: font)
         let maximumHeight = max(ceil(lineHeight * CGFloat(maximumLines)) + insets, minimumHeight)
         guard width > 0 else {
             return CGSize(width: width, height: minimumHeight)
@@ -203,7 +189,8 @@ struct GrowingTextEditor: NSViewRepresentable {
         let contentHeight = ceil(context.coordinator.textLayout.textHeight(
             measuredText, width: width) + insets)
         var height = min(max(contentHeight, minimumHeight), maximumHeight)
-        if fitsAvailableHeight, let available = proposal.height, available.isFinite {
+        // The console's editors scroll within the fixed capsule instead of growing it.
+        if let available = proposal.height, available.isFinite {
             height = min(height, max(minimumHeight, available))
         }
         return CGSize(width: width, height: height)
@@ -261,7 +248,7 @@ struct GrowingTextEditor: NSViewRepresentable {
             if commandSelector == #selector(NSResponder.cancelOperation(_:))
                 || commandSelector == #selector(NSStandardKeyBindingResponding.complete(_:)),
                let onEscape = parent.onEscape {
-                onEscape(textView)
+                onEscape()
                 return true
             }
             return false
@@ -281,7 +268,7 @@ private final class TrailingPlaceholderTextView: NSTextView {
     }
 
     var placeholderColor: NSColor = .placeholderTextColor {
-        didSet { needsDisplay = true }
+        didSet { if placeholderColor != oldValue { needsDisplay = true } }
     }
     /// A real NSView inside the panel, so the hosting view's claim on the
     /// first click (FirstMouseHostingView) does not cover it: AppKit asks the

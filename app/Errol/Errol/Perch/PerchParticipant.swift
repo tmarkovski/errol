@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct PerchParticipant: View {
-    @Bindable var controller: RelayController
+    let controller: RelayController
     let speaker: Speaker
     @State private var hovering = false
     /// The tip, once the pointer has rested on the icon a moment.
