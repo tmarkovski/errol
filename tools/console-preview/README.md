@@ -17,6 +17,6 @@ tools/console-preview/render /tmp/errol-preview canvas
 tools/console-preview/render /tmp/errol-preview --dark canvas-05 canvas-18
 ```
 
-Assertions in states 08, 09, and 14 exercise the production controller: a pending pause cannot show a window, a granted hold and note survive Show window, Resume cannot release that hold until the action completes, and both relay-operation gates stay blocked. These are simulated interaction checks, not live copy/send or VoiceOver tests.
+Assertions in states 08, 09, and 14 exercise the production controller: a pending pause cannot show a window, a granted hold and note survive focusing a side's window, Resume cannot release that hold until the window is up, and both relay-operation gates stay blocked. These are simulated interaction checks, not live copy/send or VoiceOver tests.
 
 The renderer stores its executable and module cache in `/private/tmp/errol-console-preview`. Override this with `ERROL_PREVIEW_BUILD` when needed.

@@ -140,8 +140,6 @@ private struct PerchTranscriptRow: View {
     let controller: RelayController
     let entry: TranscriptEntry
     let isNewest: Bool
-    @State private var hovering = false
-    @FocusState private var actionFocused: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Perch.s(7)) {
@@ -177,24 +175,7 @@ private struct PerchTranscriptRow: View {
             }
             Spacer(minLength: 0)
         }
-        .overlay(alignment: .trailing) {
-            if let side = actionSide, controller.consoleAccess.canShowWindow {
-                Button("Show \(controller.appName(side)) window") { controller.showWindow(side) }
-                    .font(Perch.text(10)).buttonStyle(.plain).foregroundStyle(Perch.accentText)
-                    .fixedSize().focused($actionFocused)
-                    .padding(.leading, Perch.s(8)).padding(.vertical, Perch.s(2))
-                    .background(Perch.paper)
-                    .opacity(hovering || actionFocused ? 1 : 0)
-                    .help("Show the connected window; its current conversation may have changed")
-            }
-        }
-        .contentShape(Rectangle()).onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
-    }
-
-    private var actionSide: Speaker? {
-        if case .side(let side) = entry.author { return side }
-        return entry.recipient
     }
 
     private var author: String {

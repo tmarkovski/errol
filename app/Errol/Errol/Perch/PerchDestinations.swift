@@ -39,7 +39,7 @@ struct PerchDestinations: View {
                 Button { controller.setup.launch(info.speaker) } label: { text(info).perchChip() }
                     .buttonStyle(.plain)
             case .focus:
-                Button { controller.showWindow(info.speaker, returningKeyboard: false) } label: { text(info).perchChip() }
+                Button { controller.showWindow(info.speaker) } label: { text(info).perchChip() }
                     .buttonStyle(.plain)
             case nil:
                 text(info)

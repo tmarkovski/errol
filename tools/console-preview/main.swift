@@ -177,7 +177,7 @@ func main() {
         precondition(c.isSteering && c.steeringText.contains("Push on"))
         precondition(c.isShowingWindow && !c.consoleAccess.canResume)
         c.sendSteering()
-        precondition(c.isSteering, "Resume must wait for Show window")
+        precondition(c.isSteering, "Resume must wait for the window to come forward")
         pumpUntil(3) { !c.isShowingWindow }
         precondition(c.consoleAccess.canResume && c.steeringText.contains("Push on"))
         precondition(engine.control.isPaused)

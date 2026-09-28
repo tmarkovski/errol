@@ -142,19 +142,14 @@ final class RelayController {
                       focusOperationActive: control.hasFocusOperation)
     }
 
-    /// Brings a side's window forward. Show window hands the keyboard back
-    /// to the console once the window is up, and to the note during a pause;
-    /// a click on the side's icon focuses the app, so it leaves the keyboard
-    /// there (`returningKeyboard: false`).
-    func showWindow(_ side: Speaker, returningKeyboard: Bool = true) {
+    /// Brings a side's window forward, from a click on the side's icon or
+    /// its destination line. That focuses the app, so the keyboard stays
+    /// with it; a note written during a pause stays as it is.
+    func showWindow(_ side: Speaker) {
         guard consoleAccess.canShowWindow else { return }
         isShowingWindow = true
         setup.bringForward(side) { [weak self] in
-            guard let self else { return }
-            isShowingWindow = false
-            guard returningKeyboard else { return }
-            focusPanelHandler?()
-            if consoleAccess.pauseGranted { steeringEditor.restoreFocus() }
+            self?.isShowingWindow = false
         }
     }
 
@@ -165,8 +160,8 @@ final class RelayController {
     }
     /// Set by the AppKit shell. A finished run routes here so the console
     /// takes the keyboard back from the chat app that replied last, and so
-    /// do an arrangement of the windows, which brings both chat apps
-    /// forward on the way, and Show window, once the window is up.
+    /// does an arrangement of the windows, which brings both chat apps
+    /// forward on the way.
     @ObservationIgnored var focusPanelHandler: (() -> Void)?
 
     init(engine: RelayEngine, transferOverlay: TransferOverlay? = nil) {

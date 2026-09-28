@@ -91,7 +91,7 @@ struct PerchParticipant: View {
         tipShown = false
         tipSpent = true
         switch click {
-        case .focus: controller.showWindow(speaker, returningKeyboard: false)
+        case .focus: controller.showWindow(speaker)
         case .open: controller.setup.launch(speaker)
         case .unavailable: break
         }
