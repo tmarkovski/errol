@@ -2,11 +2,12 @@
 // installed apps: the face on every PerchAvatar and the mark beside each
 // transcript line. Its own file because it is a shared cache, not a view.
 //
-// Artwork stays in the installed app's bundle. ChatGPT's optional Codex
-// artwork follows its Dock preference; other apps use their macOS icon.
+// Artwork stays in the installed app's bundle. ChatGPT's optional Codex or
+// Space artwork follows its Dock preference; other apps use their macOS icon.
 
 import AppKit
 import Combine
+import ImageIO
 import Observation
 
 /// Icons of the apps the relay targets, looked up by bundle ID through
@@ -202,29 +203,14 @@ final class AppIcons {
                                                      bundleID as CFString) as? String
         // Match the Dock's system appearance, independently of Errol's theme.
         let dark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
-        guard let filename = codexIconResource(preference: preference, resourceName: resourceName,
-                                              dark: dark),
-              let resources = Bundle(url: appURL)?.resourceURL else { return nil }
-        return NSImage(contentsOf: resources.appendingPathComponent(filename))
-    }
-
-    /// Keep this mapping separate from preference I/O so fallback and light/
-    /// dark selection can be checked without changing another app's settings.
-    static func codexIconResource(preference: String?, resourceName: String?, dark: Bool) -> String? {
-        let useDark: Bool
-        switch preference {
-        case "codex-system": useDark = dark
-        case "codex-light": useDark = false
-        case "codex-dark": useDark = true
-        default: return nil
-        }
-        let light = resourceName ?? "icon-codex-light.png"
-        // Only accept a file in this bundle's Resources folder. Keep optional
-        // build-flavor suffixes while following the vendor's paired filenames.
-        guard light.hasPrefix("icon-codex-light"), light.hasSuffix(".png"),
-              !light.contains("/"), !light.contains("\\"), !light.contains("..") else { return nil }
-        return useDark
-            ? "icon-codex-dark-color" + light.dropFirst("icon-codex-light".count)
-            : light
+        guard let filename = ChatGPTDockIcon.resource(preference: preference, resourceName: resourceName,
+                                                      dark: dark),
+              let resources = Bundle(url: appURL)?.resourceURL,
+              let source = CGImageSourceCreateWithURL(resources.appendingPathComponent(filename) as CFURL, nil),
+              let artwork = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let tile = artwork.cropping(to: ChatGPTDockIcon.dockCrop(width: artwork.width,
+                                                                       height: artwork.height))
+        else { return nil }
+        return NSImage(cgImage: tile, size: .zero)
     }
 }
