@@ -117,4 +117,34 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         XCTAssertTrue(d.copyLabels.isEmpty)
         XCTAssertEqual(d.status.surface, "Code")
     }
+
+    func testOnlyTheComposersStopCounts() throws {
+        // A Code session is full of buttons named by text someone wrote, and
+        // any of it can mention stopping: the session's own header ("…,
+        // rename session"), a tool step's summary, the human's message on its
+        // actions toggle, and the session's sidebar row. Live Oct 15 2026,
+        // each read an idle session as replying. The real Stop, an icon named
+        // "Stop", shared an ancestor with the composer's text area 4 levels
+        // up; the transcript and header shared one 8 or more up. The fixture
+        // keeps those distances; the first window runs, the second is idle
+        // under the same traps (StopEvidence).
+        let d = detectClaude("claude-code-stop-traps")
+        XCTAssertEqual(d.windows.count, 2)
+        XCTAssertEqual(d.chosenIndex, 0)
+        XCTAssertTrue(d.streaming)
+        for (index, window) in d.windows.enumerated() {
+            let running = index == 0
+            XCTAssertEqual(stopControls(under: window, selectors: selectors).map(\.label),
+                           running ? ["Stop"] : [], "window \(index)")
+            XCTAssertEqual(d.scans[index].isReplying, running, "window \(index)")
+            XCTAssertEqual(conversationSighting(under: window, selectors: selectors).streaming, running,
+                           "window \(index)")
+        }
+        let idle = d.windows[1]
+        var traps: [FixtureElement] = []
+        findAll(in: idle, where: {
+            $0.role == kAXButtonRole as String && isStopButtonLabel($0.label, selectors: selectors)
+        }, into: &traps)
+        XCTAssertEqual(traps.count, 5, "every trap still meets the label rule; where it sits rules it out")
+    }
 }

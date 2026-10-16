@@ -63,7 +63,9 @@ final class WindowCandidateTests: XCTestCase {
                                            ("chatgpt-chat-conversation", chatgpt, "ChatGPT"),
                                            ("claude-code-collapsed", claude, "Claude"),
                                            ("chatgpt-chat-streaming", chatgpt, "ChatGPT"),
-                                           ("claude-code-streaming", claude, "Claude")] {
+                                           ("claude-code-streaming", claude, "Claude"),
+                                           ("chatgpt-sidebar-stop-trap", chatgpt, "ChatGPT"),
+                                           ("claude-sidebar-stop-trap", claude, "Claude")] {
             let detection = detect(fixture: fixture, selectors: selectors, appName: name)
             let chosen = try XCTUnwrap(detection.chosenIndex)
             XCTAssertEqual(detection.scans[chosen].isReplying, detection.streaming, fixture)

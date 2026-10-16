@@ -1,7 +1,7 @@
 // Claude Desktop fixture scenarios for the claude.ai surfaces: Chat and
-// Cowork (home and open conversation), a project chat, and the sidebar
-// hazard. Trees are synthesized from the live-verified shapes in the field
-// notes of docs/how-it-works.md (Aug 2026); recapture with
+// Cowork (home and open conversation), a project chat, and a sidebar title
+// that mentions stopping. Trees are synthesized from the live-verified
+// shapes in the field notes of docs/how-it-works.md (Aug 2026); recapture with
 // `tools/ax-dump.swift claude --capture` when an update moves them. The
 // Claude Code surface has its own scenario file.
 
@@ -88,17 +88,25 @@ final class ClaudeScenarioTests: XCTestCase {
         XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
     }
 
-    // MARK: Known hazard, pinned
+    // MARK: Sidebar titles
 
-    func testSidebarTitleContainingStopReadsAsStreaming() {
-        // HAZARD (documented in docs/how-it-works.md's open threads): hasStopButton
-        // matches any button label containing "stop" anywhere in the window,
-        // so a sidebar conversation titled "Stop ..." makes an idle chat look
-        // mid-stream — waitForResponse would sit at "streaming" until the
-        // timeout. If this assertion starts failing (false), stop detection
-        // learned to scope past the sidebar — update docs/how-it-works.md too.
+    func testSidebarTitleContainingStopIsNotAReply() throws {
+        // A conversation titled "Stop ..." meets the stop rule by its label,
+        // and it once made an idle chat read as replying: the console said
+        // so, the start was refused, and the response wait would have sat at
+        // "streaming" until the timeout (live Oct 15 2026). Its row sits in
+        // the sidebar, a complementary landmark far from the composer's area,
+        // where the real Stop sits (StopEvidence).
         let d = detectClaude("claude-sidebar-stop-trap")
-        XCTAssertTrue(d.streaming)
+        XCTAssertFalse(d.streaming)
+        let chosen = try XCTUnwrap(d.chosenIndex)
+        XCTAssertFalse(d.scans[chosen].isReplying)
+        XCTAssertEqual(d.status.state, .ready)
         XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
+        let row = try XCTUnwrap(firstMatch(in: d.windows[chosen]) {
+            $0.role == kAXButtonRole as String && $0.title == "Stop procrastinating plan"
+        })
+        XCTAssertTrue(isStopButtonLabel(row.label, selectors: selectors),
+                      "the label alone still meets the rule; where the row sits is what rules it out")
     }
 }

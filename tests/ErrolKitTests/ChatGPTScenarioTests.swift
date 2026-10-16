@@ -193,4 +193,26 @@ final class ChatGPTScenarioTests: XCTestCase {
                       "the label alone still meets the rule; the row's shape is what rules it out")
         XCTAssertFalse(isCopyButton(row, selectors: selectors))
     }
+
+    func testSidebarTitleContainingStopIsNotAReply() throws {
+        // A conversation titled "Stop ..." read an idle ChatGPT as replying
+        // (live Oct 15 2026, in Claude's sidebar too at the same time). The
+        // row sits in the sidebar, a complementary landmark, named and drawn
+        // by its title; the fixture keeps the live path to it. The first
+        // window is idle, the second streams under the same row, so the rule
+        // must rule the row out and still see the composer's Stop.
+        let d = detectChatGPT("chatgpt-sidebar-stop-trap")
+        XCTAssertEqual(d.windows.count, 2)
+        XCTAssertEqual(d.chosenIndex, 0)
+        XCTAssertFalse(d.streaming)
+        XCTAssertEqual(d.status.state, .ready)
+        XCTAssertEqual(d.affordanceLabels, ["Copy newest"])
+        for (index, window) in d.windows.enumerated() {
+            let replying = index == 1
+            XCTAssertEqual(hasStopButton(under: window, selectors: selectors), replying, "window \(index)")
+            XCTAssertEqual(d.scans[index].isReplying, replying, "window \(index)")
+            XCTAssertEqual(conversationSighting(under: window, selectors: selectors).streaming, replying,
+                           "window \(index)")
+        }
+    }
 }

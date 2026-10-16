@@ -1,0 +1,136 @@
+[
+  {
+    "role": "AXWindow",
+    "title": "ChatGPT",
+    "children": [
+      {
+        "role": "AXWebArea",
+        "children": [
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkComplementary",
+            "children": [
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkNavigation",
+                "description": "Home",
+                "children": [
+                  {
+                    "role": "AXList",
+                    "subrole": "AXContentList",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "children": [
+                          {
+                            "role": "AXGroup",
+                            "subrole": "AXApplicationGroup",
+                            "children": [
+                              {
+                                "role": "AXButton",
+                                "description": "Stop the build caching HTML",
+                                "title": "Stop the build caching HTML",
+                                "children": [
+                                  { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Unread" } ] },
+                                  { "role": "AXGroup", "subrole": "AXApplicationGroup", "children": [ { "role": "AXStaticText", "value": "Stop the build caching HTML" } ] },
+                                  {
+                                    "role": "AXGroup",
+                                    "children": [
+                                      { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Pin chat", "title": "Pin chat" } ] },
+                                      { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Archive chat", "title": "Archive chat" } ] }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkMain",
+            "children": [
+              {
+                "role": "AXGroup",
+                "description": "Conversation",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "description": "Assistant message",
+                    "children": [ { "role": "AXButton", "description": "Copy", "help": "newest" } ]
+                  }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Composer",
+                "children": [
+                  { "role": "AXTextArea", "description": "Do anything", "value": "Do anything\n" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "role": "AXWindow",
+    "title": "ChatGPT",
+    "children": [
+      {
+        "role": "AXWebArea",
+        "children": [
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkComplementary",
+            "children": [
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkNavigation",
+                "description": "Home",
+                "children": [
+                  {
+                    "role": "AXButton",
+                    "description": "Stop the build caching HTML",
+                    "title": "Stop the build caching HTML",
+                    "children": [
+                      { "role": "AXGroup", "subrole": "AXApplicationGroup", "children": [ { "role": "AXStaticText", "value": "Stop the build caching HTML" } ] }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkMain",
+            "children": [
+              {
+                "role": "AXGroup",
+                "description": "Conversation",
+                "children": [
+                  { "role": "AXGroup", "description": "User message" }
+                ]
+              },
+              {
+                "role": "AXGroup",
+                "description": "Composer",
+                "children": [
+                  { "role": "AXTextArea", "description": "Do anything", "value": "Do anything\n" },
+                  { "role": "AXButton", "description": "Stop streaming" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

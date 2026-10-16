@@ -56,7 +56,8 @@ struct WindowScan {
     /// when the window has no such text area.
     var composerValue: String?
     var composerLabel = ""
-    /// A stop control is mounted: the app is producing a reply.
+    /// A stop control is mounted in the composer's area (StopEvidence): the
+    /// app is producing a reply.
     var isReplying = false
     /// Pasted-text attachment chips anywhere in the window. Coarse — the
     /// composer-scoped count needs the live parent walk — so a chip left in
@@ -85,7 +86,11 @@ func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> W
     var scan = WindowScan()
     scan.title = window.title ?? ""
     var path: [Node] = []
-    visit(window, depth: 0, path: &path, into: &scan, selectors: selectors)
+    var position: [Int] = []
+    var stop = StopEvidence()
+    visit(window, depth: 0, path: &path, position: &position, stop: &stop,
+          into: &scan, selectors: selectors)
+    scan.isReplying = stop.isReplying
     // Only a window without a composer is walked again, and a covered one
     // is a small tree: the dialog hides everything behind it.
     if !scan.hasComposer, let dialog = openDialog(under: window) {
@@ -95,8 +100,11 @@ func scanWindow<Node: ElementNode>(_ window: Node, selectors: AppSelectors) -> W
 }
 
 /// `path` holds the nodes above `element`, the window first; they are read
-/// only for a text area's side-panel check (isInSidePanel).
+/// only for a text area's or a stop match's side-panel check (isInSidePanel).
+/// `position` is the element's child indices from the window, for the stop
+/// rule's measure from the composer (StopEvidence).
 private func visit<Node: ElementNode>(_ element: Node, depth: Int, path: inout [Node],
+                                      position: inout [Int], stop: inout StopEvidence,
                                       into scan: inout WindowScan, selectors: AppSelectors) {
     guard depth <= axMaxTreeDepth else { return }
     let role = element.role ?? ""
@@ -110,8 +118,8 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, path: inout [
         if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
             scan.isExcluded = true
         }
-        if !scan.isReplying, isStopButtonLabel(label, selectors: selectors) {
-            scan.isReplying = true
+        if isStopButtonLabel(label, selectors: selectors) {
+            stop.noteMatch(at: position, ancestors: path)
         }
         if isPastedTextRemoveLabel(label, selectors: selectors) {
             scan.attachmentChips += 1
@@ -130,6 +138,7 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, path: inout [
                 }
                 scan.composerValue = element.stringValue
                 scan.composerLabel = label
+                stop.composer = position
             }
         } else if !scan.isExcluded, isExclusionMarker(role: role, label: label, selected: false, selectors: selectors) {
             scan.isExcluded = true
@@ -201,8 +210,11 @@ private func visit<Node: ElementNode>(_ element: Node, depth: Int, path: inout [
     }
 
     path.append(element)
-    for child in element.children {
-        visit(child, depth: depth + 1, path: &path, into: &scan, selectors: selectors)
+    for (index, child) in element.children.enumerated() {
+        position.append(index)
+        visit(child, depth: depth + 1, path: &path, position: &position, stop: &stop,
+              into: &scan, selectors: selectors)
+        position.removeLast()
     }
     path.removeLast()
 }

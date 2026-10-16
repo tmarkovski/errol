@@ -44,6 +44,8 @@ func inspectReport(_ target: TargetApp) -> String {
         var counts: [String: Int] = [:]
         var order: [String] = []
         var copyKeys = Set<String>()
+        let stopKeys = Set(stopControls(under: LiveElement(ax: window), selectors: target.selectors)
+            .map { $0.label.trimmingCharacters(in: .whitespacesAndNewlines) })
         for button in buttons {
             let label = axLabel(button).trimmingCharacters(in: .whitespacesAndNewlines)
             let key = label.isEmpty ? "<unlabeled>" : label
@@ -62,6 +64,10 @@ func inspectReport(_ target: TargetApp) -> String {
                 marker = "  (label matches copy, but the app does not name it so: a row, not a command)"
             } else if isMessageActionsToggleLabel(key, selectors: target.selectors) {
                 marker = "  <- message-actions toggle"
+            } else if stopKeys.contains(key) {
+                marker = "  <- matches stop: a reply is underway"
+            } else if isStopButtonLabel(key, selectors: target.selectors) {
+                marker = "  (label matches stop, but it sits away from the composer: a row, not the Stop)"
             }
             lines.append("     \(counts[key]!)x \(key)\(marker)")
         }

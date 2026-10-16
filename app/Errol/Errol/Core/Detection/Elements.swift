@@ -101,9 +101,62 @@ func isMessageActionsToggleLabel(_ label: String, selectors: AppSelectors) -> Bo
     return label.localizedCaseInsensitiveContains(actions)
 }
 
-/// The control that stops a reply in progress.
+/// The control that stops a reply in progress. The label only nominates a
+/// button; where it sits decides (StopEvidence).
 func isStopButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
     label.localizedCaseInsensitiveContains(selectors.stopKeyword)
+}
+
+/// How far above the composer's text area a stop control may share an
+/// ancestor with it: the composer's own area, its box and the toolbar under
+/// it. Live Oct 15 2026, Claude Code's Stop shared one 4 levels up (3 on
+/// Sep 12) and its model toolbar 6, while every transcript row shared one 8
+/// up, the session header 9 and the sidebar 22; ChatGPT's composer controls
+/// shared one 1 up and its sidebar 18. A wrapper added around the composer
+/// lifts the Stop and the transcript alike, so the gap holds.
+let composerAreaLevels = 6
+
+/// What one walk saw of the stop rule: every button whose label met it, by
+/// its position in the window (child indices from the root), and the
+/// composer's position, the last text area outside a side panel, the way
+/// composerElement picks it. The verdict waits for the end of the walk,
+/// because the composer can come after a match in tree order.
+///
+/// A label is text a person or a model can write. Both apps name their rows
+/// by it: a conversation in a sidebar, the session in its own header ("Stop
+/// missing … files, rename session"), a tool step in a Claude Code
+/// transcript, and the human's message on its actions toggle. On Oct 15
+/// 2026 one conversation titled "Stop missing /assets/* files …", in both
+/// apps' sidebars at once, read both sides as replying while they sat idle.
+/// The real Stop sits in the composer's area, so a match counts only there.
+/// With no composer to measure from, a match counts anywhere outside a side
+/// panel: dismissing the real Stop copies a reply before it is finished,
+/// which costs more than a wait.
+struct StopEvidence {
+    private var matches: [(position: [Int], inSidePanel: Bool)] = []
+    /// Set for each text area outside a side panel, so the last one wins.
+    var composer: [Int]?
+
+    /// A button whose label met the stop rule (isStopButtonLabel), with the
+    /// nodes above it; they are read only here, for the few matches.
+    mutating func noteMatch<Ancestors: Sequence>(at position: [Int], ancestors: Ancestors)
+        where Ancestors.Element: ElementNode {
+        matches.append((position, isInSidePanel(ancestors)))
+    }
+
+    /// The matches the rule takes for a stop control, by their order in the
+    /// walk.
+    var accepted: [Int] {
+        matches.indices.filter { index in
+            let match = matches[index]
+            if match.inSidePanel { return false }
+            guard let composer else { return true }
+            let shared = zip(match.position, composer).prefix { $0 == $1 }.count
+            return composer.count - shared <= composerAreaLevels
+        }
+    }
+
+    var isReplying: Bool { !accepted.isEmpty }
 }
 
 /// The remove button on a long paste's attachment chip; never on an app
@@ -253,11 +306,44 @@ func lastMessageOrdinal<Node: ElementNode>(under root: Node) -> Int? {
     return newest
 }
 
+/// The buttons in the window that stop a reply (StopEvidence), in tree
+/// order. The Inspect dump marks them; the finders only ask whether there
+/// is one.
+func stopControls<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
+    var evidence = StopEvidence()
+    var matches: [Node] = []
+    var path: [Node] = []
+    var position: [Int] = []
+    collectStopEvidence(root, depth: 0, path: &path, position: &position,
+                        into: &evidence, matches: &matches, selectors: selectors)
+    return evidence.accepted.map { matches[$0] }
+}
+
+private func collectStopEvidence<Node: ElementNode>(_ element: Node, depth: Int, path: inout [Node],
+                                                    position: inout [Int], into evidence: inout StopEvidence,
+                                                    matches: inout [Node], selectors: AppSelectors) {
+    guard depth <= axMaxTreeDepth else { return }
+    let role = element.role
+    if role == kAXButtonRole as String, isStopButtonLabel(element.label, selectors: selectors) {
+        evidence.noteMatch(at: position, ancestors: path)
+        matches.append(element)
+    } else if role == kAXTextAreaRole as String, !isInSidePanel(path) {
+        evidence.composer = position
+    }
+    path.append(element)
+    for (index, child) in element.children.enumerated() {
+        position.append(index)
+        collectStopEvidence(child, depth: depth + 1, path: &path, position: &position,
+                            into: &evidence, matches: &matches, selectors: selectors)
+        position.removeLast()
+    }
+    path.removeLast()
+}
+
+/// Whether a reply is underway: a stop control in the composer's area
+/// (StopEvidence).
 func hasStopButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Bool {
-    firstMatch(in: root, where: { el in
-        guard el.role == kAXButtonRole as String else { return false }
-        return isStopButtonLabel(el.label, selectors: selectors)
-    }) != nil
+    !stopControls(under: root, selectors: selectors).isEmpty
 }
 
 /// What the relay reads of a conversation while it waits on a reply and
@@ -281,17 +367,26 @@ struct ConversationSighting: Equatable {
 /// stands in for, fixture by fixture. Role is read once per node, a
 /// button's label once for all three button rules (and a copy match's
 /// description and children once more, isAppCommand), and a group's title
-/// (then label) only as messageOrdinal reads them. Dialogs stay out of the
-/// walk: the cover check looks for one only when this found no composer
-/// (coveringDialog(under:sighting:)), as scanWindow does.
+/// (then label) only as messageOrdinal reads them. The nodes above each
+/// one, and its position, are held at no cost in reads for the stop rule,
+/// which reads a match's and a text area's ancestors (StopEvidence).
+/// Dialogs stay out of the walk: the cover check looks for one only when
+/// this found no composer (coveringDialog(under:sighting:)), as scanWindow
+/// does.
 func conversationSighting<Node: ElementNode>(under root: Node,
                                              selectors: AppSelectors) -> ConversationSighting {
     var sighting = ConversationSighting()
-    sight(root, depth: 0, into: &sighting, selectors: selectors)
+    var stop = StopEvidence()
+    var path: [Node] = []
+    var position: [Int] = []
+    sight(root, depth: 0, path: &path, position: &position, stop: &stop,
+          into: &sighting, selectors: selectors)
+    sighting.streaming = stop.isReplying
     return sighting
 }
 
-private func sight<Node: ElementNode>(_ element: Node, depth: Int,
+private func sight<Node: ElementNode>(_ element: Node, depth: Int, path: inout [Node],
+                                      position: inout [Int], stop: inout StopEvidence,
                                       into sighting: inout ConversationSighting,
                                       selectors: AppSelectors) {
     guard depth <= axMaxTreeDepth else { return }
@@ -302,8 +397,8 @@ private func sight<Node: ElementNode>(_ element: Node, depth: Int,
             || isMessageActionsToggleLabel(label, selectors: selectors) {
             sighting.affordances += 1
         }
-        if !sighting.streaming, isStopButtonLabel(label, selectors: selectors) {
-            sighting.streaming = true
+        if isStopButtonLabel(label, selectors: selectors) {
+            stop.noteMatch(at: position, ancestors: path)
         }
     } else if role == kAXGroupRole as String {
         if let ordinal = messageOrdinal(ofGroup: element) {
@@ -311,10 +406,16 @@ private func sight<Node: ElementNode>(_ element: Node, depth: Int,
         }
     } else if role == kAXTextAreaRole as String {
         sighting.hasComposer = true
+        if !isInSidePanel(path) { stop.composer = position }
     }
-    for child in element.children {
-        sight(child, depth: depth + 1, into: &sighting, selectors: selectors)
+    path.append(element)
+    for (index, child) in element.children.enumerated() {
+        position.append(index)
+        sight(child, depth: depth + 1, path: &path, position: &position, stop: &stop,
+              into: &sighting, selectors: selectors)
+        position.removeLast()
     }
+    path.removeLast()
 }
 
 func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {

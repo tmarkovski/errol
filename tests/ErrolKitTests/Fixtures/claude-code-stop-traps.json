@@ -1,0 +1,262 @@
+[
+  {
+    "role": "AXWindow",
+    "subrole": "AXStandardWindow",
+    "title": "Claude",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 0 },
+          { "role": "AXRadioButton", "description": "Code, running", "value": 1 }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "subrole": "AXLandmarkComplementary",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New session" },
+          {
+            "role": "AXButton",
+            "title": "Running Stop the flaky deploy",
+            "children": [
+              { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Stop the flaky deploy" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/epitaxy/local_5d6e7f80-9a1b-4c2d-8e3f-4a5b6c7d8e9f",
+        "children": [
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkMain",
+            "children": [
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkRegion",
+                "description": "Primary pane",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      { "role": "AXButton", "description": "Stop the flaky deploy, rename session" },
+                      { "role": "AXPopUpButton", "description": "More options for Stop the flaky deploy" }
+                    ]
+                  },
+                  {
+                    "role": "AXGroup",
+                    "subrole": "AXApplicationGroup",
+                    "description": "Chat messages",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "subrole": "AXDocumentArticle",
+                        "description": "Message 1",
+                        "children": [
+                          { "role": "AXStaticText", "value": "Stop the flaky deploy from timing out." },
+                          { "role": "AXButton", "description": "Show message actions for You said: Stop the flaky deploy from timing out." }
+                        ]
+                      },
+                      {
+                        "role": "AXGroup",
+                        "subrole": "AXDocumentArticle",
+                        "description": "Message 2",
+                        "children": [
+                          { "role": "AXButton", "title": "Measured how far Send and Stop sit from the composer" },
+                          { "role": "AXButton", "title": "Stopped the stale preview server" },
+                          { "role": "AXStaticText", "value": "Looking at the deploy logs next." }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "children": [
+                          {
+                            "role": "AXGroup",
+                            "children": [
+                              {
+                                "role": "AXGroup",
+                                "children": [
+                                  {
+                                    "role": "AXGroup",
+                                    "children": [
+                                      {
+                                        "role": "AXGroup",
+                                        "children": [
+                                          {
+                                            "role": "AXGroup",
+                                            "children": [ { "role": "AXTextArea", "description": "Prompt", "value": "\n" } ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  { "role": "AXGroup", "children": [ { "role": "AXPopUpButton", "description": "Add" } ] },
+                                  {
+                                    "role": "AXGroup",
+                                    "children": [
+                                      { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Stop" } ] },
+                                      { "role": "AXCheckBox", "subrole": "AXToggleButton", "description": "Press and hold to record", "value": 0 }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "role": "AXGroup",
+                            "children": [
+                              { "role": "AXPopUpButton", "description": "Auto" },
+                              { "role": "AXPopUpButton", "description": "Model: Opus 5.5 Extra" }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "role": "AXWindow",
+    "subrole": "AXStandardWindow",
+    "title": "Claude",
+    "children": [
+      {
+        "role": "AXRadioGroup",
+        "children": [
+          { "role": "AXRadioButton", "description": "Chat and Cowork", "value": 0 },
+          { "role": "AXRadioButton", "description": "Code, idle", "value": 1 }
+        ]
+      },
+      {
+        "role": "AXGroup",
+        "subrole": "AXLandmarkComplementary",
+        "description": "Sidebar",
+        "children": [
+          { "role": "AXButton", "description": "New session" },
+          {
+            "role": "AXButton",
+            "title": "Idle Stop the flaky deploy",
+            "children": [
+              { "role": "AXGroup", "children": [ { "role": "AXStaticText", "value": "Stop the flaky deploy" } ] }
+            ]
+          }
+        ]
+      },
+      {
+        "role": "AXWebArea",
+        "url": "https://claude.ai/epitaxy/local_5d6e7f80-9a1b-4c2d-8e3f-4a5b6c7d8e9f",
+        "children": [
+          {
+            "role": "AXGroup",
+            "subrole": "AXLandmarkMain",
+            "children": [
+              {
+                "role": "AXGroup",
+                "subrole": "AXLandmarkRegion",
+                "description": "Primary pane",
+                "children": [
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      { "role": "AXButton", "description": "Stop the flaky deploy, rename session" },
+                      { "role": "AXPopUpButton", "description": "More options for Stop the flaky deploy" }
+                    ]
+                  },
+                  {
+                    "role": "AXGroup",
+                    "subrole": "AXApplicationGroup",
+                    "description": "Chat messages",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "subrole": "AXDocumentArticle",
+                        "description": "Message 1",
+                        "children": [
+                          { "role": "AXStaticText", "value": "Stop the flaky deploy from timing out." },
+                          { "role": "AXButton", "description": "Show message actions for You said: Stop the flaky deploy from timing out." }
+                        ]
+                      },
+                      {
+                        "role": "AXGroup",
+                        "subrole": "AXDocumentArticle",
+                        "description": "Message 2",
+                        "children": [
+                          { "role": "AXButton", "title": "Measured how far Send and Stop sit from the composer" },
+                          { "role": "AXButton", "title": "Stopped the stale preview server" },
+                          { "role": "AXStaticText", "value": "The deploy no longer times out." },
+                          { "role": "AXButton", "description": "Show message actions" }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "AXGroup",
+                    "children": [
+                      {
+                        "role": "AXGroup",
+                        "children": [
+                          {
+                            "role": "AXGroup",
+                            "children": [
+                              {
+                                "role": "AXGroup",
+                                "children": [
+                                  {
+                                    "role": "AXGroup",
+                                    "children": [
+                                      {
+                                        "role": "AXGroup",
+                                        "children": [
+                                          {
+                                            "role": "AXGroup",
+                                            "children": [ { "role": "AXTextArea", "description": "Prompt", "value": "\n" } ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  { "role": "AXGroup", "children": [ { "role": "AXPopUpButton", "description": "Add" } ] },
+                                  {
+                                    "role": "AXGroup",
+                                    "children": [
+                                      { "role": "AXCheckBox", "subrole": "AXToggleButton", "description": "Press and hold to record", "value": 0 }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "role": "AXGroup",
+                            "children": [
+                              { "role": "AXPopUpButton", "description": "Auto" },
+                              { "role": "AXPopUpButton", "description": "Model: Opus 5.5 Extra" }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

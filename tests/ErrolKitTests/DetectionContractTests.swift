@@ -332,3 +332,36 @@ final class SurfaceNamePrecedenceTests: XCTestCase {
         XCTAssertEqual(surfaceName(scan, selectors: config.chatgptSelectors), "Work")
     }
 }
+
+final class StopRuleTests: XCTestCase {
+    let selectors = config.claudeSelectors
+
+    func testAStopCountsOnlyInTheComposersArea() {
+        // Measured from the composer's text area: the shared ancestor may sit
+        // up to composerAreaLevels above it, no further.
+        func window(stopAt levels: Int) -> FixtureElement {
+            var composer = FixtureElement(role: "AXTextArea", axDescription: "Prompt")
+            for _ in 0..<levels - 1 { composer = FixtureElement(role: "AXGroup", children: [composer]) }
+            return FixtureElement(role: "AXWindow", children: [
+                FixtureElement(role: "AXGroup", children: [composer, FixtureElement(role: "AXButton", axDescription: "Stop")]),
+            ])
+        }
+        XCTAssertTrue(hasStopButton(under: window(stopAt: composerAreaLevels), selectors: selectors))
+        XCTAssertFalse(hasStopButton(under: window(stopAt: composerAreaLevels + 1), selectors: selectors))
+    }
+
+    func testWithNoComposerAStopCountsOutsideASidePanel() {
+        // Nothing to measure from, so the rule falls back to the side panel
+        // alone: missing the real Stop would copy a reply before it is
+        // finished, which costs more than a wait.
+        let window = FixtureElement(role: "AXWindow", children: [
+            FixtureElement(role: "AXGroup", subrole: sidePanelSubrole, children: [
+                FixtureElement(role: "AXButton", title: "Stop procrastinating plan"),
+            ]),
+            FixtureElement(role: "AXGroup", children: [FixtureElement(role: "AXButton", axDescription: "Stop")]),
+        ])
+        XCTAssertEqual(stopControls(under: window, selectors: selectors).map(\.label), ["Stop"])
+        XCTAssertEqual(scanWindow(window, selectors: selectors).isReplying, true)
+        XCTAssertTrue(conversationSighting(under: window, selectors: selectors).streaming)
+    }
+}
