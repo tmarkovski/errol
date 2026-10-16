@@ -107,14 +107,24 @@ func isStopButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
     label.localizedCaseInsensitiveContains(selectors.stopKeyword)
 }
 
-/// How far above the composer's text area a stop control may share an
-/// ancestor with it: the composer's own area, its box and the toolbar under
+/// How far above the composer's text area a control may share an ancestor
+/// with it and still be the composer's own: its box and the toolbar under
 /// it. Live Oct 15 2026, Claude Code's Stop shared one 4 levels up (3 on
 /// Sep 12) and its model toolbar 6, while every transcript row shared one 8
 /// up, the session header 9 and the sidebar 22; ChatGPT's composer controls
 /// shared one 1 up and its sidebar 18. A wrapper added around the composer
-/// lifts the Stop and the transcript alike, so the gap holds.
+/// lifts its controls and the transcript alike, so the gap holds.
 let composerAreaLevels = 6
+
+/// Whether a control at `position` is the composer's own: it shares an
+/// ancestor with the composer's text area, at `composer`, at most
+/// composerAreaLevels above it. Both are child indices from the window.
+/// The Stop and Send rules measure their matches this way, because a label
+/// is text a person or a model can write, and both apps name rows by it.
+func isInComposerArea(_ position: [Int], composer: [Int]) -> Bool {
+    let shared = zip(position, composer).prefix { $0 == $1 }.count
+    return composer.count - shared <= composerAreaLevels
+}
 
 /// What one walk saw of the stop rule: every button whose label met it, by
 /// its position in the window (child indices from the root), and the
@@ -151,8 +161,7 @@ struct StopEvidence {
             let match = matches[index]
             if match.inSidePanel { return false }
             guard let composer else { return true }
-            let shared = zip(match.position, composer).prefix { $0 == $1 }.count
-            return composer.count - shared <= composerAreaLevels
+            return isInComposerArea(match.position, composer: composer)
         }
     }
 
@@ -312,32 +321,44 @@ func lastMessageOrdinal<Node: ElementNode>(under root: Node) -> Int? {
 func stopControls<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> [Node] {
     var evidence = StopEvidence()
     var matches: [Node] = []
-    var path: [Node] = []
-    var position: [Int] = []
-    collectStopEvidence(root, depth: 0, path: &path, position: &position,
-                        into: &evidence, matches: &matches, selectors: selectors)
+    let composer = walkFromComposer(root, labels: { isStopButtonLabel($0, selectors: selectors) }) {
+        node, position, ancestors in
+        evidence.noteMatch(at: position, ancestors: ancestors)
+        matches.append(node)
+    }
+    evidence.composer = composer
     return evidence.accepted.map { matches[$0] }
 }
 
-private func collectStopEvidence<Node: ElementNode>(_ element: Node, depth: Int, path: inout [Node],
-                                                    position: inout [Int], into evidence: inout StopEvidence,
-                                                    matches: inout [Node], selectors: AppSelectors) {
-    guard depth <= axMaxTreeDepth else { return }
-    let role = element.role
-    if role == kAXButtonRole as String, isStopButtonLabel(element.label, selectors: selectors) {
-        evidence.noteMatch(at: position, ancestors: path)
-        matches.append(element)
-    } else if role == kAXTextAreaRole as String, !isInSidePanel(path) {
-        evidence.composer = position
+/// One walk for a button rule measured from the composer (isInComposerArea):
+/// `match` is handed each button whose label `labels` accepts, in tree
+/// order, with its position and the nodes above it, and the walk returns the
+/// composer's position, the last text area outside a side panel, the way
+/// composerElement picks it; nil when the window has none. A match can come
+/// before the composer in tree order, so the caller weighs them after.
+private func walkFromComposer<Node: ElementNode>(_ root: Node, labels: (String) -> Bool,
+                                                 match: (Node, [Int], [Node]) -> Void) -> [Int]? {
+    var composer: [Int]?
+    var path: [Node] = []
+    var position: [Int] = []
+    func visit(_ element: Node, depth: Int) {
+        guard depth <= axMaxTreeDepth else { return }
+        let role = element.role
+        if role == kAXButtonRole as String, labels(element.label) {
+            match(element, position, path)
+        } else if role == kAXTextAreaRole as String, !isInSidePanel(path) {
+            composer = position
+        }
+        path.append(element)
+        for (index, child) in element.children.enumerated() {
+            position.append(index)
+            visit(child, depth: depth + 1)
+            position.removeLast()
+        }
+        path.removeLast()
     }
-    path.append(element)
-    for (index, child) in element.children.enumerated() {
-        position.append(index)
-        collectStopEvidence(child, depth: depth + 1, path: &path, position: &position,
-                            into: &evidence, matches: &matches, selectors: selectors)
-        position.removeLast()
-    }
-    path.removeLast()
+    visit(root, depth: 0)
+    return composer
 }
 
 /// Whether a reply is underway: a stop control in the composer's area
@@ -425,11 +446,22 @@ func isSendButtonLabel(_ label: String, selectors: AppSelectors) -> Bool {
     return true
 }
 
+/// The composer's Send: the first button whose label meets the send rule
+/// and that is the composer's own (isInComposerArea). The relay presses it
+/// to submit and watches it to confirm. A Claude Code transcript holds
+/// buttons whose labels can mention sending and that come before the
+/// composer in tree order, so one of them was the one pressed: a tool
+/// step's summary ("Look for recorded composer-row structure around
+/// Send/Stop"), or a code block's "Run in terminal and send output to
+/// Claude", which runs the block (both live Oct 15 2026). With no composer
+/// there is nothing to send, and no Send.
 func sendButton<Node: ElementNode>(under root: Node, selectors: AppSelectors) -> Node? {
-    firstMatch(in: root, where: { el in
-        guard el.role == kAXButtonRole as String else { return false }
-        return isSendButtonLabel(el.label, selectors: selectors)
-    })
+    var matches: [(node: Node, position: [Int])] = []
+    let composer = walkFromComposer(root, labels: { isSendButtonLabel($0, selectors: selectors) }) {
+        node, position, _ in matches.append((node, position))
+    }
+    guard let composer else { return nil }
+    return matches.first { isInComposerArea($0.position, composer: composer) }?.node
 }
 
 /// Count the long-paste attachment chips under one composer container. The

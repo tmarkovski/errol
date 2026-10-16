@@ -127,8 +127,8 @@ final class ClaudeCodeScenarioTests: XCTestCase {
         // "Stop", shared an ancestor with the composer's text area 4 levels
         // up; the transcript and header shared one 8 or more up. The fixture
         // keeps those distances; the first window runs, the second is idle
-        // under the same traps (StopEvidence).
-        let d = detectClaude("claude-code-stop-traps")
+        // under the same traps, with a draft and its Send (StopEvidence).
+        let d = detectClaude("claude-code-composer-traps")
         XCTAssertEqual(d.windows.count, 2)
         XCTAssertEqual(d.chosenIndex, 0)
         XCTAssertTrue(d.streaming)
@@ -146,5 +146,26 @@ final class ClaudeCodeScenarioTests: XCTestCase {
             $0.role == kAXButtonRole as String && isStopButtonLabel($0.label, selectors: selectors)
         }, into: &traps)
         XCTAssertEqual(traps.count, 5, "every trap still meets the label rule; where it sits rules it out")
+    }
+
+    func testOnlyTheComposersSendIsPressed() throws {
+        // A tool step's summary can mention sending too ("Look for recorded
+        // composer-row structure around Send/Stop"), and so does a code
+        // block's "Run in terminal and send output to Claude" (both live Oct
+        // 15 2026). Both came before the composer in tree order, so the relay
+        // pressed one to submit, which for the code block runs it. The
+        // running window has no Send at all, Stop holding its slot; the idle
+        // one has a draft and the Send in that slot (isInComposerArea).
+        let d = detectClaude("claude-code-composer-traps")
+        XCTAssertNil(d.sendLabel, "the running composer shows Stop, not Send")
+        XCTAssertNil(sendButton(under: d.windows[0], selectors: selectors))
+        XCTAssertEqual(sendButton(under: d.windows[1], selectors: selectors)?.label, "Send")
+        var rows: [FixtureElement] = []
+        findAll(in: d.windows[1], where: {
+            $0.role == kAXButtonRole as String && isSendButtonLabel($0.label, selectors: selectors)
+        }, into: &rows)
+        XCTAssertEqual(rows.map(\.label), ["Measured how far Send and Stop sit from the composer",
+                                           "Run in terminal and send output to Claude", "Send"],
+                       "the labels alone still meet the rule; where the rows sit is what rules them out")
     }
 }

@@ -333,7 +333,7 @@ final class SurfaceNamePrecedenceTests: XCTestCase {
     }
 }
 
-final class StopRuleTests: XCTestCase {
+final class ComposerAreaTests: XCTestCase {
     let selectors = config.claudeSelectors
 
     func testAStopCountsOnlyInTheComposersArea() {
@@ -348,6 +348,22 @@ final class StopRuleTests: XCTestCase {
         }
         XCTAssertTrue(hasStopButton(under: window(stopAt: composerAreaLevels), selectors: selectors))
         XCTAssertFalse(hasStopButton(under: window(stopAt: composerAreaLevels + 1), selectors: selectors))
+    }
+
+    func testASendCountsOnlyInTheComposersArea() {
+        // The Send is measured as the Stop is, and with no composer there is
+        // nothing to send, so no Send either.
+        func window(sendAt levels: Int) -> FixtureElement {
+            var composer = FixtureElement(role: "AXTextArea", axDescription: "Prompt")
+            for _ in 0..<levels - 1 { composer = FixtureElement(role: "AXGroup", children: [composer]) }
+            return FixtureElement(role: "AXWindow", children: [
+                FixtureElement(role: "AXGroup", children: [composer, FixtureElement(role: "AXButton", axDescription: "Send")]),
+            ])
+        }
+        XCTAssertEqual(sendButton(under: window(sendAt: composerAreaLevels), selectors: selectors)?.label, "Send")
+        XCTAssertNil(sendButton(under: window(sendAt: composerAreaLevels + 1), selectors: selectors))
+        let noComposer = FixtureElement(role: "AXWindow", children: [FixtureElement(role: "AXButton", axDescription: "Send")])
+        XCTAssertNil(sendButton(under: noComposer, selectors: selectors))
     }
 
     func testWithNoComposerAStopCountsOutsideASidePanel() {

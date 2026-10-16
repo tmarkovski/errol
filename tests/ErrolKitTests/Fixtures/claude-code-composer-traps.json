@@ -66,6 +66,7 @@
                         "description": "Message 2",
                         "children": [
                           { "role": "AXButton", "title": "Measured how far Send and Stop sit from the composer" },
+                          { "role": "AXButton", "description": "Run in terminal and send output to Claude" },
                           { "role": "AXButton", "title": "Stopped the stale preview server" },
                           { "role": "AXStaticText", "value": "Looking at the deploy logs next." }
                         ]
@@ -196,6 +197,7 @@
                         "description": "Message 2",
                         "children": [
                           { "role": "AXButton", "title": "Measured how far Send and Stop sit from the composer" },
+                          { "role": "AXButton", "description": "Run in terminal and send output to Claude" },
                           { "role": "AXButton", "title": "Stopped the stale preview server" },
                           { "role": "AXStaticText", "value": "The deploy no longer times out." },
                           { "role": "AXButton", "description": "Show message actions" }
@@ -223,7 +225,7 @@
                                         "children": [
                                           {
                                             "role": "AXGroup",
-                                            "children": [ { "role": "AXTextArea", "description": "Prompt", "value": "\n" } ]
+                                            "children": [ { "role": "AXTextArea", "description": "Prompt", "value": "Check the deploy logs too" } ]
                                           }
                                         ]
                                       }
@@ -233,6 +235,7 @@
                                   {
                                     "role": "AXGroup",
                                     "children": [
+                                      { "role": "AXGroup", "children": [ { "role": "AXButton", "description": "Send" } ] },
                                       { "role": "AXCheckBox", "subrole": "AXToggleButton", "description": "Press and hold to record", "value": 0 }
                                     ]
                                   }
