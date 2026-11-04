@@ -79,11 +79,11 @@ The original reviews and their assets are kept in `output/`.
 | Stage | What the box holds | Actions |
 | --- | --- | --- |
 | Composing | The prompt editor | **Start relay**. When it is unavailable, the reason stands beside it ("Choose ChatGPT's conversation to start"), and a refused start shows its reason there too. |
-| Running | Status panel: the speaker's own app icon, "ChatGPT is replying…" or "Sending ChatGPT's reply to Claude", then the turn, the clock, and the last note's receipt | Pause to steer and Stop, as round buttons |
+| Running | Status panel, in words alone (the icons at the ends show who is replying): "ChatGPT is replying…" or "Sending ChatGPT's reply to Claude", then the turn, the clock, and the last note's receipt | Pause to steer and Stop, as round buttons |
 | Pause pending | Status panel: "Pausing after the current handoff…", then what is still finishing, the turn, and the clock | Pause disabled, Stop |
 | Paused (hold granted) | The note editor, with a cursor and an accent outline, and the key hint beside the actions | Resume (Send note & continue once the note has words) and Stop |
 | Note queued | Status panel: the running headline, then "Note queued · goes to Claude with the next handoff" with **Clear note**, then the note | Edit note and Stop |
-| Held | Status panel: a warning icon and the `RunBlock` headline in red ("Paused: Claude's window isn't showing"), then its recovery text | Pause and Stop |
+| Held | Status panel: the `RunBlock` headline in red ("Paused: Claude's window isn't showing"), then its recovery text, while the stuck side's badge turns to needs attention | Pause and Stop |
 | Finished | Status panel: the outcome's icon, the `RunReport` headline, and its detail | **New topic in these chats** |
 
 The finished icons follow the outcome. A completed run gets the check. A stopped run or a reached turn

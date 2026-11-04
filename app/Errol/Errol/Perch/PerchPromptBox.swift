@@ -129,7 +129,11 @@ struct PerchPromptBox: View {
 
     private var statusPanel: some View {
         HStack(alignment: .center, spacing: Perch.s(9)) {
-            statusIcon.frame(width: Perch.s(24), height: Perch.s(24))
+            // During a run the icons at the ends already say who is
+            // replying and who needs attention, so the panel is words alone.
+            if controller.stage == .finished {
+                outcomeIcon.frame(width: Perch.s(24), height: Perch.s(24))
+            }
             VStack(alignment: .leading, spacing: Perch.s(3)) {
                 Text(headline).font(Perch.text(13, .semibold))
                     .foregroundStyle(needsAttention ? Perch.red : Perch.ink)
@@ -188,23 +192,11 @@ struct PerchPromptBox: View {
             : controller.block != nil && !controller.stopRequested
     }
 
-    @ViewBuilder private var statusIcon: some View {
-        if controller.stage == .finished {
-            Image(systemName: controller.lastReport?.outcome.symbol ?? "stop.circle")
-                .font(Perch.text(20))
-                .foregroundStyle(needsAttention ? Perch.red
-                    : controller.lastReport?.outcome == .completed ? Perch.accentText : Perch.secondary)
-        } else if needsAttention {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Perch.red)
-        } else {
-            let speaker: Speaker = controller.chatgptConversation == .chatting || controller.chatgptConversation == .replied
-                ? .chatgpt : controller.claudeConversation == .notStarted ? controller.firstSpeaker : .claude
-            PerchAvatar(bundleID: config.bundleID(for: speaker),
-                        initial: String(controller.appName(speaker).prefix(1)),
-                        feather: Perch.feather(for: speaker))
-                .scaleEffect(0.48).frame(width: Perch.s(24), height: Perch.s(24))
-                .accessibilityHidden(true)
-        }
+    private var outcomeIcon: some View {
+        Image(systemName: controller.lastReport?.outcome.symbol ?? "stop.circle")
+            .font(Perch.text(20))
+            .foregroundStyle(needsAttention ? Perch.red
+                : controller.lastReport?.outcome == .completed ? Perch.accentText : Perch.secondary)
     }
 
     // MARK: Before a run

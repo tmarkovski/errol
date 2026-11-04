@@ -29,3 +29,6 @@ xcuserdata/
 .artifacts/
 
 site/scripts/promo-film/__pycache__/
+
+# Private marketing plans and drafts
+/docs/marketing/
